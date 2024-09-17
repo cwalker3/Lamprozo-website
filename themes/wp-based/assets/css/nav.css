@@ -1,0 +1,115 @@
+body > header > nav {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 40vw;
+	height: 100vh;
+	animation: 0.5s slideInFromLeft forwards;
+	background-color: black;
+	color: white;
+    z-index: 3;
+}
+
+body > header > nav.slide-out {
+	animation: 0.5s slideOutFromLeft forwards;
+}
+
+body > header > nav .website-menu {
+	max-height: 85vh;
+	overflow-y: auto;
+	padding: 2rem;
+}
+
+body > header > nav a {
+	color: white;
+}
+
+body > header > nav a:hover {
+	color: rgb(48, 50, 173);
+}
+
+.menu {
+	margin-top: 3.5rem;
+}
+
+body > header > nav,
+#close-nav-btn {
+    display: none;
+}
+
+body > header > nav a {
+	display: inline-block;
+	width: 100%;
+	font-size: 1.25rem;
+	color: white;
+    text-align: right;
+}
+
+body > header > nav .menu-item {
+	position: relative;
+}
+
+body > header > nav .expand-icon {
+	position: absolute;
+	left: 0;
+	top: 0;
+	pointer-events: none;
+}
+
+body > header > nav .sub-menu {
+	max-height: 0;
+	transition: max-height 0.4s ease-out;
+	overflow: hidden;
+	padding-left: 1rem;
+}
+
+body > header > nav .sub-menu a {
+	font-size: 1rem;
+}
+
+body > header > nav ul {
+	padding: 0;
+}
+
+body > header > nav ul > li {
+	margin-top: .5rem;
+}
+
+body > header > nav li {
+    list-style: none;
+}
+
+#hamburger, #close-nav-btn {
+	max-width: 35px;
+	height: auto;
+	z-index: 5;
+	position: absolute;
+	top: 25px;
+	left: 25px;
+	cursor: pointer;
+}
+
+#backdrop {
+	display: none;
+	width: 100vw;
+	height: 100vh;
+	background-color: rgba(0, 0, 0, 0.9);
+	position: absolute;
+	z-index: 2;
+	animation: 0.5s fadeIn forwards;
+}
+
+#backdrop.fade {
+	animation: 0.5s fadeOut forwards;
+}
+
+.stop-scrolling {
+	max-height: 100vh;
+	overflow-y: hidden;
+}
+
+@media (max-width: 800px) {
+	body > header > nav {
+		width: 70vw;
+	}
+}
