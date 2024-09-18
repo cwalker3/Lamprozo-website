@@ -1,7 +1,4 @@
 <?php
-// Include the functions in your functions.php file or define them here
-// ...
-
 // Get the post ID
 $postID = get_the_ID();
 
@@ -11,16 +8,19 @@ $pageTitle = get_the_title();
 // Get theme path
 $themePath = get_template_directory_uri();
 
+$pageFound = false;
+
 // Get the slug for the page
 $pageSlug = '';
 if (is_single()) {
     $pageSlug = 'blog-post';
 } elseif (is_page()) {
+    $pageFound = true;
     $pageSlug = get_post_field('post_name', $postID);
 }
 
 $view = determine_view();
-if ( $view !== null ) $pageTitle = slugToTitle($view);
+if ( $view !== null && !$pageFound) $pageTitle = slugToTitle($view);
 
 // Unique ID for cache busting or unique elements
 $unique = wp_unique_id('unique-');
