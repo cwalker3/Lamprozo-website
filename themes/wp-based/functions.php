@@ -1,7 +1,7 @@
 <?php
 // Register Navigation Menu
 function register_website_menu() {
-    register_nav_menu('website-menu', __('Main Website Menu', 'your-theme-textdomain'));
+    register_nav_menu('website-menu', __('Main Website Menu', 'wp-based'));
 }
 add_action('init', 'register_website_menu');
 
@@ -78,11 +78,11 @@ function handle_contact_form_submission(WP_REST_Request $request) {
     $message = sanitize_textarea_field($params['message'] ?? '');
 
     if (empty($name) || empty($email) || empty($message) || !is_email($email)) {
-        return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'your-theme-textdomain'), array('status' => 400));
+        return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'wp-based'), array('status' => 400));
     }
 
     $adminEmail = get_option('admin_email');
-    $subject    = __('Website Contact Form Submitted from: ', 'your-theme-textdomain') . $name;
+    $subject    = __('Website Contact Form Submitted from: ', 'wp-based') . $name;
     $fullMessage = $message . "\n\nFrom: " . $email;
     $headers    = array('Reply-To: ' . $email);
 
@@ -92,10 +92,10 @@ function handle_contact_form_submission(WP_REST_Request $request) {
     $sent = wp_mail(sanitize_email($adminEmail), sanitize_text_field($subject), wp_strip_all_tags($fullMessage), $headers);
 
     // if (!$sent) {
-    //     return new WP_Error('email_failed', __('Failed to send email.', 'your-theme-textdomain'), array('status' => 500));
+    //     return new WP_Error('email_failed', __('Failed to send email.', 'wp-based'), array('status' => 500));
     // }
 
-    return rest_ensure_response(array('message' => __('Message sent successfully.', 'your-theme-textdomain')));
+    return rest_ensure_response(array('message' => __('Message sent successfully.', 'wp-based')));
 }
 
 // Handle Signup Submission
@@ -109,12 +109,12 @@ function handle_signup_submission(WP_REST_Request $request) {
     $phone = sanitize_text_field($params['phone'] ?? '');
 
     if (empty($fname) || empty($lname) || empty($email) || !is_email($email)) {
-        return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'your-theme-textdomain'), array('status' => 400));
+        return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'wp-based'), array('status' => 400));
     }
 
     // Check if user already exists
     if (email_exists($email)) {
-        return new WP_Error('user_exists', __('An account with this email already exists.', 'your-theme-textdomain'), array('status' => 400));
+        return new WP_Error('user_exists', __('An account with this email already exists.', 'wp-based'), array('status' => 400));
     }
 
     // Generate a strong random password
@@ -142,28 +142,28 @@ function handle_signup_submission(WP_REST_Request $request) {
     }
 
     // Send welcome email to the user
-    $message = __("Welcome to our community!\n\n", 'your-theme-textdomain');
-    $message .= __("Name: ", 'your-theme-textdomain') . "$fname $lname\n";
-    $message .= __("Email: ", 'your-theme-textdomain') . "$email\n";
+    $message = __("Welcome to our community!\n\n", 'wp-based');
+    $message .= __("Name: ", 'wp-based') . "$fname $lname\n";
+    $message .= __("Email: ", 'wp-based') . "$email\n";
     if (!empty($phone)) {
-        $message .= __("Phone: ", 'your-theme-textdomain') . "$phone\n\n";
+        $message .= __("Phone: ", 'wp-based') . "$phone\n\n";
     }
-    $message .= __("Your account has been created successfully.", 'your-theme-textdomain');
+    $message .= __("Your account has been created successfully.", 'wp-based');
 
-    wp_mail($email, __('Welcome to Our Community', 'your-theme-textdomain'), wp_strip_all_tags($message));
+    wp_mail($email, __('Welcome to Our Community', 'wp-based'), wp_strip_all_tags($message));
 
     // Notify admin of new signup
     $adminEmail = get_option('admin_email');
-    $adminMessage = __("New website signup:\n\n", 'your-theme-textdomain');
-    $adminMessage .= __("Name: ", 'your-theme-textdomain') . "$fname $lname\n";
-    $adminMessage .= __("Email: ", 'your-theme-textdomain') . "$email\n";
+    $adminMessage = __("New website signup:\n\n", 'wp-based');
+    $adminMessage .= __("Name: ", 'wp-based') . "$fname $lname\n";
+    $adminMessage .= __("Email: ", 'wp-based') . "$email\n";
     if (!empty($phone)) {
-        $adminMessage .= __("Phone: ", 'your-theme-textdomain') . "$phone\n";
+        $adminMessage .= __("Phone: ", 'wp-based') . "$phone\n";
     }
 
-    wp_mail($adminEmail, __('New Website Signup', 'your-theme-textdomain'), wp_strip_all_tags($adminMessage));
+    wp_mail($adminEmail, __('New Website Signup', 'wp-based'), wp_strip_all_tags($adminMessage));
 
-    return rest_ensure_response(array('message' => __('Signup successful!', 'your-theme-textdomain')));
+    return rest_ensure_response(array('message' => __('Signup successful!', 'wp-based')));
 }
 
 // Handle Get More Blogs

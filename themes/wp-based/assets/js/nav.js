@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
         closeNavBtn.style.display = 'block';
         nav.classList.remove('slide-out');
         backdrop.classList.remove('fade');
-        body.classList.add('stop-scrolling');
     }
 
     function closeWebsiteMenu() {
@@ -51,7 +50,6 @@ document.addEventListener('DOMContentLoaded', function () {
         backdrop.style.pointerEvents = 'none';
         hamburger.style.display = 'block';
         closeNavBtn.style.display = 'none';
-        body.classList.remove('stop-scrolling');
     }
 
     function expandMenu(menuItemEle, expandIcon) {

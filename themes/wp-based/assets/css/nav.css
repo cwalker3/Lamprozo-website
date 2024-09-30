@@ -1,3 +1,19 @@
+body > header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 2;
+}
+
+#nav-bar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	height: 10vh;
+	width: 100vw;
+	background-color: rgba(0, 0, 0, 0.9);
+}
+
 body > header > nav {
 	position: absolute;
 	top: 0;
@@ -92,7 +108,7 @@ body > header > nav li {
 #backdrop {
 	display: none;
 	width: 100vw;
-	height: 100vh;
+	height: 100%;
 	background-color: rgba(0, 0, 0, 0.9);
 	position: absolute;
 	z-index: 2;
@@ -101,11 +117,6 @@ body > header > nav li {
 
 #backdrop.fade {
 	animation: 0.5s fadeOut forwards;
-}
-
-.stop-scrolling {
-	max-height: 100vh;
-	overflow-y: hidden;
 }
 
 @media (max-width: 800px) {

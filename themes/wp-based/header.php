@@ -11,6 +11,7 @@
     <div id="backdrop"></div>
 
     <header>
+        <div id="nav-bar"></div>
         <div>
             <img id="hamburger" src="<?php echo esc_url($args['theme-path'] . '/images/hamburger.webp'); ?>" alt="<?php esc_attr_e('Menu', 'your-theme-textdomain'); ?>">
         </div>
