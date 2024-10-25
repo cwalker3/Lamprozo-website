@@ -1,7 +1,7 @@
 <?php
 // Register Navigation Menu
 function register_website_menu() {
-    register_nav_menu('website-menu', __('Main Website Menu', 'wp-based'));
+    register_nav_menu('website-menu', __('Main Website Menu', 'firefly-collective'));
 }
 add_action('init', 'register_website_menu');
 
@@ -78,11 +78,11 @@ function handle_contact_form_submission(WP_REST_Request $request) {
     $message = sanitize_textarea_field($params['message'] ?? '');
 
     if (empty($name) || empty($email) || empty($message) || !is_email($email)) {
-        return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'wp-based'), array('status' => 400));
+        return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'firefly-collective'), array('status' => 400));
     }
 
     $adminEmail = get_option('admin_email');
-    $subject    = __('Website Contact Form Submitted from: ', 'wp-based') . $name;
+    $subject    = __('Website Contact Form Submitted from: ', 'firefly-collective') . $name;
     $fullMessage = $message . "\n\nFrom: " . $email;
     $headers    = array('Reply-To: ' . $email);
 
@@ -92,10 +92,10 @@ function handle_contact_form_submission(WP_REST_Request $request) {
     $sent = wp_mail(sanitize_email($adminEmail), sanitize_text_field($subject), wp_strip_all_tags($fullMessage), $headers);
 
     // if (!$sent) {
-    //     return new WP_Error('email_failed', __('Failed to send email.', 'wp-based'), array('status' => 500));
+    //     return new WP_Error('email_failed', __('Failed to send email.', 'firefly-collective'), array('status' => 500));
     // }
 
-    return rest_ensure_response(array('message' => __('Message sent successfully.', 'wp-based')));
+    return rest_ensure_response(array('message' => __('Message sent successfully.', 'firefly-collective')));
 }
 
 // Handle Signup Submission
@@ -109,12 +109,12 @@ function handle_signup_submission(WP_REST_Request $request) {
     $phone = sanitize_text_field($params['phone'] ?? '');
 
     if (empty($fname) || empty($lname) || empty($email) || !is_email($email)) {
-        return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'wp-based'), array('status' => 400));
+        return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'firefly-collective'), array('status' => 400));
     }
 
     // Check if user already exists
     if (email_exists($email)) {
-        return new WP_Error('user_exists', __('An account with this email already exists.', 'wp-based'), array('status' => 400));
+        return new WP_Error('user_exists', __('An account with this email already exists.', 'firefly-collective'), array('status' => 400));
     }
 
     // Generate a strong random password
@@ -142,28 +142,28 @@ function handle_signup_submission(WP_REST_Request $request) {
     }
 
     // Send welcome email to the user
-    $message = __("Welcome to our community!\n\n", 'wp-based');
-    $message .= __("Name: ", 'wp-based') . "$fname $lname\n";
-    $message .= __("Email: ", 'wp-based') . "$email\n";
+    $message = __("Welcome to our community!\n\n", 'firefly-collective');
+    $message .= __("Name: ", 'firefly-collective') . "$fname $lname\n";
+    $message .= __("Email: ", 'firefly-collective') . "$email\n";
     if (!empty($phone)) {
-        $message .= __("Phone: ", 'wp-based') . "$phone\n\n";
+        $message .= __("Phone: ", 'firefly-collective') . "$phone\n\n";
     }
-    $message .= __("Your account has been created successfully.", 'wp-based');
+    $message .= __("Your account has been created successfully.", 'firefly-collective');
 
-    wp_mail($email, __('Welcome to Our Community', 'wp-based'), wp_strip_all_tags($message));
+    wp_mail($email, __('Welcome to Our Community', 'firefly-collective'), wp_strip_all_tags($message));
 
     // Notify admin of new signup
     $adminEmail = get_option('admin_email');
-    $adminMessage = __("New website signup:\n\n", 'wp-based');
-    $adminMessage .= __("Name: ", 'wp-based') . "$fname $lname\n";
-    $adminMessage .= __("Email: ", 'wp-based') . "$email\n";
+    $adminMessage = __("New website signup:\n\n", 'firefly-collective');
+    $adminMessage .= __("Name: ", 'firefly-collective') . "$fname $lname\n";
+    $adminMessage .= __("Email: ", 'firefly-collective') . "$email\n";
     if (!empty($phone)) {
-        $adminMessage .= __("Phone: ", 'wp-based') . "$phone\n";
+        $adminMessage .= __("Phone: ", 'firefly-collective') . "$phone\n";
     }
 
-    wp_mail($adminEmail, __('New Website Signup', 'wp-based'), wp_strip_all_tags($adminMessage));
+    wp_mail($adminEmail, __('New Website Signup', 'firefly-collective'), wp_strip_all_tags($adminMessage));
 
-    return rest_ensure_response(array('message' => __('Signup successful!', 'wp-based')));
+    return rest_ensure_response(array('message' => __('Signup successful!', 'firefly-collective')));
 }
 
 // Handle Get More Blogs
@@ -287,6 +287,86 @@ function handle_custom_views() {
     }
 }
 add_action('template_redirect', 'handle_custom_views');
+
+function custom_theme_setup_pages() {
+    $pages = array(
+        'home' => array(
+            'title'   => 'Home',
+            'content' => 'This is the homepage.',
+        ),
+        'blog' => array(
+            'title'   => 'Blog',
+            'content' => 'This is the blog.',
+        ),
+        'contact' => array(
+            'title'   => 'Contact',
+            'content' => 'This is the contact page.',
+        ),
+        'signup' => array(
+            'title'   => 'Signup',
+            'content' => 'This is the signup page.',
+        ),
+    );
+
+    $page_ids = array();
+
+    foreach ($pages as $slug => $page_data) {
+        // Check if the page already exists
+        $page = get_page_by_path($slug);
+
+        if (!$page) {
+            // Page doesn't exist, so create it
+            $page_id = wp_insert_post(array(
+                'post_title'   => $page_data['title'],
+                'post_content' => $page_data['content'],
+                'post_status'  => 'publish',
+                'post_type'    => 'page',
+                'post_name'    => $slug,
+            ));
+            $page_ids[$slug] = $page_id;
+        } else {
+            // Page exists, store its ID
+            $page_ids[$slug] = $page->ID;
+        }
+    }
+
+    // Set 'Home' as the static front page
+    if (isset($page_ids['home'])) {
+        update_option('show_on_front', 'page');
+        update_option('page_on_front', $page_ids['home']);
+    }
+
+    // Set 'Blog' as the posts page
+    if (isset($page_ids['blog'])) {
+        update_option('page_for_posts', $page_ids['blog']);
+    }
+
+    // Create 'Main Website Menu' and assign it to the 'website-menu' location
+    $menu_name = 'Main Website Menu';
+    $menu_exists = wp_get_nav_menu_object($menu_name);
+
+    if (!$menu_exists) {
+        // Create the menu
+        $menu_id = wp_create_nav_menu($menu_name);
+
+        // Assign the menu to the 'website-menu' theme location
+        $locations = get_theme_mod('nav_menu_locations');
+        $locations['website-menu'] = $menu_id;
+        set_theme_mod('nav_menu_locations', $locations);
+
+        // Add pages to the menu
+        foreach ($page_ids as $slug => $page_id) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title'     => $pages[$slug]['title'],
+                'menu-item-object'    => 'page',
+                'menu-item-object-id' => $page_id,
+                'menu-item-type'      => 'post_type',
+                'menu-item-status'    => 'publish',
+            ));
+        }
+    }
+}
+add_action('after_switch_theme', 'custom_theme_setup_pages');
 
 function slugToTitle($slug) {
     // Replace hyphens with spaces
