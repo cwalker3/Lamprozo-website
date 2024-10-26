@@ -1,0 +1,297 @@
+:root {
+    --mainColor: #c0c0c0;
+    --darkGrey: #424242;
+    --lightGrey: hsl(240, 0%, 95%);
+    --darkGreen: #083b07;
+    --lightGreen: #1e8d1c;
+}
+
+h2 {
+    text-align: center;
+}
+
+#bookings-backdrop {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 200%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 2;
+}
+
+.auto-fold #wpcontent {
+    padding-left: 0;
+}
+
+.undo-remove,
+.remove-type {
+    position: absolute;
+    padding: 1rem;
+}
+
+.remove-type {
+    top: 50%;
+    left: 15%;
+    transform: translateY(-50%);
+}
+
+.undo-remove {
+    visibility: hidden;
+    top: 50%;
+    right: 15%;
+    transform: translateY(-50%);
+}
+
+.booking-type {
+    margin-top: 1rem;
+    position: relative;
+}
+
+#bookings-admin h2,
+#bookings-admin .booking-type,
+#booking-settings-save-changes-btn,
+#booking-type-add,
+#booking-types {
+    grid-column: 1/-1;
+}
+
+#booking-settings-save-changes-btn input {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+#bookings-settings-btn {
+    position: absolute;
+    top: 1vh;
+    right: 1vh;
+    cursor: pointer;
+    z-index: 1;
+}
+
+#bookings-settings-close-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    cursor: pointer;
+    padding: 10px;
+}
+
+#bookings-settings-close-btn > img {
+    max-width: 25px;
+    height: auto;
+}
+
+#booking-type-add {
+    padding-left: 25px;
+}
+
+.booking-type > span > img,
+#booking-type-add > span > img,
+#authorization-token > span > img {
+    max-width: 20px;
+    height: auto;
+    cursor: pointer;
+}
+
+#authorization-token {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#authorization-token > span > img {
+    max-width: 30px;
+}
+
+#authorization-token input {
+    max-width: 25vw;
+}
+
+#bookings-settings-window {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30vw;
+    height: 80vh;
+    z-index: 3;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    background-color: var(--lightGrey);
+    border: 1px solid var(--mainColor);
+}
+
+#bookings-settings-window::-webkit-scrollbar {
+    width: 12px;
+}
+
+#bookings-settings-window::-webkit-scrollbar-track {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+#bookings-settings-window::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+#bookings-settings-window {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.3);
+}
+
+#bookings-settings-content {
+    position: relative;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
+    padding: 1rem;
+}
+
+#bookings-settings-content > div {
+    align-self: center;
+}
+
+#bookings-settings-window > div {
+    align-self: center;
+    text-align: center;
+}
+
+#booking-settings-save-changes-btn {
+    margin: 0 auto;
+    margin-top: 3rem;
+}
+
+#booking-settings-save-changes-btn input[type=button] {
+    cursor: pointer;
+}
+
+.book-an-appointment-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: center;
+    gap: 1rem;
+    position: relative;
+}
+
+.book-an-appointment-form {
+    padding-bottom: 10vh;
+}
+
+.book-an-appointment-time-select {
+    width: 90%;
+}
+
+.book-an-appointment-form input[type=text],
+.book-an-appointment-form textarea {
+    width: 50%;
+    font-family: 'verdana';
+    font-size: 1rem;
+    margin: 0 auto;
+    padding: 0.5rem;
+}
+
+.book-an-appointment-form input[type=text],
+.book-an-appointment-form textarea {
+    width: 70%;
+}
+
+.book-an-appointment-form textarea {
+    min-height: 20vh;
+}
+
+#book-an-appointment-btn {
+    position: absolute;
+    bottom: 3%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40%;
+    text-align: center;
+}
+
+#book-an-appointment-btn button {
+    cursor: pointer;
+    font-family: 'verdana';
+}
+
+#book-an-appointment-btn {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+#save-calendar {
+    margin-block: 2rem;
+    text-align: center;
+}
+
+#save-calendar input[type=button] {
+    cursor: pointer;
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.appointment-request {
+    width: 100%;
+    display: grid;
+    place-content: stretch;
+    color: white;
+}
+
+.appointment-request > div {
+    width: 100%;
+}
+
+.apt-confirm-confirm,
+.apt-confirm-cancel,
+.apt-safety {
+    display: none;
+}
+
+.appointment-request > div.apt-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    place-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.appointment-request button {
+    cursor: pointer;
+}
+
+.loader,
+#bookings-settings-loader {
+    max-width: 30px;
+    height: auto;
+    visibility: hidden;
+}
+
+@media (max-width: 1400px) {
+    #bookings-settings-window {
+        width: 60vw;
+    }
+}
+
+@media (max-width: 800px) {
+    #bookings-settings-window {
+        width: 80vw;
+        height: 70vh;
+    }
+
+    #bookings-settings-btn {
+        top: 10vh;
+    }
+
+    .remove-type {
+        left: -1rem;
+    }
+
+    .undo-remove {
+        right: -1rem;
+    }
+
+    .booking-type input[type=text] {
+        max-width: 200px;
+    }
+}

@@ -197,48 +197,72 @@ footer {
     text-align: center;
 }
 
-/* Signup */
+/* Signup/Bookings */
 
-#error-txt {
+.signup-form,
+.signup-form > div,
+.book-an-appointment-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+}
+
+.book-an-appointment-form h2 {
     text-align: center;
-    color: red;
-    min-height: 20px;
-  }
-  
-  .signup-form {
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-content: center;
-    gap: 1rem;
-    position: relative;
-    padding-bottom: 4.5rem;
-  }
-  
-  
-  .signup-form input[type=text],
-  .signup-form input[type=password],
-  .signup-form input[type=email],
-  .signup-form input[type=tel] {
-    width: 50%;
-    font-family: 'cinzel-bold';
-    font-size: 1rem;
-    margin: 0 auto;
-    padding: 0.5rem;
-  }
-  
-  #signup-btn {
-    position: absolute;
-    bottom: 3%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40%;
-    text-align: center;
-  }
-  
-  #signup-btn button {
-    cursor: pointer;
-    font-family: 'cinzel-bold';
-  }
+}
+
+.signup-form,
+.book-an-appointment-form {
+  padding-bottom: 10vh;
+}
+
+.book-an-appointment-form input[type=text],
+.book-an-appointment-form textarea,
+.book-an-appointment-form select,
+.signup-form input[type=text],
+.signup-form input[type=password],
+.signup-form select,
+.signup-form textarea {
+  width: 50%;
+  font-family: 'verdana';
+  font-size: 1rem;
+  margin: 0 auto;
+  padding: 0.5rem;
+}
+
+.book-an-appointment-form input[type=text],
+.book-an-appointment-form textarea,
+.book-an-appointment-form select {
+  width: 70%;
+}
+
+.signup-form textarea,
+.book-an-appointment-form textarea {
+  min-height: 20vh;
+}
+
+#signup-btn,
+#book-an-appointment-btn {
+  position: absolute;
+  bottom: 3%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  text-align: center;
+}
+
+#signup-btn button,
+#book-an-appointment-btn button {
+  cursor: pointer;
+  font-family: 'cinzel-bold';
+}
+
+#book-an-appointment-btn {
+  opacity: 0.3;
+  pointer-events: none;
+}
 
 .loader {
     max-width: 50px;
@@ -250,4 +274,8 @@ footer {
         margin: 5vw;
         margin-top: 15vh;
     }
+
+    #book-an-appointment-btn {
+        bottom: 0;
+      }
 }
