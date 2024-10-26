@@ -223,6 +223,8 @@ footer {
 .book-an-appointment-form select,
 .signup-form input[type=text],
 .signup-form input[type=password],
+.signup-form input[type=email],
+.signup-form input[type=tel],
 .signup-form select,
 .signup-form textarea {
   width: 50%;

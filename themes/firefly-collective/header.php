@@ -3,7 +3,7 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Firefly Collective - <?=$args['page-title']?></title>
+    <title><?=get_bloginfo('name')?> - <?=$args['page-title']?></title>
     <?php wp_head(); ?>
 </head>
 
