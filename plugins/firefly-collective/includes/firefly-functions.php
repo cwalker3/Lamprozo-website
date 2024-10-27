@@ -135,6 +135,7 @@
         $unique_id = uniqid(); // Adjust this for versioning or cache-busting
 
         // Enqueue Stylesheets
+        wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
         wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
         wp_enqueue_style('bookings-css', PLUGIN_PATH_BACKEND . '/assets/css/bookings.css', array(), $unique_id);
 

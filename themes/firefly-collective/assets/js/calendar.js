@@ -147,7 +147,7 @@ function renderCalendar(containerId, year = null, month = null, day = null) {
                        let requestConfirmed = appointment['request_confirmed'];
                        if (aptRequestFlag === '1') {
                         enableCell(cell);
-                        cell.style.backgroundColor = 'var(----outlineRed)';
+                        cell.style.backgroundColor = 'var(--darkGreen)';
                         if (isAdmin) {
                             cell.style.backgroundColor = 'var(--darkGreen)';
                             if (requestConfirmed === '1') cell.style.backgroundColor = 'var(--lightGreen)';
@@ -329,7 +329,7 @@ async function renderSchedule(containerId, year, month, day, isAdmin) {
         const eventEle = document.querySelector(`#event-${hour}`);
     
         if (!isAdmin && isAppointmentRequest) {
-        eventEle.style.outline = '3px solid var(----outlineRed)';
+        eventEle.style.outline = '3px solid var(--outlineRed)';
         }
     
         if (isAdmin && !isRemoved) {
@@ -550,7 +550,7 @@ function toggleAppointmentRequest(id, eventCell, day, month, year, appointmentDa
     }
 
     let isSelected = false;
-    if (eventCell.style.outline === '3px solid var(----outlineRed)') isSelected = true;
+    if (eventCell.style.outline === '3px solid var(--outlineRed)') isSelected = true;
     if (!isSelected && appointmentData['appointment-request-start']) return;
     let hour = id.replace(/[a-z]+\-/, '');
     let blockId = `${day}-${month}-${year}@${hour}`;
@@ -565,7 +565,7 @@ function toggleAppointmentRequest(id, eventCell, day, month, year, appointmentDa
     if (!isSelected) {
         appointmentData[blockId].request_flag = '1';
         appointmentData['appointment-request-start'] = true;
-        eventCell.style.outline = '3px solid var(----outlineRed)';
+        eventCell.style.outline = '3px solid var(--outlineRed)';
         eventCell.innerHTML = 'Reserved';
         bookAppointmentBtn.style.opacity = '1';
         bookAppointmentBtn.style.pointerEvents = 'auto';
@@ -584,7 +584,7 @@ function toggleOpenHourBlock(id, day, month, year, isAdmin) {
     let blockId = `${day}-${month}-${year}@${hour}`;
     let isSelected = false;
     let isAdminSelected;
-    if (hourBlock.style.outline === '3px solid var(----outlineRed)') isSelected = true;
+    if (hourBlock.style.outline === '3px solid var(--outlineRed)') isSelected = true;
     if (hourBlock.style.opacity === '0.5') isAdminSelected = false;
     if (hourBlock.style.opacity === '1') isAdminSelected = true;
 
@@ -604,7 +604,7 @@ function toggleOpenHourBlock(id, day, month, year, isAdmin) {
         enableSaveCalendar();
         return;
     }
-    if (!isAdmin) hourBlock.style.outline = '3px solid var(----outlineRed)';
+    if (!isAdmin) hourBlock.style.outline = '3px solid var(--outlineRed)';
     const startTimeEle = document.querySelector(`#start-time-${hour}`);
     const endTimeEle = document.querySelector(`#end-time-${hour}`);
     let startTime = '', endTime = '';

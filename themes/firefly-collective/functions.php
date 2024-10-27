@@ -11,19 +11,20 @@ add_theme_support('post-thumbnails');
 // Enqueue Styles and Scripts
 function enqueue_my_styles_and_scripts() {
     $theme_path = get_template_directory_uri();
-    $version = wp_get_theme()->get('Version'); // Use theme version for cache busting
+    $version = wp_get_theme()->get('Version');
     $unique_id = uniqid();
 
     // Enqueue Stylesheets
-    wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $version);
+    wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
+    wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $unique_id);
     wp_enqueue_style('main-css', $theme_path . '/assets/css/main.css', array(), $unique_id);
-    wp_enqueue_style('animations-css', $theme_path . '/assets/css/animations.css', array(), $version);
-    wp_enqueue_style('gutenberg-css', $theme_path . '/assets/css/gutenberg.css', array(), $version);
+    wp_enqueue_style('animations-css', $theme_path . '/assets/css/animations.css', array(), $unique_id);
+    wp_enqueue_style('gutenberg-css', $theme_path . '/assets/css/gutenberg.css', array(), $unique_id);
     wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
 
     // Enqueue Scripts
-    wp_enqueue_script('nav-js', $theme_path . '/assets/js/nav.js', array(), $version, true);
-    wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $version, true);
+    wp_enqueue_script('nav-js', $theme_path . '/assets/js/nav.js', array(), $unique_id, true);
+    wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
     wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
 
     $nonce = wp_create_nonce('wp_rest');

@@ -1,0 +1,9 @@
+:root {
+    --mainColor: #c0c0c0;
+    --darkGrey: #424242;
+    --lightGrey: hsl(240, 0%, 95%);
+    --darkGreen: #083b07;
+    --lightGreen: #1e8d1c;
+    --lightBlue: hsl(239, 100%, 72%);
+    --outlineRed: hsl(0, 68%, 36%);
+}
