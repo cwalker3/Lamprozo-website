@@ -14,6 +14,12 @@ body > header {
 	background-color: rgba(0, 0, 0, 0.9);
 }
 
+#nav-bar.user-nav,
+.user-header #hamburger,
+.user-header #close-nav-btn {
+	margin-top: 32px;
+}
+
 body > header > nav {
 	position: absolute;
 	top: 0;
