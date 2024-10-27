@@ -40,11 +40,12 @@ if (has_post_thumbnail($postID)) {
 }
 
 $template_vars = array(
-    'page-title' => $pageTitle,
-    'theme-path' => $themePath,
-    'page-slug'  => $pageSlug,
-    'unique'     => $unique,
-    'is-single'  => is_single(),
+    'page-title'    => $pageTitle,
+    'theme-path'    => $themePath,
+    'page-slug'     => $pageSlug,
+    'unique'        => $unique,
+    'is-single'     => is_single(),
+    'is-user-logged-in'  => is_user_logged_in(),
 );
 
 $content .= $postContent;

@@ -12,16 +12,16 @@ body > header {
 	height: 10vh;
 	width: 100vw;
 	background-color: rgba(0, 0, 0, 0.9);
+	z-index: 2;
 }
 
-#nav-bar.user-nav,
-.user-header #hamburger,
-.user-header #close-nav-btn {
+.user-nav,
+#nav-bar.user-nav {
 	margin-top: 32px;
 }
 
-body > header > nav {
-	position: absolute;
+body > nav {
+	position: fixed;
 	top: 0;
 	left: 0;
 	width: 40vw;
@@ -29,24 +29,24 @@ body > header > nav {
 	animation: 0.5s slideInFromLeft forwards;
 	background-color: black;
 	color: white;
-    z-index: 3;
+    z-index: 4;
 }
 
-body > header > nav.slide-out {
+body > nav.slide-out {
 	animation: 0.5s slideOutFromLeft forwards;
 }
 
-body > header > nav .website-menu {
+body > nav .website-menu {
 	max-height: 85vh;
 	overflow-y: auto;
 	padding: 2rem;
 }
 
-body > header > nav a {
+body > nav a {
 	color: white;
 }
 
-body > header > nav a:hover {
+body > nav a:hover {
 	color: rgb(48, 50, 173);
 }
 
@@ -54,12 +54,12 @@ body > header > nav a:hover {
 	margin-top: 3.5rem;
 }
 
-body > header > nav,
+body > nav,
 #close-nav-btn {
     display: none;
 }
 
-body > header > nav a {
+body > nav a {
 	display: inline-block;
 	width: 100%;
 	font-size: 1.25rem;
@@ -67,37 +67,37 @@ body > header > nav a {
     text-align: right;
 }
 
-body > header > nav .menu-item {
+body > nav .menu-item {
 	position: relative;
 }
 
-body > header > nav .expand-icon {
+body > nav .expand-icon {
 	position: absolute;
 	left: 0;
 	top: 0;
 	pointer-events: none;
 }
 
-body > header > nav .sub-menu {
+body > nav .sub-menu {
 	max-height: 0;
 	transition: max-height 0.4s ease-out;
 	overflow: hidden;
 	padding-left: 1rem;
 }
 
-body > header > nav .sub-menu a {
+body > nav .sub-menu a {
 	font-size: 1rem;
 }
 
-body > header > nav ul {
+body > nav ul {
 	padding: 0;
 }
 
-body > header > nav ul > li {
+body > nav ul > li {
 	margin-top: .5rem;
 }
 
-body > header > nav li {
+body > nav li {
     list-style: none;
 }
 
@@ -105,7 +105,7 @@ body > header > nav li {
 	max-width: 35px;
 	height: auto;
 	z-index: 5;
-	position: absolute;
+	position: fixed;
 	top: 25px;
 	left: 25px;
 	cursor: pointer;
@@ -116,8 +116,8 @@ body > header > nav li {
 	width: 100vw;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.9);
-	position: absolute;
-	z-index: 2;
+	position: fixed;
+	z-index: 3;
 	animation: 0.5s fadeIn forwards;
 }
 
@@ -126,7 +126,7 @@ body > header > nav li {
 }
 
 @media (max-width: 800px) {
-	body > header > nav {
+	body > nav {
 		width: 70vw;
 	}
 }

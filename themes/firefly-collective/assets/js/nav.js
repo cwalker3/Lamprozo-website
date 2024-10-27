@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const hamburger = document.getElementById('hamburger');
     const closeNavBtn = document.getElementById('close-nav-btn');
-    const nav = document.querySelector('body > header > nav');
+    const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
     const body = document.body;
 
