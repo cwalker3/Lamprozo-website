@@ -98,19 +98,24 @@ function handle_contact_form_submission(WP_REST_Request $request) {
         return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'firefly-collective'), array('status' => 400));
     }
 
-    $adminEmail = get_option('admin_email');
-    $subject    = __('Website Contact Form Submitted from: ', 'firefly-collective') . $name;
-    $fullMessage = $message . "\n\nFrom: " . $email;
-    $headers    = array('Reply-To: ' . $email);
+    // Admin Email
+    // ----------------------------------------------------------------------------------------
+    $message = nl2br($message);
+    $subject = "{$name} has sent you a message";
+    $html = "
+        <html>
+        <head>
+            <title>Website contact</title>
+        </head>
+        <body>
+            <p>{$message}</p>
 
-    // Sanitize headers to prevent email injection
-    $headers = array_map('sanitize_text_field', $headers);
-
-    $sent = wp_mail(sanitize_email($adminEmail), sanitize_text_field($subject), wp_strip_all_tags($fullMessage), $headers);
-
-    // if (!$sent) {
-    //     return new WP_Error('email_failed', __('Failed to send email.', 'firefly-collective'), array('status' => 500));
-    // }
+            <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+        </body>
+        </html>
+        ";
+    send_html_mail(NULL, $subject, $html, true);
+    // ----------------------------------------------------------------------------------------
 
     return rest_ensure_response(array('message' => __('Message sent successfully.', 'firefly-collective')));
 }
@@ -158,27 +163,51 @@ function handle_signup_submission(WP_REST_Request $request) {
         update_user_meta($user_id, 'phone', $phone);
     }
 
-    // Send welcome email to the user
-    $message = __("Welcome to our community!\n\n", 'firefly-collective');
-    $message .= __("Name: ", 'firefly-collective') . "$fname $lname\n";
-    $message .= __("Email: ", 'firefly-collective') . "$email\n";
-    if (!empty($phone)) {
-        $message .= __("Phone: ", 'firefly-collective') . "$phone\n\n";
-    }
-    $message .= __("Your account has been created successfully.", 'firefly-collective');
+    // User Email
+    // ----------------------------------------------------------------------------------------
+    $site_name = get_bloginfo('name');
+    $subject = "Thank you for signing up with {$site_name}";
+    $html = "
+        <html>
+        <head>
+            <title>Welcome to {$site_name}</title>
+        </head>
+        <body>
+            <p>Thank you for signing up with {$site_name}.</p>
+            <p>
+                <strong>Name:</strong> {$fname} {$lname}<br>
+                <strong>Email:</strong> {$email}<br>
+                <strong>Phone:</strong> {$phone}
+            </p>
 
-    wp_mail($email, __('Welcome to Our Community', 'firefly-collective'), wp_strip_all_tags($message));
+            <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+        </body>
+        </html>
+        ";
+    send_html_mail($email, $subject, $html);
 
-    // Notify admin of new signup
-    $adminEmail = get_option('admin_email');
-    $adminMessage = __("New website signup:\n\n", 'firefly-collective');
-    $adminMessage .= __("Name: ", 'firefly-collective') . "$fname $lname\n";
-    $adminMessage .= __("Email: ", 'firefly-collective') . "$email\n";
-    if (!empty($phone)) {
-        $adminMessage .= __("Phone: ", 'firefly-collective') . "$phone\n";
-    }
+    // Admin Email
+    // ----------------------------------------------------------------------------------------
+    $subject = "{$fname} {$lname} has signed up on the website!";
+    $html = "
+        <html>
+        <head>
+            <title>Website Signup</title>
+        </head>
+        <body>
+            <p>{$fname} {$lname} has signed up with the website.</p>
+            <p>
+                <strong>Name:</strong> {$first_name} {$last_name}<br>
+                <strong>Email:</strong> {$email}<br>
+                <strong>Phone:</strong> {$phone}
+            </p>
 
-    wp_mail($adminEmail, __('New Website Signup', 'firefly-collective'), wp_strip_all_tags($adminMessage));
+            <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+        </body>
+        </html>
+        ";
+    send_html_mail(NULL, $subject, $html, true);
+    // ----------------------------------------------------------------------------------------
 
     return rest_ensure_response(array('message' => __('Signup successful!', 'firefly-collective')));
 }
@@ -566,6 +595,16 @@ function custom_theme_setup_pages() {
     }
 }
 add_action('after_switch_theme', 'custom_theme_setup_pages');
+
+function dequeue_jquery_migrate( $scripts ) {
+    if ( ! is_admin() ) {
+        // Deregister jQuery
+        wp_deregister_script('jquery');
+        // Optionally, remove jQuery Migrate
+        wp_deregister_script('jquery-migrate');
+    }
+}
+add_action( 'wp_enqueue_scripts', 'dequeue_jquery_migrate' );
 
 function format_time($time_str) {
     // Create a DateTime object from the input time string

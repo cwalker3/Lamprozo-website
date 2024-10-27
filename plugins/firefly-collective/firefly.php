@@ -9,4 +9,4 @@
     register_activation_hook(__FILE__, 'firefly_collective_create_tables');
 
     // DANGEROUS LINE :: DO NOT UNCOMMENT UNLESS ABSOLUTELY NECESSARY
-    // register_deactivation_hook(__FILE__, 'eyh_drop_all_tables');
+    // register_deactivation_hook(__FILE__, 'firefly_collective_drop_all_tables');
