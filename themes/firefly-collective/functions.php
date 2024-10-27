@@ -26,11 +26,13 @@ function enqueue_my_styles_and_scripts() {
     wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $version, true);
     wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
 
+    $nonce = wp_create_nonce('wp_rest');
+
     // Localize main.js with the nonce and API URL for security
     wp_localize_script('main-js', 'myApi', array(
-        'nonce'   => wp_create_nonce('wp_rest'), // Generate the nonce
+        'nonce'   => $nonce,
         'api_url' => esc_url_raw(rest_url('custom-api/v1/')), // Base API URL
-        'themePath' => $theme_path,
+        'themePath' => $theme_path
     ));
 
     wp_localize_script('cal-js', 'calData', array(

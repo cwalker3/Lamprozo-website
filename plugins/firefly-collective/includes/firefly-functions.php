@@ -143,7 +143,7 @@
         wp_enqueue_script('bookings-js', PLUGIN_PATH_BACKEND . '/assets/js/bookings.js', array(), $unique_id, true);
 
         // Admin access
-        $nonce = wp_create_nonce('wp_rest'); // Updated to 'wp_rest'
+        $nonce = wp_create_nonce('wp_rest');
         $is_admin = current_user_can('manage_options') ? 'true' : 'false';
         $calendar = get_firefly_collective_calendar(true);
 
