@@ -1,3 +1,9 @@
+body > header,
+#nav-bar {
+	width: 100vw;
+	height: 10vh;
+}
+
 body > header {
     position: fixed;
     top: 0;
@@ -15,6 +21,32 @@ body > header {
 	z-index: 2;
 }
 
+#logo-name {
+	position: fixed;
+	top: 28px;
+	left: 50%;
+	transform: translateX(-50%);
+	color: white;
+	z-index: 2;
+	font-size: 1.5rem;
+	display: flex;
+	gap: 1rem;
+	min-width: 75vw;
+	justify-content: center;
+	align-items: center;
+}
+
+#logo-name img {
+	max-height: 5vh;
+	width: auto;
+}
+
+#site-name,
+#site-logo {
+	align-self: center;
+}
+
+body > header,
 .user-nav,
 #nav-bar.user-nav {
 	margin-top: 32px;
@@ -128,5 +160,13 @@ body > nav li {
 @media (max-width: 800px) {
 	body > nav {
 		width: 70vw;
+	}
+
+	#logo-name img {
+		max-height: 3.5vh;
+	}
+
+	#wpadminbar {
+		position: fixed;
 	}
 }

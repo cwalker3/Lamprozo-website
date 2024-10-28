@@ -16,8 +16,8 @@ function enqueue_my_styles_and_scripts() {
 
     // Enqueue Stylesheets
     wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
-    wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $unique_id);
     wp_enqueue_style('main-css', $theme_path . '/assets/css/main.css', array(), $unique_id);
+    wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $unique_id);
     wp_enqueue_style('animations-css', $theme_path . '/assets/css/animations.css', array(), $unique_id);
     wp_enqueue_style('gutenberg-css', $theme_path . '/assets/css/gutenberg.css', array(), $unique_id);
     wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
