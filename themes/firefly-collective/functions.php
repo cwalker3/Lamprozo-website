@@ -200,7 +200,7 @@ function handle_signup_submission(WP_REST_Request $request) {
         <body>
             <p>{$fname} {$lname} has signed up with the website.</p>
             <p>
-                <strong>Name:</strong> {$first_name} {$last_name}<br>
+                <strong>Name:</strong> {$fname} {$lname}<br>
                 <strong>Email:</strong> {$email}<br>
                 <strong>Phone:</strong> {$phone}
             </p>
