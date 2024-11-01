@@ -36,13 +36,15 @@ function enqueue_my_styles_and_scripts() {
         'themePath' => $theme_path
     ));
 
-    wp_localize_script('cal-js', 'calData', array(
-        'isAdmin'        => 'false',
-        'nonce'          => $nonce,
-        'calendar'       => get_firefly_collective_calendar(),
-        'booking_types'  => get_booking_types(),
-        'admin_settings' => get_admin_settings()
-    ));
+    if (determine_view() === 'request-an-appointment') {
+        wp_localize_script('cal-js', 'calData', array(
+            'isAdmin'        => 'false',
+            'nonce'          => $nonce,
+            'calendar'       => get_firefly_collective_calendar(),
+            'booking_types'  => get_booking_types(),
+            'admin_settings' => get_admin_settings()
+        ));
+    }
 }
 add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
 

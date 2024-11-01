@@ -123,9 +123,9 @@
     }
 
     /**
-     * Enqueue Admin Styles and Scripts
+     * Enqueue Bookings Styles and Scripts
      */
-    function enqueue_my_admin_styles_and_scripts($hook) {
+    function enqueue_bookings_styles_and_scripts($hook) {
         // Check if we're on the 'My Bookings' admin page
         if ($hook !== 'toplevel_page_my-bookings') {
             return; // Exit if we're not on the correct page
@@ -164,7 +164,7 @@
             'bookings_types'    => get_booking_types()
         ));
     }
-    add_action('admin_enqueue_scripts', 'enqueue_my_admin_styles_and_scripts');
+    add_action('admin_enqueue_scripts', 'enqueue_bookings_styles_and_scripts');
 
     /**
      * Register Custom REST API Endpoints
