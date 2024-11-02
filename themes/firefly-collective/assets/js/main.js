@@ -10,12 +10,16 @@ document.addEventListener('DOMContentLoaded', function () {
         keywords: ''
     };
 
+    handleContactSticky();
+
     switch (page) {
+
         case 'contact':
             const sendMessageBtn = document.getElementById('send-message-btn');
             if (sendMessageBtn) {
                 sendMessageBtn.addEventListener('click', sendContactMessage);
             }
+            contactSticky.style.opacity = '0';
             break;
 
         case 'signup':
@@ -331,5 +335,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!phoneNumber) return true;
         const phonePattern = /^[0-9\-\+\s\(\)]+$/;
         return phonePattern.test(phoneNumber);
+    }
+
+    function handleContactSticky() {
+        const contactSticky = document.querySelector('#contact-sticky');
+        contactSticky.addEventListener('click', () => {
+            window.location = "/contact";
+        });
+        let isVisible = false;
+        function toggleContactSticky() {
+            if (!isVisible && window.scrollY > 250) {
+                contactSticky.style.display = 'block';
+                isVisible = true;
+            }
+        }
+        window.addEventListener('scroll', toggleContactSticky);
+        toggleContactSticky();
     }
 });
