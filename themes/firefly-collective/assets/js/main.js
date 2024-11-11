@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const page = window.location.pathname.split('/')[1];
     const themePath = myApi.themePath;
+    const logoNameEle = document.querySelector('#logo-name');
     let blogPageNum = 2;
     let blogFilterOptions = {
         category_id: '',
@@ -10,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
         keywords: ''
     };
 
+    logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
     handleContactSticky();
 
     switch (page) {

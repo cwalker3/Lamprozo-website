@@ -34,6 +34,7 @@ body > header {
 	min-width: 75vw;
 	justify-content: center;
 	align-items: center;
+	cursor: pointer;
 }
 
 #logo-name img {
