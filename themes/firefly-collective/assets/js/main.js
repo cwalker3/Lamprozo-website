@@ -340,15 +340,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleContactSticky() {
+        if (page === 'contact' || page === 'request-an-appointment') return;
         const contactSticky = document.querySelector('#contact-sticky');
-        contactSticky.addEventListener('click', () => {
-            window.location = "/contact";
-        });
+        contactSticky.addEventListener('pointerup', ()=>{window.location='/request-a-quote';});
         let isVisible = false;
         function toggleContactSticky() {
-            if (!isVisible && window.scrollY > 250) {
+            if (!isVisible && window.scrollY > 1000) {
                 contactSticky.style.display = 'block';
                 isVisible = true;
+            }
+            if (window.scrollY + window.innerHeight > document.body.offsetHeight - 200) {
+                contactSticky.style.display = 'none';
+                isVisible = false;
             }
         }
         window.addEventListener('scroll', toggleContactSticky);
