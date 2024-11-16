@@ -39,6 +39,11 @@ main {
     position: relative;
 }
 
+img {
+    max-width: 90vw;
+    height: auto;
+}
+
 #contact-sticky {
     display: none;
     position: fixed;
@@ -125,6 +130,7 @@ footer {
     position: absolute;
     top: -30px;
     left: 0px;
+    z-index: 5;
 }
 
 .blog-short {
@@ -135,20 +141,11 @@ footer {
     display: flex;
     justify-content: center;
     align-items: center;
-    position: relative;
 }
 
 .img-frame {
     position: relative;
     z-index: 2;
-}
-
-.featured-img {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
 }
 
 .img-frame img,
