@@ -531,6 +531,9 @@ function parse_request_uri() {
 function determine_view() {
     $aCmd = parse_request_uri();
 
+    // For single blog posts
+    if ( is_single() ) return 'blog-post';
+
     // Check if the first segment exists
     if (isset($aCmd[0])) {
         $view = sanitize_title($aCmd[0]);

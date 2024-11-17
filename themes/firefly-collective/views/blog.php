@@ -98,12 +98,12 @@ $tags = get_tags(array(
         while ($the_query->have_posts()) {
             $the_query->the_post(); ?>
             <div class="blog-short">
-                <h2><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h2>
                 <?php if (has_post_thumbnail()) { ?>
                     <div class="featured-img-container">
                         <img src="<?php echo esc_url(get_the_post_thumbnail_url(get_the_ID(), 'full')); ?>" class="featured-img" alt="<?php the_title_attribute(); ?>">
                     </div>
                 <?php } ?>
+                <h2><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h2>
                 <div><?php the_excerpt(); ?></div>
                 <hr>
             </div>

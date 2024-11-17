@@ -123,14 +123,14 @@ footer {
 }
 
 .blogs h2 {
-    margin-bottom: 1rem;
+    text-align: center;
 }
 
 #back-to-blogs {
     position: absolute;
     top: -30px;
     left: 0px;
-    z-index: 5;
+    z-index: 3;
 }
 
 .blog-short {
@@ -213,6 +213,21 @@ footer {
 
 #blog-filter-submit {
     cursor: pointer;
+}
+
+.blog-post > h1,
+.blog-post > h3 {
+    text-align: center;
+}
+
+#blog-post-img {
+    margin: 0 auto;
+    text-align: center;
+}
+
+#blog-post-img > img {
+    max-width: 100%;
+    height: auto;
 }
 
 .no-blogs {

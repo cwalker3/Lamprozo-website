@@ -30,8 +30,14 @@ $postContent = '';
 $featuredImgHTML = '';
 $content = '';
 
-if (is_page()) {
-    $postContent = apply_filters('the_content', get_the_content(null, false, $post));
+if ( is_page() ) $postContent = apply_filters('the_content', get_the_content(null, false, $post));
+if ( is_home() ) {
+    $posts_page_id = get_option('page_for_posts'); // Get the ID of the Posts page
+    if ( $posts_page_id ) { // Check if a Posts page is set
+        $postContent = apply_filters('the_content', get_post_field('post_content', $posts_page_id));
+    } else {
+        $postContent = ''; // Fallback in case no Posts page is assigned
+    }
 }
 
 if (has_post_thumbnail($postID)) {
