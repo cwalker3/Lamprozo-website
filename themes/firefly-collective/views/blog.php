@@ -104,6 +104,7 @@ $tags = get_tags(array(
                     </div>
                 <?php } ?>
                 <h2><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h2>
+                <h2>By: <?php the_author(); ?></h2>
                 <div><?php the_excerpt(); ?></div>
                 <hr>
             </div>

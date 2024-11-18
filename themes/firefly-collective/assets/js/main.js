@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const page = window.location.pathname.split('/')[1];
     const themePath = myApi.themePath;
     const logoNameEle = document.querySelector('#logo-name');
+    const maxBlogsPerPage = parseInt(myApi.maxBlogs);
     let blogPageNum = 2;
     let blogFilterOptions = {
         category_id: '',
@@ -51,39 +52,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
         case 'blog':
             const target = document.getElementById('blogs-end');
+            const blogKeywordsInput = document.querySelector('#blog-filter-keywords');
             const blogFilterBtn = document.getElementById('blog-filter-head');
             const blogFilterSubmitBtn = document.getElementById('blog-filter-submit-btn');
             const loader = document.getElementById('more-blogs-loader');
-
+            const blogElements = document.querySelectorAll('blog-short');
+            const numBlogs = 0;
+            if (blogElements.length > 0) numBlogs = blogElements.length;
             if (target && loader) {
                 const observer = new IntersectionObserver(function (entries) {
                     entries.forEach(function (entry) {
                         if (entry.isIntersecting) {
                             observer.unobserve(target);
-                            loader.style.display = 'block';
+                            if (numBlogs < maxBlogsPerPage) {
+                                return;
+                            } else {
+                                loader.style.display = 'block';
 
-                            let params = new URLSearchParams(blogFilterOptions);
-                            params.append('page', blogPageNum);
+                                let params = new URLSearchParams(blogFilterOptions);
+                                params.append('page', blogPageNum);
 
-                            fetch(`${myApi.api_url}get-more-blogs?${params.toString()}`, {
-                                method: 'GET',
-                                headers: {
-                                    'X-WP-Nonce': myApi.nonce
-                                }
-                            })
-                                .then(response => response.json())
-                                .then(function (data) {
-                                    data.forEach(blog => {
-                                        prependBlogHTML(blog);
-                                    });
-                                    loader.style.display = 'none';
-                                    blogPageNum++;
-                                    if (data.length === 15) observer.observe(target);
+                                fetch(`${myApi.api_url}get-more-blogs?${params.toString()}`, {
+                                    method: 'GET',
+                                    headers: {
+                                        'X-WP-Nonce': myApi.nonce
+                                    }
                                 })
-                                .catch(function (error) {
-                                    console.error('Error:', error);
-                                    loader.style.display = 'none';
-                                });
+                                    .then(response => response.json())
+                                    .then(function (data) {
+                                        data.forEach(blog => {
+                                            prependBlogHTML(blog);
+                                        });
+                                        loader.style.display = 'none';
+                                        blogPageNum++;
+                                        if (data.length === maxBlogsPerPage) observer.observe(target);
+                                    })
+                                    .catch(function (error) {
+                                        console.error('Error:', error);
+                                        loader.style.display = 'none';
+                                    });
+                            }
                         }
                     });
                 }, {
@@ -93,6 +101,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
 
                 observer.observe(target);
+
+                if (blogKeywordsInput) {
+                    blogKeywordsInput.addEventListener('keyup', (event) => {
+                        if (event.key === 'Enter' || event.keyCode === 13) {
+                            applyBlogFilter(target, observer);
+                            blogKeywordsInput.blur();
+                        }
+                    });
+                }            
 
                 if (blogFilterBtn) {
                     blogFilterBtn.addEventListener('click', function () {
@@ -250,8 +267,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         blogShort.innerHTML = `<h2><a href="${blog.permalink}" target="_blank">${blog.title}</a></h2>
+                               <h2>By: ${blog.author}</h2>
                                ${imgHTML}
-                               <div>${blog.excerpt}</div>
+                               <div><p>${blog.excerpt}</p></div>
                                <hr>`;
         blogsContainer.insertBefore(blogShort, moreBlogsLoader);
     }
@@ -308,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 loader.style.display = 'none';
                 blogPageNum = 2;
-                if (data.length === 15) observer.observe(target);
+                if (data.length === maxBlogsPerPage) observer.observe(target);
             })
             .catch(error => {
                 console.error('Error:', error);

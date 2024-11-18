@@ -62,12 +62,10 @@ function enqueue_my_styles_and_scripts() {
     wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $unique_id);
     wp_enqueue_style('animations-css', $theme_path . '/assets/css/animations.css', array(), $unique_id);
     wp_enqueue_style('gutenberg-css', $theme_path . '/assets/css/gutenberg.css', array(), $unique_id);
-    wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
 
     // Enqueue Scripts
     wp_enqueue_script('nav-js', $theme_path . '/assets/js/nav.js', array(), $unique_id, true);
     wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-    wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
 
     $nonce = wp_create_nonce('wp_rest');
 
@@ -75,10 +73,13 @@ function enqueue_my_styles_and_scripts() {
     wp_localize_script('main-js', 'myApi', array(
         'nonce'   => $nonce,
         'api_url' => esc_url_raw(rest_url('custom-api/v1/')), // Base API URL
-        'themePath' => $theme_path
+        'themePath' => $theme_path,
+        'maxBlogs' => 15
     ));
 
     if (determine_view() === 'request-an-appointment') {
+        wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
+        wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
         wp_localize_script('cal-js', 'calData', array(
             'isAdmin'        => 'false',
             'nonce'          => $nonce,
@@ -332,6 +333,7 @@ function handle_filter_blogs(WP_REST_Request $request) {
             'title'          => get_the_title($post->ID),
             'excerpt'        => get_the_excerpt($post->ID),
             'permalink'      => get_permalink($post->ID),
+            'author'         => get_the_author('display_name', $post->post_author),
             'featured_image' => get_the_post_thumbnail_url($post->ID, 'full'),
         );
     }
@@ -533,14 +535,14 @@ function determine_view() {
 
     // For single blog posts
     if ( is_single() ) return 'blog-post';
+    if ( is_home() ) return 'blog';
 
     // Check if the first segment exists
     if (isset($aCmd[0])) {
         $view = sanitize_title($aCmd[0]);
 
         // Valid custom URLs
-        $valid_views = array('contact', 
-                             'blog', 
+        $valid_views = array('contact',
                              'signup',
                             'request-an-appointment');
 
