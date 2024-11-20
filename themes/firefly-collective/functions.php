@@ -680,3 +680,18 @@ function slugToTitle($slug) {
 
     return $title;
 }
+
+
+function get_blog_poster_name( $author_id = null ) {
+    if ( is_null( $author_id ) ) {
+        $author_id = get_the_author_meta( 'ID' );
+    }
+
+    $display_name = get_the_author_meta( 'display_name', $author_id );
+
+    if ( empty( $display_name ) ) {
+        $display_name = __( 'Anonymous', 'your-text-domain' );
+    }
+
+    return esc_html( apply_filters( 'get_blog_poster_display_name', $display_name, $author_id ) );
+}
