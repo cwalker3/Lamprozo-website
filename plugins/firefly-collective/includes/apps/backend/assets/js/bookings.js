@@ -1,4 +1,4 @@
-const saveCalendarBtn = document.querySelector('#save-calendar input[type=button]');
+const saveCalendarBtn = document.querySelector('#save-calendar-btn');
 saveCalendarBtn.addEventListener('pointerup', saveCalendar);
 
 saveCalendarData(calData.calendar, true);

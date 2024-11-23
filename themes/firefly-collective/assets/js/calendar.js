@@ -926,14 +926,14 @@ function saveCalendarData(blocks, isAdmin = false) {
 }
 
 function disableSaveCalendar() {
-    const saveCalendarBtn = document.querySelector('#save-calendar > input[type=button]');
+    const saveCalendarBtn = document.querySelector('#save-calendar-btn');
     saveCalendarBtn.style.opacity = '0.3';
     saveCalendarBtn.style.pointerEvents = 'none';
     saveCalendarBtn.style.cursor = 'none';
 }
 
 function enableSaveCalendar() {
-    const saveCalendarBtn = document.querySelector('#save-calendar > input[type=button]');
+    const saveCalendarBtn = document.querySelector('#save-calendar-btn');
     saveCalendarBtn.style.opacity = '1';
     saveCalendarBtn.style.pointerEvents = 'auto';
     saveCalendarBtn.style.cursor = 'pointer';

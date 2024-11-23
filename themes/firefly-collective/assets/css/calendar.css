@@ -4,12 +4,24 @@
     text-align: center;
     font-family: Arial, sans-serif;
     display: grid;
+    grid-template-rows: 1fr 1fr 7.5fr;
     place-self: center;
 }
 
+#calendar-container > h2 {
+    font-size: 1.25rem;
+    align-self: center;
+    margin: 0;
+}
+
+#calendar-title,
+.calendar-nav {
+    max-height: 5vh;
+}
+
 #calendar-title {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    margin: 0;
 }
 
 .calendar-nav {
@@ -34,10 +46,8 @@
 .calendar {
     background-color: var(--lightGrey);
     margin: 0 auto;
-    width: 40vw;
-    height: 40vw;
-    max-width: 600px;
-    max-height: 600px;
+    width: 100%;
+    height: 100%;
     border-collapse: collapse;
     table-layout: fixed;
     font-family: Arial, sans-serif;
@@ -72,12 +82,7 @@
     color: #999;
 }
 
-#calendar-container h2#calendar-title {
-    margin-bottom: 1rem;
-}
-
 .back-button {
-    padding: 0.5rem 1rem;
     background-color: var(--mainColor);
     border: none;
     cursor: pointer;
@@ -86,15 +91,28 @@
     margin-bottom: 1rem;
     max-width: 150px;
     justify-self: center;
+    max-height: 35px;
+    align-self: center;
+    padding: 0.5rem;
 }
 
 .schedule {
     margin: 0 auto;
-    width: 90%;
+    width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
     justify-content: center;
     font-family: Arial, sans-serif;
+}
+
+.schedule tr:empty {
+    display: none;
+}
+
+.book-an-appointment-form .schedule tr {
+    display: grid;
+    grid-template-columns: 3fr 7fr;
+    width: 100%;
 }
 
 .schedule td {
@@ -106,26 +124,28 @@
 }
 
 .schedule .time-cell {
-    width: 30%;
+    width: 40%;
     background-color: var(--mainColor);
     font-weight: bold;
 }
 
 .schedule .event-cell {
-    width: 70%;
+    width: 60%;
     background-color: #fff;
     cursor: pointer;
     background-color: var(--mainBlue);
     user-select: none;
 }
 
-@media (max-width: 800px) {
+.book-an-appointment-form .schedule .time-cell,
+.book-an-appointment-form .schedule .event-cell {
+    width: 100%;
+    height: 75px;
+    display: grid;
+    align-items: center;
+}
 
-    .calendar {
-        width: 90%;
-        height: 40vh;
-        aspect-ratio: auto;
-    }
+@media (max-width: 800px) {
 
     .calendar th, .calendar td {
         padding: 3px;
@@ -155,16 +175,13 @@
         font-size: 0.9rem;
     }
 
-    .schedule .time-cell {
-        width: 50%;
-    }
-
     .schedule .event-cell {
         font-size: 0.9rem;
     }
+}
 
-    .back-button {
-        padding: 0.3rem 0.6rem;
-        font-size: 12px;
+@media (max-height: 600px) {
+    .calendar {
+        max-height: 50vh;
     }
 }
