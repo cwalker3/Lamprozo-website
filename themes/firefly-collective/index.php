@@ -58,29 +58,16 @@ $content .= $postContent;
 
 get_header(null, $template_vars);
 
-// Determine if a custom view should be loaded
-$view = determine_view();
-
 if ($postID && is_null($view)) {
-    $title = '';
-    if (!is_front_page()) {
-        $title = '<h1>' . esc_html($pageTitle) . '</h1>';
-    }
-
+    $title = !is_front_page() ? '<h1>' . esc_html($pageTitle) . '</h1>' : '';
     echo $title . $featuredImgHTML . apply_filters('the_content', $content);
-} elseif (!is_null($view)) {
-    $view = sanitize_file_name($view);
-    $view_path = get_template_directory() . '/views/' . $view . '.php';
-
-    if (file_exists($view_path)) {
-        include $view_path;
-    } else {
-        // Fallback to 404 if view not found
-        include get_template_directory() . '/views/404.php';
-    }
 } else {
-    // If no post ID and no view, load 404
-    include get_template_directory() . '/views/404.php';
+    $view = sanitize_file_name($view ?: '404');
+    $view_path = get_template_directory() . '/views/' . $view . '.php';
+    if (!file_exists($view_path)) {
+        $view_path = get_template_directory() . '/views/404.php';
+    }
+    include $view_path;
 }
 
 get_footer(null, $template_vars);

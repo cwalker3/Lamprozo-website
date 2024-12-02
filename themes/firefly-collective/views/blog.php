@@ -39,14 +39,14 @@ $tags = get_tags(array(
 
 <div id="blog-filter">
     <div id="blog-filter-head">
-        <img src="<?php echo esc_url($themePath . '/images/filter.webp'); ?>" alt="<?php esc_attr_e('Filter', 'your-theme-textdomain'); ?>">
+        <img src="<?php echo esc_url($themePath . '/images/filter.webp'); ?>" alt="<?php esc_attr_e('Filter'); ?>">
     </div>
     <div id="blog-filter-options">
         <div>
-            <h3><?php esc_html_e('Filter Options', 'your-theme-textdomain'); ?></h3>
+            <h3><?php esc_html_e('Filter Options'); ?></h3>
             <div id="blog-filter-options-wrapper">
                 <select id="category-filter">
-                    <option value=""><?php esc_html_e('All Categories', 'your-theme-textdomain'); ?></option>
+                    <option value=""><?php esc_html_e('All Categories'); ?></option>
                     <?php foreach ($categories as $category) { ?>
                         <option value="<?php echo esc_attr($category->term_id); ?>">
                             <?php echo esc_html($category->name); ?>
@@ -55,7 +55,7 @@ $tags = get_tags(array(
                 </select>
 
                 <select id="tag-filter">
-                    <option value=""><?php esc_html_e('All Tags', 'your-theme-textdomain'); ?></option>
+                    <option value=""><?php esc_html_e('All Tags'); ?></option>
                     <?php foreach ($tags as $tag) { ?>
                         <option value="<?php echo esc_attr($tag->term_id); ?>">
                             <?php echo esc_html($tag->name); ?>
@@ -64,14 +64,14 @@ $tags = get_tags(array(
                 </select>
 
                 <select id="month-filter">
-                    <option value=""><?php esc_html_e('All Months', 'your-theme-textdomain'); ?></option>
+                    <option value=""><?php esc_html_e('All Months'); ?></option>
                     <?php for ($m = 1; $m <= 12; $m++) { ?>
                         <option value="<?php echo esc_attr($m); ?>"><?php echo esc_html(date_i18n('M', mktime(0, 0, 0, $m, 1))); ?></option>
                     <?php } ?>
                 </select>
 
                 <select id="year-filter">
-                    <option value=""><?php esc_html_e('All Years', 'your-theme-textdomain'); ?></option>
+                    <option value=""><?php esc_html_e('All Years'); ?></option>
                     <?php
                     $currentYear = date('Y');
                     $startYear   = $currentYear - 10;
@@ -81,11 +81,11 @@ $tags = get_tags(array(
                 </select>
 
                 <div id="blog-search-text">
-                    <input type="text" id="blog-filter-keywords" placeholder="<?php esc_attr_e('Keywords', 'your-theme-textdomain'); ?>">
+                    <input type="text" id="blog-filter-keywords" placeholder="<?php esc_attr_e('Keywords'); ?>">
                 </div>
 
                 <div id="blog-filter-submit">
-                    <input type="submit" id="blog-filter-submit-btn" value="<?php esc_attr_e('Filter Results', 'your-theme-textdomain'); ?>">
+                    <input type="submit" id="blog-filter-submit-btn" value="<?php esc_attr_e('Filter Results'); ?>">
                 </div>
             </div>
         </div>
@@ -111,10 +111,10 @@ $tags = get_tags(array(
         <?php }
         wp_reset_postdata();
     } else {
-        echo '<p>' . esc_html__('No posts found.', 'your-theme-textdomain') . '</p>';
+        echo '<p>' . esc_html__('No posts found.') . '</p>';
     }
     ?>
 
-    <img id="more-blogs-loader" class="loader" src="<?php echo esc_url($themePath . '/images/loading.gif'); ?>" alt="<?php esc_attr_e('Loading', 'your-theme-textdomain'); ?>">
+    <img id="more-blogs-loader" class="loader" src="<?php echo esc_url($themePath . '/images/loading.gif'); ?>" alt="<?php esc_attr_e('Loading'); ?>">
     <a id="blogs-end" name="blogs-end"></a>
 </div>
