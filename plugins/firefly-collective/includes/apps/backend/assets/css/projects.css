@@ -1,0 +1,85 @@
+.projects-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 20px;
+    table-layout: fixed; /* Ensures fixed layout */
+}
+
+.projects-table th, .projects-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    /* Removed white-space, overflow, and text-overflow to allow wrapping */
+}
+
+.projects-table th {
+    background-color: var(--darkGrey);
+    color: white;
+    font-weight: bold;
+    text-align: left;
+}
+
+.projects-table td {
+    background-color: var(--mainColor);
+}
+
+/* Define specific widths for each column */
+.projects-table th:nth-child(1),
+.projects-table td:nth-child(1) {
+    width: 30%; /* Adjust as needed */
+}
+
+.projects-table th:nth-child(2),
+.projects-table td:nth-child(2) {
+    width: 50%; /* Adjust as needed */
+}
+
+.projects-table th:nth-child(3),
+.projects-table td:nth-child(3) {
+    width: 20%; /* Adjust as needed */
+    text-align: center; /* Center-align the Update button */
+    vertical-align: top; /* Align content to the top */
+}
+
+/* Style the Update button */
+.update-project-button {
+    background: #007cba;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    cursor: pointer;
+    border-radius: 3px; /* Optional: Adds slight rounding to buttons */
+}
+
+.update-project-button:hover {
+    background: #005a8d;
+}
+
+/* Style the message container */
+.update-message-container {
+    display: block; /* Allows messages to stack vertically */
+    margin-top: 5px; /* Spacing between button and message */
+    max-width: 100%; /* Fixed width to prevent cell expansion */
+    word-wrap: break-word; /* Allows long words to wrap */
+}
+
+/* Optional: Style for success and error messages */
+.update-message-container .success-message {
+    color: green;
+    font-weight: bold;
+    display: block; /* Ensures messages start on a new line */
+    width: 50%;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.update-message-container .error-message {
+    color: red;
+    font-weight: bold;
+    display: block; /* Ensures messages start on a new line */
+}
+
+.update-message-container img.loading-gif {
+    max-width: 30px;
+    height: auto;
+    vertical-align: middle; /* Aligns loader vertically with the button */
+}

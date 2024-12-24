@@ -1,0 +1,10 @@
+[
+    {
+        "name": "Firefly Collective Base",
+        "description": "Core website features.",
+        "files": [
+            "/wp-content/plugins/firefly-collective",
+            "/wp-content/themes/firefly-collective"
+        ]
+    }
+]
