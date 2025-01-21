@@ -5,9 +5,6 @@ Description: Core website features.
 Author: Alex Strait
 */
 
-// Define the shared secret for authenticating requests between local and live dev environments
-define('FIREFLY_SHARED_SECRET', '2R%$<Gs>Ft-iY"[73[_uR|kkDdyIAx');
-
 require_once plugin_dir_path(__FILE__) . 'includes/firefly-functions.php';
 
 register_activation_hook(__FILE__, 'firefly_collective_create_tables');

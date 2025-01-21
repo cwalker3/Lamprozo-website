@@ -119,6 +119,10 @@ function firefly_collective_handle_project_update(WP_REST_Request $request) {
     // Synchronize the unzipped file structure with the live site
     firefly_collective_sync_unzipped($update_dir);
 
+    // Delete the update directory and all its contents after successful sync
+    // WP_Filesystem delete method accepts a second parameter for recursive deletion.
+    $wp_filesystem->delete($update_dir, true);
+
     return new WP_REST_Response(array(
         'message' => 'Project updated successfully.',
         'project' => $project_name
