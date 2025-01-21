@@ -355,6 +355,13 @@ footer {
     }
 }
 
+@media(max-width: 800px) {
+    main {
+        margin-left: 2vw;
+        margin-right: 2vw;
+    }
+}
+
 @media (max-width: 600px) {
     main {
         margin-bottom: 12vh;
