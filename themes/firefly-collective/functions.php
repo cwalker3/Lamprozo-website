@@ -9,10 +9,10 @@
     $models = array(
                 'init',     'rest',     
                 'meta',     'contact',
-                'signup',   'blogs',
-                'bookings', 'mail',
-                'view',     'pages',
-                'util');
+                'signup',   'signin',   
+                'blogs',    'bookings',
+                'mail',     'view',
+                'pages',    'util');
     foreach($models as $model) {
         require_once(get_template_directory()."/models/$model.php");
     }

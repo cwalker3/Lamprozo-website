@@ -236,6 +236,8 @@ footer {
 
 /* Signup/Bookings */
 
+/* Signup/Bookings */
+
 .signup-form,
 .signup-form > div {
   display: grid;
@@ -325,6 +327,22 @@ footer {
   width: 100%;
   text-align: center;
   margin-top: 3vh;
+}
+
+.password-field {
+  position: relative;
+}
+
+.toggle-password {
+  cursor: pointer;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+input.error {
+    border: 2px solid red;
 }
 
 .loader {

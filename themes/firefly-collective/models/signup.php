@@ -4,27 +4,37 @@
     function handle_signup_submission(WP_REST_Request $request) {
         $params = $request->get_params();
 
-        // Sanitize and Validate Inputs
         $fname = sanitize_text_field($params['fname'] ?? '');
         $lname = sanitize_text_field($params['lname'] ?? '');
         $email = sanitize_email($params['email'] ?? '');
         $phone = sanitize_text_field($params['phone'] ?? '');
 
         if (empty($fname) || empty($lname) || empty($email) || !is_email($email)) {
-            return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'firefly-collective'), array('status' => 400));
+            return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'alex-strait'), array('status' => 400));
         }
 
-        // Check if user already exists
         if (email_exists($email)) {
-            return new WP_Error('user_exists', __('An account with this email already exists.', 'firefly-collective'), array('status' => 400));
+            return new WP_Error('user_exists', __('An account with this email already exists.', 'alex-strait'), array('status' => 400));
         }
 
-        // Generate a strong random password
-        $password = wp_generate_password();
+        $username = sanitize_user($params['username'] ?? '');
+        $password_input = sanitize_text_field($params['password'] ?? '');
 
-        // Create the user
+        if (!empty($username) || !empty($password_input)) {
+            if (empty($username) || empty($password_input)) {
+                return new WP_Error('invalid_input', __('Please provide both username and password.', 'alex-strait'), array('status' => 400));
+            }
+            if (username_exists($username)) {
+                return new WP_Error('user_exists', __('Username already exists.', 'alex-strait'), array('status' => 400));
+            }
+            $password = $password_input;
+        } else {
+            $password = wp_generate_password();
+            $username = sanitize_user($email, true);
+        }
+
         $userdata = array(
-            'user_login' => sanitize_user($email, true),
+            'user_login' => $username,
             'user_email' => $email,
             'first_name' => $fname,
             'last_name'  => $lname,
@@ -38,13 +48,10 @@
             return new WP_Error('user_creation_failed', $user_id->get_error_message(), array('status' => 500));
         }
 
-        // Update user meta
         if (!empty($phone)) {
             update_user_meta($user_id, 'phone', $phone);
         }
 
-        // User Email
-        // ----------------------------------------------------------------------------------------
         $site_name = get_bloginfo('name');
         $subject = "Thank you for signing up with {$site_name}";
         $html = "
@@ -59,15 +66,12 @@
                     <strong>Email:</strong> {$email}<br>
                     <strong>Phone:</strong> {$phone}
                 </p>
-
                 <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
             </body>
             </html>
             ";
         send_html_mail($email, $subject, $html);
 
-        // Admin Email
-        // ----------------------------------------------------------------------------------------
         $subject = "{$fname} {$lname} has signed up on the website!";
         $html = "
             <html>
@@ -81,13 +85,11 @@
                     <strong>Email:</strong> {$email}<br>
                     <strong>Phone:</strong> {$phone}
                 </p>
-
                 <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
             </body>
             </html>
             ";
         send_html_mail(NULL, $subject, $html, true);
-        // ----------------------------------------------------------------------------------------
 
-        return rest_ensure_response(array('message' => __('Signup successful!', 'firefly-collective')));
+        return rest_ensure_response(array('message' => __('Signup successful!', 'alex-strait')));
     }

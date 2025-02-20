@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const themePath = myApi.themePath;
     const logoNameEle = document.querySelector('#logo-name');
     const maxBlogsPerPage = parseInt(myApi.maxBlogs);
+    let usernameValid = true;
+    let emailValid = true;
     let blogPageNum = 2;
     let blogFilterOptions = {
         category_id: '',
@@ -26,9 +28,95 @@ document.addEventListener('DOMContentLoaded', function () {
             break;
 
         case 'signup':
-            const signupBtn = document.getElementById('signup-btn');
-            if (signupBtn) {
-                signupBtn.addEventListener('click', signup);
+            const joinNowBtn = document.getElementById('join-now-btn');
+            if (joinNowBtn) {
+                joinNowBtn.addEventListener('click', signup);
+            }
+            const enableUsernamePassword = document.getElementById('enable-username-password');
+            if (enableUsernamePassword) {
+                enableUsernamePassword.addEventListener('change', function() {
+                    const fields = document.getElementById('username-password-fields');
+                    fields.style.display = this.checked ? 'block' : 'none';
+                    if (!this.checked) {
+                        usernameValid = true;
+                        const usernameInput = document.getElementById('signup-form-username');
+                        if (usernameInput) {
+                            usernameInput.classList.remove('error');
+                        }
+                        updateJoinButtonState();
+                    }
+                });
+            }
+            const togglePassword = document.getElementById('toggle-password');
+            if (togglePassword) {
+                togglePassword.addEventListener('click', function() {
+                    const passwordInput = document.getElementById('signup-form-password');
+                    passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+                });
+            }
+            // Email validation on blur
+            const emailInput = document.getElementById('signup-form-email');
+            if (emailInput) {
+                emailInput.addEventListener('blur', function() {
+                    const errorTxt = document.getElementById('error-txt');
+                    const email = emailInput.value.trim();
+                    if (email.length > 0) {
+                        fetch(`${myApi.api_url}check-email?email=${encodeURIComponent(email)}`, {
+                            method: 'GET',
+                            headers: { 'X-WP-Nonce': myApi.nonce }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.exists) {
+                                errorTxt.innerHTML = 'Email already exists.';
+                                emailInput.classList.add('error');
+                                emailValid = false;
+                            } else {
+                                if (errorTxt.innerHTML === 'Email already exists.') {
+                                    errorTxt.innerHTML = '';
+                                }
+                                emailInput.classList.remove('error');
+                                emailValid = true;
+                            }
+                            updateJoinButtonState();
+                        })
+                        .catch(error => {
+                            console.error('Error checking email:', error);
+                        });
+                    }
+                });
+            }
+            // Username validation on blur
+            const usernameInput = document.getElementById('signup-form-username');
+            if (usernameInput) {
+                usernameInput.addEventListener('blur', function() {
+                    const errorTxt = document.getElementById('error-txt');
+                    const username = usernameInput.value.trim();
+                    if (username.length > 0 && enableUsernamePassword.checked) {
+                        fetch(`${myApi.api_url}check-username?username=${encodeURIComponent(username)}`, {
+                            method: 'GET',
+                            headers: { 'X-WP-Nonce': myApi.nonce }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.exists) {
+                                errorTxt.innerHTML = 'Username already exists.';
+                                usernameInput.classList.add('error');
+                                usernameValid = false;
+                            } else {
+                                if (errorTxt.innerHTML === 'Username already exists.') {
+                                    errorTxt.innerHTML = '';
+                                }
+                                usernameInput.classList.remove('error');
+                                usernameValid = true;
+                            }
+                            updateJoinButtonState();
+                        })
+                        .catch(error => {
+                            console.error('Error checking username:', error);
+                        });
+                    }
+                });
             }
             break;
         
@@ -189,60 +277,82 @@ document.addEventListener('DOMContentLoaded', function () {
         const phoneInput = document.getElementById('signup-form-phone');
         const emailInput = document.getElementById('signup-form-email');
         const errorTxt = document.getElementById('error-txt');
-        const signupButton = this;
-
+        const joinNowBtn = document.getElementById('signup-btn');
+    
         let fname = fnameInput.value.trim();
         let lname = lnameInput.value.trim();
         let phone = phoneInput.value.trim();
         let email = emailInput.value.trim();
-
+    
         errorTxt.innerHTML = '';
-
+    
         let validationErrors = validateSignup(fname, lname, email, phone);
+        
+        const enableUsernamePassword = document.getElementById('enable-username-password');
+        let username = '';
+        let password = '';
+        if (enableUsernamePassword.checked) {
+            const usernameInput = document.getElementById('signup-form-username');
+            const passwordInput = document.getElementById('signup-form-password');
+            username = usernameInput.value.trim();
+            password = passwordInput.value.trim();
+            if (!username) validationErrors.push('Username is required.');
+            if (!password) validationErrors.push('Password is required.');
+            else if (password.length < 6) validationErrors.push('Password must be at least 6 characters.');
+        }
+    
         if (validationErrors.length > 0) {
             errorTxt.innerHTML = validationErrors.join('<br>');
             return;
         }
-
-        signupButton.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
-
+    
+        joinNowBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+    
         let formData = new FormData();
         formData.append('fname', fname);
         formData.append('lname', lname);
         formData.append('phone', phone);
         formData.append('email', email);
-
+        if (enableUsernamePassword.checked) {
+            formData.append('username', username);
+            formData.append('password', password);
+        }
+    
         fetch(`${myApi.api_url}submit-signup`, {
             method: 'POST',
-            headers: {
-                'X-WP-Nonce': myApi.nonce
-            },
+            headers: { 'X-WP-Nonce': myApi.nonce },
             body: formData,
         })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.message || 'An error occurred.');
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.message === 'Signup successful!') {
-                    signupButton.textContent = data.message;
-                    signupButton.style.cursor = 'auto';
-                    signupButton.removeEventListener('click', signup);
-                } else {
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
                     throw new Error(data.message || 'An error occurred.');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.message === 'Signup successful!') {
+                joinNowBtn.innerHTML = data.message;
+                joinNowBtn.style.cursor = 'auto';
+            } else {
+                throw new Error(data.message || 'An error occurred.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            errorTxt.textContent = error.message || 'An error occurred.';
+            if (error.message.indexOf('Username already exists') !== -1) {
+                const usernameInput = document.getElementById('signup-form-username');
+                if (usernameInput) {
+                    usernameInput.classList.add('error');
+                    usernameInput.focus();
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                errorTxt.textContent = error.message || 'An error occurred.';
-                signupButton.textContent = 'Join Now';
-            });
+            }
+            joinNowBtn.textContent = 'Join Now';
+        });
     }
-
+    
     function validateSignup(fname, lname, email, phone) {
         let errors = [];
         if (!fname) errors.push('First name is required.');
@@ -250,6 +360,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!isValidEmail(email)) errors.push('Valid email is required.');
         if (phone && !isValidPhoneNumber(phone)) errors.push('Valid phone number is required.');
         return errors;
+    }
+
+    function updateJoinButtonState() {
+        const joinNowBtn = document.getElementById('join-now-btn');
+        if (joinNowBtn) {
+            joinNowBtn.disabled = !(usernameValid && emailValid);
+        }
     }
 
     function prependBlogHTML(blog) {
