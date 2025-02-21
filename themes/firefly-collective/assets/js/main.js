@@ -28,9 +28,21 @@ document.addEventListener('DOMContentLoaded', function () {
             break;
 
         case 'signup':
-            const joinNowBtn = document.getElementById('join-now-btn');
-            if (joinNowBtn) {
-                joinNowBtn.addEventListener('click', signup);
+            const signUpBtn = document.getElementById('signup-btn');
+            if (signUpBtn) {
+                signUpBtn.addEventListener('click', signup);
+            }
+            const signupMethodRadios = document.getElementsByName('signup-method');
+            for (let radio of signupMethodRadios) {
+                radio.addEventListener('change', function() {
+                    if (this.value === 'direct') {
+                        document.getElementById('direct-signup-fields').style.display = 'block';
+                        document.getElementById('third-party-signup-fields').style.display = 'none';
+                    } else if (this.value === 'third') {
+                        document.getElementById('direct-signup-fields').style.display = 'none';
+                        document.getElementById('third-party-signup-fields').style.display = 'block';
+                    }
+                });
             }
             const enableUsernamePassword = document.getElementById('enable-username-password');
             if (enableUsernamePassword) {
@@ -118,6 +130,34 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
             }
+            // Google sign-in button
+            const googleSigninBtn = document.getElementById('google-signin');
+            if (googleSigninBtn) {
+                googleSigninBtn.addEventListener('click', function(e) {
+                    // Construct the OAuth URL using the localized domain.
+                    let googleAuthUrl = myApi.gapiDomain + '/wp-json/custom-api/v1/google-auth-init';
+                    
+                    // Calculate dimensions: maximum is 1024, otherwise use 95% of screen dimensions.
+                    let width  = Math.min(1024, screen.width * 0.95);
+                    let height = Math.min(1024, screen.height * 0.95);
+                    
+                    // Center the popup on the screen.
+                    let left = (screen.width - width) / 2;
+                    let top  = (screen.height - height) / 2;
+                    
+                    window.open(googleAuthUrl, 'Google Signin', `width=${width},height=${height},top=${top},left=${left}`);
+                });
+            }
+
+            window.addEventListener('message', function(event) {
+                // Optionally, check event.origin for security if your domains are known.
+                if (event.data && event.data.type === 'googleSignupSuccess') {
+                    const googleSignInBtnEle = document.querySelector('#google-signin-btn');
+                    if (googleSignInBtnEle) {
+                        googleSignInBtnEle.innerHTML = event.data.message;
+                    }
+                }
+            });
             break;
         
         case 'request-an-appointment':
@@ -277,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const phoneInput = document.getElementById('signup-form-phone');
         const emailInput = document.getElementById('signup-form-email');
         const errorTxt = document.getElementById('error-txt');
-        const joinNowBtn = document.getElementById('signup-btn');
+        const signUpBtn = document.getElementById('signup-btn');
     
         let fname = fnameInput.value.trim();
         let lname = lnameInput.value.trim();
@@ -306,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
     
-        joinNowBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+        signUpBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
     
         let formData = new FormData();
         formData.append('fname', fname);
@@ -333,8 +373,8 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             if (data.message === 'Signup successful!') {
-                joinNowBtn.innerHTML = data.message;
-                joinNowBtn.style.cursor = 'auto';
+                signUpBtn.innerHTML = data.message;
+                signUpBtn.style.cursor = 'auto';
             } else {
                 throw new Error(data.message || 'An error occurred.');
             }
@@ -349,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     usernameInput.focus();
                 }
             }
-            joinNowBtn.textContent = 'Join Now';
+            signUpBtn.textContent = 'Join Now';
         });
     }
     
@@ -363,10 +403,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateJoinButtonState() {
-        const joinNowBtn = document.getElementById('join-now-btn');
-        if (joinNowBtn) {
-            joinNowBtn.disabled = !(usernameValid && emailValid);
+        const signUpBtn = document.getElementById('signup-btn');
+        if (signUpBtn) {
+            signUpBtn.disabled = !(usernameValid && emailValid);
         }
+    }
+
+    function updateGoogleSigninBtn(msg) {
+        const googleSignInBtnEle = document.querySelector('#google-signin-btn');
+        googleSignInBtnEle.innerHTML = msg;
     }
 
     function prependBlogHTML(blog) {

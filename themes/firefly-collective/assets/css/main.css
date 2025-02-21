@@ -235,9 +235,6 @@ footer {
 }
 
 /* Signup/Bookings */
-
-/* Signup/Bookings */
-
 .signup-form,
 .signup-form > div {
   display: grid;
@@ -305,9 +302,14 @@ footer {
   min-height: 20vh;
 }
 
+.party-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
 #signup-btn {
   position: absolute;
-  bottom: 0;
+  bottom: -5vh;
   left: 50%;
   transform: translateX(-50%);
   width: 40%;
@@ -342,7 +344,7 @@ footer {
 }
 
 input.error {
-    border: 2px solid red;
+  border: 2px solid red;
 }
 
 .loader {

@@ -32,7 +32,8 @@
             'nonce'   => $nonce,
             'api_url' => esc_url_raw(rest_url('custom-api/v1/')), // Base API URL
             'themePath' => $theme_path,
-            'maxBlogs' => 15
+            'maxBlogs' => 15,
+            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
 
         if (determine_view() === 'request-an-appointment') {
