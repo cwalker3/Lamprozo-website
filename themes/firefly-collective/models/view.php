@@ -23,7 +23,8 @@
             // Valid custom URLs
             $valid_views = array('contact',
                                 'signup',
-                                'request-an-appointment');
+                                'request-an-appointment',
+                                'login');
 
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists
@@ -46,3 +47,31 @@
         }
     }
     add_action('template_redirect', 'handle_custom_views');
+
+    // Only remove the default admin redirect when the request is for /login.
+    add_action( 'init', 'conditionally_remove_default_redirect' );
+    function conditionally_remove_default_redirect() {
+        $current_path = untrailingslashit( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
+        if ( $current_path === '/login' ) {
+            remove_action( 'template_redirect', 'wp_redirect_admin_locations', 1000 );
+        }
+    }
+
+    // Only trigger our custom auth_redirect_scheme filter on /login.
+    add_filter( 'auth_redirect_scheme', 'conditional_stop_redirect', 9999 );
+    function conditional_stop_redirect( $scheme ) {
+        $current_path = untrailingslashit( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
+        // If not /login, do nothing.
+        if ( $current_path !== '/login' ) {
+            return $scheme;
+        }
+        // If the user is validated, let the scheme remain.
+        if ( wp_validate_auth_cookie( '', $scheme ) ) {
+            return $scheme;
+        }
+        // Otherwise, force a 404 for /login.
+        global $wp_query;
+        $wp_query->set_404();
+        get_template_part( '404' );
+        exit();
+    }

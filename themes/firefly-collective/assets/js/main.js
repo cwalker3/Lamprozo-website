@@ -409,11 +409,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function updateGoogleSigninBtn(msg) {
-        const googleSignInBtnEle = document.querySelector('#google-signin-btn');
-        googleSignInBtnEle.innerHTML = msg;
-    }
-
     function prependBlogHTML(blog) {
         let blogsContainer = document.querySelector('.blogs');
         let moreBlogsLoader = document.getElementById('more-blogs-loader');

@@ -143,8 +143,9 @@
         if ($existing_user) {
             update_user_meta($existing_user->ID, 'third_party', 'google');
             // Alert the user that they've already signed up, then close the window.
-            $html = '<b>You have already signed up with this account. Window closing...</b>
-                    <script>window.close(); updateGoogleSigninBtn(\'You have already signed up with this account\');</script>';
+            $html = '<script>window.opener.postMessage({ type: "googleSignupSuccess", message: "You have already signed up with this account." }, "*");
+                    // Then close the popup after a short delay to ensure the message is sent
+                    setTimeout(function(){ window.close(); }, 500);</script>';
             return new WP_REST_Response($html, 200, $response_headers);
         } else {
             $username = sanitize_user($email, true);
@@ -162,6 +163,9 @@
                 return new WP_REST_Response('Could not create user', 500, $response_headers);
             }
             update_user_meta($user_id, 'third_party', 'google');
+            wp_set_auth_cookie( $user_id, false );
+            wp_set_current_user( $user_id );
+
             // For a new user, simply close the window.
             $html = '<script>
                         // Send a message to the opener (parent window)

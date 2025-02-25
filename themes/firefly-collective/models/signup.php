@@ -10,11 +10,11 @@
         $phone = sanitize_text_field($params['phone'] ?? '');
 
         if (empty($fname) || empty($lname) || empty($email) || !is_email($email)) {
-            return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'alex-strait'), array('status' => 400));
+            return new WP_Error('invalid_input', __('Please provide valid first name, last name, and email.', 'firefly-collective'), array('status' => 400));
         }
 
         if (email_exists($email)) {
-            return new WP_Error('user_exists', __('An account with this email already exists.', 'alex-strait'), array('status' => 400));
+            return new WP_Error('user_exists', __('An account with this email already exists.', 'firefly-collective'), array('status' => 400));
         }
 
         $username = sanitize_user($params['username'] ?? '');
@@ -22,10 +22,10 @@
 
         if (!empty($username) || !empty($password_input)) {
             if (empty($username) || empty($password_input)) {
-                return new WP_Error('invalid_input', __('Please provide both username and password.', 'alex-strait'), array('status' => 400));
+                return new WP_Error('invalid_input', __('Please provide both username and password.', 'firefly-collective'), array('status' => 400));
             }
             if (username_exists($username)) {
-                return new WP_Error('user_exists', __('Username already exists.', 'alex-strait'), array('status' => 400));
+                return new WP_Error('user_exists', __('Username already exists.', 'firefly-collective'), array('status' => 400));
             }
             $password = $password_input;
         } else {
@@ -91,5 +91,5 @@
             ";
         send_html_mail(NULL, $subject, $html, true);
 
-        return rest_ensure_response(array('message' => __('Signup successful!', 'alex-strait')));
+        return rest_ensure_response(array('message' => __('Signup successful!', 'firefly-collective')));
     }
