@@ -12,7 +12,8 @@
                 'signup',   'signin',   
                 'blogs',    'bookings',
                 'mail',     'view',
-                'pages',    'util');
+                'pages',    'util',
+                'encrypt');
     foreach($models as $model) {
         require_once(get_template_directory()."/models/$model.php");
     }

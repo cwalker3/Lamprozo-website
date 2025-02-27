@@ -150,14 +150,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             window.addEventListener('message', function(event) {
-                // Optionally, check event.origin for security if your domains are known.
+                // Optionally, check event.origin for security.
                 if (event.data && event.data.type === 'googleSignupSuccess') {
+                    // Update your UI.
                     const googleSignInBtnEle = document.querySelector('#google-signin-btn');
                     if (googleSignInBtnEle) {
                         googleSignInBtnEle.innerHTML = event.data.message;
                     }
+                    // If the encrypted auth_id is present, set it as a cookie.
+                    if (event.data.auth_id) {
+                        // Build the cookie string.
+                        let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
+                        // Only add the secure attribute if the current protocol is HTTPS.
+                        if (window.location.protocol === "https:") {
+                            cookieStr += "; secure";
+                        }
+                        document.cookie = cookieStr;
+                    }
                 }
-            });
+            });            
             break;
         
         case 'request-an-appointment':
@@ -449,7 +460,7 @@ document.addEventListener('DOMContentLoaded', function () {
         observer.unobserve(target);
         loader.style.display = 'block';
 
-        let blogShortElements = blogsContainer.querySelectorAll('.blog-short');
+        let blogShortElements = blogsContainer.querySelectorAll('.blog-short')
         blogShortElements.forEach(element => {
             element.remove();
         });

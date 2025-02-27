@@ -1,6 +1,8 @@
 <?php
 
-    // Handle Signup Submission
+    /**
+     * Handle Signup Submission.
+     */
     function handle_signup_submission(WP_REST_Request $request) {
         $params = $request->get_params();
 
@@ -52,6 +54,7 @@
             update_user_meta($user_id, 'phone', $phone);
         }
 
+        // Send welcome email to the new user.
         $site_name = get_bloginfo('name');
         $subject = "Thank you for signing up with {$site_name}";
         $html = "
@@ -72,6 +75,7 @@
             ";
         send_html_mail($email, $subject, $html);
 
+        // Send notification email to admin.
         $subject = "{$fname} {$lname} has signed up on the website!";
         $html = "
             <html>
@@ -90,6 +94,21 @@
             </html>
             ";
         send_html_mail(NULL, $subject, $html, true);
+
+        // Encrypt the user ID using our encryption function.
+        $encrypted_user_id = encrypt_with_auth_key($user_id);
+
+        // Set the auth_id cookie using PHP's setcookie().
+        // Adjust the domain parameter if needed (omit or set to your domain).
+        $cookie_options = [
+            'expires'  => time() + 3600,  // 1 hour
+            'path'     => '/',
+            // 'domain'   => 'yourdomain.com', // Uncomment and set for production if required.
+            'secure'   => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ];
+        setcookie('auth_id', $encrypted_user_id, $cookie_options);
 
         return rest_ensure_response(array('message' => __('Signup successful!', 'firefly-collective')));
     }
