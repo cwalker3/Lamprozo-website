@@ -1,4 +1,5 @@
 <?php
+    
     function check_username_exists(WP_REST_Request $request) {
         $username = sanitize_user($request->get_param('username') ?? '');
         if (empty($username)) {
@@ -24,13 +25,11 @@
         $scope        = 'email profile';
         $state        = wp_create_nonce('google_auth_state');
 
-        // Use our defined GOOGLE_API_DOMAIN for cookie and URL.
-        $host = GOOGLE_API_DOMAIN; // must exactly match the domain in DevTools
+        $host = GOOGLE_API_DOMAIN;
         $cookie_name  = 'google_auth_state';
         $cookie_value = urlencode($state);
-        $max_age      = 300; // 5 minutes
+        $max_age      = 300;
 
-        // Build cookie header using lowercase attribute names.
         $cookie_parts = [
             "{$cookie_name}={$cookie_value}",
             "path=/",
@@ -46,7 +45,6 @@
         }
         $cookie_header = implode("; ", $cookie_parts);
         
-        // Build the authorization URL.
         $params = [
             'client_id'     => $client_id,
             'redirect_uri'  => $redirect_uri,
@@ -57,7 +55,6 @@
         ];
         $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
         
-        // Send a 302 redirect along with the cookie header.
         $response = new WP_REST_Response('', 302, ['Location' => $auth_url]);
         $response->header('Set-Cookie', $cookie_header, false);
         $response->header('Content-Type', 'text/html');
@@ -71,13 +68,11 @@
      * google_auth_callback: Handles the OAuth callback from Google.
      */
     function google_auth_callback(WP_REST_Request $request) {
-        // Retrieve 'code' and 'state' from the request.
         $code  = sanitize_text_field($request->get_param('code') ?? '');
         $state = sanitize_text_field($request->get_param('state') ?? '');
         
         error_log("google_auth_callback: Received state: $state");
         
-        // Check if the temporary 'google_auth_state' cookie exists.
         if (empty($_COOKIE['google_auth_state'])) {
             error_log("google_auth_callback: Cookie 'google_auth_state' is missing.");
             $response = new WP_REST_Response('Invalid state: cookie missing', 400);
@@ -86,7 +81,6 @@
         }
         error_log("google_auth_callback: Cookie 'google_auth_state': " . $_COOKIE['google_auth_state']);
         
-        // Verify the state matches the cookie value.
         if ($_COOKIE['google_auth_state'] !== $state) {
             error_log("google_auth_callback: State mismatch: cookie (" . $_COOKIE['google_auth_state'] . ") vs received ($state)");
             $response = new WP_REST_Response('Invalid state', 400);
@@ -94,11 +88,9 @@
             return $response;
         }
         
-        // --- Delete the temporary google_auth_state cookie ---
-        // Must match the same attributes as when it was set.
         $host = GOOGLE_API_DOMAIN;
         setcookie('google_auth_state', 'deleted', [
-            'expires'  => time() - 3600, // expired in the past
+            'expires'  => time() - 3600,
             'path'     => '/',
             'domain'   => $host,
             'secure'   => is_ssl(),
@@ -106,19 +98,16 @@
             'samesite' => 'Lax'
         ]);
         
-        // If no authorization code is provided, return an error.
         if (empty($code)) {
             $response = new WP_REST_Response('Missing code parameter', 400);
             $response->header('Content-Type', 'text/html');
             return $response;
         }
         
-        // Set up OAuth parameters.
         $client_id     = defined('GOOGLE_CLIENT_ID') ? GOOGLE_CLIENT_ID : '';
         $client_secret = defined('GOOGLE_CLIENT_SECRET') ? GOOGLE_CLIENT_SECRET : '';
         $redirect_uri  = defined('GOOGLE_REDIRECT_URI') ? GOOGLE_REDIRECT_URI : home_url('/wp-json/custom-api/v1/google-auth-callback');
         
-        // Exchange the code for an access token.
         $token_response = wp_remote_post('https://oauth2.googleapis.com/token', [
             'body' => [
                 'code'          => $code,
@@ -142,7 +131,6 @@
         }
         $access_token = sanitize_text_field($token_json['access_token']);
         
-        // Retrieve the user's profile from Google.
         $profile_response = wp_remote_get('https://www.googleapis.com/oauth2/v2/userinfo', [
             'headers' => ['Authorization' => 'Bearer ' . $access_token]
         ]);
@@ -154,7 +142,6 @@
         $profile_body = wp_remote_retrieve_body($profile_response);
         $profile_json = json_decode($profile_body, true);
         
-        // Extract user information.
         $email = sanitize_email($profile_json['email'] ?? '');
         $fname = sanitize_text_field($profile_json['given_name'] ?? '');
         $lname = sanitize_text_field($profile_json['family_name'] ?? '');
@@ -165,16 +152,13 @@
             return $response;
         }
         
-        // Initialize variables for HTML message and auth_id.
         $html = '';
         $auth_id = '';
         
-        // Check if the user already exists.
         if ($existing_user = get_user_by('email', $email)) {
             update_user_meta($existing_user->ID, 'third_party', 'google');
             $auth_id = $existing_user->ID;
         } else {
-            // Create a new user.
             $username = sanitize_user($email, true);
             $password = wp_generate_password();
             $userdata = [
@@ -197,32 +181,68 @@
         
         $encrypted_user_id = encrypt_with_auth_key($auth_id);
         
-        // Build a JavaScript snippet to send the encrypted user ID to the parent window.
-        // The parent page should then set the cookie on its own domain.
         $html = '<script>
                     var encryptedUserId = "' . esc_js($encrypted_user_id) . '";
                     window.opener.postMessage(
-                      { type: "googleSignupSuccess", message: "Sign-in successful!", auth_id: encryptedUserId },
-                      "*"
+                        { type: "googleSignupSuccess", message: "Sign-in successful!", auth_id: encryptedUserId },
+                        "*"
                     );
+                    window.opener.location.href = "/dashboard";
                     setTimeout(function(){ window.close(); }, 500);
-                 </script>';
+                </script>';
         
-        // Return the HTML message.
         $response = new WP_REST_Response($html, 200);
         $response->header('Content-Type', 'text/html');
         return $response;
     }
 
+    function decrypt_current_user($encrypted_user_id) {
+        $auth_id = decrypt_with_auth_key($encrypted_user_id);
+        $user_id = intval($auth_id);
+        $user = get_user_by('id', $user_id);
+        if ($user) {
+            wp_set_current_user($user->ID, $user->user_login);
+            wp_set_auth_cookie($user->ID);
+        }
+
+        $current_user = wp_get_current_user();
+        return $current_user;
+    }
 
     add_filter('rest_pre_serve_request', function($served, $result, $request, $server) {
         $headers = $result->get_headers();
         if ( isset($headers['Content-Type']) && strpos($headers['Content-Type'], 'text/html') !== false ) {
-            // Send headers
             header('Content-Type: text/html; charset=UTF-8');
-            // Output the response body directly.
             echo $result->get_data();
-            return true; // We've served the request.
+            return true;
         }
         return $served;
     }, 10, 4);
+
+    // Redirect on login pages.
+    add_action('login_init', function() {
+        if (isset($_COOKIE['auth_id'])) {
+            wp_safe_redirect(home_url('/dashboard'));
+            exit;
+        }
+    });
+
+    function custom_google_signin_button() {
+        ?>
+        <div class="google-signin-container">
+            <button id="google-signin" class="google-signin-button">
+                Sign in with Google
+            </button>
+        </div>
+        <?php
+    }
+    add_action('login_form', 'custom_google_signin_button');
+
+    // Redirect on admin pages.
+    add_action('admin_init', function() {
+        // Avoid interfering with AJAX requests.
+        if (isset($_COOKIE['auth_id']) && !(defined('DOING_AJAX') && DOING_AJAX)) {
+            wp_safe_redirect(home_url('/dashboard'));
+            exit;
+        }
+    });

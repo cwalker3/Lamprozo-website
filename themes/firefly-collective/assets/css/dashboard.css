@@ -1,0 +1,59 @@
+:root {
+    --profileMaxWidth: 500px;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+#profile-container {
+    width: 100%;
+    max-width: var(--profileMaxWidth);
+    margin: 20px auto;
+    border-radius: 5px;
+    background: #1c1c1c;
+}
+
+#profile-container form {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    margin: 0;
+}
+
+#profile-container > form > div:first-child {
+    margin-bottom: 15px;
+}
+
+#profile-container input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+#profile-container button {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 3px;
+    background: #0073aa;
+    color: #fff;
+    cursor: pointer;
+}
+#profile-container button:hover {
+    background: #005177;
+}
+
+#profile-message {
+    color: green;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 800px) {
+    :root {
+        --profileMaxWidth: 300px;
+    }
+}

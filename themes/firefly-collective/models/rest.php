@@ -42,6 +42,18 @@ function register_custom_api_endpoints() {
         'permission_callback' => 'verify_rest_nonce',
     ));
     
+    register_rest_route('custom-api/v1', '/update-profile', array(
+        'methods'             => 'POST',
+        'callback'            => 'handle_profile_update',
+        'permission_callback' => 'verify_rest_nonce',
+    ));
+    
+    register_rest_route('custom-api/v1', '/reset-password', array(
+        'methods'             => 'POST',
+        'callback'            => 'handle_password_reset',
+        'permission_callback' => 'verify_rest_nonce',
+    ));
+    
     register_rest_route('custom-api/v1', '/google-auth-init', array(
         'methods'             => 'GET',
         'callback'            => 'google_auth_init',

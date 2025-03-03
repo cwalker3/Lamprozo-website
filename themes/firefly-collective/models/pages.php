@@ -18,6 +18,10 @@
                 'title'   => 'Signup',
                 'content' => 'This is the signup page.',
             ),
+            'dashboard' => array(
+                'title'   => 'Dashboard',
+                'content' => 'This is the dashboard page.',
+            )
         );
 
         $page_ids = array();

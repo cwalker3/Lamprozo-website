@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
                 });
             }
-            // Email validation on blur
             const emailInput = document.getElementById('signup-form-email');
             if (emailInput) {
                 emailInput.addEventListener('blur', function() {
@@ -98,7 +97,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
             }
-            // Username validation on blur
             const usernameInput = document.getElementById('signup-form-username');
             if (usernameInput) {
                 usernameInput.addEventListener('blur', function() {
@@ -129,47 +127,77 @@ document.addEventListener('DOMContentLoaded', function () {
                         });
                     }
                 });
-            }
-            // Google sign-in button
-            const googleSigninBtn = document.getElementById('google-signin');
-            if (googleSigninBtn) {
-                googleSigninBtn.addEventListener('click', function(e) {
-                    // Construct the OAuth URL using the localized domain.
-                    let googleAuthUrl = myApi.gapiDomain + '/wp-json/custom-api/v1/google-auth-init';
-                    
-                    // Calculate dimensions: maximum is 1024, otherwise use 95% of screen dimensions.
-                    let width  = Math.min(1024, screen.width * 0.95);
-                    let height = Math.min(1024, screen.height * 0.95);
-                    
-                    // Center the popup on the screen.
-                    let left = (screen.width - width) / 2;
-                    let top  = (screen.height - height) / 2;
-                    
-                    window.open(googleAuthUrl, 'Google Signin', `width=${width},height=${height},top=${top},left=${left}`);
-                });
-            }
-
-            window.addEventListener('message', function(event) {
-                // Optionally, check event.origin for security.
-                if (event.data && event.data.type === 'googleSignupSuccess') {
-                    // Update your UI.
-                    const googleSignInBtnEle = document.querySelector('#google-signin-btn');
-                    if (googleSignInBtnEle) {
-                        googleSignInBtnEle.innerHTML = event.data.message;
-                    }
-                    // If the encrypted auth_id is present, set it as a cookie.
-                    if (event.data.auth_id) {
-                        // Build the cookie string.
-                        let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
-                        // Only add the secure attribute if the current protocol is HTTPS.
-                        if (window.location.protocol === "https:") {
-                            cookieStr += "; secure";
-                        }
-                        document.cookie = cookieStr;
-                    }
-                }
-            });            
+            }          
             break;
+        
+            case 'dashboard':
+                // Update profile handler
+                const updateProfileBtn = document.getElementById('update-profile-btn');
+                if (updateProfileBtn) {
+                    updateProfileBtn.addEventListener('click', () => {
+                        const firstName = document.getElementById('profile-first-name').value.trim();
+                        const lastName = document.getElementById('profile-last-name').value.trim();
+                        const email = document.getElementById('profile-email').value.trim();
+                        const profileMessage = document.getElementById('profile-message');
+                        profileMessage.innerHTML = '';
+                        updateProfileBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+                        let formData = new FormData();
+                        formData.append('first_name', firstName);
+                        formData.append('last_name', lastName);
+                        formData.append('email', email);
+                        fetch(`${myApi.api_url}update-profile`, {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': myApi.nonce },
+                            body: formData,
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(data => {
+                                    throw new Error(data.message || 'An error occurred.');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            profileMessage.textContent = data.message || 'Profile updated successfully.';
+                            updateProfileBtn.textContent = 'Update Profile';
+                        })
+                        .catch(error => {
+                            profileMessage.textContent = error.message || 'An error occurred.';
+                            updateProfileBtn.textContent = 'Update Profile';
+                        });
+                    });
+                }
+                // Reset password handler
+                const resetPasswordBtn = document.getElementById('reset-password-btn');
+                if (resetPasswordBtn) {
+                    resetPasswordBtn.addEventListener('click', () => {
+                        const profileMessage = document.getElementById('profile-message');
+                        profileMessage.innerHTML = '';
+                        resetPasswordBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+                        fetch(`${myApi.api_url}reset-password`, {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': myApi.nonce },
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(data => {
+                                    throw new Error(data.message || 'An error occurred.');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            profileMessage.textContent = data.message || 'Password reset email sent.';
+                            resetPasswordBtn.textContent = 'Send Password Reset';
+                        })
+                        .catch(error => {
+                            profileMessage.textContent = error.message || 'An error occurred.';
+                            resetPasswordBtn.textContent = 'Send Password Reset';
+                        });
+                    });
+                }
+                break;
         
         case 'request-an-appointment':
             let bookAnAppointmentBtn = document.querySelector('#book-an-appointment-btn');
@@ -383,11 +411,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return response.json();
         })
         .then(data => {
-            if (data.message === 'Signup successful!') {
-                signUpBtn.innerHTML = data.message;
-                signUpBtn.style.cursor = 'auto';
+            if (data.redirect) {
+                window.location.href = data.redirect;
             } else {
-                throw new Error(data.message || 'An error occurred.');
+                throw new Error('No redirect specified.');
             }
         })
         .catch(error => {
@@ -412,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (phone && !isValidPhoneNumber(phone)) errors.push('Valid phone number is required.');
         return errors;
     }
-
+    
     function updateJoinButtonState() {
         const signUpBtn = document.getElementById('signup-btn');
         if (signUpBtn) {

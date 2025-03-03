@@ -1,0 +1,26 @@
+.google-signin-container {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.google-signin-button {
+    background: #4285F4;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.google-signin-button:hover {
+    background: #357ae8;
+}
+
+#welcome-msg {
+    position: absolute; 
+    top: 20px; 
+    right: 20px; 
+    font-size: 1rem;
+}

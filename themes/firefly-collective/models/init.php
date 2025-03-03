@@ -47,6 +47,26 @@
                 'admin_settings' => get_admin_settings()
             ));
         }
+
+        if (determine_view() === 'signup') {
+            wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $unique_id, true);
+        }
+
+        if (determine_view() === 'dashboard') {
+            $theme_path = get_template_directory_uri();
+            wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
+            wp_enqueue_style('dashboard-css', $theme_path . '/assets/css/dashboard.css', array(), $unique_id);
+        }
     }
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
+
+    add_action('login_init', function() {
+        $theme_path = get_template_directory_uri();
+        wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
+        wp_enqueue_script('auth', $theme_path . '/assets/js/auth.js', array(), $unique_id, true);
+        wp_localize_script('auth', 'myApi', array(
+            'nonce'   => $nonce,
+            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+        ));
+    });
     
