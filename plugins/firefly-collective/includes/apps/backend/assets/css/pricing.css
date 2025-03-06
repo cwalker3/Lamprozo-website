@@ -1,0 +1,182 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow-y: scroll !important;
+}
+body {
+    font-family: Arial, sans-serif;
+}
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+}
+#pricing-form {
+    display: grid;
+}
+#pricing-form button.add-button {
+    justify-self: end;
+}
+h1 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 30px;
+}
+.feature {
+    border: 1px solid #ddd;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.feature-header {
+    cursor: pointer;
+    background-color: #0073aa;
+    color: #fff;
+    padding: 10px 15px;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.feature-header:hover {
+    background-color: #005177;
+}
+.feature-header-left {
+    display: flex;
+    align-items: center;
+}
+.feature-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.toggle-indicator {
+    font-size: 1.2em;
+    color: white; /* White plus/minus */
+}
+/* Accordion style: use max-height with transition */
+.feature-content {
+    padding: 0 15px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    margin-bottom: 15px;
+}
+.feature-content.open {
+    padding: 15px;
+}
+.option {
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    background: #fafafa;
+}
+.addon {
+    background-color: #e9f7ff !important;
+    margin-left: 20px;
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+.field-group {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+.field-group label {
+    width: 150px;
+    font-weight: bold;
+}
+/* Make checkboxes auto-width, so they don't stretch */
+.field-group input[type="checkbox"] {
+    max-width: 15px;
+    margin-left: 0;
+}
+.field-group input,
+.field-group select,
+.field-group textarea {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+/* Dim disabled fields */
+input[disabled], select[disabled], textarea[disabled] {
+    opacity: 0.4;
+}
+.button-row {
+    text-align: right;
+    margin-top: 10px;
+}
+.button-group {
+    width: 100%;
+    text-align: center;
+    margin-top: 20px;
+}
+button,
+.add-button,
+.delete-button {
+    cursor: pointer !important;
+}
+#apply-button {
+    background-color: #0073aa !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    margin: 5px !important;
+    cursor: pointer !important;
+    border-radius: 4px !important;
+    transition: background-color 0.3s ease !important;
+    font-size: 14px !important;
+    display: inline-block !important;
+    text-indent: 0 !important;
+    line-height: normal !important;
+}
+.button-group button {
+    background-color: #0073aa;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+.button-group button:hover {
+    background-color: #005177;
+}
+.add-button {
+    background-color: #28a745;
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+.add-button:hover {
+    background-color: #218838;
+}
+.delete-button {
+    background-color: #dc3545;
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+.delete-button:hover {
+    background-color: #c82333;
+}
+.fade-in {
+    opacity: 0;
+    animation: fadeIn 0.5s forwards;
+}
+.fade-out {
+    animation: fadeOut 0.5s forwards;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
