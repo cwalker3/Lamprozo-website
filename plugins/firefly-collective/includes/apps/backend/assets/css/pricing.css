@@ -40,6 +40,7 @@ h1 {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    scroll-margin: 10vh;
 }
 .feature-header:hover {
     background-color: #005177;
@@ -55,17 +56,15 @@ h1 {
 }
 .toggle-indicator {
     font-size: 1.2em;
-    color: white; /* White plus/minus */
+    color: white;
 }
-/* Accordion style: use max-height with transition */
 .feature-content {
-    padding: 0 15px;
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease;
     margin-bottom: 15px;
 }
-.feature-content.open {
+.feature-content-inner {
     padding: 15px;
 }
 .option {
@@ -92,9 +91,11 @@ h1 {
     width: 150px;
     font-weight: bold;
 }
-/* Make checkboxes auto-width, so they don't stretch */
 .field-group input[type="checkbox"] {
-    max-width: 15px;
+    min-height:20px;
+    max-height: 20px;
+    min-width: 20px;
+    max-width: 20px;
     margin-left: 0;
 }
 .field-group input,
@@ -105,23 +106,47 @@ h1 {
     border: 1px solid #ccc;
     border-radius: 4px;
 }
-/* Dim disabled fields */
 input[disabled], select[disabled], textarea[disabled] {
     opacity: 0.4;
 }
 .button-row {
-    text-align: right;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    justify-content: center;
     margin-top: 10px;
+    gap: 1vw;
+}
+.button-row:has(.add-button),
+.button-row:has(.delete-button) {
+    display: block;
+    text-align: right;
+}
+.button-row:has(.add-button) > button,
+.button-row:has(.delete-button) > button {
+    max-width: 20%;
+}
+.button-row > button {
+    width: 70%;
+    justify-self: center;
 }
 .button-group {
     width: 100%;
     text-align: center;
     margin-top: 20px;
 }
+button {
+    color: white;
+}
+.confirm-dialog-content button {
+    color: black;
+}
 button,
 .add-button,
 .delete-button {
     cursor: pointer !important;
+}
+.delete-button {
+    margin-right: 1vw;
 }
 #apply-button {
     background-color: #0073aa !important;
@@ -180,10 +205,6 @@ button,
     from { opacity: 1; }
     to { opacity: 0; }
 }
-
-/* ==============================================
-   Responsive fix: stack labels and inputs
-   ============================================== */
 @media (max-width: 600px) {
   .field-group {
     flex-direction: column;
@@ -198,4 +219,34 @@ button,
   .field-group textarea {
     width: 100%;
   }
+  .button-row:has(.add-button) > button,
+  .button-row:has(.delete-button) > button {
+        max-width: 50%;
+  }
+  .button-row:has(.delete-button) > button {
+    margin-right: 10px;
+    margin-top: 2vh;
+  }
+}
+
+/* Confirmation Dialog */
+.confirm-dialog {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.confirm-dialog.show {
+  display: flex;
+  animation: fadeIn 0.3s forwards;
+}
+.confirm-dialog-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 4px;
+  text-align: center;
+  max-width: 80vw;
 }
