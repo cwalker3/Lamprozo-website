@@ -29,7 +29,6 @@ function handleStaticPriceChange(floorInput, ceilingInput, staticInput) {
  * Save & Load Data in sessionStorage
  *****************************************************/
 function saveData() {
-  console.log("Saving to sessionStorage:", window.pricingData);
   sessionStorage.setItem('pricingData', JSON.stringify(window.pricingData));
 }
 
@@ -773,7 +772,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return Array.from(metrics);
   })(window.pricingData);
 
-  console.log("Initial pricingData:", window.pricingData);
   renderPricingForm(window.pricingData, availableOptionMetrics, availableAddonMetrics);
 
   const applyButton = document.getElementById('apply-button');

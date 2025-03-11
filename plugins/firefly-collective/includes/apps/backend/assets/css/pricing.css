@@ -180,3 +180,22 @@ button,
     from { opacity: 1; }
     to { opacity: 0; }
 }
+
+/* ==============================================
+   Responsive fix: stack labels and inputs
+   ============================================== */
+@media (max-width: 600px) {
+  .field-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .field-group label {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+  .field-group input,
+  .field-group select,
+  .field-group textarea {
+    width: 100%;
+  }
+}
