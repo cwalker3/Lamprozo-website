@@ -19,18 +19,22 @@ function register_plugin_custom_api_endpoints() {
         'permission_callback' => 'verify_rest_nonce'
     ));
 
-    // This route is for the local environment to trigger the project update
     register_rest_route('custom-api/v1', '/update-project', array(
         'methods'             => 'POST',
         'callback'            => 'firefly_collective_local_update_project',
         'permission_callback' => 'verify_rest_nonce'
     ));
 
-    // This route is for the live dev environment to receive the project updates
     register_rest_route('firefly-collective/v1', '/update_project', array(
         'methods'             => 'POST',
         'callback'            => 'firefly_collective_handle_project_update',
         'permission_callback' => '__return_true'
+    ));
+
+    register_rest_route('custom-api/v1', '/save-pricing', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_collective_save_pricing',
+        'permission_callback' => 'verify_rest_nonce'
     ));
 }
 add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

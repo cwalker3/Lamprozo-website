@@ -37,7 +37,9 @@
         }
         // Localize the pricingData variable.
         wp_localize_script('pricing-js', 'pricingData', array(
-            'data' => $pricing_data
+            'data' => $pricing_data,
+            'nonce'  => $nonce,
+            'apiUrl' => $api_url
         ));
 
         // Localize additional settings if needed.
@@ -60,3 +62,15 @@
             wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
         }
     }
+
+    function firefly_collective_save_pricing( $request ) {
+        $data = $request->get_json_params();
+        $plugin_root_path = dirname(plugin_dir_path(__FILE__));
+        $pricing_json_path = $plugin_root_path . '/pricing.json';
+        $result = file_put_contents($pricing_json_path, json_encode($data, JSON_PRETTY_PRINT));
+        if($result === false) {
+             return new WP_Error('save_failed', 'Failed to save pricing data', array('status' => 500));
+        }
+        return array('success' => true, 'message' => 'Pricing data saved successfully.');
+    }
+    

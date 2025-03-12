@@ -2,9 +2,7 @@
  * Helper: Scroll element into view with offset
  *****************************************************/
 function scrollIntoViewWithOffset(element, offset) {
-  // Scroll element to top
   element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // After a short delay, adjust by offset (e.g., 15vh)
   setTimeout(() => {
     window.scrollBy({ top: -offset, behavior: 'smooth' });
   }, 500);
@@ -607,7 +605,7 @@ function createFeatureElement(featureKey, featureData, availableOptionMetrics, a
     newOptionElem.classList.add('fade-in');
     contentInner.insertBefore(newOptionElem, addOptionRow);
     expandFeature(featureDiv);
-    // Delay scrolling to center the new feature element
+    // Delay scrolling to center the feature
     setTimeout(() => {
       scrollIntoViewWithOffset(featureDiv, window.innerHeight * 0.15);
     }, 350);
@@ -649,7 +647,7 @@ function createFeatureElement(featureKey, featureData, availableOptionMetrics, a
       contentDiv.style.maxHeight = contentDiv.scrollHeight + 'px';
       toggleIndicator.textContent = '-';
       window.expandedFeatures[featureKey] = true;
-      // Delay scrolling to allow expansion transition to finish
+      // Delay scrolling to allow expansion to finish
       setTimeout(() => {
         scrollIntoViewWithOffset(featureDiv, window.innerHeight * 0.15);
       }, 350);
@@ -780,10 +778,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
   renderPricingForm(window.pricingData, availableOptionMetrics, availableAddonMetrics);
 
+  // Apply Changes: Save pricing data via the WordPress REST API.
   const applyButton = document.getElementById('apply-button');
   if (applyButton) {
     applyButton.addEventListener('click', function() {
-      renderPricingForm(window.pricingData, availableOptionMetrics, availableAddonMetrics);
+      const loader = document.getElementById('pricing-loader');
+      if (loader) {
+        loader.style.display = 'block';
+      }
+      fetch(pricingDataSettings.apiUrl + 'save-pricing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': pricingDataSettings.nonce
+        },
+        body: JSON.stringify(window.pricingData)
+      })
+      .then(response => response.json())
+      .then(function (data) {
+        if (!data.success) {
+          console.error(data);
+        }
+        if (loader) {
+          loader.style.display = 'none';
+        }
+      })
+      .catch(function (error) {
+        console.error('Error:', error);
+        if (loader) {
+          loader.style.display = 'none';
+        }
+      });
     });
   }
 });
