@@ -1,0 +1,58 @@
+{
+    "features": [
+        {
+            "featureName": "Feature 1",
+            "description": "This is the description for Feature 1.",
+            "options": [
+                {
+                    "optionName": "Option A",
+                    "recurring": null,
+                    "startDate": null,
+                    "interval": null,
+                    "staticPrice": null,
+                    "priceFloor": 10,
+                    "priceCeiling": 20,
+                    "optionMetric": "unit",
+                    "addons": [
+                        {
+                            "addonName": "Addon 1",
+                            "addOnMetric": "unit",
+                            "priceMultiplierType": "plus",
+                            "staticPriceMod": null,
+                            "floorPriceMod": 2,
+                            "ceilingPriceMod": 2
+                        }
+                    ]
+                },
+                {
+                    "optionName": "Option B",
+                    "recurring": null,
+                    "startDate": null,
+                    "interval": null,
+                    "staticPrice": null,
+                    "priceFloor": 5,
+                    "priceCeiling": 15,
+                    "optionMetric": "unit",
+                    "addons": []
+                }
+            ]
+        },
+        {
+            "featureName": "Feature 2",
+            "description": "This is the description for Feature 2.",
+            "options": [
+                {
+                    "optionName": "Option C",
+                    "recurring": null,
+                    "startDate": null,
+                    "interval": null,
+                    "staticPrice": null,
+                    "priceFloor": 20,
+                    "priceCeiling": 30,
+                    "optionMetric": "unit",
+                    "addons": []
+                }
+            ]
+        }
+    ]
+}

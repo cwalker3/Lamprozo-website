@@ -1,5 +1,22 @@
 /*****************************************************
- * Helper: Scroll element into view with offset
+ * 1) Use JSON Control Data Directly
+ *****************************************************/
+window.nameChanges = sessionStorage.getItem('nameChanges')
+  ? JSON.parse(sessionStorage.getItem('nameChanges'))
+  : { features: {}, options: {}, addons: {} };
+
+/*****************************************************
+ * Helper: Format Field Name
+ *****************************************************/
+function formatFieldName(fieldName) {
+  let result = fieldName.replace(/[_-]+/g, ' ');
+  result = result.replace(/([a-z])([A-Z])/g, '$1 $2');
+  result = result.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return result;
+}
+
+/*****************************************************
+ * 2) Scroll helper
  *****************************************************/
 function scrollIntoViewWithOffset(element, offset) {
   element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -9,21 +26,18 @@ function scrollIntoViewWithOffset(element, offset) {
 }
 
 /*****************************************************
- * Mutual Exclusivity – static vs. floor/ceiling
+ * 3) Mutual Exclusivity – static vs. floor/ceiling
  *****************************************************/
 function handleStaticPriceChange(floorInput, ceilingInput, staticInput) {
   const floorVal = floorInput.value.trim() === "" ? 0 : parseFloat(floorInput.value) || 0;
   const ceilVal  = ceilingInput.value.trim() === "" ? 0 : parseFloat(ceilingInput.value) || 0;
   const staticVal = staticInput.value.trim() === "" ? 0 : parseFloat(staticInput.value) || 0;
-
   if (staticInput.value.trim() !== "" && staticVal !== 0) {
     floorInput.disabled = true;
     ceilingInput.disabled = true;
     staticInput.disabled = false;
-  } else if (
-    (floorInput.value.trim() !== "" && floorVal !== 0) ||
-    (ceilingInput.value.trim() !== "" && ceilVal !== 0)
-  ) {
+  } else if ((floorInput.value.trim() !== "" && floorVal !== 0) ||
+             (ceilingInput.value.trim() !== "" && ceilVal !== 0)) {
     staticInput.disabled = true;
     floorInput.disabled = false;
     ceilingInput.disabled = false;
@@ -35,16 +49,16 @@ function handleStaticPriceChange(floorInput, ceilingInput, staticInput) {
   saveData();
 }
 
-/* Confirmation Dialog */
+/*****************************************************
+ * 4) Confirmation Dialog
+ *****************************************************/
 function confirmDeletion(name, onConfirm) {
   const dialog = document.getElementById('confirm-dialog');
   const message = document.getElementById('confirm-message');
   const yesBtn = document.getElementById('confirm-yes');
   const noBtn = document.getElementById('confirm-no');
-
   message.textContent = 'Are you sure you want to delete "' + name + '"?';
   dialog.classList.add('show');
-
   function closeDialog() {
     dialog.classList.remove('show');
     yesBtn.removeEventListener('click', onYes);
@@ -62,12 +76,12 @@ function confirmDeletion(name, onConfirm) {
 }
 
 /*****************************************************
- * Save & Load Data in sessionStorage
+ * 5) Save & Load Data in sessionStorage
  *****************************************************/
 function saveData() {
   sessionStorage.setItem('pricingData', JSON.stringify(window.pricingData));
+  sessionStorage.setItem('nameChanges', JSON.stringify(window.nameChanges));
 }
-
 function loadData() {
   let stored = sessionStorage.getItem('pricingData');
   if (stored) {
@@ -77,7 +91,7 @@ function loadData() {
 }
 
 /*****************************************************
- * Decide display name for a key/dataName pair
+ * 6) Decide display name for a key/dataName pair
  *****************************************************/
 function getDisplayName(key, dataName, prefix) {
   if (dataName && dataName.trim() !== '') {
@@ -90,15 +104,13 @@ function getDisplayName(key, dataName, prefix) {
 }
 
 /*****************************************************
- * Create a field group (label + input)
+ * 7) Create a field group (label + input)
  *****************************************************/
 function createFieldGroup(labelText, inputType, value, placeholder = '') {
   const group = document.createElement('div');
   group.className = 'field-group';
-
   const label = document.createElement('label');
-  label.textContent = labelText + ':';
-
+  label.textContent = formatFieldName(labelText) + ':';
   if (inputType === 'text') {
     const input = createInputOrTextarea(labelText, value, placeholder);
     group.appendChild(label);
@@ -117,9 +129,7 @@ function createFieldGroup(labelText, inputType, value, placeholder = '') {
     const input = document.createElement('input');
     input.type = 'number';
     input.value = (value === 0 ? "" : value);
-    if (placeholder) {
-      input.placeholder = placeholder;
-    }
+    if (placeholder) { input.placeholder = placeholder; }
     input.addEventListener('input', saveData);
     group.appendChild(label);
     group.appendChild(input);
@@ -128,9 +138,7 @@ function createFieldGroup(labelText, inputType, value, placeholder = '') {
     const input = document.createElement('input');
     input.type = inputType;
     input.value = value;
-    if (placeholder) {
-      input.placeholder = placeholder;
-    }
+    if (placeholder) { input.placeholder = placeholder; }
     input.addEventListener('blur', saveData);
     group.appendChild(label);
     group.appendChild(input);
@@ -139,7 +147,7 @@ function createFieldGroup(labelText, inputType, value, placeholder = '') {
 }
 
 /*****************************************************
- * Minimal helper for description -> textarea
+ * 8) Minimal helper for description -> textarea
  *****************************************************/
 function createInputOrTextarea(labelText, value, placeholder) {
   if (labelText.toLowerCase().includes('description')) {
@@ -147,51 +155,42 @@ function createInputOrTextarea(labelText, value, placeholder) {
     txt.value = value || '';
     txt.placeholder = placeholder;
     txt.rows = 3;
-    txt.addEventListener('input', function() {
-      saveData();
-    });
+    txt.addEventListener('input', function() { saveData(); });
     return txt;
   } else {
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.value = value;
-    if (placeholder) inp.placeholder = placeholder;
-    inp.addEventListener('input', function() {
-      saveData();
-    });
+    if (placeholder) { inp.placeholder = placeholder; }
+    inp.addEventListener('input', function() { saveData(); });
     return inp;
   }
 }
 
 /*****************************************************
- * Create a dropdown field group (label + select)
+ * 9) Create a dropdown field group (label + select)
  *****************************************************/
 function createDropdownFieldGroup(labelText, optionsArray, selectedValue) {
   const group = document.createElement('div');
   group.className = 'field-group';
-
   const label = document.createElement('label');
-  label.textContent = labelText + ':';
-
+  label.textContent = formatFieldName(labelText) + ':';
   const select = document.createElement('select');
   optionsArray.forEach(function(option) {
     const opt = document.createElement('option');
     opt.value = option;
     opt.textContent = option;
-    if (option === selectedValue) {
-      opt.selected = true;
-    }
+    if (option === selectedValue) { opt.selected = true; }
     select.appendChild(opt);
   });
   select.addEventListener('change', saveData);
-
   group.appendChild(label);
   group.appendChild(select);
   return group;
 }
 
 /*****************************************************
- * Force feature to fully expand (open)
+ * 10) Force feature to fully expand (open)
  *****************************************************/
 function expandFeature(featureDiv) {
   const contentDiv = featureDiv.querySelector('.feature-content');
@@ -204,19 +203,105 @@ function expandFeature(featureDiv) {
 }
 
 /*****************************************************
- * Addon Element
+ * 11) Dynamic Field Generation
  *****************************************************/
-function createAddonElement(featureKey, optionKey, addonData, availableAddonMetrics) {
+function determineFieldType(value) {
+  const t = typeof value;
+  if (t === "boolean") return "checkbox";
+  if (t === "number") return "number";
+  if (Array.isArray(value)) {
+    if (value.every(v => typeof v === "string")) return "dropdown";
+    return "text";
+  }
+  if (t === "string") { return value.length > 80 ? "textarea" : "text"; }
+  return "text";
+}
+
+function createDynamicField(key, value, onChange) {
+  const fieldType = determineFieldType(value);
+  const group = document.createElement('div');
+  group.className = 'field-group';
+  const label = document.createElement('label');
+  label.textContent = formatFieldName(key) + ':';
+  group.appendChild(label);
+  if (fieldType === 'checkbox') {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = !!value;
+    input.addEventListener('change', e => onChange(e.target.checked));
+    group.appendChild(input);
+  } else if (fieldType === 'number') {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.value = value;
+    input.addEventListener('input', e => onChange(parseFloat(e.target.value) || 0));
+    group.appendChild(input);
+  } else if (fieldType === 'textarea') {
+    const txt = document.createElement('textarea');
+    txt.value = value;
+    txt.rows = 3;
+    txt.addEventListener('input', e => onChange(e.target.value));
+    group.appendChild(txt);
+  } else if (fieldType === 'dropdown') {
+    const select = document.createElement('select');
+    value.forEach(strVal => {
+      const opt = document.createElement('option');
+      opt.value = strVal;
+      opt.textContent = strVal;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', e => onChange([e.target.value]));
+    group.appendChild(select);
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.addEventListener('input', e => onChange(e.target.value));
+    group.appendChild(input);
+  }
+  return group;
+}
+
+function createDynamicFields(obj, container, knownKeys) {
+  for (let key in obj) {
+    if (!obj.hasOwnProperty(key)) continue;
+    if (knownKeys.indexOf(key) !== -1) continue;
+    const field = createDynamicField(key, obj[key], newVal => {
+      obj[key] = newVal;
+      saveData();
+    });
+    container.appendChild(field);
+  }
+}
+
+/*****************************************************
+ * 12) Addon Element
+ *****************************************************/
+function createAddonElement(featureIndex, optionIndex, addonData, availableAddonMetrics) {
   const addonDiv = document.createElement('div');
   addonDiv.className = 'addon';
-
   const addonNameGroup = createFieldGroup('Addon Name', 'text', addonData.addonName || '', 'Enter addon name...');
   addonNameGroup.querySelector('input, textarea').addEventListener('input', e => {
-    addonData.addonName = e.target.value;
+    const oldName = addonData.addonName;
+    const newName = e.target.value;
+    if (!window.nameChanges.addons.hasOwnProperty(featureIndex)) {
+      window.nameChanges.addons[featureIndex] = {};
+    }
+    if (!window.nameChanges.addons[featureIndex].hasOwnProperty(optionIndex)) {
+      window.nameChanges.addons[featureIndex][optionIndex] = {};
+    }
+    if (!window.nameChanges.addons[featureIndex][optionIndex].hasOwnProperty('0')) {
+      window.nameChanges.addons[featureIndex][optionIndex]['0'] = { oldName: oldName, newName: newName };
+    } else {
+      if (!window.nameChanges.addons[featureIndex][optionIndex]['0'].oldName) {
+        window.nameChanges.addons[featureIndex][optionIndex]['0'].oldName = oldName;
+      }
+      window.nameChanges.addons[featureIndex][optionIndex]['0'].newName = newName;
+    }
+    addonData.addonName = newName;
     saveData();
   });
   addonDiv.appendChild(addonNameGroup);
-
   const addonMetricValue = addonData.addOnMetric || (availableAddonMetrics[0] || '');
   let addonMetricField;
   if (availableAddonMetrics.length > 1) {
@@ -233,7 +318,6 @@ function createAddonElement(featureKey, optionKey, addonData, availableAddonMetr
     });
   }
   addonDiv.appendChild(addonMetricField);
-
   const floorGroup = createFieldGroup('Addon Floor Modifier', 'number', addonData.floorPriceMod || 0, 'Enter floor mod...');
   const floorInput = floorGroup.querySelector('input');
   floorInput.addEventListener('input', e => {
@@ -242,7 +326,6 @@ function createAddonElement(featureKey, optionKey, addonData, availableAddonMetr
     handleStaticPriceChange(floorInput, ceilingInput, staticPriceModInput);
   });
   addonDiv.appendChild(floorGroup);
-
   const ceilingGroup = createFieldGroup('Addon Ceiling Modifier', 'number', addonData.ceilingPriceMod || 0, 'Enter ceiling mod...');
   const ceilingInput = ceilingGroup.querySelector('input');
   ceilingInput.addEventListener('input', e => {
@@ -251,7 +334,6 @@ function createAddonElement(featureKey, optionKey, addonData, availableAddonMetr
     handleStaticPriceChange(floorInput, ceilingInput, staticPriceModInput);
   });
   addonDiv.appendChild(ceilingGroup);
-
   const spVal = addonData.staticPriceMod || '';
   const spGroup = createFieldGroup('Static Price Mod', 'number', spVal, 'Static price');
   const staticPriceModInput = spGroup.querySelector('input');
@@ -261,24 +343,21 @@ function createAddonElement(featureKey, optionKey, addonData, availableAddonMetr
     handleStaticPriceChange(floorInput, ceilingInput, staticPriceModInput);
   });
   addonDiv.appendChild(spGroup);
-
   handleStaticPriceChange(floorInput, ceilingInput, staticPriceModInput);
-
+  const knownAddonKeys = ['addonName','addOnMetric','floorPriceMod','ceilingPriceMod','priceMultiplierType','staticPriceMod'];
+  createDynamicFields(addonData, addonDiv, knownAddonKeys);
   const addonButtonRow = document.createElement('div');
   addonButtonRow.className = 'button-row';
   const deleteAddonButton = document.createElement('button');
   deleteAddonButton.textContent = 'Delete Addon';
   deleteAddonButton.className = 'delete-button';
   deleteAddonButton.addEventListener('click', () => {
-    const nameForDialog = addonData.addonName && addonData.addonName.trim()
-      ? addonData.addonName
-      : 'this addon';
+    const nameForDialog = addonData.addonName && addonData.addonName.trim() ? addonData.addonName : 'this addon';
     confirmDeletion(nameForDialog, () => {
       addonDiv.classList.add('fade-out');
       addonDiv.addEventListener('animationend', () => {
-        const optionData = window.pricingData.features[featureKey].options[optionKey];
-        const idx = optionData.addons.indexOf(addonData);
-        if (idx > -1) optionData.addons.splice(idx, 1);
+        window.pricingData.features[featureIndex].options[optionIndex].addons =
+          window.pricingData.features[featureIndex].options[optionIndex].addons.filter(a => a !== addonData);
         saveData();
         addonDiv.remove();
       });
@@ -286,31 +365,38 @@ function createAddonElement(featureKey, optionKey, addonData, availableAddonMetr
   });
   addonButtonRow.appendChild(deleteAddonButton);
   addonDiv.appendChild(addonButtonRow);
-
   return addonDiv;
 }
 
 /*****************************************************
- * Option Element
+ * 13) Option Element
  *****************************************************/
-function createOptionElement(featureKey, optionKey, optionData, availableOptionMetrics, availableAddonMetrics) {
+function createOptionElement(featureIndex, optionIndex, optionData, availableOptionMetrics, availableAddonMetrics) {
+  const featureName = window.pricingData.features[featureIndex].featureName;
   const optionDiv = document.createElement('div');
   optionDiv.className = 'option';
-
-  const feature = window.pricingData.features[featureKey];
-  let featureHasOnlyOneOption = false;
-  if (feature.options.hasOwnProperty("")) featureHasOnlyOneOption = true;
-
-  let optionNameValue = getDisplayName(optionKey, optionData.name, 'option_');
-  if (featureHasOnlyOneOption) optionNameValue = featureKey;
+  let optionNameValue = optionData.optionName || '';
+  if (optionNameValue === "") optionNameValue = featureName;
   const titleGroup = createFieldGroup('Option Name', 'text', optionNameValue, 'Enter option name...');
   const titleInput = titleGroup.querySelector('input, textarea');
   titleInput.addEventListener('input', e => {
-    optionData.name = e.target.value;
+    const oldName = optionData.optionName;
+    const newName = e.target.value;
+    if (!window.nameChanges.options.hasOwnProperty(featureIndex)) {
+      window.nameChanges.options[featureIndex] = {};
+    }
+    if (!window.nameChanges.options[featureIndex].hasOwnProperty(optionIndex)) {
+      window.nameChanges.options[featureIndex][optionIndex] = { oldName: oldName, newName: newName };
+    } else {
+      if (!window.nameChanges.options[featureIndex][optionIndex].oldName) {
+        window.nameChanges.options[featureIndex][optionIndex].oldName = oldName;
+      }
+      window.nameChanges.options[featureIndex][optionIndex].newName = newName;
+    }
+    optionData.optionName = newName;
     saveData();
   });
   optionDiv.appendChild(titleGroup);
-
   if (optionData.recurring !== null) {
     const recurringGroup = document.createElement('div');
     recurringGroup.className = 'field-group';
@@ -334,11 +420,9 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     recurringGroup.appendChild(recurringLabel);
     recurringGroup.appendChild(recurringCheckbox);
     optionDiv.appendChild(recurringGroup);
-
     const recurringContent = document.createElement('div');
     recurringContent.style.display = optionData.recurring ? 'block' : 'none';
     optionDiv.appendChild(recurringContent);
-
     const startDateGroup = createFieldGroup('Start Date', 'date', optionData.startDate || '', '');
     const startDateInput = startDateGroup.querySelector('input');
     startDateInput.addEventListener('change', e => {
@@ -346,7 +430,6 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
       saveData();
     });
     recurringContent.appendChild(startDateGroup);
-
     const intervalVals = ['every day','every week','bi weekly','monthly','yearly','specific day'];
     const intervalGroup = createDropdownFieldGroup('Interval', intervalVals, optionData.interval || '');
     const intervalSelect = intervalGroup.querySelector('select');
@@ -363,7 +446,6 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
       }
     });
     recurringContent.appendChild(intervalGroup);
-
     const specificDayGroup = document.createElement('div');
     specificDayGroup.className = 'field-group';
     {
@@ -382,7 +464,6 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     specificDayGroup.style.display = (optionData.interval === 'specific day') ? 'flex' : 'none';
     recurringContent.appendChild(specificDayGroup);
   }
-
   const floorGroup = createFieldGroup('Price Floor', 'number', optionData.priceFloor || 0, 'Enter floor price...');
   const floorInput = floorGroup.querySelector('input');
   floorInput.addEventListener('input', e => {
@@ -391,7 +472,6 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     handleStaticPriceChange(floorInput, ceilingInput, spInput);
   });
   optionDiv.appendChild(floorGroup);
-
   const ceilingGroup = createFieldGroup('Price Ceiling', 'number', optionData.priceCeiling || 0, 'Enter ceiling price...');
   const ceilingInput = ceilingGroup.querySelector('input');
   ceilingInput.addEventListener('input', e => {
@@ -400,7 +480,6 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     handleStaticPriceChange(floorInput, ceilingInput, spInput);
   });
   optionDiv.appendChild(ceilingGroup);
-
   const spGroup = createFieldGroup('Static Price', 'number', optionData.staticPrice || '', 'Static price');
   const spInput = spGroup.querySelector('input');
   spInput.addEventListener('input', e => {
@@ -409,9 +488,7 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     handleStaticPriceChange(floorInput, ceilingInput, spInput);
   });
   optionDiv.appendChild(spGroup);
-
   handleStaticPriceChange(floorInput, ceilingInput, spInput);
-
   const metricValue = optionData.optionMetric || (availableOptionMetrics[0] || '');
   let metricField;
   if (availableOptionMetrics.length > 1) {
@@ -428,33 +505,37 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
     });
   }
   optionDiv.appendChild(metricField);
-
-  optionData.addons.forEach(function(addon) {
-    const addonElem = createAddonElement(featureKey, optionKey, addon, availableAddonMetrics);
+  const knownOptionKeys = ['optionName','recurring','startDate','interval','staticPrice','priceFloor','priceCeiling','optionMetric','addons'];
+  createDynamicFields(optionData, optionDiv, knownOptionKeys);
+  optionData.addons.forEach((addon, addonIndex) => {
+    if (!window.nameChanges.addons.hasOwnProperty(featureIndex)) {
+      window.nameChanges.addons[featureIndex] = {};
+    }
+    if (!window.nameChanges.addons[featureIndex].hasOwnProperty(optionIndex)) {
+      window.nameChanges.addons[featureIndex][optionIndex] = {};
+    }
+    const addonElem = createAddonElement(featureIndex, optionIndex, addon, availableAddonMetrics);
+    addonElem.setAttribute('data-addon-index', addonIndex);
     optionDiv.appendChild(addonElem);
   });
-
   const optionButtonRow = document.createElement('div');
   optionButtonRow.className = 'button-row';
-
   const deleteOptionButton = document.createElement('button');
   deleteOptionButton.textContent = 'Delete Option';
   deleteOptionButton.className = 'delete-button';
   deleteOptionButton.addEventListener('click', function() {
-    const dialogName = getDisplayName(optionKey, optionData.name, 'option_') || 'this option';
+    const dialogName = optionData.optionName && optionData.optionName.trim() !== '' ? optionData.optionName : 'this option';
     confirmDeletion(dialogName, () => {
       optionDiv.classList.add('fade-out');
       optionDiv.addEventListener('animationend', function() {
-        delete window.pricingData.features[featureKey].options[optionKey];
+        window.pricingData.features[featureIndex].options.splice(optionIndex, 1);
         saveData();
         optionDiv.remove();
       });
     });
   });
   optionButtonRow.appendChild(deleteOptionButton);
-
   optionDiv.appendChild(optionButtonRow);
-
   const addAddonButton = document.createElement('button');
   addAddonButton.textContent = 'Add Addon';
   addAddonButton.className = 'add-button';
@@ -468,7 +549,7 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
       staticPriceMod: null
     };
     optionData.addons.push(newAddon);
-    const newAddonElem = createAddonElement(featureKey, optionKey, newAddon, availableAddonMetrics);
+    const newAddonElem = createAddonElement(featureIndex, optionIndex, newAddon, availableAddonMetrics);
     newAddonElem.classList.add('fade-in');
     optionDiv.insertBefore(newAddonElem, optionButtonRow);
     const featureDiv = optionDiv.closest('.feature');
@@ -483,58 +564,56 @@ function createOptionElement(featureKey, optionKey, optionData, availableOptionM
 }
 
 /*****************************************************
- * Feature Element
+ * 14) Feature Element
  *****************************************************/
-function createFeatureElement(featureKey, featureData, availableOptionMetrics, availableAddonMetrics) {
+function createFeatureElement(featureIndex, featureData, availableOptionMetrics, availableAddonMetrics) {
   const featureDiv = document.createElement('div');
   featureDiv.className = 'feature';
-
   const header = document.createElement('div');
   header.className = 'feature-header';
-
   const leftDiv = document.createElement('div');
   leftDiv.className = 'feature-header-left';
-
   const rightDiv = document.createElement('div');
   rightDiv.className = 'feature-header-right';
-
   const toggleIndicator = document.createElement('span');
   toggleIndicator.className = 'toggle-indicator';
   toggleIndicator.textContent = '+';
-
   const deleteFeatureBtn = document.createElement('button');
   deleteFeatureBtn.textContent = 'Delete Feature';
   deleteFeatureBtn.className = 'delete-button';
-
   rightDiv.appendChild(toggleIndicator);
   rightDiv.appendChild(deleteFeatureBtn);
   header.appendChild(leftDiv);
   header.appendChild(rightDiv);
   featureDiv.appendChild(header);
-
   const contentDiv = document.createElement('div');
   contentDiv.className = 'feature-content';
-
   const contentInner = document.createElement('div');
   contentInner.className = 'feature-content-inner';
   contentDiv.appendChild(contentInner);
-
-  const initialNameVal = getDisplayName(featureKey, featureData.name, 'Feature_');
+  const initialNameVal = featureData.featureName || '';
   const displayName = initialNameVal !== '' ? initialNameVal : 'New Feature';
-
   const featureTitleSpan = document.createElement('span');
   featureTitleSpan.textContent = displayName;
   leftDiv.appendChild(featureTitleSpan);
-
   const featureNameGroup = createFieldGroup('Feature Name', 'text', initialNameVal, 'Feature name...');
   const featureNameInput = featureNameGroup.querySelector('input, textarea');
   featureNameInput.addEventListener('input', function(e) {
-    featureData.name = e.target.value;
-    featureTitleSpan.textContent = e.target.value.trim() !== '' ? e.target.value : 'New Feature';
+    const oldName = featureData.featureName;
+    const newName = e.target.value;
+    if (!window.nameChanges.features.hasOwnProperty(featureIndex)) {
+      window.nameChanges.features[featureIndex] = { oldName: oldName, newName: newName };
+    } else {
+      if (!window.nameChanges.features[featureIndex].oldName) {
+        window.nameChanges.features[featureIndex].oldName = oldName;
+      }
+      window.nameChanges.features[featureIndex].newName = newName;
+    }
+    featureData.featureName = newName;
+    featureTitleSpan.textContent = newName.trim() !== '' ? newName : 'New Feature';
     saveData();
   });
   contentInner.appendChild(featureNameGroup);
-
   const descVal = featureData.description || '';
   const descGroup = createFieldGroup('Feature Description', 'text', descVal, 'Description...');
   descGroup.querySelector('input,textarea').addEventListener('input', function(e) {
@@ -542,184 +621,148 @@ function createFeatureElement(featureKey, featureData, availableOptionMetrics, a
     saveData();
   });
   contentInner.appendChild(descGroup);
-
-  if (Object.keys(featureData.options || {}).length === 0 && typeof featureData.recurring === 'undefined') {
+  const knownFeatureKeys = ['featureName','description','options','recurring'];
+  createDynamicFields(featureData, contentInner, knownFeatureKeys);
+  if ((!featureData.options || featureData.options.length === 0) && typeof featureData.recurring === 'undefined') {
     const recurringRow = document.createElement('div');
     recurringRow.className = 'field-group recurring-row';
     const recurringLabel = document.createElement('label');
-    recurringLabel.textContent = 'Recurring charge?';
+    recurringLabel.textContent = 'Recurring Charge?';
     const recurringCheckbox = document.createElement('input');
     recurringCheckbox.type = 'checkbox';
     recurringCheckbox.checked = false;
     recurringCheckbox.addEventListener('change', e => {
-      featureData.recurring = e.target.checked ? true : false;
+      featureData.recurring = e.target.checked;
       saveData();
     });
     recurringRow.appendChild(recurringLabel);
     recurringRow.appendChild(recurringCheckbox);
     contentInner.appendChild(recurringRow);
   }
-
-  for (let optionKey in featureData.options) {
-    const optionData = featureData.options[optionKey];
-    const optionElem = createOptionElement(featureKey, optionKey, optionData, availableOptionMetrics, availableAddonMetrics);
-    contentInner.appendChild(optionElem);
+  if (!featureData.options || !Array.isArray(featureData.options)) {
+    featureData.options = [];
   }
-
+  featureData.options.forEach((optionData, optionIndex) => {
+    if (!window.nameChanges.options.hasOwnProperty(featureIndex)) {
+      window.nameChanges.options[featureIndex] = {};
+    }
+    const optionElem = createOptionElement(featureIndex, optionIndex, optionData, availableOptionMetrics, availableAddonMetrics);
+    contentInner.appendChild(optionElem);
+  });
+  // --- FIX: Change "Add Feature" button to "Add Option" button ---
   const addOptionRow = document.createElement('div');
   addOptionRow.className = 'button-row';
-
   const addOptionButton = document.createElement('button');
   addOptionButton.textContent = 'Add Option';
   addOptionButton.className = 'add-button';
   addOptionButton.addEventListener('click', function(e) {
-    e.stopPropagation();
-    let finalRecurringVal = null;
-    if (featureData.recurring === true) {
-      finalRecurringVal = true;
-    }
-    const recurringRow = contentInner.querySelector('.recurring-row');
-    if (recurringRow) recurringRow.remove();
-
-    const newOptionKey = 'option_' + Date.now();
-    const newOptionData = {
-      name: '',
-      recurring: finalRecurringVal,
-      interval: null,
+    // Create a new option for the current feature.
+    const newOption = {
+      optionName: '',
+      recurring: null,
       startDate: null,
+      interval: null,
+      staticPrice: null,
       priceFloor: 0,
       priceCeiling: 0,
-      staticPrice: null,
       optionMetric: availableOptionMetrics.length > 0 ? availableOptionMetrics[0] : '',
       addons: []
     };
-
-    featureData.options[newOptionKey] = newOptionData;
-    const newOptionElem = createOptionElement(
-      featureKey,
-      newOptionKey,
-      newOptionData,
-      availableOptionMetrics,
-      availableAddonMetrics
-    );
+    featureData.options.push(newOption);
+    const newOptionIndex = featureData.options.length - 1;
+    const newOptionElem = createOptionElement(featureIndex, newOptionIndex, newOption, availableOptionMetrics, availableAddonMetrics);
     newOptionElem.classList.add('fade-in');
     contentInner.insertBefore(newOptionElem, addOptionRow);
     expandFeature(featureDiv);
-    // Delay scrolling to center the feature
     setTimeout(() => {
-      scrollIntoViewWithOffset(featureDiv, window.innerHeight * 0.15);
+      scrollIntoViewWithOffset(newOptionElem, window.innerHeight/2 - newOptionElem.offsetHeight/2);
     }, 350);
     saveData();
   });
   addOptionRow.appendChild(addOptionButton);
   contentInner.appendChild(addOptionRow);
-
   featureDiv.appendChild(contentDiv);
-
-  if (window.expandedFeatures && window.expandedFeatures[featureKey]) {
+  if (window.expandedFeatures && window.expandedFeatures[featureIndex]) {
     contentDiv.classList.add('open');
     contentDiv.style.maxHeight = contentDiv.scrollHeight + 'px';
     toggleIndicator.textContent = '-';
   }
-
   deleteFeatureBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    const nameForDialog = getDisplayName(featureKey, featureData.name, 'Feature_') || 'this feature';
+    const nameForDialog = featureData.featureName && featureData.featureName.trim() !== '' ? featureData.featureName : 'this feature';
     confirmDeletion(nameForDialog, () => {
       featureDiv.classList.add('fade-out');
       featureDiv.addEventListener('animationend', function() {
-        delete window.pricingData.features[featureKey];
+        window.pricingData.features.splice(featureIndex, 1);
         saveData();
         featureDiv.remove();
       });
     });
   });
-
   header.addEventListener('click', function(e) {
     if (rightDiv.contains(e.target)) return;
     if (contentDiv.classList.contains('open')) {
       contentDiv.style.maxHeight = 0;
       contentDiv.classList.remove('open');
       toggleIndicator.textContent = '+';
-      window.expandedFeatures[featureKey] = false;
+      window.expandedFeatures[featureIndex] = false;
     } else {
       contentDiv.classList.add('open');
       contentDiv.style.maxHeight = contentDiv.scrollHeight + 'px';
       toggleIndicator.textContent = '-';
-      window.expandedFeatures[featureKey] = true;
-      // Delay scrolling to allow expansion to finish
+      window.expandedFeatures[featureIndex] = true;
       setTimeout(() => {
         scrollIntoViewWithOffset(featureDiv, window.innerHeight * 0.15);
       }, 350);
     }
   });
-
   return featureDiv;
 }
 
 /*****************************************************
- * Delete Option from a Feature
+ * 16) Delete Option from a Feature
  *****************************************************/
-function deleteFeatureOption(pricingData, featureKey, optionKey) {
-  if (pricingData.features[featureKey] && pricingData.features[featureKey].options[optionKey]) {
-    delete pricingData.features[featureKey].options[optionKey];
+function deleteFeatureOption(pricingData, featureIndex, optionIndex) {
+  if (pricingData.features[featureIndex] && pricingData.features[featureIndex].options[optionIndex] !== undefined) {
+    pricingData.features[featureIndex].options.splice(optionIndex, 1);
   }
 }
 
 /*****************************************************
- * Render all features
+ * 17) Render all features
  *****************************************************/
 function renderPricingForm(data, availableOptionMetrics, availableAddonMetrics) {
   const container = document.getElementById('pricing-form');
   container.innerHTML = '';
-
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    data = {};
+  if (!data || typeof data !== 'object' || !Array.isArray(data.features)) {
+    data.features = [];
   }
-  if (!data.features || typeof data.features !== 'object') {
-    data.features = {};
-  }
-
-  for (let featureKey in data.features) {
-    const featureData = data.features[featureKey];
-    if (!featureData.options || typeof featureData.options !== 'object') {
-      featureData.options = {};
+  data.features.forEach((featureData, featureIndex) => {
+    if (!featureData.options || !Array.isArray(featureData.options)) {
+      featureData.options = Array.isArray(featureData.options)
+        ? featureData.options
+        : Object.values(featureData.options || {});
     }
-    const featureElem = createFeatureElement(
-      featureKey,
-      featureData,
-      availableOptionMetrics,
-      availableAddonMetrics
-    );
+    const featureElem = createFeatureElement(featureIndex, featureData, availableOptionMetrics, availableAddonMetrics);
     container.appendChild(featureElem);
-  }
-
+  });
   const addFeatureButton = document.createElement('button');
   addFeatureButton.textContent = 'Add Feature';
+  addFeatureButton.id = 'add-feature-button';
   addFeatureButton.className = 'add-button';
   addFeatureButton.addEventListener('click', function() {
-    if (!data.features || typeof data.features !== 'object') {
-      data.features = {};
-    }
-    const newFeatureKey = 'Feature_' + Date.now();
-    data.features[newFeatureKey] = {
-      name: '',
+    const newFeature = {
+      featureName: '',
       description: '',
-      options: {}
+      options: []
     };
+    data.features.push(newFeature);
     window.expandedFeatures = window.expandedFeatures || {};
-    window.expandedFeatures[newFeatureKey] = true;
-
-    const newFeatureElem = createFeatureElement(
-      newFeatureKey,
-      data.features[newFeatureKey],
-      availableOptionMetrics,
-      availableAddonMetrics
-    );
+    window.expandedFeatures[data.features.length - 1] = true;
+    const newFeatureElem = createFeatureElement(data.features.length - 1, newFeature, availableOptionMetrics, availableAddonMetrics);
     newFeatureElem.classList.add('fade-in');
     container.insertBefore(newFeatureElem, addFeatureButton);
     expandFeature(newFeatureElem);
-    // Delay scrolling to center the new feature
     setTimeout(() => {
       scrollIntoViewWithOffset(newFeatureElem, window.innerHeight/2 - newFeatureElem.offsetHeight/2);
     }, 350);
@@ -729,85 +772,143 @@ function renderPricingForm(data, availableOptionMetrics, availableAddonMetrics) 
 }
 
 /*****************************************************
- * On DOM ready
+ * Merge Functions (sync only properties by index)
+ *****************************************************/
+function mergeJSONWithSession(sessionData, controlData) {
+  if (!sessionData.features || !Array.isArray(sessionData.features)) {
+    sessionData.features = [];
+  }
+  if (!controlData.features || !Array.isArray(controlData.features)) {
+    return sessionData;
+  }
+  for (let i = 0; i < controlData.features.length; i++) {
+    if (i < sessionData.features.length) {
+      mergeObjectProperties(sessionData.features[i], controlData.features[i]);
+    } else {
+      sessionData.features.push(controlData.features[i]);
+    }
+  }
+  return sessionData;
+}
+
+function mergeObjectProperties(sessionObj, controlObj) {
+  Object.keys(sessionObj).forEach(key => {
+    if (!controlObj.hasOwnProperty(key) && !/^nameChanges_/.test(key)) {
+      if (!Array.isArray(sessionObj[key])) {
+        delete sessionObj[key];
+      }
+    }
+  });
+  Object.keys(controlObj).forEach(key => {
+    if (Array.isArray(controlObj[key])) {
+      if (!sessionObj.hasOwnProperty(key) || !Array.isArray(sessionObj[key])) {
+        sessionObj[key] = controlObj[key];
+      } else {
+        let minLen = Math.min(sessionObj[key].length, controlObj[key].length);
+        for (let j = 0; j < minLen; j++) {
+          if (typeof controlObj[key][j] === "object" && controlObj[key][j] !== null) {
+            mergeObjectProperties(sessionObj[key][j], controlObj[key][j]);
+          } else {
+            sessionObj[key][j] = controlObj[key][j];
+          }
+        }
+        for (let j = sessionObj[key].length; j < controlObj[key].length; j++) {
+          sessionObj[key].push(controlObj[key][j]);
+        }
+      }
+    } else if (typeof controlObj[key] === "object" && controlObj[key] !== null) {
+      if (!sessionObj.hasOwnProperty(key) || typeof sessionObj[key] !== "object" || sessionObj[key] === null) {
+        sessionObj[key] = controlObj[key];
+      } else {
+        mergeObjectProperties(sessionObj[key], controlObj[key]);
+      }
+    } else {
+      if (!sessionObj.hasOwnProperty(key)) {
+        sessionObj[key] = controlObj[key];
+      }
+    }
+  });
+}
+
+/*****************************************************
+ * 18) On DOM ready
  *****************************************************/
 document.addEventListener('DOMContentLoaded', function() {
   let loaded = loadData();
+  const controlData = window.pricingData.data;
   if (loaded) {
     window.pricingData = loaded;
+    window.pricingData = mergeJSONWithSession(loaded, controlData);
   } else {
     window.pricingData = pricingData.data;
   }
-
-  if (!window.pricingData || typeof window.pricingData !== 'object' || Array.isArray(window.pricingData)) {
-    window.pricingData = { features: {} };
+  if (!window.pricingData || typeof window.pricingData !== 'object' || !Array.isArray(window.pricingData.features)) {
+    window.pricingData = { features: [] };
   }
-  if (!window.pricingData.features || typeof window.pricingData.features !== 'object') {
-    window.pricingData.features = {};
-  }
-
   window.expandedFeatures = window.expandedFeatures || {};
 
   const availableOptionMetrics = (function(data) {
     let metrics = new Set();
-    for (let featureKey in data.features) {
-      let options = data.features[featureKey].options;
-      for (let optKey in options) {
-        if (options[optKey].optionMetric) {
-          metrics.add(options[optKey].optionMetric);
-        }
-      }
-    }
+    data.features.forEach(feature => {
+      const options = Array.isArray(feature.options)
+        ? feature.options
+        : Object.values(feature.options || {});
+      options.forEach(option => {
+        if (option.optionMetric) { metrics.add(option.optionMetric); }
+      });
+    });
     return Array.from(metrics);
   })(window.pricingData);
 
   const availableAddonMetrics = (function(data) {
     let metrics = new Set();
-    for (let featureKey in data.features) {
-      let options = data.features[featureKey].options;
-      for (let optKey in options) {
-        options[optKey].addons.forEach(function(addon) {
-          if (addon.addOnMetric && addon.addOnMetric.trim() !== '') {
-            metrics.add(addon.addOnMetric);
-          }
+    data.features.forEach(feature => {
+      const options = Array.isArray(feature.options)
+        ? feature.options
+        : Object.values(feature.options || {});
+      options.forEach(option => {
+        const addons = Array.isArray(option.addons)
+          ? option.addons
+          : Object.values(option.addons || {});
+        addons.forEach(function(addon) {
+          if (addon.addOnMetric && addon.addOnMetric.trim() !== '') { metrics.add(addon.addOnMetric); }
         });
-      }
-    }
+      });
+    });
     return Array.from(metrics);
   })(window.pricingData);
 
   renderPricingForm(window.pricingData, availableOptionMetrics, availableAddonMetrics);
 
-  // Apply Changes: Save pricing data via the WordPress REST API.
+  // When applying changes, send both pricingData and nameChanges.
   const applyButton = document.getElementById('apply-button');
   if (applyButton) {
     applyButton.addEventListener('click', function() {
       const loader = document.getElementById('pricing-loader');
-      if (loader) {
-        loader.style.display = 'block';
-      }
+      if (loader) { loader.style.display = 'block'; }
+      const payload = {
+        pricingData: window.pricingData,
+        nameChanges: window.nameChanges
+      };
       fetch(pricingDataSettings.apiUrl + 'save-pricing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-WP-Nonce': pricingDataSettings.nonce
         },
-        body: JSON.stringify(window.pricingData)
+        body: JSON.stringify(payload)
       })
       .then(response => response.json())
       .then(function (data) {
-        if (!data.success) {
-          console.error(data);
-        }
-        if (loader) {
-          loader.style.display = 'none';
-        }
+        if (!data.success) { console.error(data); }
+        // On successful update, reset the nameChanges mapping.
+        window.nameChanges = { features: {}, options: {}, addons: {} };
+        sessionStorage.setItem('nameChanges', JSON.stringify(window.nameChanges));
+        if (loader) { loader.style.display = 'none'; }
       })
       .catch(function (error) {
         console.error('Error:', error);
-        if (loader) {
-          loader.style.display = 'none';
-        }
+        if (loader) { loader.style.display = 'none'; }
       });
     });
   }
