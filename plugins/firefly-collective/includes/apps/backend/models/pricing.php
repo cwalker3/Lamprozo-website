@@ -8,7 +8,6 @@
  * of name changes is used to UPSERT the database so that existing IDs are preserved.
  */
 
- 
 /* ------------------------------ *
  * Admin Menu & Assets
  * ------------------------------ */
@@ -243,6 +242,18 @@ function create_pricing_tables_if_not_exist() {
 }
 
 /**
+ * Helper: Normalize a record.
+ */
+function normalize_record($record) {
+    foreach ($record as $k => $v) {
+        if (is_array($v) && isset($v['text'])) {
+            $record[$k] = $v['text'];
+        }
+    }
+    return $record;
+}
+
+/**
  * Update pricing schema based on current JSON data.
  */
 function update_pricing_schema($data) {
@@ -274,7 +285,6 @@ function update_pricing_schema($data) {
             foreach ($feature['options'] as $option) {
                 if (isset($option['addons']) && is_array($option['addons'])) {
                     foreach ($option['addons'] as $addon) {
-                        // In the new JSON, addonName is already used.
                         $addons[] = $addon;
                     }
                 }
@@ -348,6 +358,7 @@ function upsert_pricing_data($payload) {
         $feature_to_save = $feature;
         unset($feature_to_save['options']);
         $feature_to_save['featureName'] = $finalFeatureName;
+        $feature_to_save = normalize_record($feature_to_save);
         $feature_id = 0;
         if ($row) {
             $feature_id = $row['id'];
@@ -387,6 +398,7 @@ function upsert_pricing_data($payload) {
                 unset($option_to_save['addons']);
                 $option_to_save['optionName'] = $finalOptionName;
                 $option_to_save['featureId'] = $feature_id;
+                $option_to_save = normalize_record($option_to_save);
                 $option_id = 0;
                 if ($row_option) {
                     $option_id = $row_option['id'];
@@ -400,8 +412,7 @@ function upsert_pricing_data($payload) {
                 $nameChanges['options'][$fIndex][$oIndex] = array();
 
                 // Process addons.
-                // We'll upsert addons by first deleting all addons for this option,
-                // then inserting those in JSON (this is simpler, so we track the inserted addon IDs).
+                // Delete all addons for this option then insert new ones.
                 $wpdb->delete($addons_table, array('optionId' => $option_id));
                 if (isset($option['addons']) && is_array($option['addons'])) {
                     foreach ($option['addons'] as $aIndex => $addon) {
@@ -413,12 +424,12 @@ function upsert_pricing_data($payload) {
                             $finalAddonName = $nameChanges['addons'][$fIndex][$oIndex][$aIndex]['newName'];
                         }
                         $addon_to_save = $addon;
-                        // Normalize: use finalAddonName in addonName.
                         $addon_to_save['addonName'] = $finalAddonName;
                         if (isset($addon_to_save['addon_name'])) {
                             unset($addon_to_save['addon_name']);
                         }
                         $addon_to_save['optionId'] = $option_id;
+                        $addon_to_save = normalize_record($addon_to_save);
                         $wpdb->insert($addons_table, $addon_to_save);
                         $processed_addons[$option_id][] = $wpdb->insert_id;
                         $nameChanges['addons'][$fIndex][$oIndex][$aIndex] = array();
@@ -432,7 +443,6 @@ function upsert_pricing_data($payload) {
     $all_feature_ids = $wpdb->get_col("SELECT id FROM {$features_table}");
     $to_delete_features = array_diff($all_feature_ids, $processed_features);
     foreach ($to_delete_features as $fid) {
-        // Delete options and addons for this feature.
         $option_ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$options_table} WHERE featureId = %d", $fid));
         if (!empty($option_ids)) {
             $ids = implode(',', array_map('intval', $option_ids));

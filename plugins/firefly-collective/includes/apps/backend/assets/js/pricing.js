@@ -152,10 +152,19 @@ function createFieldGroup(labelText, inputType, value, placeholder = '') {
 function createInputOrTextarea(labelText, value, placeholder) {
   if (labelText.toLowerCase().includes('description')) {
     const txt = document.createElement('textarea');
-    txt.value = value || '';
+    if (typeof value === "object" && value !== null && "text" in value) {
+      txt.value = value.text;
+    } else {
+      txt.value = value || '';
+    }
     txt.placeholder = placeholder;
     txt.rows = 3;
-    txt.addEventListener('input', function() { saveData(); });
+    txt.addEventListener('input', function(e) {
+      if (typeof value === "object" && value !== null && "text" in value) {
+        value.text = e.target.value;
+      }
+      saveData();
+    });
     return txt;
   } else {
     const inp = document.createElement('input');
@@ -206,6 +215,9 @@ function expandFeature(featureDiv) {
  * 11) Dynamic Field Generation
  *****************************************************/
 function determineFieldType(value) {
+  if (typeof value === "object" && value !== null && value.hasOwnProperty("text")) {
+    return "textarea";
+  }
   const t = typeof value;
   if (t === "boolean") return "checkbox";
   if (t === "number") return "number";
@@ -238,9 +250,19 @@ function createDynamicField(key, value, onChange) {
     group.appendChild(input);
   } else if (fieldType === 'textarea') {
     const txt = document.createElement('textarea');
-    txt.value = value;
+    if (typeof value === "object" && value !== null && "text" in value) {
+      txt.value = value.text;
+    } else {
+      txt.value = value;
+    }
     txt.rows = 3;
-    txt.addEventListener('input', e => onChange(e.target.value));
+    txt.addEventListener('input', e => {
+      if (typeof value === "object" && value !== null && "text" in value) {
+        onChange({ text: e.target.value });
+      } else {
+        onChange(e.target.value);
+      }
+    });
     group.appendChild(txt);
   } else if (fieldType === 'dropdown') {
     const select = document.createElement('select');
@@ -272,6 +294,41 @@ function createDynamicFields(obj, container, knownKeys) {
     });
     container.appendChild(field);
   }
+}
+
+/*****************************************************
+ * Helper: Get union of keys and merge defaults
+ *****************************************************/
+function getUnionKeys(arr) {
+  let union = {};
+  arr.forEach(obj => {
+    Object.keys(obj).forEach(k => union[k] = true);
+  });
+  return Object.keys(union);
+}
+function mergeWithUnionKeys(newObj, arrOfObjs) {
+  const unionKeys = getUnionKeys(arrOfObjs);
+  unionKeys.forEach(key => {
+    if (!newObj.hasOwnProperty(key)) {
+      let sample;
+      for (let i = 0; i < arrOfObjs.length; i++) {
+        if (arrOfObjs[i].hasOwnProperty(key)) {
+          sample = arrOfObjs[i][key];
+          break;
+        }
+      }
+      if (typeof sample === "object" && sample !== null && sample.hasOwnProperty("text")) {
+        newObj[key] = { text: "" };
+      } else if (typeof sample === "number") {
+        newObj[key] = 0;
+      } else if (typeof sample === "boolean") {
+        newObj[key] = false;
+      } else {
+        newObj[key] = "";
+      }
+    }
+  });
+  return newObj;
 }
 
 /*****************************************************
@@ -540,7 +597,7 @@ function createOptionElement(featureIndex, optionIndex, optionData, availableOpt
   addAddonButton.textContent = 'Add Addon';
   addAddonButton.className = 'add-button';
   addAddonButton.addEventListener('click', function() {
-    const newAddon = {
+    let newAddon = {
       addonName: '',
       addOnMetric: availableAddonMetrics.length > 0 ? availableAddonMetrics[0] : '',
       floorPriceMod: 0,
@@ -548,6 +605,9 @@ function createOptionElement(featureIndex, optionIndex, optionData, availableOpt
       priceMultiplierType: 'plus',
       staticPriceMod: null
     };
+    if (optionData.addons && optionData.addons.length > 0) {
+      newAddon = mergeWithUnionKeys(newAddon, optionData.addons);
+    }
     optionData.addons.push(newAddon);
     const newAddonElem = createAddonElement(featureIndex, optionIndex, newAddon, availableAddonMetrics);
     newAddonElem.classList.add('fade-in');
@@ -649,17 +709,16 @@ function createFeatureElement(featureIndex, featureData, availableOptionMetrics,
     const optionElem = createOptionElement(featureIndex, optionIndex, optionData, availableOptionMetrics, availableAddonMetrics);
     contentInner.appendChild(optionElem);
   });
-  // --- FIX: Change "Add Feature" button to "Add Option" button ---
+  // --- Change "Add Feature" button to "Add Option" button ---
   const addOptionRow = document.createElement('div');
   addOptionRow.className = 'button-row';
   const addOptionButton = document.createElement('button');
   addOptionButton.textContent = 'Add Option';
   addOptionButton.className = 'add-button';
   addOptionButton.addEventListener('click', function(e) {
-    // Create a new option for the current feature.
-    const newOption = {
+    let newOption = {
       optionName: '',
-      recurring: null,
+      recurring: featureData.recurring === true ? true : null,
       startDate: null,
       interval: null,
       staticPrice: null,
@@ -668,6 +727,9 @@ function createFeatureElement(featureIndex, featureData, availableOptionMetrics,
       optionMetric: availableOptionMetrics.length > 0 ? availableOptionMetrics[0] : '',
       addons: []
     };
+    if (featureData.options && featureData.options.length > 0) {
+      newOption = mergeWithUnionKeys(newOption, featureData.options);
+    }
     featureData.options.push(newOption);
     const newOptionIndex = featureData.options.length - 1;
     const newOptionElem = createOptionElement(featureIndex, newOptionIndex, newOption, availableOptionMetrics, availableAddonMetrics);
@@ -751,11 +813,14 @@ function renderPricingForm(data, availableOptionMetrics, availableAddonMetrics) 
   addFeatureButton.id = 'add-feature-button';
   addFeatureButton.className = 'add-button';
   addFeatureButton.addEventListener('click', function() {
-    const newFeature = {
+    let newFeature = {
       featureName: '',
       description: '',
       options: []
     };
+    if (data.features && data.features.length > 0) {
+      newFeature = mergeWithUnionKeys(newFeature, data.features);
+    }
     data.features.push(newFeature);
     window.expandedFeatures = window.expandedFeatures || {};
     window.expandedFeatures[data.features.length - 1] = true;
