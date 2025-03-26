@@ -230,13 +230,13 @@
     function custom_google_signin_button() {
         ?>
         <div class="google-signin-container">
-            <button id="google-signin" class="google-signin-button">
+            <button id="google-signin" type="button" class="google-signin-button">
                 Sign in with Google
             </button>
         </div>
         <?php
     }
-    add_action('login_form', 'custom_google_signin_button');
+    add_action('login_form', 'custom_google_signin_button');    
 
     // Redirect on admin pages.
     add_action('admin_init', function() {
