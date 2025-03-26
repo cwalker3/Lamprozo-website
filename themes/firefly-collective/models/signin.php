@@ -246,3 +246,19 @@
             exit;
         }
     });
+
+    function custom_logout_redirect() {
+        // Check if the request URI is exactly '/logout'
+        if ( untrailingslashit($_SERVER['REQUEST_URI']) === '/logout' ) {
+            // Remove the 'auth_id' cookie by setting its expiration to a past time.
+            if ( isset($_COOKIE['auth_id']) ) {
+                // Adjust cookie parameters (path, domain) if needed.
+                setcookie( 'auth_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+                unset( $_COOKIE['auth_id'] );
+            }
+            // Redirect the user to the WordPress login page.
+            wp_redirect( wp_login_url() );
+            exit;
+        }
+    }
+    add_action( 'init', 'custom_logout_redirect' );
