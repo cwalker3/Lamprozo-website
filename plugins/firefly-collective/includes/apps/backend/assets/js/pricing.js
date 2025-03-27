@@ -215,8 +215,13 @@ function expandFeature(featureDiv) {
  * 11) Dynamic Field Generation
  *****************************************************/
 function determineFieldType(value) {
-  if (typeof value === "object" && value !== null && value.hasOwnProperty("text")) {
-    return "textarea";
+  if (typeof value === "object" && value !== null) {
+    if (value.hasOwnProperty("types") && Array.isArray(value.types) && value.hasOwnProperty("selected")) {
+      return "dropdown_custom";
+    }
+    if (value.hasOwnProperty("text")) {
+      return "textarea";
+    }
   }
   const t = typeof value;
   if (t === "boolean") return "checkbox";
@@ -264,6 +269,21 @@ function createDynamicField(key, value, onChange) {
       }
     });
     group.appendChild(txt);
+  } else if (fieldType === 'dropdown_custom') {
+    const select = document.createElement('select');
+    value.types.forEach(function(opt, index) {
+      const optionElem = document.createElement('option');
+      optionElem.value = index;
+      optionElem.textContent = opt;
+      if (index === value.selected) {
+        optionElem.selected = true;
+      }
+      select.appendChild(optionElem);
+    });
+    select.addEventListener('change', function(e) {
+      onChange({ types: value.types, selected: parseInt(e.target.value, 10) });
+    });
+    group.appendChild(select);
   } else if (fieldType === 'dropdown') {
     const select = document.createElement('select');
     value.forEach(strVal => {
@@ -287,6 +307,7 @@ function createDynamicField(key, value, onChange) {
 function createDynamicFields(obj, container, knownKeys) {
   for (let key in obj) {
     if (!obj.hasOwnProperty(key)) continue;
+    // If it's in knownKeys, we skip it here because it might be handled manually above
     if (knownKeys.indexOf(key) !== -1) continue;
     const field = createDynamicField(key, obj[key], newVal => {
       obj[key] = newVal;
@@ -319,6 +340,8 @@ function mergeWithUnionKeys(newObj, arrOfObjs) {
       }
       if (typeof sample === "object" && sample !== null && sample.hasOwnProperty("text")) {
         newObj[key] = { text: "" };
+      } else if (typeof sample === "object" && sample !== null && sample.hasOwnProperty("types") && sample.hasOwnProperty("selected")) {
+        newObj[key] = { types: sample.types, selected: 0 };
       } else if (typeof sample === "number") {
         newObj[key] = 0;
       } else if (typeof sample === "boolean") {
@@ -401,8 +424,18 @@ function createAddonElement(featureIndex, optionIndex, addonData, availableAddon
   });
   addonDiv.appendChild(spGroup);
   handleStaticPriceChange(floorInput, ceilingInput, staticPriceModInput);
-  const knownAddonKeys = ['addonName','addOnMetric','floorPriceMod','ceilingPriceMod','priceMultiplierType','staticPriceMod'];
+
+  // Remove "priceModifierType" from knownAddonKeys so that createDynamicFields
+  // will handle it as a dynamic field, i.e. as a dropdown_custom if present.
+  const knownAddonKeys = [
+    'addonName',
+    'addOnMetric',
+    'floorPriceMod',
+    'ceilingPriceMod',
+    'staticPriceMod'
+  ];
   createDynamicFields(addonData, addonDiv, knownAddonKeys);
+
   const addonButtonRow = document.createElement('div');
   addonButtonRow.className = 'button-row';
   const deleteAddonButton = document.createElement('button');
@@ -562,7 +595,18 @@ function createOptionElement(featureIndex, optionIndex, optionData, availableOpt
     });
   }
   optionDiv.appendChild(metricField);
-  const knownOptionKeys = ['optionName','recurring','startDate','interval','staticPrice','priceFloor','priceCeiling','optionMetric','addons'];
+
+  const knownOptionKeys = [
+    'optionName',
+    'recurring',
+    'startDate',
+    'interval',
+    'staticPrice',
+    'priceFloor',
+    'priceCeiling',
+    'optionMetric',
+    'addons'
+  ];
   createDynamicFields(optionData, optionDiv, knownOptionKeys);
   optionData.addons.forEach((addon, addonIndex) => {
     if (!window.nameChanges.addons.hasOwnProperty(featureIndex)) {
@@ -602,7 +646,7 @@ function createOptionElement(featureIndex, optionIndex, optionData, availableOpt
       addOnMetric: availableAddonMetrics.length > 0 ? availableAddonMetrics[0] : '',
       floorPriceMod: 0,
       ceilingPriceMod: 0,
-      priceMultiplierType: 'plus',
+      priceModifierType: { types: ["add", "multiply"], selected: 0 },
       staticPriceMod: null
     };
     if (optionData.addons && optionData.addons.length > 0) {

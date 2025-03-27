@@ -130,12 +130,12 @@ function get_default_option_columns() {
  */
 function get_default_addon_columns() {
     return array(
-        'addonName'           => "VARCHAR(255) NOT NULL",
-        'addOnMetric'         => "VARCHAR(50)",
-        'priceMultiplierType' => "VARCHAR(50)",
-        'staticPriceMod'      => "FLOAT",
-        'floorPriceMod'       => "FLOAT",
-        'ceilingPriceMod'     => "FLOAT"
+        'addonName'         => "VARCHAR(255) NOT NULL",
+        'addOnMetric'       => "VARCHAR(50)",
+        'priceModifierType' => "VARCHAR(50)",
+        'staticPriceMod'    => "FLOAT",
+        'floorPriceMod'     => "FLOAT",
+        'ceilingPriceMod'   => "FLOAT"
     );
 }
 
@@ -194,7 +194,6 @@ function update_table_schema($table, $desired_columns) {
 function create_pricing_tables_if_not_exist() {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
-
     // ffc_features table.
     $features_default = get_default_feature_columns();
     $columns_sql = "";
@@ -209,7 +208,6 @@ function create_pricing_tables_if_not_exist() {
     ) $charset_collate;";
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_features);
-
     // ffc_options table.
     $options_default = get_default_option_columns();
     $columns_sql = "";
@@ -224,7 +222,6 @@ function create_pricing_tables_if_not_exist() {
         KEY featureId (featureId)
     ) $charset_collate;";
     dbDelta($sql_options);
-
     // ffc_addons table.
     $addons_default = get_default_addon_columns();
     $columns_sql = "";
@@ -246,8 +243,12 @@ function create_pricing_tables_if_not_exist() {
  */
 function normalize_record($record) {
     foreach ($record as $k => $v) {
-        if (is_array($v) && isset($v['text'])) {
-            $record[$k] = $v['text'];
+        if (is_array($v)) {
+            if (isset($v['types']) && isset($v['selected'])) {
+                $record[$k] = $v['types'][$v['selected']];
+            } elseif (isset($v['text'])) {
+                $record[$k] = $v['text'];
+            }
         }
     }
     return $record;
@@ -265,7 +266,6 @@ function update_pricing_schema($data) {
     }
     $desired_features = merge_extra_columns($features, get_default_feature_columns());
     update_table_schema($wpdb->prefix . "ffc_features", $desired_features);
-
     // Options.
     $options = array();
     foreach ($data['features'] as $feature) {
@@ -277,7 +277,6 @@ function update_pricing_schema($data) {
     }
     $desired_options = merge_extra_columns($options, get_default_option_columns());
     update_table_schema($wpdb->prefix . "ffc_options", $desired_options);
-
     // Addons.
     $addons = array();
     foreach ($data['features'] as $feature) {
@@ -297,44 +296,23 @@ function update_pricing_schema($data) {
 
 /**
  * Upsert pricing data into the DB, preserving IDs when names are changed.
- *
- * The REST payload is expected to have the structure:
- * {
- *    pricingData: { features: [...] },
- *    nameChanges: {
- *       features: { "0": { oldName: "Old", newName: "New" }, ... },
- *       options: { "0": { "0": { oldName: "Old", newName: "New" }, ... }, ... },
- *       addons: { "0": { "0": { "0": { oldName: "Old", newName: "New" } } }, ... }
- *    }
- * }
- *
- * In addition to updating/inserting records, this function now deletes any features,
- * options or addons that exist in the DB but are not present in the incoming JSON.
  */
 function upsert_pricing_data($payload) {
     global $wpdb;
     create_pricing_tables_if_not_exist();
-    // Use pricingData from the payload.
     $pricingData = $payload['pricingData'];
     update_pricing_schema($pricingData);
-
-    // Retrieve nameChanges mapping.
     $nameChanges = isset($payload['nameChanges']) ? $payload['nameChanges'] : array(
         'features' => array(),
         'options'  => array(),
         'addons'   => array()
     );
-
     $features_table = $wpdb->prefix . "ffc_features";
     $options_table  = $wpdb->prefix . "ffc_options";
     $addons_table   = $wpdb->prefix . "ffc_addons";
-
-    // Arrays to track processed IDs.
     $processed_features = array();
-    $processed_options = array(); // keyed by featureId => array of option IDs
-    $processed_addons = array();  // keyed by optionId => array of addon IDs
-
-    // Process each feature.
+    $processed_options = array();
+    $processed_addons = array();
     foreach ($pricingData['features'] as $fIndex => $feature) {
         $finalFeatureName = $feature['featureName'];
         $oldFeatureName = $finalFeatureName;
@@ -368,10 +346,7 @@ function upsert_pricing_data($payload) {
             $feature_id = $wpdb->insert_id;
         }
         $processed_features[] = $feature_id;
-        // Clear mapping for this feature.
         $nameChanges['features'][$fIndex] = array();
-
-        // Process options.
         if (isset($feature['options']) && is_array($feature['options'])) {
             foreach ($feature['options'] as $oIndex => $option) {
                 $finalOptionName = $option['optionName'];
@@ -407,13 +382,8 @@ function upsert_pricing_data($payload) {
                     $wpdb->insert($options_table, $option_to_save);
                     $option_id = $wpdb->insert_id;
                 }
-                // Track processed option IDs per feature.
                 $processed_options[$feature_id][] = $option_id;
                 $nameChanges['options'][$fIndex][$oIndex] = array();
-
-                // Process addons.
-                // Delete all addons for this option then insert new ones.
-                $wpdb->delete($addons_table, array('optionId' => $option_id));
                 if (isset($option['addons']) && is_array($option['addons'])) {
                     foreach ($option['addons'] as $aIndex => $addon) {
                         $finalAddonName = isset($addon['addonName']) ? $addon['addonName'] : '';
@@ -423,6 +393,19 @@ function upsert_pricing_data($payload) {
                             $oldAddonName = $nameChanges['addons'][$fIndex][$oIndex][$aIndex]['oldName'];
                             $finalAddonName = $nameChanges['addons'][$fIndex][$oIndex][$aIndex]['newName'];
                         }
+                        $row_addon = null;
+                        if ($oldAddonName !== $finalAddonName) {
+                            $row_addon = $wpdb->get_row($wpdb->prepare(
+                                "SELECT id FROM {$addons_table} WHERE optionId = %d AND addonName = %s",
+                                $option_id, $oldAddonName
+                            ), ARRAY_A);
+                        }
+                        if (!$row_addon) {
+                            $row_addon = $wpdb->get_row($wpdb->prepare(
+                                "SELECT id FROM {$addons_table} WHERE optionId = %d AND addonName = %s",
+                                $option_id, $finalAddonName
+                            ), ARRAY_A);
+                        }
                         $addon_to_save = $addon;
                         $addon_to_save['addonName'] = $finalAddonName;
                         if (isset($addon_to_save['addon_name'])) {
@@ -430,16 +413,21 @@ function upsert_pricing_data($payload) {
                         }
                         $addon_to_save['optionId'] = $option_id;
                         $addon_to_save = normalize_record($addon_to_save);
-                        $wpdb->insert($addons_table, $addon_to_save);
-                        $processed_addons[$option_id][] = $wpdb->insert_id;
+                        $addon_id = 0;
+                        if ($row_addon) {
+                            $addon_id = $row_addon['id'];
+                            $wpdb->update($addons_table, $addon_to_save, array('id' => $addon_id));
+                        } else {
+                            $wpdb->insert($addons_table, $addon_to_save);
+                            $addon_id = $wpdb->insert_id;
+                        }
+                        $processed_addons[$option_id][] = $addon_id;
                         $nameChanges['addons'][$fIndex][$oIndex][$aIndex] = array();
                     }
                 }
             }
         }
     }
-    
-    // Delete any features that exist in the DB but were not processed.
     $all_feature_ids = $wpdb->get_col("SELECT id FROM {$features_table}");
     $to_delete_features = array_diff($all_feature_ids, $processed_features);
     foreach ($to_delete_features as $fid) {
@@ -451,8 +439,6 @@ function upsert_pricing_data($payload) {
         }
         $wpdb->query($wpdb->prepare("DELETE FROM {$features_table} WHERE id = %d", $fid));
     }
-    
-    // For each processed feature, delete options not in the processed list.
     foreach ($processed_options as $featureId => $optionIds) {
         $all_opts = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$options_table} WHERE featureId = %d", $featureId));
         $to_delete_opts = array_diff($all_opts, $optionIds);
@@ -462,8 +448,6 @@ function upsert_pricing_data($payload) {
             $wpdb->query("DELETE FROM {$options_table} WHERE id IN ($ids)");
         }
     }
-    
-    // For each processed option, delete addons not in the processed list.
     foreach ($processed_addons as $optionId => $addonIds) {
         $all_addons = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$addons_table} WHERE optionId = %d", $optionId));
         $to_delete_addons = array_diff($all_addons, $addonIds);
@@ -477,7 +461,7 @@ function upsert_pricing_data($payload) {
 /**
  * Drop all pricing tables.
  */
-function drop_oscpc_tables() {
+function drop_ffc_tables() {
     global $wpdb;
     $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_addons");
     $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_options");
@@ -491,12 +475,10 @@ function firefly_collective_save_pricing($request) {
     $data = $request->get_json_params();
     $plugin_root_path = dirname(plugin_dir_path(__FILE__));
     $pricing_json_path = $plugin_root_path . '/pricing.json';
-    // Save only the pricingData portion to disk.
     $result = file_put_contents($pricing_json_path, json_encode($data['pricingData'], JSON_PRETTY_PRINT));
     if ($result === false) {
         return new WP_Error('save_failed', 'Failed to save pricing data', array('status' => 500));
     }
-    // Pass the entire payload (including nameChanges) to upsert.
     upsert_pricing_data($data);
     return array('success' => true, 'message' => 'Pricing data saved and database updated successfully.');
 }
