@@ -1,30 +1,31 @@
 :root {
     --profileMaxWidth: 500px;
+    --calcMaxWidth: 800px;
+    --primaryColor: #0073aa;
+    --secondaryColor: #005177;
+    --bgLight: #f9f9f9;
+    --bgWhite: #fff;
+    --textDark: #333;
+    --textGray: #555;
 }
 
 *, *::before, *::after {
     box-sizing: border-box;
 }
 
+/* Profile Section */
 #profile-container {
     width: 100%;
     max-width: var(--profileMaxWidth);
     margin: 20px auto;
     border-radius: 5px;
     background: #1c1c1c;
+    padding: 20px;
 }
-
 #profile-container form {
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    margin: 0;
 }
-
-#profile-container > form > div:first-child {
-    margin-bottom: 15px;
-}
-
 #profile-container input {
     width: 100%;
     padding: 8px;
@@ -32,28 +33,228 @@
     border: 1px solid #ccc;
     border-radius: 3px;
 }
-
 #profile-container button {
     width: 100%;
     padding: 8px;
     margin-bottom: 15px;
     border: none;
     border-radius: 3px;
-    background: #0073aa;
+    background: var(--primaryColor);
     color: #fff;
     cursor: pointer;
 }
 #profile-container button:hover {
-    background: #005177;
+    background: var(--secondaryColor);
 }
-
 #profile-message {
     color: green;
     margin-bottom: 15px;
 }
 
+/* Price Calculator Container */
+#price-calculator {
+    margin: 20px auto;
+    max-width: var(--calcMaxWidth);
+    background: var(--bgLight);
+    padding: 20px;
+    border-radius: 5px;
+}
+#price-calculator h2 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: var(--textDark);
+}
+
+/* Feature Type Block */
+.feature-type {
+    margin-bottom: 5rem;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ddd;
+}
+.feature-type h3 {
+    font-size: 20px;
+    margin-bottom: 5px;
+    color: var(--primaryColor);
+}
+.feature-type p {
+    font-size: 14px;
+    color: var(--textGray);
+    margin-bottom: 10px;
+}
+
+/* Instance Block (each duplicate instance) */
+.instances-container {
+    margin-left: 10px;
+}
+.feature {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--bgWhite);
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+/* Header for each instance */
+.instance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 16px;
+    font-weight: bold;
+}
+.delete-instance {
+    background: var(--secondaryColor);
+    border: none;
+    padding: 4px 8px;
+    color: #fff;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.delete-instance:hover {
+    background: var(--primaryColor);
+}
+
+/* Select dropdown */
+.feature select {
+    padding: 8px;
+    font-size: 14px;
+    width: 100%;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+/* Option Details */
+.option-details {
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 3px;
+    margin-top: 10px;
+}
+.option-details p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+/* Quantity Input (for non recurring features) */
+.quantity-input {
+    margin-top: 10px;
+    text-align: right;
+    color: black;
+}
+
+/* Addons */
+.addons {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f7f7f7;
+    border-radius: 3px;
+}
+.addons h4 {
+    margin-bottom: 5px;
+    font-size: 15px;
+    color: var(--primaryColor);
+}
+.addon-item {
+    color: #333;
+    font-size: 13px;
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* Add New Feature Button */
+.add-new-feature {
+    background: var(--primaryColor);
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    margin: 10px 0;
+    cursor: pointer;
+    border-radius: 3px;
+    float: right;
+    margin-top: 1rem;
+}
+.add-new-feature:hover {
+    background: var(--secondaryColor);
+}
+
+/* Invoice Container */
+#invoice-container {
+    margin: 20px auto;
+    max-width: var(--calcMaxWidth);
+    background: var(--bgLight);
+    padding: 20px;
+    border-radius: 5px;
+}
+#invoice-container h2 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: var(--textDark);
+}
+
+/* Invoice Table */
+.invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    margin-bottom: 15px;
+    color: black;
+}
+.invoice-table th,
+.invoice-table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    vertical-align: middle;
+    text-align: left;
+}
+.invoice-table thead {
+    background-color: #eee;
+}
+.invoice-table tfoot td {
+    background-color: #eee;
+    font-weight: bold;
+}
+.invoice-table th:nth-child(4),
+.invoice-table td:nth-child(4) {
+    text-align: right;
+}
+.addon-row td {
+    color: #666;
+    padding-left: 20px;
+}
+
+/* Invoice Total Text */
+#invoice-total {
+    font-weight: bold;
+    text-align: right;
+}
+
+/* "Pay Now" / "Request Estimate" Button */
+#pay-now {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 3px;
+    background: var(--primaryColor);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 10px;
+}
+#pay-now:hover {
+    background: var(--secondaryColor);
+}
+
 @media (max-width: 800px) {
     :root {
         --profileMaxWidth: 300px;
+    }
+    #price-calculator,
+    #invoice-container {
+        max-width: 95%;
     }
 }

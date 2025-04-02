@@ -53,9 +53,16 @@
         }
 
         if (determine_view() === 'dashboard') {
+            global $features_options_addons;
+            $features_options_addons = get_features_options_addons();
             $theme_path = get_template_directory_uri();
             wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
             wp_enqueue_style('dashboard-css', $theme_path . '/assets/css/dashboard.css', array(), $unique_id);
+            wp_enqueue_script('dashboard-js', $theme_path . '/assets/js/dashboard.js', array(), $unique_id, true);
+            wp_localize_script('dashboard-js', 'dashboardData', array(
+                'nonce'          => $nonce,
+                'features'       => $features_options_addons
+            ));
         }
     }
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');

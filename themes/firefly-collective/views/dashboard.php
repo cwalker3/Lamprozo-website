@@ -35,4 +35,24 @@
             </div>
         </form>
     </div>
+
+    <!-- Price Calculator Interface -->
+    <div id="price-calculator">
+        <h2>Billing - Price Calculator</h2>
+        <div id="features-container">
+            <!-- JavaScript will dynamically build feature type blocks with instance UIs -->
+        </div>
+    </div>
+
+    <!-- Invoice Summary -->
+    <div id="invoice-container">
+        <h2>Your Invoice</h2>
+        <div id="invoice-details">
+            <!-- Itemized selections will be displayed here -->
+        </div>
+        <div id="invoice-total">
+            <!-- Total price will be calculated and displayed here -->
+        </div>
+        <button id="pay-now">Pay Now</button>
+    </div>
 <?php endif; ?>

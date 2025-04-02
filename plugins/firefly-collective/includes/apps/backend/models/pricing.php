@@ -458,6 +458,146 @@ function upsert_pricing_data($payload) {
     }
 }
 
+function get_features_options_addons() {
+    global $wpdb;
+
+    // Define table names dynamically using the WordPress table prefix.
+    $features_table = $wpdb->prefix . 'ffc_features';
+    $options_table  = $wpdb->prefix . 'ffc_options';
+    $addons_table   = $wpdb->prefix . 'ffc_addons';
+
+    // Helper closure: get columns for a table, excluding linking keys.
+    // $exclude should be an array of column names to skip.
+    $get_table_columns = function($table, $exclude = array()) use ($wpdb) {
+        $cols = array();
+        $results = $wpdb->get_results("SHOW COLUMNS FROM `$table`", ARRAY_A);
+        if ($results) {
+            foreach ($results as $column) {
+                $colName = $column['Field'];
+                if (!in_array($colName, $exclude)) {
+                    // Save the column type as well.
+                    $cols[$colName] = $column['Type'];
+                }
+            }
+        }
+        return $cols;
+    };
+
+    // Get columns dynamically.
+    $features_columns = $get_table_columns($features_table, array('id'));
+    $options_columns  = $get_table_columns($options_table, array('id', 'featureId'));
+    $addons_columns   = $get_table_columns($addons_table, array('id', 'optionId'));
+
+    // Build the SELECT fields dynamically.
+    $select_fields = array();
+
+    // For features: alias each column as f_<column>
+    foreach ($features_columns as $col => $type) {
+        $select_fields[] = "f.`$col` AS f_$col";
+    }
+    // Also include the feature primary key for linking.
+    $select_fields[] = "f.id AS f_id";
+
+    // For options: alias each column as o_<column>
+    foreach ($options_columns as $col => $type) {
+        $select_fields[] = "o.`$col` AS o_$col";
+    }
+    // Include the option primary key.
+    $select_fields[] = "o.id AS o_id";
+
+    // For addons: alias each column as a_<column>
+    foreach ($addons_columns as $col => $type) {
+        $select_fields[] = "a.`$col` AS a_$col";
+    }
+    // Include the addon primary key.
+    $select_fields[] = "a.id AS a_id";
+
+    // Combine into the SELECT clause.
+    $select_clause = implode(", ", $select_fields);
+
+    // Build the query with LEFT JOINs.
+    $sql = "SELECT $select_clause 
+            FROM `$features_table` f
+            LEFT JOIN `$options_table` o ON o.featureId = f.id
+            LEFT JOIN `$addons_table` a ON a.optionId = o.id
+            ORDER BY f.id, o.id, a.id";
+
+    $results = $wpdb->get_results($sql, ARRAY_A);
+
+    // Helper closure: cast a value based on its MySQL type.
+    // This does a basic conversion so numeric values become numbers, booleans from tinyint(1), etc.
+    $cast_value = function($value, $type) {
+        if ($value === null) {
+            return null;
+        }
+        // If the type contains "int"
+        if (stripos($type, 'int') !== false) {
+            // For tinyint(1), assume boolean.
+            if (stripos($type, 'tinyint(1)') !== false) {
+                return (bool)$value;
+            }
+            return (int)$value;
+        }
+        // If the type is decimal, float or double.
+        if (stripos($type, 'decimal') !== false || stripos($type, 'float') !== false || stripos($type, 'double') !== false) {
+            return (float)$value;
+        }
+        return $value;
+    };
+
+    // Build the nested array structure.
+    $features = array();
+
+    foreach ($results as $row) {
+        // Use the feature id for grouping.
+        $f_id = $row['f_id'];
+        if (!isset($features[$f_id])) {
+            // Dynamically build the feature array using all feature columns.
+            $feature = array();
+            foreach ($features_columns as $col => $type) {
+                $feature[$col] = $cast_value($row["f_$col"], $type);
+            }
+            // Add a placeholder for options.
+            $feature['options'] = array();
+            $features[$f_id] = $feature;
+        }
+
+        // Process options only if there is an option row.
+        if (!empty($row['o_id'])) {
+            $o_id = $row['o_id'];
+            if (!isset($features[$f_id]['options'][$o_id])) {
+                $option = array();
+                foreach ($options_columns as $col => $type) {
+                    $option[$col] = $cast_value($row["o_$col"], $type);
+                }
+                // Placeholder for addons.
+                $option['addons'] = array();
+                $features[$f_id]['options'][$o_id] = $option;
+            }
+
+            // Process addons only if there is an addon row.
+            if (!empty($row['a_id'])) {
+                $addon = array();
+                foreach ($addons_columns as $col => $type) {
+                    $addon[$col] = $cast_value($row["a_$col"], $type);
+                }
+                $features[$f_id]['options'][$o_id]['addons'][] = $addon;
+            }
+        }
+    }
+
+    // Re-index the features and options arrays to get sequential numeric arrays.
+    $features = array_values($features);
+    foreach ($features as &$feature) {
+        if (!empty($feature['options'])) {
+            $feature['options'] = array_values($feature['options']);
+        }
+    }
+
+    // Return the final structure with 'features' as the top-level key.
+    return $features;
+}
+
 /**
  * Drop all pricing tables.
  */
