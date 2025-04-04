@@ -1,5 +1,5 @@
 <?php
-    
+
     function check_username_exists(WP_REST_Request $request) {
         $username = sanitize_user($request->get_param('username') ?? '');
         if (empty($username)) {
@@ -179,7 +179,14 @@
             $auth_id = $user_id;
         }
         
+        // Encrypt the user ID
         $encrypted_user_id = encrypt_with_auth_key($auth_id);
+        
+        // Set auth_id cookie if the user is a subscriber
+        $current_user = get_user_by('id', $auth_id);
+        if ($current_user && in_array('subscriber', (array)$current_user->roles)) {
+            setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+        }
         
         $html = '<script>
                     var encryptedUserId = "' . esc_js($encrypted_user_id) . '";
@@ -208,6 +215,24 @@
         $current_user = wp_get_current_user();
         return $current_user;
     }
+
+    // Hook into regular login to set the auth_id cookie for subscribers.
+    function set_auth_cookie_on_wp_login($user_login, $user) {
+        if (in_array('subscriber', (array)$user->roles)) {
+            $encrypted_user_id = encrypt_with_auth_key($user->ID);
+            setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+        }
+    }
+    add_action('wp_login', 'set_auth_cookie_on_wp_login', 10, 2);
+
+    // Redirect subscribers to /dashboard after login.
+    function custom_login_redirect($redirect_to, $request, $user) {
+        if (isset($user->roles) && is_array($user->roles) && in_array('subscriber', $user->roles)) {
+            return home_url('/dashboard');
+        }
+        return $redirect_to;
+    }
+    add_filter('login_redirect', 'custom_login_redirect', 10, 3);
 
     add_filter('rest_pre_serve_request', function($served, $result, $request, $server) {
         $headers = $result->get_headers();
