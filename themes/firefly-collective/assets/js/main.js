@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', function () {
             for (let radio of signupMethodRadios) {
                 radio.addEventListener('change', function() {
                     if (this.value === 'direct') {
-                        document.getElementById('direct-signup-fields').style.display = 'block';
+                        document.getElementById('direct-signup-fields').style.display = 'grid';
                         document.getElementById('third-party-signup-fields').style.display = 'none';
                     } else if (this.value === 'third') {
                         document.getElementById('direct-signup-fields').style.display = 'none';
-                        document.getElementById('third-party-signup-fields').style.display = 'block';
+                        document.getElementById('third-party-signup-fields').style.display = 'grid';
                     }
                 });
             }
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (enableUsernamePassword) {
                 enableUsernamePassword.addEventListener('change', function() {
                     const fields = document.getElementById('username-password-fields');
-                    fields.style.display = this.checked ? 'block' : 'none';
+                    fields.style.display = this.checked ? 'grid' : 'none';
                     if (!this.checked) {
                         usernameValid = true;
                         const usernameInput = document.getElementById('signup-form-username');
