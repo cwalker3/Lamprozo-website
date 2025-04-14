@@ -598,6 +598,73 @@ document.addEventListener('DOMContentLoaded', function() {
         featuresContainer.appendChild(featureTypeDiv);
     });
 
+    // Update profile handler
+    const updateProfileBtn = document.getElementById('update-profile-btn');
+    if (updateProfileBtn) {
+        updateProfileBtn.addEventListener('click', () => {
+            const firstName = document.getElementById('profile-first-name').value.trim();
+            const lastName = document.getElementById('profile-last-name').value.trim();
+            const email = document.getElementById('profile-email').value.trim();
+            const profileMessage = document.getElementById('profile-message');
+            profileMessage.innerHTML = '';
+            updateProfileBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+            let formData = new FormData();
+            formData.append('first_name', firstName);
+            formData.append('last_name', lastName);
+            formData.append('email', email);
+            fetch(`${myApi.api_url}update-profile`, {
+                method: 'POST',
+                headers: { 'X-WP-Nonce': myApi.nonce },
+                body: formData,
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'An error occurred.');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                profileMessage.textContent = data.message || 'Profile updated successfully.';
+                updateProfileBtn.textContent = 'Update Profile';
+            })
+            .catch(error => {
+                profileMessage.textContent = error.message || 'An error occurred.';
+                updateProfileBtn.textContent = 'Update Profile';
+            });
+        });
+    }
+    // Reset password handler
+    const resetPasswordBtn = document.getElementById('reset-password-btn');
+    if (resetPasswordBtn) {
+        resetPasswordBtn.addEventListener('click', () => {
+            const profileMessage = document.getElementById('profile-message');
+            profileMessage.innerHTML = '';
+            resetPasswordBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+            fetch(`${myApi.api_url}reset-password`, {
+                method: 'POST',
+                headers: { 'X-WP-Nonce': myApi.nonce },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'An error occurred.');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                profileMessage.textContent = data.message || 'Password reset email sent.';
+                resetPasswordBtn.textContent = 'Send Password Reset';
+            })
+            .catch(error => {
+                profileMessage.textContent = error.message || 'An error occurred.';
+                resetPasswordBtn.textContent = 'Send Password Reset';
+            });
+        });
+    }
+
     // Finally, build the invoice
     updateInvoice();
 
