@@ -145,37 +145,37 @@ function firefly_collective_sync_unzipped($update_dir) {
     foreach ($files as $file) {
         if (!$file->isFile()) continue;
 
-        $file_path = $file->getRealPath();
+        $file_path     = $file->getRealPath();
         $relative_path = str_replace($update_dir, '', $file_path);
         $relative_path = ltrim($relative_path, '/');
 
-        // Map relative_path (e.g. "plugins/firefly-collective/foo.php") to final destination
-        $destination = firefly_collective_map_unzipped_path($relative_path);
-        if (!$destination) continue; // skip if it's not recognized
+        // Determine destination
+        if (strpos($relative_path, 'plugins/') === 0 || strpos($relative_path, 'themes/') === 0) {
+            // under wp-content/plugins or wp-content/themes
+            $destination = ABSPATH . 'wp-content/' . $relative_path;
+        } else {
+            // ANY other file (e.g. .htaccess) → root of wp-content
+            $destination = WP_CONTENT_DIR . '/' . $relative_path;
+        }
 
-        // Ensure the destination directory
+        // Ensure the destination directory exists
         $destination_dir = dirname($destination);
-        if (!file_exists($destination_dir)) {
+        if (! file_exists($destination_dir)) {
             wp_mkdir_p($destination_dir);
         }
 
-        // Overwrite file
+        // Copy/overwrite
         copy($file_path, $destination);
 
-        // Track this relative path as existing
+        // Track for cleanup
         $unzipped_paths[] = $relative_path;
     }
 
-    // 2. Remove extraneous files on the live site that do not appear in $unzipped_paths
-    //    We'll look at top-level directories under "plugins/" or "themes/" from $unzipped_paths
+    // 2. Remove extraneous plugin/theme files
     $top_level_dirs = firefly_collective_extract_top_level_dirs($unzipped_paths);
-
     foreach ($top_level_dirs as $dir) {
-        // e.g. "plugins/firefly-collective" => final path is ABSPATH . 'wp-content/plugins/firefly-collective'
         $live_dir = ABSPATH . 'wp-content/' . $dir;
-        if (!is_dir($live_dir)) continue;
-
-        // Remove extras
+        if (! is_dir($live_dir)) continue;
         firefly_collective_remove_extras($live_dir, $dir, $unzipped_paths);
     }
 }
@@ -302,7 +302,7 @@ function firefly_collective_local_update_project(WP_REST_Request $request) {
         return new WP_Error('no_files', 'No directories defined for the project.', array('status' => 400));
     }
 
-    $zip_path = firefly_collective_zip_directories($project_name, $directories);
+    $zip_path = firefly_collective_zip_contents($project_name, $directories);
     if (is_wp_error($zip_path)) {
         return $zip_path;
     }
@@ -318,7 +318,7 @@ function firefly_collective_local_update_project(WP_REST_Request $request) {
 /**
  * Zip directories from local site, placing files under plugins/ or themes/ as needed.
  */
-function firefly_collective_zip_directories($project_name, $directories) {
+function firefly_collective_zip_contents($project_name, $directories) {
     $upload_dir = wp_upload_dir();
     $temp_dir   = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
     if (!file_exists($temp_dir)) {
@@ -336,6 +336,13 @@ function firefly_collective_zip_directories($project_name, $directories) {
     foreach ($directories as $dir) {
         $absolute_dir = ABSPATH . ltrim($dir, '/');
         if (!file_exists($absolute_dir)) continue;
+
+        // Handle single files from wp-content
+        if (is_file($absolute_dir) && strpos($dir, '/wp-content/') !== false) {
+            $relative_path = trim(str_replace('/wp-content/', '', $dir), '/');
+            $zip->addFile($absolute_dir, $relative_path);
+            continue;
+        }
 
         // Determine if it's a plugin or theme directory
         if (strpos($dir, '/wp-content/plugins/') !== false) {

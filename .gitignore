@@ -1,0 +1,15 @@
+# Ignore everything
+*
+
+# Don't ignore specific files
+!/.htaccess
+!.gitignore
+
+# Don't ignore specific directories and their contents
+!plugins/
+!plugins/firefly-collective/
+!plugins/firefly-collective/**
+
+!themes/
+!themes/firefly-collective/
+!themes/firefly-collective/**
