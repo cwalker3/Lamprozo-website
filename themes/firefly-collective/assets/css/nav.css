@@ -134,6 +134,10 @@ body > nav li {
     list-style: none;
 }
 
+body > nav ul > li:last-of-type {
+    display: none;
+}
+
 #hamburger, #close-nav-btn {
 	max-width: 35px;
 	height: auto;

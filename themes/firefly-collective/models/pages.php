@@ -46,7 +46,7 @@
             }
         }
 
-        // Set 'Home' as the static front page
+        // Assign front page and posts page
         if (isset($page_ids['home'])) {
             update_option('show_on_front', 'page');
             update_option('page_on_front', $page_ids['home']);
@@ -57,20 +57,24 @@
             update_option('page_for_posts', $page_ids['blog']);
         }
 
-        // Create 'Main Website Menu' and assign it to the 'website-menu' location
+        // Create or fetch the main menu
         $menu_name = 'Main Website Menu';
-        $menu_exists = wp_get_nav_menu_object($menu_name);
-
-        if (!$menu_exists) {
-            // Create the menu
+        $menu_obj  = wp_get_nav_menu_object($menu_name);
+        if (! $menu_obj) {
             $menu_id = wp_create_nav_menu($menu_name);
+            $new_menu = true;
+        } else {
+            $menu_id  = $menu_obj->term_id;
+            $new_menu = false;
+        }
 
-            // Assign the menu to the 'website-menu' theme location
-            $locations = get_theme_mod('nav_menu_locations');
-            $locations['website-menu'] = $menu_id;
-            set_theme_mod('nav_menu_locations', $locations);
+        // Assign to theme location
+        $locations = get_theme_mod('nav_menu_locations');
+        $locations['website-menu'] = $menu_id;
+        set_theme_mod('nav_menu_locations', $locations);
 
-            // Add pages to the menu
+        // 5. If this is a brand‑new menu, add all pages
+        if ($new_menu) {
             foreach ($page_ids as $slug => $page_id) {
                 wp_update_nav_menu_item($menu_id, 0, array(
                     'menu-item-title'     => $pages[$slug]['title'],
@@ -80,6 +84,30 @@
                     'menu-item-status'    => 'publish',
                 ));
             }
+        }
+
+        // Fetch existing item titles
+        $items  = wp_get_nav_menu_items($menu_id);
+        $titles = wp_list_pluck($items, 'title');
+
+        // Add 'Log In' if missing
+        if (! in_array('Log In', $titles, true)) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title'  => 'Log In',
+                'menu-item-url'    => '/admin',
+                'menu-item-status' => 'publish',
+                'menu-item-type'   => 'custom',
+            ));
+        }
+
+        // Add 'Log Out' if missing
+        if (! in_array('Log Out', $titles, true)) {
+            wp_update_nav_menu_item($menu_id, 0, array(
+                'menu-item-title'  => 'Log Out',
+                'menu-item-url'    => '/logout',
+                'menu-item-status' => 'publish',
+                'menu-item-type'   => 'custom',
+            ));
         }
     }
     add_action('after_switch_theme', 'custom_theme_setup_pages');

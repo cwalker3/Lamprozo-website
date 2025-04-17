@@ -6,8 +6,7 @@
 
 <?php if ( $current_user->exists() ) : ?>
     <div id="welcome-msg">
-        Hi, <?php echo esc_html( $current_user->first_name ); ?><br>
-        <a href="/logout">Logout</a>
+        Hi, <?php echo esc_html( $current_user->first_name ); ?>
     </div>
     <div id="profile-container">
         <form id="profile-form">

@@ -34,6 +34,13 @@ document.addEventListener('DOMContentLoaded', function () {
         closeWebsiteMenu();
     });
 
+    if (navData.auth_id) {
+        const loginBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+        const logoutBtn = document.querySelector('body > nav ul > li:last-of-type');
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'block';
+    }
+
     function openWebsiteMenu() {
         nav.style.display = 'grid';
         backdrop.style.display = 'block';
