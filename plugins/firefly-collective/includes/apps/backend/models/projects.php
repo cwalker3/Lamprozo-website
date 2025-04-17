@@ -433,4 +433,6 @@ function firefly_collective_send_project_update($zip_path, $project_name, $desti
 
 // Hooks for the project admin page.
 add_action('admin_enqueue_scripts', 'enqueue_projects_styles_and_scripts');
-add_action('admin_menu', 'firefly_collective_add_projects_link');
+if (defined('FIREFLY_DEV')) {
+    add_action('admin_menu', 'firefly_collective_add_projects_link');
+}
