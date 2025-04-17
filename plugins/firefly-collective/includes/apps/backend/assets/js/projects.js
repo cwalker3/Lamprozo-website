@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             fetch(`${projectData.apiUrl}update-project`, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-WP-Nonce': projectData.nonce
