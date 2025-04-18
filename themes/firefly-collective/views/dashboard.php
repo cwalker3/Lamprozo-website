@@ -1,5 +1,5 @@
 <?php
-    $current_user = decrypt_current_user($_COOKIE['auth_id']);
+    global $current_user;
 ?>
 <h1><?php echo esc_html($pageTitle); ?></h1>
 <p><?php echo apply_filters('the_content', $postContent); ?></p>

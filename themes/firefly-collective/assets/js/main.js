@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleContactSticky() {
-        if (page === 'contact' || page === 'request-an-appointment') return;
+        if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard') return;
         const contactSticky = document.querySelector('#contact-sticky');
         contactSticky.addEventListener('pointerup', ()=>{window.location='/request-a-quote';});
         let isVisible = false;

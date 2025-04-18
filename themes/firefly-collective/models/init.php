@@ -13,12 +13,7 @@
         $theme_path = get_template_directory_uri();
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
-        if ($_COOKIE['auth_id']) {
-            $auth_id = $_COOKIE['auth_id'];
-            $user_id = decrypt_with_auth_key($auth_id);
-            wp_set_current_user($user_id);
-            wp_set_auth_cookie($user_id);
-        }
+        $auth_id = $_COOKIE['auth_id'];
 
         // Enqueue Stylesheets
         wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
@@ -71,7 +66,8 @@
             wp_enqueue_script('dashboard-js', $theme_path . '/assets/js/dashboard.js', array(), $unique_id, true);
             wp_localize_script('dashboard-js', 'dashboardData', array(
                 'nonce'          => $nonce,
-                'features'       => $features_options_addons
+                'features'       => $features_options_addons,
+                'theme_path'     => $theme_path
             ));
         }
     }

@@ -158,6 +158,7 @@
         if ($existing_user = get_user_by('email', $email)) {
             update_user_meta($existing_user->ID, 'third_party', 'google');
             $auth_id = $existing_user->ID;
+            $user_id = $existing_user->ID;
         } else {
             $username = sanitize_user($email, true);
             $password = wp_generate_password();
@@ -182,6 +183,9 @@
         // Encrypt the user ID
         $encrypted_user_id = encrypt_with_auth_key($auth_id);
         
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true, is_ssl());
+
         // Set auth_id cookie if the user is a subscriber
         $current_user = get_user_by('id', $auth_id);
         if ($current_user && in_array('subscriber', (array)$current_user->roles)) {
@@ -201,19 +205,6 @@
         $response = new WP_REST_Response($html, 200);
         $response->header('Content-Type', 'text/html');
         return $response;
-    }
-
-    function decrypt_current_user($encrypted_user_id) {
-        $auth_id = decrypt_with_auth_key($encrypted_user_id);
-        $user_id = intval($auth_id);
-        $user = get_user_by('id', $user_id);
-        if ($user) {
-            wp_set_current_user($user->ID, $user->user_login);
-            wp_set_auth_cookie($user->ID);
-        }
-
-        $current_user = wp_get_current_user();
-        return $current_user;
     }
 
     // Hook into regular login to set the auth_id cookie for subscribers.
@@ -287,3 +278,17 @@
         }
     }
     add_action( 'init', 'custom_logout_redirect' );
+
+    add_filter('determine_current_user', function( $user_id ) {
+        if ( empty( $_COOKIE['auth_id'] ) ) {
+            return $user_id;
+        }
+        $decrypted = decrypt_with_auth_key( sanitize_text_field( $_COOKIE['auth_id'] ) );
+        $uid = intval( $decrypted );
+        if ( $uid && get_user_by('id', $uid) ) {
+            wp_set_current_user($uid);
+            wp_set_auth_cookie($uid, true, is_ssl());
+            return $uid; // tells WP, “this is the logged‑in user”
+        }
+        return $user_id;
+    }, 20 );
