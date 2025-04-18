@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const featuresContainer = document.getElementById('features-container');
     const invoiceDetails = document.getElementById('invoice-details');
     const invoiceTotal = document.getElementById('invoice-total');
+    const themePath = dashboardData.theme_path;
 
     // Clear container to prevent duplication.
     featuresContainer.innerHTML = '';
