@@ -264,20 +264,23 @@
     });
 
     function custom_logout_redirect() {
-        // Check if the request URI is exactly '/logout'
-        if ( untrailingslashit($_SERVER['REQUEST_URI']) === '/logout' ) {
-            // Remove the 'auth_id' cookie by setting its expiration to a past time.
-            if ( isset($_COOKIE['auth_id']) ) {
-                // Adjust cookie parameters (path, domain) if needed.
+        // Only intercept the exact /logout URI
+        if ( untrailingslashit( $_SERVER['REQUEST_URI'] ) === '/logout' ) {
+            // 1. Log the user out of WP (clears WP’s own cookies/auth)
+            wp_logout();
+    
+            // 2. Remove custom auth_id cookie
+            if ( isset( $_COOKIE['auth_id'] ) ) {
                 setcookie( 'auth_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
                 unset( $_COOKIE['auth_id'] );
             }
-            // Redirect the user to the WordPress login page.
+    
+            // 3. Redirect to WP login page
             wp_redirect( wp_login_url() );
             exit;
         }
     }
-    add_action( 'init', 'custom_logout_redirect' );
+    add_action( 'init', 'custom_logout_redirect' );    
 
     add_filter('determine_current_user', function( $user_id ) {
         if ( empty( $_COOKIE['auth_id'] ) ) {
