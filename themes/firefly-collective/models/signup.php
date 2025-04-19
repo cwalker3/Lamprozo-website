@@ -90,7 +90,7 @@
         send_html_mail(NULL, $subject, $html, true);
 
         $encrypted_user_id = encrypt_with_auth_key($user_id);
-
+        
         $cookie_options = [
             'expires'  => time() + 3600,
             'path'     => '/',
@@ -99,6 +99,9 @@
             'samesite' => 'Lax'
         ];
         setcookie('auth_id', $encrypted_user_id, $cookie_options);
+
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true, is_ssl());
 
         return rest_ensure_response(array('redirect' => '/dashboard'));
     }
