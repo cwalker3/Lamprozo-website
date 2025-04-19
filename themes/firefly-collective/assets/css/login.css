@@ -1,0 +1,43 @@
+/* Page background and font */
+body.login {
+    background-color: rgb(51, 51, 51);
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+  
+  /* Form container styling */
+  .login form {
+    background: #ffffff;
+    border-radius: 5px;
+    padding: 26px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.13);
+  }
+  
+  /* Input labels and fields */
+  .login label {
+    color: #454545;
+    font-weight: bold;
+    margin-bottom: 0.5em;
+  }
+  .login form .input {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+  }
+  
+  /* Links and button colors */
+  .login #backtoblog a,
+  .login #nav a {
+    color: #4da28f;
+  }
+  .wp-core-ui .button-primary {
+    background: #4da28f;
+    border-color: #4da28f;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .login .message, .login .notice, .login .success {
+    color: black;
+  }
+  

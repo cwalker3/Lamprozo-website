@@ -1,5 +1,37 @@
 <?php
 
+    function change_login_logo() {
+        echo '<style type="text/css">
+        .login h1 a { 
+            background-image: url(' . get_template_directory_uri() . '/images/logo.webp) !important;
+            background-size: contain;
+            width: 200px;
+            height: 100px;
+        }
+        </style>';
+    }
+    add_action('login_head', 'change_login_logo');
+
+    function custom_login_logo_url() {
+        return home_url();
+    }
+    add_filter('login_headerurl', 'custom_login_logo_url');
+
+    function custom_login_logo_url_title() {
+        return get_bloginfo('name');
+    }
+    add_filter('login_headertitle', 'custom_login_logo_url_title');
+
+    function enqueue_custom_login_style() {
+    wp_enqueue_style(
+        'custom-login',
+        get_template_directory_uri() . '/assets/css/login.css',
+        array(),
+        wp_get_theme()->get('Version')
+    );
+    }
+    add_action('login_enqueue_scripts', 'enqueue_custom_login_style');
+
     function check_username_exists(WP_REST_Request $request) {
         $username = sanitize_user($request->get_param('username') ?? '');
         if (empty($username)) {
