@@ -134,6 +134,10 @@ body > nav li {
     list-style: none;
 }
 
+body > nav ul > li:nth-last-of-type(2) {
+    display: none;
+}
+
 body > nav ul > li:last-of-type {
     display: none;
 }

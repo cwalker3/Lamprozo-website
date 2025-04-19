@@ -35,9 +35,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (navData.auth_id) {
-        const loginBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+        const loginBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+        const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
         const logoutBtn = document.querySelector('body > nav ul > li:last-of-type');
         loginBtn.style.display = 'none';
+        dashboardBtn.style.display = 'block';
         logoutBtn.style.display = 'block';
     }
 
