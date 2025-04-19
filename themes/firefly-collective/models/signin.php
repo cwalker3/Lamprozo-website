@@ -295,3 +295,11 @@
         }
         return $user_id;
     }, 20 );
+
+    add_filter('show_admin_bar', function( $show ) {
+        // if this user was logged in only via auth_id
+        if ( ! empty( $_COOKIE['auth_id'] ) ) {
+            return false; 
+        }
+        return $show;
+    });

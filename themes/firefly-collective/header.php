@@ -11,18 +11,18 @@
     <div id="backdrop"></div>
 
     <header>
-        <div id="nav-bar"<? if($args['is-user-logged-in']) {?> class="user-nav"<? } ?>></div>
-        <div id="logo-name" <? if ($args['is-user-logged-in']) {?> class="user-nav"<?}?>>
+        <div id="nav-bar"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id']) {?> class="user-nav"<? } ?>></div>
+        <div id="logo-name" <? if ($args['is-user-logged-in'] && !$_COOKIE['auth_id']) {?> class="user-nav"<?}?>>
             <div id="site-logo"><img src="<?php echo esc_url($args['theme-path'] . '/images/logo.webp'); ?>"></div>
             <div id="site-name"><?=get_bloginfo('name')?></div>
         </div>
     </header>  
 
     <div>
-        <img id="hamburger"<? if($args['is-user-logged-in']) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/hamburger.webp'); ?>" alt="<?php esc_attr_e('Menu'); ?>">
+        <img id="hamburger"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id']) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/hamburger.webp'); ?>" alt="<?php esc_attr_e('Menu'); ?>">
     </div>
     <div>
-        <img id="close-nav-btn"<? if($args['is-user-logged-in']) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/close-nav.webp'); ?>" alt="<?php esc_attr_e('Close Menu'); ?>">
+        <img id="close-nav-btn"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id']) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/close-nav.webp'); ?>" alt="<?php esc_attr_e('Close Menu'); ?>">
     </div>
     <nav>
         <?php
