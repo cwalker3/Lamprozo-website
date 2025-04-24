@@ -318,6 +318,10 @@
         if ( empty( $_COOKIE['auth_id'] ) ) {
             return $user_id;
         }
+        if (defined('FIREFLY_DEV')) {
+            add_filter('secure_auth_cookie',     '__return_true');
+            add_filter('secure_logged_in_cookie','__return_true');
+        }
         $decrypted = decrypt_with_auth_key( sanitize_text_field( $_COOKIE['auth_id'] ) );
         $uid = intval( $decrypted );
         if ( $uid && get_user_by('id', $uid) ) {
