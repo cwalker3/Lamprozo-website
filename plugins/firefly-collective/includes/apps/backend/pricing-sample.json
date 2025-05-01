@@ -1,56 +1,114 @@
 {
     "features": [
         {
-            "featureName": "Feature 1",
-            "description": "This is the description for Feature 1.",
+            "featureName": "Membership",
+            "description": {
+                "text": "This is the membership description."
+            },
+            "recurring": true,
+            "normalText": {
+                "level": "admin",
+                "ui_type": "normal-text",
+                "value": "Hello"
+            },
+            "longText": {
+                "level": "admin",
+                "ui_type": "long-text",
+                "value": "Hello Thar"
+            },
+            "intFloat": {
+                "level": "admin",
+                "ui_type": "int-float",
+                "value": 90
+            },
+            "dateField": {
+                "level": "admin",
+                "ui_type": "date",
+                "value": "2025-04-29"
+            },
+            "multiple": {
+                "level": "admin",
+                "ui_type": "array",
+                "value": {
+                    "types": [
+                        "Choice 1",
+                        "Choice 2",
+                        "Choice 3"
+                    ],
+                    "selected": 1
+                }
+            },
             "options": [
                 {
-                    "optionName": "Option A",
-                    "recurring": null,
-                    "startDate": null,
-                    "interval": null,
-                    "staticPrice": null,
-                    "priceFloor": 10,
-                    "priceCeiling": 20,
+                    "optionName": "Bronze",
+                    "description": {
+                        "text": "This is the bronze description."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "daily",
+                                "bi-weekly",
+                                "weekly",
+                                "monthly",
+                                "bi-annually",
+                                "annually",
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 5,
                     "optionMetric": "unit",
                     "addons": [
                         {
-                            "addonName": "Addon 1",
+                            "addonName": "Bonus Item",
+                            "description": {
+                                "text": "This is the bonus item description."
+                            },
                             "addOnMetric": "unit",
-                            "priceMultiplierType": "plus",
-                            "staticPriceMod": null,
-                            "floorPriceMod": 2,
-                            "ceilingPriceMod": 2
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1
                         }
                     ]
-                },
-                {
-                    "optionName": "Option B",
-                    "recurring": null,
-                    "startDate": null,
-                    "interval": null,
-                    "staticPrice": null,
-                    "priceFloor": 5,
-                    "priceCeiling": 15,
-                    "optionMetric": "unit",
-                    "addons": []
-                }
-            ]
-        },
-        {
-            "featureName": "Feature 2",
-            "description": "This is the description for Feature 2.",
-            "options": [
-                {
-                    "optionName": "Option C",
-                    "recurring": null,
-                    "startDate": null,
-                    "interval": null,
-                    "staticPrice": null,
-                    "priceFloor": 20,
-                    "priceCeiling": 30,
-                    "optionMetric": "unit",
-                    "addons": []
                 }
             ]
         }

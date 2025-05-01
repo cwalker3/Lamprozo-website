@@ -59,6 +59,22 @@ h1 {
     align-items: center;
     gap: 10px;
 }
+/* Clone button styling */
+.clone-button {
+    background-color: #ffc107;
+    color: #212529;
+    border: none;
+    padding: 5px 10px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.clone-button:hover {
+    background-color: #e0a800;
+}
+#new-feature-form {
+    padding: 1rem;
+}
 .toggle-indicator {
     font-size: 1.2em;
     color: white;
@@ -71,7 +87,6 @@ h1 {
 }
 .feature-content-inner {
     padding: 15px;
-
 }
 div.option:nth-of-type(even) {
     background: #fafafa;
@@ -156,9 +171,6 @@ button,
 .delete-button {
     cursor: pointer !important;
 }
-.delete-button {
-    margin-right: 1vw;
-}
 #apply-button {
     background-color: #0073aa !important;
     color: #fff !important;
@@ -186,6 +198,7 @@ button,
     background-color: #005177;
 }
 .add-button {
+    margin-top: 2vh;
     background-color: #28a745;
     padding: 5px 10px;
     font-size: 0.9em;
