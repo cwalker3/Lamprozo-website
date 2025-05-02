@@ -1439,6 +1439,10 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
       recordNameChange(window.nameChanges.options, [fIdx, oIdx], opt.optionName, v);
       opt.optionName = v;
       optionTitle.textContent = v || 'New Option';
+      
+      // Add this line to update the reference text
+      const optionNameRef = wrap.querySelector('.option-name-reference');
+      if (optionNameRef) optionNameRef.textContent = (v || 'Option') + "'s Add-ons";
     },
     'Enter option name...'
   );
@@ -1520,6 +1524,19 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
     'link_name'
   ]);
   
+  // Create addons header with option name
+  const addonsHeader = document.createElement('div');
+  addonsHeader.className = 'section-header option-addons-header';
+
+  // Set initial text
+  const optionNameSpan = document.createElement('span');
+  optionNameSpan.className = 'option-name-reference';
+  optionNameSpan.textContent = (opt.optionName || 'Option') + "'s Add-ons:";
+  addonsHeader.appendChild(optionNameSpan);
+
+  // Insert the header before addons list
+  contentInner.appendChild(addonsHeader);
+
   // Create addon container
   const addonContentArea = document.createElement('div');
   addonContentArea.className = 'addon-content-area';
@@ -1639,6 +1656,11 @@ function createFeatureElement(idx, feat, availOpt, availAdd){
       recordNameChange(window.nameChanges.features, [idx], old, v);
       feat.featureName = v;
       titleSpan.textContent = v || 'New Feature';
+      
+      // Add this line to update the reference text
+      const featureNameRef = outer.querySelector('.feature-name-reference');
+      if (featureNameRef) featureNameRef.textContent = (v || 'Feature') + "'s Options";
+      
       // propagate into link_name
       window.pricingData.features.forEach(f => {
         if (f.link_name === old) {
@@ -1668,6 +1690,19 @@ function createFeatureElement(idx, feat, availOpt, availAdd){
   createDynamicFields(feat, inner, [
     'featureName','description','options','recurring','link_name'
   ]);
+
+  // Create options header with feature name
+  const optionsHeader = document.createElement('div');
+  optionsHeader.className = 'section-header feature-options-header';
+
+  // Set initial text
+  const featureNameSpan = document.createElement('span');
+  featureNameSpan.className = 'feature-name-reference';
+  featureNameSpan.textContent = (feat.featureName || 'Feature') + "'s Options:";
+  optionsHeader.appendChild(featureNameSpan);
+
+  // Insert the header before options list
+  inner.appendChild(optionsHeader);
 
   // Add options to the feature
   feat.options.forEach((o, i) => {

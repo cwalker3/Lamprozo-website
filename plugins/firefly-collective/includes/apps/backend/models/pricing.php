@@ -136,11 +136,6 @@ function get_default_feature_columns() {
         'featureName' => "VARCHAR(255) NOT NULL",
         'description' => "TEXT",
         'recurring'   => "TINYINT(1)",
-        'normalText'  => "VARCHAR(255)",
-        'longText'    => "TEXT",
-        'intFloat'    => "FLOAT",
-        'dateField'   => "DATE",
-        'multiple'    => "VARCHAR(255)",
         'link_name'   => "VARCHAR(255) NULL"
     );
 }

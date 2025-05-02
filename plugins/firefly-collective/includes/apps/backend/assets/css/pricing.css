@@ -131,6 +131,29 @@ html, body {
     margin-top: 15px;
     overflow: visible;
   }
+
+  /* Section headers for options and add-ons */
+  .section-header {
+    margin: 20px 0 10px 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+  }
+
+  .feature-options-header {
+    color: #0073aa;
+  }
+
+  .option-addons-header {
+    color: #0c4d6b;
+  }
+
+  /* Name reference spans */
+  .feature-name-reference,
+  .option-name-reference {
+    font-style: italic;
+  }
   
   /* Clone button styling */
   .clone-button {

@@ -41,6 +41,7 @@
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
 
+        // Request an Appointment
         if (determine_view() === 'request-an-appointment') {
             wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
             wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
@@ -53,10 +54,12 @@
             ));
         }
 
+        // Signup
         if (determine_view() === 'signup') {
             wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $unique_id, true);
         }
 
+        // Dashboard
         if (determine_view() === 'dashboard') {
             global $features_options_addons;
             $features_options_addons = get_features_options_addons();
