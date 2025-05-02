@@ -73,6 +73,22 @@
     }
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
 
+    function disable_comments() {
+        // Remove from admin menu
+        remove_menu_page('edit-comments.php');
+        
+        // Remove from post and pages
+        remove_post_type_support('post', 'comments');
+        remove_post_type_support('page', 'comments');
+        
+        // Close comments site-wide
+        function disable_all_comments($open, $post_id) {
+            return false;
+        }
+        add_filter('comments_open', 'disable_all_comments', 10, 2);
+    }
+    add_action('init', 'disable_comments');
+
     add_action('login_init', function() {
         $theme_path = get_template_directory_uri();
         wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
