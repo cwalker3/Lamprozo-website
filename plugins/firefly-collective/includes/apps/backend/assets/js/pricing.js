@@ -125,14 +125,35 @@ function scrollIntoViewWithOffset(el) {
 /**************************************************************
  * 5) Pricing-Type Logic
  **************************************************************/
-function handlePricingTypeChange(fI, cI, sI, typeIdx) {
+function handlePricingTypeChange(fI, cI, sI, poDiv, typeIdx) {
+  // Clear all inputs first
+  fI.disabled = cI.disabled = sI.disabled = true;
+
+  // Always hide price options form first
+  if (poDiv) {
+    poDiv.style.display = 'none';
+  }
+  
   if (typeIdx === 0) { // static price
-    fI.disabled = cI.disabled = true;
+    // Enable only static price field for static price option
     sI.disabled = false;
+    
+    // Clear other fields
     [fI, cI].forEach(i => { i.value = ''; i.dispatchEvent(new Event('input')); });
-  } else {             // price range
+  } else if (typeIdx === 1) { // price range
+    // Enable min/max price fields for price range option
     fI.disabled = cI.disabled = false;
-    sI.disabled = true;
+    
+    // Clear static price field
+    sI.value = ''; sI.dispatchEvent(new Event('input'));
+  } else if (typeIdx === 2) { // price options
+    // Show price options form for price options option
+    if (poDiv) {
+      poDiv.style.display = 'block';
+    }
+    
+    // Clear other fields
+    [fI, cI].forEach(i => { i.value = ''; i.dispatchEvent(new Event('input')); });
     sI.value = ''; sI.dispatchEvent(new Event('input'));
   }
 }
@@ -667,6 +688,154 @@ function createDynamicFields(obj, container, knownKeys){
   }
 }
 
+function createPriceOptionsUI(optionsData, onChange) {
+  // Create main container as a field-group to match other fields
+  const container = document.createElement('div');
+  container.className = 'field-group price-options-field';
+  container.style.display = 'none'; // Start hidden, controlled by price type
+  
+  // Create label (first column)
+  const label = document.createElement('label');
+  label.textContent = 'Price Options:';
+  container.appendChild(label);
+  
+  // Handle potential string input (from DB)
+  let typesArray = [];
+  if (typeof optionsData === 'string') {
+    try {
+      typesArray = JSON.parse(optionsData);
+    } catch(e) {
+      console.error('Failed to parse price options:', e);
+      typesArray = [{ label: 'Default', price: 0 }];
+    }
+  } else if (Array.isArray(optionsData)) {
+    typesArray = optionsData;
+  } else if (optionsData && optionsData.types) {
+    typesArray = optionsData.types;
+  } else {
+    typesArray = [{ label: 'Default', price: 0 }];
+  }
+  
+  // Create the working data structure - just the array, no selected property
+  const workingData = typesArray;
+
+  // Create right-side container (second column)
+  const rightColumn = document.createElement('div');
+  rightColumn.className = 'price-options-container';
+  rightColumn.style.flex = '1';
+  rightColumn.style.display = 'flex';
+  rightColumn.style.flexDirection = 'column';
+  container.appendChild(rightColumn);
+  
+  function renderOptions() {
+    rightColumn.innerHTML = '';
+    
+    // Create each option row
+    workingData.forEach((option, idx) => {
+      const row = document.createElement('div');
+      row.className = 'price-option-row';
+      
+      // Label input
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.value = option.label;
+      labelInput.placeholder = 'Option label';
+      labelInput.addEventListener('input', e => {
+        workingData[idx].label = e.target.value;
+        onChange(workingData);
+      });
+      
+      // Price input
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.value = option.price;
+      priceInput.placeholder = 'Price';
+      priceInput.addEventListener('input', e => {
+        workingData[idx].price = parseFloat(e.target.value) || 0;
+        onChange(workingData);
+      });
+      
+      // Controls container for buttons
+      const controlsContainer = document.createElement('div');
+      controlsContainer.className = 'controls-container';
+      
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = '−';
+      deleteBtn.className = 'price-option-delete';
+      deleteBtn.addEventListener('click', () => {
+        workingData.splice(idx, 1);
+        onChange(workingData);
+        renderOptions();
+      });
+      
+      // Up arrow button
+      const upBtn = document.createElement('button');
+      upBtn.innerHTML = '&#9650;'; // Up arrow symbol
+      upBtn.className = 'price-option-arrow';
+      upBtn.disabled = idx === 0;
+      upBtn.addEventListener('click', () => {
+        if (idx > 0) {
+          // Swap current item with the one above it
+          [workingData[idx-1], workingData[idx]] = 
+          [workingData[idx], workingData[idx-1]];
+          onChange(workingData);
+          renderOptions();
+        }
+      });
+      
+      // Down arrow button
+      const downBtn = document.createElement('button');
+      downBtn.innerHTML = '&#9660;'; // Down arrow symbol
+      downBtn.className = 'price-option-arrow';
+      downBtn.disabled = idx === workingData.length - 1;
+      downBtn.addEventListener('click', () => {
+        if (idx < workingData.length - 1) {
+          // Swap current item with the one below it
+          [workingData[idx], workingData[idx+1]] = 
+          [workingData[idx+1], workingData[idx]];
+          onChange(workingData);
+          renderOptions();
+        }
+      });
+      
+      // Add buttons to controls container
+      controlsContainer.appendChild(deleteBtn);
+      controlsContainer.appendChild(upBtn);
+      controlsContainer.appendChild(downBtn);
+      
+      // Add all elements to row
+      row.appendChild(labelInput);
+      row.appendChild(priceInput);
+      row.appendChild(controlsContainer);
+      rightColumn.appendChild(row);
+    });
+    
+    // Add button row
+    const addBtnRow = document.createElement('div');
+    addBtnRow.style.textAlign = 'right';
+    addBtnRow.style.marginTop = '5px';
+    
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+';
+    addBtn.className = 'add-button';
+    addBtn.style.marginTop = '0';
+    addBtn.addEventListener('click', () => {
+      workingData.push({ label: '', price: 0 });
+      onChange(workingData);
+      renderOptions();
+    });
+    
+    addBtnRow.appendChild(addBtn);
+    rightColumn.appendChild(addBtnRow);
+  }
+  
+  // Initial render
+  renderOptions();
+  
+  return container;
+}
+
 /**************************************************************
  * 10) clearSchemaValues — preserve dropdown.types
  **************************************************************/
@@ -789,8 +958,17 @@ function showNewOptionForm(fIdx) {
         interval: isRecurring
           ? JSON.parse(JSON.stringify(defaultIntervalSchema))
           : { level:'admin', ui_type:'array', value:{types:['none'],selected:0} },
-        pricingType:{ level:'admin', ui_type:'array', value:{types:['static price','price range'],selected:0} },
+        // Include price options in pricing type options
+        pricingType:{ level:'admin', ui_type:'array', value:{types:['static price','price range','price options'],selected:0} },
         priceFloor:0, priceCeiling:0, staticPrice:0,
+        // Add default priceOptions structure
+        priceOptions: {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ label: 'Default', price: 0 }]
+          }
+        },
         optionMetric:'', addons:[], link_name:''
       };
     } else {
@@ -810,6 +988,25 @@ function showNewOptionForm(fIdx) {
       newO.addons          = [];
       if (isRecurring) {
         newO.interval = JSON.parse(JSON.stringify(defaultIntervalSchema));
+      }
+      
+      // Make sure cloned options have the price options in the dropdown
+      if (newO.pricingType && newO.pricingType.value && Array.isArray(newO.pricingType.value.types)) {
+        if (!newO.pricingType.value.types.includes('price options')) {
+          newO.pricingType.value.types.push('price options');
+        }
+      }
+      
+      // Add default priceOptions if not present in the clone
+      if (!newO.priceOptions) {
+        newO.priceOptions = {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ label: 'Default', price: 0 }],
+            selected: 0
+          }
+        };
       }
     }
 
@@ -1302,7 +1499,7 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
         spI   = spG.querySelector('input');
         
   function applyA(){
-    handlePricingTypeChange(fpI, cpI, spI, parseInt(ptSel.value, 10));
+    handlePricingTypeChange(fpI, cpI, spI, null, parseInt(ptSel.value, 10));
   }
   ptSel.addEventListener('change', applyA);
   applyA();
@@ -1490,16 +1687,60 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
   );
   contentInner.append(pfG, pcG, spG);
   
-  // Setup pricing type logic
-  const ptSel = ptG.querySelector('select'),
-        pfI   = pfG.querySelector('input'),
-        pcI   = pcG.querySelector('input'),
-        spI   = spG.querySelector('input');
-        
-  function applyO(){
-    handlePricingTypeChange(pfI, pcI, spI, parseInt(ptSel.value, 10));
+  // Price options field
+  const poDiv = createPriceOptionsUI(
+    opt.priceOptions ? (
+        typeof opt.priceOptions === 'string' ? 
+        JSON.parse(opt.priceOptions) : 
+        (Array.isArray(opt.priceOptions) ? opt.priceOptions : 
+        (opt.priceOptions.value?.types || [{ label: 'Default', price: 0 }]))
+    ) : [{ label: 'Default', price: 0 }],
+    v => {
+        if (!opt.priceOptions) {
+            opt.priceOptions = {
+                level: 'admin',
+                ui_type: 'array-obj',
+                value: {
+                    types: v
+                }
+            };
+        } else if (typeof opt.priceOptions === 'string') {
+            // Convert from string to proper object if it was loaded from DB
+            opt.priceOptions = {
+                level: 'admin',
+                ui_type: 'array-obj',
+                value: {
+                    types: v
+                }
+            };
+        } else {
+            opt.priceOptions.value = {
+                types: v
+            };
+        }
+        saveData();
+    }
+  );
+  contentInner.append(poDiv);
+
+  // Setup pricing type logic with price options
+  const ptSel = ptG.querySelector('select');
+  const pfI = pfG.querySelector('input');
+  const pcI = pcG.querySelector('input');
+  const spI = spG.querySelector('input');
+
+  function applyO() {
+    // Get the selected pricing type index
+    const selectedTypeIdx = parseInt(ptSel.value, 10);
+    
+    // Apply UI changes based on the selected type
+    handlePricingTypeChange(pfI, pcI, spI, poDiv, selectedTypeIdx);
+    saveData();
   }
+  
+  // Add change listener
   ptSel.addEventListener('change', applyO);
+  
   applyO();
   
   // Setup interval logic
@@ -1520,7 +1761,7 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
   // Add dynamic fields
   createDynamicFields(opt, contentInner, [
     'optionName', 'description', 'interval', 'pricingType',
-    'priceFloor', 'priceCeiling', 'staticPrice', 'optionMetric', 'addons',
+    'priceFloor', 'priceCeiling', 'staticPrice', 'priceOptions', 'optionMetric', 'addons',
     'link_name'
   ]);
   

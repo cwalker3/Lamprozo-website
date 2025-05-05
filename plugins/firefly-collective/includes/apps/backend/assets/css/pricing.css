@@ -303,6 +303,7 @@ html, body {
     background-color: #28a745;
     padding: 5px 10px;
     font-size: 0.9em;
+    border-radius: 5px;
   }
   .add-button:hover {
     background-color: #218838;
@@ -315,6 +316,114 @@ html, body {
   .delete-button:hover {
     background-color: #c82333;
   }
+
+  /* Price options styling - full width alignment */
+  .price-options-field {
+    align-items: flex-start !important;
+    display: flex;
+    width: 100% !important;
+  }
+
+  .price-options-container {
+    flex: 1;
+    margin-top: 0;
+    margin-bottom: 10px;
+    width: 100%;
+  }
+
+  .price-option-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* Label input styling */
+  .price-option-row input:first-of-type {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* Price input styling */
+  .price-option-row input:nth-of-type(2) {
+    width: 80px;
+    min-width: 80px;
+    flex: 0 0 80px;
+  }
+
+  /* Controls container */
+  .controls-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+
+  /* Delete button styling */
+  .price-option-delete {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .price-option-delete:hover {
+    background-color: #c82333;
+  }
+
+  /* Arrow buttons styling */
+  .price-option-arrow {
+    background-color: #4dabf7;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .price-option-arrow:hover:not(:disabled) {
+    background-color: #339af0;
+  }
+
+  .price-option-arrow:disabled {
+    background-color: #adb5bd;
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  /* Add button in price options */
+  .price-options-container .add-button {
+    margin-top: 5px;
+    padding: 3px 8px;
+    font-size: 14px;
+  }
+
+  /* Ensure the buttons row aligns with other elements */
+  .price-options-container > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
   .fade-in {
     opacity: 0;
     animation: fadeIn 0.5s forwards;
@@ -330,6 +439,24 @@ html, body {
     from { opacity: 1; }
     to { opacity: 0; }
   }
+
+  /* Responsive adjustments */
+  @media (max-width: 800px) {
+    .price-option-row {
+      flex-wrap: nowrap;
+    }
+    
+    .price-option-row input:first-of-type {
+      min-width: 100px;
+    }
+    
+    .price-option-row input:nth-of-type(2) {
+      flex: 0 0 60px;
+      width: 60px;
+      min-width: 60px;
+    }
+  }
+
   @media (max-width: 600px) {
     .field-group {
       flex-direction: column;
@@ -351,6 +478,32 @@ html, body {
     .button-row:has(.delete-button) > button {
       margin-right: 10px;
       margin-top: 2vh;
+    }
+    
+    /* Price options responsive adjustments for very small screens */
+    .price-option-row {
+      gap: 5px;
+    }
+    
+    .price-option-row input:first-of-type {
+      min-width: 80px;
+    }
+    
+    .price-option-row input:nth-of-type(2) {
+      flex: 0 0 50px;
+      width: 50px;
+      min-width: 50px;
+    }
+    
+    .controls-container {
+      gap: 3px;
+    }
+    
+    .price-option-delete,
+    .price-option-arrow {
+      width: 24px;
+      height: 24px;
+      font-size: 12px;
     }
   }
   

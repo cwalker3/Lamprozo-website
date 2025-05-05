@@ -92,7 +92,7 @@ function unwrap_pricing_json($data) {
         'normalText','longText','intFloat','dateField','multiple','link_name',
         // option-level
         'optionName','description','interval','pricingType',
-        'staticPrice','priceFloor','priceCeiling','optionMetric','link_name',
+        'staticPrice','priceFloor','priceCeiling','optionMetric','priceOptions','link_name',
         // addon-level
         'addonName','description','addOnMetric','pricingType','priceModifierType',
         'staticPriceMod','floorPriceMod','ceilingPriceMod','link_name'
@@ -153,6 +153,7 @@ function get_default_option_columns() {
         'priceFloor'   => "FLOAT",
         'priceCeiling' => "FLOAT",
         'optionMetric' => "VARCHAR(50)",
+        'priceOptions' => "TEXT",
         'link_name'    => "VARCHAR(255) NULL"
     );
 }
@@ -276,15 +277,41 @@ function create_pricing_tables_if_not_exist() {
  * Normalize {types,selected} or {text} objects to scalars.
  */
 function normalize_record($record) {
+    // First determine if this is an option record with pricing type
+    $has_pricing_type = isset($record['pricingType']);
+    $pricing_type_value = null;
+    
+    // Process all fields normally first
     foreach ($record as $k => $v) {
         if (is_array($v)) {
+            // Special handling for priceOptions - we want to keep the types array
+            if ($k === 'priceOptions') {
+                continue; // Skip processing for now, handle it separately
+            }
+            
             if (isset($v['types'], $v['selected'])) {
+                // Extract the pricing type value for later use
+                if ($k === 'pricingType' && $has_pricing_type) {
+                    $pricing_type_value = $v['types'][$v['selected']];
+                }
                 $record[$k] = $v['types'][$v['selected']];
             } elseif (isset($v['text'])) {
                 $record[$k] = $v['text'];
             }
         }
     }
+    
+    // Now handle the priceOptions field based on pricingType
+    if ($has_pricing_type) {
+        // Use the extracted pricing type value or the resolved one
+        $pricing_type = $pricing_type_value ?? $record['pricingType'] ?? null;
+        
+        // ONLY keep priceOptions if the pricing type is explicitly "price options"
+        if ($pricing_type !== 'price options' && isset($record['priceOptions'])) {
+            unset($record['priceOptions']);
+        }
+    }
+    
     return $record;
 }
 
@@ -402,7 +429,35 @@ function upsert_pricing_data($payload) {
             unset($saveO['addons']);
             $saveO['optionName']  = $fO;
             $saveO['featureId']   = $fid;
+
+            // FIRST normalize the record (this will remove priceOptions if pricing type isn't "price options")
             $saveO = normalize_record($saveO);
+
+            // THEN handle priceOptions conversion to JSON (only if it still exists after normalization)
+            if (isset($saveO['priceOptions'])) {
+                // After unwrapping, priceOptions should just be an array of {label, price} objects
+                if (is_array($saveO['priceOptions'])) {
+                    // If it has 'types' property (old structure), extract just the types array
+                    if (isset($saveO['priceOptions']['types']) && is_array($saveO['priceOptions']['types'])) {
+                        $saveO['priceOptions'] = json_encode($saveO['priceOptions']['types']);
+                    } else {
+                        // Otherwise encode the array directly
+                        $saveO['priceOptions'] = json_encode($saveO['priceOptions']);
+                    }
+                } elseif (is_string($saveO['priceOptions'])) {
+                    // Already a JSON string, leave it as is
+                    $decoded = json_decode($saveO['priceOptions'], true);
+                    if (!is_array($decoded)) {
+                        $saveO['priceOptions'] = '[]'; // Fallback to empty array
+                    }
+                } else {
+                    // Unexpected type, store as empty array
+                    $saveO['priceOptions'] = '[]';
+                }
+            } else {
+                // If priceOptions doesn't exist, set to NULL
+                $saveO['priceOptions'] = null;
+            }
 
             if ($rowO) {
                 $oid = $rowO['id'];
@@ -613,6 +668,66 @@ function firefly_collective_save_pricing($request) {
     $data              = $request->get_json_params();
     $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
     $pricing_json_path = $plugin_root_path . '/pricing.json';
+
+    // Clean up priceOptions for options with static price or price range
+    if (isset($data['pricingData']) && isset($data['pricingData']['features']) && is_array($data['pricingData']['features'])) {
+        foreach ($data['pricingData']['features'] as &$feature) {
+            if (isset($feature['options']) && is_array($feature['options'])) {
+                foreach ($feature['options'] as &$option) {
+                    // Check if this option uses static price or price range
+                    $uses_static_price = false;
+                    $uses_price_range = false;
+                    
+                    // Check pricing type
+                    if (isset($option['pricingType']) && is_array($option['pricingType'])) {
+                        if (isset($option['pricingType']['value']['selected'])) {
+                            $selected_type = $option['pricingType']['value']['selected'];
+                            if ($selected_type === 0) { // static price
+                                $uses_static_price = true;
+                            } else if ($selected_type === 1) { // price range
+                                $uses_price_range = true;
+                            }
+                        } elseif (isset($option['pricingType']['value']) && is_string($option['pricingType']['value'])) {
+                            if ($option['pricingType']['value'] === 'static price') {
+                                $uses_static_price = true;
+                            } elseif ($option['pricingType']['value'] === 'price range') {
+                                $uses_price_range = true;
+                            }
+                        }
+                    } elseif (isset($option['pricingType']) && is_string($option['pricingType'])) {
+                        if ($option['pricingType'] === 'static price') {
+                            $uses_static_price = true;
+                        } elseif ($option['pricingType'] === 'price range') {
+                            $uses_price_range = true;
+                        }
+                    }
+                    
+                    // Additional check: if staticPrice or priceCeiling is greater than zero
+                    if ((isset($option['staticPrice']) && $option['staticPrice'] > 0) || 
+                        (isset($option['priceCeiling']) && $option['priceCeiling'] > 0)) {
+                        $uses_static_price = true;
+                    }
+                    
+                    // If using static price or price range, reset the priceOptions
+                    if ($uses_static_price || $uses_price_range) {
+                        // Set empty priceOptions structure
+                        $option['priceOptions'] = array(
+                            'level' => 'admin',
+                            'ui_type' => 'array-obj',
+                            'value' => array(
+                                'types' => array(
+                                    array(
+                                        'label' => '',
+                                        'price' => ''
+                                    )
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     // 1) Persist raw JSON (will include link_name fields)
     file_put_contents(
