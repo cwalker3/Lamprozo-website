@@ -836,6 +836,464 @@ function createPriceOptionsUI(optionsData, onChange) {
   return container;
 }
 
+// Update the createThresholdDiscountsUI function to use placeholders
+function createThresholdDiscountsUI(discountsData, onChange) {
+  // Create main container as a field-group to match other fields
+  const container = document.createElement('div');
+  container.className = 'field-group price-options-field';
+  container.style.display = 'none'; // Start hidden, controlled by threshold checkbox
+  
+  // Create label (first column)
+  const label = document.createElement('label');
+  label.textContent = 'Quantity Discounts:';
+  container.appendChild(label);
+  
+  // Handle potential string input (from DB)
+  let thresholdsArray = [];
+  if (typeof discountsData === 'string') {
+    try {
+      thresholdsArray = JSON.parse(discountsData);
+    } catch(e) {
+      console.error('Failed to parse threshold discounts:', e);
+      thresholdsArray = [{ itemCount: '', discount: '' }]; // Empty defaults
+    }
+  } else if (Array.isArray(discountsData)) {
+    thresholdsArray = discountsData;
+  } else if (discountsData && discountsData.types) {
+    thresholdsArray = discountsData.types;
+  } else {
+    thresholdsArray = [{ itemCount: '', discount: '' }]; // Empty defaults
+  }
+  
+  // Create the working data structure - just the array, no selected property
+  const workingData = thresholdsArray;
+
+  // Create right-side container (second column)
+  const rightColumn = document.createElement('div');
+  rightColumn.className = 'price-options-container';
+  rightColumn.style.flex = '1';
+  rightColumn.style.display = 'flex';
+  rightColumn.style.flexDirection = 'column';
+  container.appendChild(rightColumn);
+  
+  function renderThresholds() {
+    rightColumn.innerHTML = '';
+    
+    // Create each threshold row
+    workingData.forEach((threshold, idx) => {
+      const row = document.createElement('div');
+      row.className = 'price-option-row';
+      
+      // Item count input
+      const countInput = document.createElement('input');
+      countInput.type = 'number';
+      countInput.min = '1';
+      countInput.value = threshold.itemCount !== '' ? threshold.itemCount : '';
+      countInput.placeholder = 'Quantity'; // Placeholder instead of default value
+      countInput.addEventListener('input', e => {
+        workingData[idx].itemCount = parseInt(e.target.value, 10) || '';
+        onChange(workingData);
+      });
+      
+      // Discount percentage input
+      const discountInput = document.createElement('input');
+      discountInput.type = 'number';
+      discountInput.min = '0';
+      discountInput.max = '100';
+      discountInput.value = threshold.discount !== '' ? threshold.discount : '';
+      discountInput.placeholder = '%'; // Placeholder instead of default value
+      discountInput.addEventListener('input', e => {
+        workingData[idx].discount = parseFloat(e.target.value) || '';
+        onChange(workingData);
+      });
+      
+      // Controls container for buttons
+      const controlsContainer = document.createElement('div');
+      controlsContainer.className = 'controls-container';
+      
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = '−';
+      deleteBtn.className = 'price-option-delete';
+      deleteBtn.addEventListener('click', () => {
+        workingData.splice(idx, 1);
+        onChange(workingData);
+        renderThresholds();
+      });
+      
+      // Up arrow button
+      const upBtn = document.createElement('button');
+      upBtn.innerHTML = '&#9650;'; // Up arrow symbol
+      upBtn.className = 'price-option-arrow';
+      upBtn.disabled = idx === 0;
+      upBtn.addEventListener('click', () => {
+        if (idx > 0) {
+          // Swap current item with the one above it
+          [workingData[idx-1], workingData[idx]] = 
+          [workingData[idx], workingData[idx-1]];
+          onChange(workingData);
+          renderThresholds();
+        }
+      });
+      
+      // Down arrow button
+      const downBtn = document.createElement('button');
+      downBtn.innerHTML = '&#9660;'; // Down arrow symbol
+      downBtn.className = 'price-option-arrow';
+      downBtn.disabled = idx === workingData.length - 1;
+      downBtn.addEventListener('click', () => {
+        if (idx < workingData.length - 1) {
+          // Swap current item with the one below it
+          [workingData[idx], workingData[idx+1]] = 
+          [workingData[idx+1], workingData[idx]];
+          onChange(workingData);
+          renderThresholds();
+        }
+      });
+      
+      // Add buttons to controls container
+      controlsContainer.appendChild(deleteBtn);
+      controlsContainer.appendChild(upBtn);
+      controlsContainer.appendChild(downBtn);
+      
+      // Add all elements to row
+      row.appendChild(countInput);
+      row.appendChild(discountInput);
+      row.appendChild(controlsContainer);
+      rightColumn.appendChild(row);
+    });
+    
+    // Add button row
+    const addBtnRow = document.createElement('div');
+    addBtnRow.style.textAlign = 'right';
+    addBtnRow.style.marginTop = '5px';
+    
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+';
+    addBtn.className = 'add-button';
+    addBtn.style.marginTop = '0';
+    addBtn.addEventListener('click', () => {
+      // Add a new empty threshold instead of calculating values
+      workingData.push({ itemCount: '', discount: '' });
+      onChange(workingData);
+      renderThresholds();
+    });
+    
+    addBtnRow.appendChild(addBtn);
+    rightColumn.appendChild(addBtnRow);
+  }
+  
+  // Initial render
+  renderThresholds();
+  
+  return container;
+}
+
+// Update the modifyCreateOptionElement function with a more direct approach
+function modifyCreateOptionElement() {
+  // Store a reference to the original function
+  const originalFunction = createOptionElement;
+  
+  // Replace it with our enhanced version
+  createOptionElement = function(fIdx, oIdx, opt, availOpt, availAdd, featureRecCheckbox) {
+    // Call the original implementation first to get the option element
+    const wrap = originalFunction(fIdx, oIdx, opt, availOpt, availAdd, featureRecCheckbox);
+    
+    // Get the content inner element
+    const contentInner = wrap.querySelector('.content-inner');
+    
+    // Create our new threshold discounts checkbox
+    const thresholdCheckboxGroup = document.createElement('div');
+    thresholdCheckboxGroup.className = 'field-group';
+    
+    const thresholdLabel = document.createElement('label');
+    thresholdLabel.textContent = 'Use Threshold Discounts:';
+    thresholdCheckboxGroup.appendChild(thresholdLabel);
+    
+    const thresholdCheckbox = document.createElement('input');
+    thresholdCheckbox.type = 'checkbox';
+    thresholdCheckbox.checked = opt.enableThresholdDiscounts || false;
+    thresholdCheckboxGroup.appendChild(thresholdCheckbox);
+    
+    // Initialize thresholdDiscounts data if not present
+    if (!opt.thresholdDiscounts) {
+      opt.thresholdDiscounts = {
+        level: 'admin',
+        ui_type: 'array-obj',
+        value: {
+          types: [{ itemCount: "", discount: "" }]
+        }
+      };
+    }
+    
+    // Create the thresholdDiscounts UI
+    const thresholdDiscountsUI = createThresholdDiscountsUI(
+      opt.thresholdDiscounts ? (
+        typeof opt.thresholdDiscounts === 'string' ? 
+        JSON.parse(opt.thresholdDiscounts) : 
+        (Array.isArray(opt.thresholdDiscounts) ? opt.thresholdDiscounts : 
+        (opt.thresholdDiscounts.value?.types || [{ itemCount: 10, discount: 5 }]))
+      ) : [{ itemCount: 10, discount: 5 }],
+      v => {
+        if (!opt.thresholdDiscounts) {
+          opt.thresholdDiscounts = {
+            level: 'admin',
+            ui_type: 'array-obj',
+            value: {
+              types: v
+            }
+          };
+        } else if (typeof opt.thresholdDiscounts === 'string') {
+          // Convert from string to proper object if it was loaded from DB
+          opt.thresholdDiscounts = {
+            level: 'admin',
+            ui_type: 'array-obj',
+            value: {
+              types: v
+            }
+          };
+        } else {
+          opt.thresholdDiscounts.value = {
+            types: v
+          };
+        }
+        saveData();
+      }
+    );
+    
+    // Find the option metric field by getting all fields and looking for the right one
+    // We'll insert our elements at a specific position in the DOM
+    const allFields = contentInner.querySelectorAll('.field-group');
+    
+    // Look for the option metric field near the end of the form
+    let optionMetricIndex = -1;
+    for (let i = 0; i < allFields.length; i++) {
+      const label = allFields[i].querySelector('label');
+      if (label && label.textContent === 'Option Metric:') {
+        optionMetricIndex = i;
+        break;
+      }
+    }
+    
+    if (optionMetricIndex !== -1) {
+      // Insert the checkbox before the option metric field
+      contentInner.insertBefore(thresholdCheckboxGroup, allFields[optionMetricIndex]);
+      // Insert the UI right after the checkbox
+      contentInner.insertBefore(thresholdDiscountsUI, allFields[optionMetricIndex]);
+    } else {
+      // Fallback: Add at the end of the form, before the addons section
+      const addonsHeader = contentInner.querySelector('.section-header.option-addons-header');
+      if (addonsHeader) {
+        contentInner.insertBefore(thresholdCheckboxGroup, addonsHeader);
+        contentInner.insertBefore(thresholdDiscountsUI, addonsHeader);
+      } else {
+        // Last resort: Just append to the content
+        contentInner.appendChild(thresholdCheckboxGroup);
+        contentInner.appendChild(thresholdDiscountsUI);
+      }
+    }
+    
+    // Handle checkbox state change
+    thresholdCheckbox.addEventListener('change', e => {
+      opt.enableThresholdDiscounts = e.target.checked;
+      thresholdDiscountsUI.style.display = e.target.checked ? 'flex' : 'none';
+      saveData();
+      
+      // Update container heights
+      setTimeout(() => {
+        updateAllOpenContainers();
+      }, 100);
+    });
+    
+    // Set initial visibility based on checkbox state
+    thresholdDiscountsUI.style.display = thresholdCheckbox.checked ? 'flex' : 'none';
+    
+    return wrap;
+  };
+}
+
+// A more reliable way to initialize our modification when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  // Add our createThresholdDiscountsUI function first if not already present
+  if (typeof createThresholdDiscountsUI !== 'function') {
+    // New function to create threshold discounts UI
+    window.createThresholdDiscountsUI = function(discountsData, onChange) {
+      // Create main container as a field-group to match other fields
+      const container = document.createElement('div');
+      container.className = 'field-group price-options-field';
+      container.style.display = 'none'; // Start hidden, controlled by threshold checkbox
+      
+      // Create label (first column)
+      const label = document.createElement('label');
+      label.textContent = 'Quantity Discounts:';
+      container.appendChild(label);
+      
+      // Handle potential string input (from DB)
+      let thresholdsArray = [];
+      if (typeof discountsData === 'string') {
+        try {
+          thresholdsArray = JSON.parse(discountsData);
+        } catch(e) {
+          console.error('Failed to parse threshold discounts:', e);
+          thresholdsArray = [{ itemCount: 10, discount: 5 }];
+        }
+      } else if (Array.isArray(discountsData)) {
+        thresholdsArray = discountsData;
+      } else if (discountsData && discountsData.types) {
+        thresholdsArray = discountsData.types;
+      } else {
+        thresholdsArray = [{ itemCount: 10, discount: 5 }];
+      }
+      
+      // Create the working data structure - just the array, no selected property
+      const workingData = thresholdsArray;
+
+      // Create right-side container (second column)
+      const rightColumn = document.createElement('div');
+      rightColumn.className = 'price-options-container';
+      rightColumn.style.flex = '1';
+      rightColumn.style.display = 'flex';
+      rightColumn.style.flexDirection = 'column';
+      container.appendChild(rightColumn);
+      
+      function renderThresholds() {
+        rightColumn.innerHTML = '';
+        
+        // Create each threshold row
+        workingData.forEach((threshold, idx) => {
+          const row = document.createElement('div');
+          row.className = 'price-option-row';
+          
+          // Item count input
+          const countInput = document.createElement('input');
+          countInput.type = 'number';
+          countInput.min = '1';
+          countInput.value = threshold.itemCount;
+          countInput.placeholder = 'Item count';
+          countInput.addEventListener('input', e => {
+            workingData[idx].itemCount = parseInt(e.target.value, 10) || 1;
+            onChange(workingData);
+          });
+          
+          // Discount percentage input
+          const discountInput = document.createElement('input');
+          discountInput.type = 'number';
+          discountInput.min = '0';
+          discountInput.max = '100';
+          discountInput.value = threshold.discount;
+          discountInput.placeholder = 'Discount %';
+          discountInput.addEventListener('input', e => {
+            workingData[idx].discount = parseFloat(e.target.value) || 0;
+            onChange(workingData);
+          });
+          
+          // Controls container for buttons
+          const controlsContainer = document.createElement('div');
+          controlsContainer.className = 'controls-container';
+          
+          // Delete button
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = '−';
+          deleteBtn.className = 'price-option-delete';
+          deleteBtn.addEventListener('click', () => {
+            workingData.splice(idx, 1);
+            onChange(workingData);
+            renderThresholds();
+          });
+          
+          // Up arrow button
+          const upBtn = document.createElement('button');
+          upBtn.innerHTML = '&#9650;'; // Up arrow symbol
+          upBtn.className = 'price-option-arrow';
+          upBtn.disabled = idx === 0;
+          upBtn.addEventListener('click', () => {
+            if (idx > 0) {
+              // Swap current item with the one above it
+              [workingData[idx-1], workingData[idx]] = 
+              [workingData[idx], workingData[idx-1]];
+              onChange(workingData);
+              renderThresholds();
+            }
+          });
+          
+          // Down arrow button
+          const downBtn = document.createElement('button');
+          downBtn.innerHTML = '&#9660;'; // Down arrow symbol
+          downBtn.className = 'price-option-arrow';
+          downBtn.disabled = idx === workingData.length - 1;
+          downBtn.addEventListener('click', () => {
+            if (idx < workingData.length - 1) {
+              // Swap current item with the one below it
+              [workingData[idx], workingData[idx+1]] = 
+              [workingData[idx+1], workingData[idx]];
+              onChange(workingData);
+              renderThresholds();
+            }
+          });
+          
+          // Add buttons to controls container
+          controlsContainer.appendChild(deleteBtn);
+          controlsContainer.appendChild(upBtn);
+          controlsContainer.appendChild(downBtn);
+          
+          // Add all elements to row
+          row.appendChild(countInput);
+          row.appendChild(discountInput);
+          row.appendChild(controlsContainer);
+          rightColumn.appendChild(row);
+        });
+        
+        // Add button row
+        const addBtnRow = document.createElement('div');
+        addBtnRow.style.textAlign = 'right';
+        addBtnRow.style.marginTop = '5px';
+        
+        const addBtn = document.createElement('button');
+        addBtn.textContent = '+';
+        addBtn.className = 'add-button';
+        addBtn.style.marginTop = '0';
+        addBtn.addEventListener('click', () => {
+          // Calculate a sensible next threshold based on the last one
+          const lastThreshold = workingData.length > 0 ? workingData[workingData.length - 1] : null;
+          const newItemCount = lastThreshold ? lastThreshold.itemCount + 5 : 10;
+          const newDiscount = lastThreshold ? Math.min(lastThreshold.discount + 5, 100) : 5;
+          
+          workingData.push({ itemCount: newItemCount, discount: newDiscount });
+          onChange(workingData);
+          renderThresholds();
+        });
+        
+        addBtnRow.appendChild(addBtn);
+        rightColumn.appendChild(addBtnRow);
+      }
+      
+      // Initial render
+      renderThresholds();
+      
+      return container;
+    };
+  }
+  
+  // Try to modify the createOptionElement function
+  let attempts = 0;
+  const maxAttempts = 50;
+  
+  function attemptModification() {
+    if (typeof createOptionElement === 'function') {
+      modifyCreateOptionElement();
+      console.log('Successfully modified createOptionElement function');
+    } else if (attempts < maxAttempts) {
+      attempts++;
+      setTimeout(attemptModification, 100);
+    } else {
+      console.error('Failed to modify createOptionElement function: not found after ' + maxAttempts + ' attempts');
+    }
+  }
+  
+  // Start the attempt process
+  attemptModification();
+});
+
 /**************************************************************
  * 10) clearSchemaValues — preserve dropdown.types
  **************************************************************/
@@ -969,6 +1427,15 @@ function showNewOptionForm(fIdx) {
             types: [{ label: 'Default', price: 0 }]
           }
         },
+        // Add thresholdDiscounts fields
+        enableThresholdDiscounts: false,
+        thresholdDiscounts: {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ itemCount: 10, discount: 5 }]
+          }
+        },
         optionMetric:'', addons:[], link_name:''
       };
     } else {
@@ -976,7 +1443,7 @@ function showNewOptionForm(fIdx) {
       const tpl = originFeat.options[+schemaSel.value];
       newO = JSON.parse(JSON.stringify(tpl));
       clearSchemaValues(newO);
-
+    
       // zero out the few fields we want blank:
       newO.link_name       = tpl.optionName;
       newO.optionName      = '';
@@ -986,6 +1453,22 @@ function showNewOptionForm(fIdx) {
       newO.staticPrice     = 0;
       newO.optionMetric    = '';
       newO.addons          = [];
+      
+      // Add thresholdDiscounts if it doesn't exist
+      if (!newO.hasOwnProperty('enableThresholdDiscounts')) {
+        newO.enableThresholdDiscounts = false;
+      }
+      
+      if (!newO.hasOwnProperty('thresholdDiscounts')) {
+        newO.thresholdDiscounts = {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ itemCount: 10, discount: 5 }]
+          }
+        };
+      }
+      
       if (isRecurring) {
         newO.interval = JSON.parse(JSON.stringify(defaultIntervalSchema));
       }
@@ -1762,7 +2245,7 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
   createDynamicFields(opt, contentInner, [
     'optionName', 'description', 'interval', 'pricingType',
     'priceFloor', 'priceCeiling', 'staticPrice', 'priceOptions', 'optionMetric', 'addons',
-    'link_name'
+    'link_name', 'thresholdDiscounts', 'enableThresholdDiscounts'
   ]);
   
   // Create addons header with option name

@@ -92,7 +92,7 @@ function unwrap_pricing_json($data) {
         'normalText','longText','intFloat','dateField','multiple','link_name',
         // option-level
         'optionName','description','interval','pricingType',
-        'staticPrice','priceFloor','priceCeiling','optionMetric','priceOptions','link_name',
+        'staticPrice','priceFloor','priceCeiling','optionMetric','priceOptions','thresholdDiscounts','link_name',
         // addon-level
         'addonName','description','addOnMetric','pricingType','priceModifierType',
         'staticPriceMod','floorPriceMod','ceilingPriceMod','link_name'
@@ -154,6 +154,7 @@ function get_default_option_columns() {
         'priceCeiling' => "FLOAT",
         'optionMetric' => "VARCHAR(50)",
         'priceOptions' => "TEXT",
+        'thresholdDiscounts' => "TEXT",
         'link_name'    => "VARCHAR(255) NULL"
     );
 }
@@ -284,8 +285,8 @@ function normalize_record($record) {
     // Process all fields normally first
     foreach ($record as $k => $v) {
         if (is_array($v)) {
-            // Special handling for priceOptions - we want to keep the types array
-            if ($k === 'priceOptions') {
+            // Special handling for priceOptions and thresholdDiscounts - we want to keep the types array
+            if ($k === 'priceOptions' || $k === 'thresholdDiscounts') {
                 continue; // Skip processing for now, handle it separately
             }
             
@@ -310,6 +311,64 @@ function normalize_record($record) {
         if ($pricing_type !== 'price options' && isset($record['priceOptions'])) {
             unset($record['priceOptions']);
         }
+    }
+    
+    // CRITICAL FIX: Handle threshold discounts based on enableThresholdDiscounts flag
+    // Check multiple possible representations of false values coming from JavaScript
+    $threshold_disabled = false;
+    if (isset($record['enableThresholdDiscounts'])) {
+        // Handle various false-like values that might come from JS
+        if ($record['enableThresholdDiscounts'] === false ||
+            $record['enableThresholdDiscounts'] === 'false' ||
+            $record['enableThresholdDiscounts'] === 0 ||
+            $record['enableThresholdDiscounts'] === '0' ||
+            $record['enableThresholdDiscounts'] === '' ||
+            $record['enableThresholdDiscounts'] === null) {
+            $threshold_disabled = true;
+        }
+    }
+    
+    // If explicitly disabled or not present at all in the data, set thresholdDiscounts to null
+    if ($threshold_disabled) {
+        $record['thresholdDiscounts'] = null;
+    } else if (isset($record['thresholdDiscounts'])) {
+        if (is_array($record['thresholdDiscounts'])) {
+            $types_array = null;
+            
+            // If it has 'types' property, extract just the types array
+            if (isset($record['thresholdDiscounts']['types']) && is_array($record['thresholdDiscounts']['types'])) {
+                $types_array = $record['thresholdDiscounts']['types'];
+            } elseif (isset($record['thresholdDiscounts']['value']['types']) && is_array($record['thresholdDiscounts']['value']['types'])) {
+                // Handle nested value structure
+                $types_array = $record['thresholdDiscounts']['value']['types'];
+            } else {
+                // Otherwise use the array directly
+                $types_array = $record['thresholdDiscounts'];
+            }
+            
+            // If the array is empty or has no valid entries, set to null
+            if (empty($types_array) || !array_filter($types_array, function($item) {
+                return !empty($item['itemCount']) || !empty($item['discount']);
+            })) {
+                $record['thresholdDiscounts'] = null;
+            } else {
+                $record['thresholdDiscounts'] = json_encode($types_array);
+            }
+        } elseif (is_string($record['thresholdDiscounts'])) {
+            // Already a JSON string, check if it's valid and not empty
+            $decoded = json_decode($record['thresholdDiscounts'], true);
+            if (!is_array($decoded) || empty($decoded)) {
+                $record['thresholdDiscounts'] = null;
+            }
+        } else {
+            // Unexpected type
+            $record['thresholdDiscounts'] = null;
+        }
+    }
+    
+    // Remove enableThresholdDiscounts field entirely
+    if (isset($record['enableThresholdDiscounts'])) {
+        unset($record['enableThresholdDiscounts']);
     }
     
     return $record;
@@ -457,6 +516,31 @@ function upsert_pricing_data($payload) {
             } else {
                 // If priceOptions doesn't exist, set to NULL
                 $saveO['priceOptions'] = null;
+            }
+
+            if (isset($saveO['thresholdDiscounts'])) {
+                // After unwrapping, thresholdDiscounts should just be an array of {itemCount, discount} objects
+                if (is_array($saveO['thresholdDiscounts'])) {
+                    // If it has 'types' property (old structure), extract just the types array
+                    if (isset($saveO['thresholdDiscounts']['types']) && is_array($saveO['thresholdDiscounts']['types'])) {
+                        $saveO['thresholdDiscounts'] = json_encode($saveO['thresholdDiscounts']['types']);
+                    } else {
+                        // Otherwise encode the array directly
+                        $saveO['thresholdDiscounts'] = json_encode($saveO['thresholdDiscounts']);
+                    }
+                } elseif (is_string($saveO['thresholdDiscounts'])) {
+                    // Already a JSON string, leave it as is
+                    $decoded = json_decode($saveO['thresholdDiscounts'], true);
+                    if (!is_array($decoded)) {
+                        $saveO['thresholdDiscounts'] = '[]'; // Fallback to empty array
+                    }
+                } else {
+                    // Unexpected type, store as empty array
+                    $saveO['thresholdDiscounts'] = '[]';
+                }
+            } else {
+                // If thresholdDiscounts doesn't exist, set to NULL
+                $saveO['thresholdDiscounts'] = null;
             }
 
             if ($rowO) {
@@ -663,17 +747,43 @@ function drop_ffc_tables() {
 
 /**
  * Save Pricing: write raw JSON + DB sync.
+ * This is a comprehensive fix that ensures threshold discounts are properly cleared
+ * in both the JSON file and the database when the checkbox is unchecked.
  */
 function firefly_collective_save_pricing($request) {
     $data              = $request->get_json_params();
     $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
     $pricing_json_path = $plugin_root_path . '/pricing.json';
 
-    // Clean up priceOptions for options with static price or price range
+    // Process the data before saving to both JSON and database
     if (isset($data['pricingData']) && isset($data['pricingData']['features']) && is_array($data['pricingData']['features'])) {
         foreach ($data['pricingData']['features'] as &$feature) {
             if (isset($feature['options']) && is_array($feature['options'])) {
                 foreach ($feature['options'] as &$option) {
+                    // CRITICAL FIX: Check and properly handle enableThresholdDiscounts
+                    // If enableThresholdDiscounts is false, null, 'false', 0, or '0', remove thresholdDiscounts
+                    if (isset($option['enableThresholdDiscounts'])) {
+                        $is_disabled = false;
+                        
+                        // Check for various representations of 'false'
+                        if ($option['enableThresholdDiscounts'] === false || 
+                            $option['enableThresholdDiscounts'] === 'false' || 
+                            $option['enableThresholdDiscounts'] === 0 || 
+                            $option['enableThresholdDiscounts'] === '0' ||
+                            $option['enableThresholdDiscounts'] === null ||
+                            $option['enableThresholdDiscounts'] === '') {
+                            $is_disabled = true;
+                        }
+                        
+                        // If disabled, completely remove thresholdDiscounts
+                        if ($is_disabled && isset($option['thresholdDiscounts'])) {
+                            unset($option['thresholdDiscounts']);
+                        }
+                        
+                        // Remove enableThresholdDiscounts field after processing
+                        unset($option['enableThresholdDiscounts']);
+                    }
+
                     // Check if this option uses static price or price range
                     $uses_static_price = false;
                     $uses_price_range = false;
