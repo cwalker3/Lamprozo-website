@@ -490,7 +490,7 @@ function upsert_pricing_data($payload) {
     update_pricing_schema($pricingData);
 
     // 2) nameChanges maps
-    $nameChanges      = $payload['nameChanges'] ?? ['features'=>[],'options'=>[],'addons'=>[]];
+    $nameChanges = $payload['nameChanges'] ?? ['features'=>[],'options'=>[],'addons'=>[]];
     $ft = $wpdb->prefix.'ffc_features';
     $ot = $wpdb->prefix.'ffc_options';
     $at = $wpdb->prefix.'ffc_addons';
@@ -498,6 +498,16 @@ function upsert_pricing_data($payload) {
     $processed_features = [];
     $processed_options  = [];
     $processed_addons   = [];
+    
+    // Define allowed columns for each table to prevent field mismatches
+    $feature_fields = array_keys(get_default_feature_columns());
+    $option_fields = array_keys(get_default_option_columns());
+    $addon_fields = array_keys(get_default_addon_columns());
+    
+    // Add the ID field to allowed fields
+    $option_fields[] = 'featureId';
+    $addon_fields[] = 'optionId';
+    $addon_fields[] = 'enableGrouping'; // This is a special field for addons
 
     // --- FEATURES ---
     foreach ($pricingData['features'] as $fi => $feat) {
@@ -522,13 +532,27 @@ function upsert_pricing_data($payload) {
         unset($save['options']);
         // include link_name automatically
         $save['featureName'] = $final;
+        
+        // IMPORTANT: Convert boolean recurring value to integer
+        if (isset($save['recurring'])) {
+            $save['recurring'] = (int)$save['recurring'];
+        }
+        
         $save = normalize_record($save);
+        
+        // IMPORTANT: Filter fields to only include those defined for features
+        $filtered_save = array();
+        foreach ($save as $key => $value) {
+            if (in_array($key, $feature_fields)) {
+                $filtered_save[$key] = $value;
+            }
+        }
 
         if ($row) {
             $fid = $row['id'];
-            $wpdb->update($ft, $save, ['id'=>$fid]);
+            $wpdb->update($ft, $filtered_save, ['id'=>$fid]);
         } else {
-            $wpdb->insert($ft, $save);
+            $wpdb->insert($ft, $filtered_save);
             $fid = $wpdb->insert_id;
         }
         $processed_features[] = $fid;
@@ -559,65 +583,31 @@ function upsert_pricing_data($payload) {
             $saveO['optionName']  = $fO;
             $saveO['featureId']   = $fid;
 
-            // FIRST normalize the record (this will remove priceOptions if pricing type isn't "price options")
+            // Normalize the record
             $saveO = normalize_record($saveO);
-
-            // THEN handle priceOptions conversion to JSON (only if it still exists after normalization)
-            if (isset($saveO['priceOptions'])) {
-                // After unwrapping, priceOptions should just be an array of {label, price} objects
-                if (is_array($saveO['priceOptions'])) {
-                    // If it has 'types' property (old structure), extract just the types array
-                    if (isset($saveO['priceOptions']['types']) && is_array($saveO['priceOptions']['types'])) {
-                        $saveO['priceOptions'] = json_encode($saveO['priceOptions']['types']);
-                    } else {
-                        // Otherwise encode the array directly
-                        $saveO['priceOptions'] = json_encode($saveO['priceOptions']);
-                    }
-                } elseif (is_string($saveO['priceOptions'])) {
-                    // Already a JSON string, leave it as is
-                    $decoded = json_decode($saveO['priceOptions'], true);
-                    if (!is_array($decoded)) {
-                        $saveO['priceOptions'] = '[]'; // Fallback to empty array
-                    }
-                } else {
-                    // Unexpected type, store as empty array
-                    $saveO['priceOptions'] = '[]';
+            
+            // IMPORTANT: Filter fields to only include those defined for options
+            $filtered_saveO = array();
+            foreach ($saveO as $key => $value) {
+                if (in_array($key, $option_fields)) {
+                    $filtered_saveO[$key] = $value;
                 }
-            } else {
-                // If priceOptions doesn't exist, set to NULL
-                $saveO['priceOptions'] = null;
             }
 
-            if (isset($saveO['thresholdDiscounts'])) {
-                // After unwrapping, thresholdDiscounts should just be an array of {itemCount, discount} objects
-                if (is_array($saveO['thresholdDiscounts'])) {
-                    // If it has 'types' property (old structure), extract just the types array
-                    if (isset($saveO['thresholdDiscounts']['types']) && is_array($saveO['thresholdDiscounts']['types'])) {
-                        $saveO['thresholdDiscounts'] = json_encode($saveO['thresholdDiscounts']['types']);
-                    } else {
-                        // Otherwise encode the array directly
-                        $saveO['thresholdDiscounts'] = json_encode($saveO['thresholdDiscounts']);
-                    }
-                } elseif (is_string($saveO['thresholdDiscounts'])) {
-                    // Already a JSON string, leave it as is
-                    $decoded = json_decode($saveO['thresholdDiscounts'], true);
-                    if (!is_array($decoded)) {
-                        $saveO['thresholdDiscounts'] = '[]'; // Fallback to empty array
-                    }
-                } else {
-                    // Unexpected type, store as empty array
-                    $saveO['thresholdDiscounts'] = '[]';
-                }
-            } else {
-                // If thresholdDiscounts doesn't exist, set to NULL
-                $saveO['thresholdDiscounts'] = null;
+            // Handle JSON fields specifically to ensure they're strings
+            if (isset($filtered_saveO['priceOptions']) && is_array($filtered_saveO['priceOptions'])) {
+                $filtered_saveO['priceOptions'] = json_encode($filtered_saveO['priceOptions']);
+            }
+            
+            if (isset($filtered_saveO['thresholdDiscounts']) && is_array($filtered_saveO['thresholdDiscounts'])) {
+                $filtered_saveO['thresholdDiscounts'] = json_encode($filtered_saveO['thresholdDiscounts']);
             }
 
             if ($rowO) {
                 $oid = $rowO['id'];
-                $wpdb->update($ot, $saveO, ['id'=>$oid]);
+                $wpdb->update($ot, $filtered_saveO, ['id'=>$oid]);
             } else {
-                $wpdb->insert($ot, $saveO);
+                $wpdb->insert($ot, $filtered_saveO);
                 $oid = $wpdb->insert_id;
             }
             $processed_options[$fid][] = $oid;
@@ -646,13 +636,32 @@ function upsert_pricing_data($payload) {
                 $saveA = $add;
                 $saveA['addonName'] = $fA;
                 $saveA['optionId']  = $oid;
+                
+                // Convert boolean values to integers
+                if (isset($saveA['enableGrouping'])) {
+                    $saveA['enableGrouping'] = (int)$saveA['enableGrouping'];
+                }
+                
                 $saveA = normalize_record($saveA);
+                
+                // IMPORTANT: Filter fields to only include those defined for addons
+                $filtered_saveA = array();
+                foreach ($saveA as $key => $value) {
+                    if (in_array($key, $addon_fields)) {
+                        $filtered_saveA[$key] = $value;
+                    }
+                }
+                
+                // Handle JSON fields specifically
+                if (isset($filtered_saveA['groupThresholdDiscounts']) && is_array($filtered_saveA['groupThresholdDiscounts'])) {
+                    $filtered_saveA['groupThresholdDiscounts'] = json_encode($filtered_saveA['groupThresholdDiscounts']);
+                }
 
                 if ($rowA) {
                     $aid = $rowA['id'];
-                    $wpdb->update($at, $saveA, ['id'=>$aid]);
+                    $wpdb->update($at, $filtered_saveA, ['id'=>$aid]);
                 } else {
-                    $wpdb->insert($at, $saveA);
+                    $wpdb->insert($at, $filtered_saveA);
                     $aid = $wpdb->insert_id;
                 }
                 $processed_addons[$oid][] = $aid;
