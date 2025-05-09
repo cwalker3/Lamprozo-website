@@ -95,7 +95,7 @@ function unwrap_pricing_json($data) {
         'staticPrice','priceFloor','priceCeiling','optionMetric','priceOptions','thresholdDiscounts','link_name',
         // addon-level
         'addonName','description','addOnMetric','pricingType','priceModifierType',
-        'staticPriceMod','floorPriceMod','ceilingPriceMod','link_name'
+        'staticPriceMod','floorPriceMod','ceilingPriceMod','groupName','groupThresholdDiscounts','link_name'
     );
 
     $out = array();
@@ -155,6 +155,7 @@ function get_default_option_columns() {
         'optionMetric' => "VARCHAR(50)",
         'priceOptions' => "TEXT",
         'thresholdDiscounts' => "TEXT",
+        'maxAddons'    => "INT DEFAULT -1",
         'link_name'    => "VARCHAR(255) NULL"
     );
 }
@@ -164,15 +165,18 @@ function get_default_option_columns() {
  */
 function get_default_addon_columns() {
     return array(
-        'addonName'         => "VARCHAR(255) NOT NULL",
-        'description'       => "TEXT",
-        'addOnMetric'       => "VARCHAR(50)",
-        'pricingType'       => "VARCHAR(50)",
-        'priceModifierType' => "VARCHAR(50)",
-        'staticPriceMod'    => "FLOAT",
-        'floorPriceMod'     => "FLOAT",
-        'ceilingPriceMod'   => "FLOAT",
-        'link_name'         => "VARCHAR(255) NULL"
+        'addonName'               => "VARCHAR(255) NOT NULL",
+        'description'             => "TEXT",
+        'addOnMetric'             => "VARCHAR(50)",
+        'pricingType'             => "VARCHAR(50)",
+        'priceModifierType'       => "VARCHAR(50)",
+        'staticPriceMod'          => "FLOAT",
+        'floorPriceMod'           => "FLOAT",
+        'ceilingPriceMod'         => "FLOAT",
+        'groupName'               => "VARCHAR(255)",
+        'groupThresholdDiscounts' => "TEXT",
+        'maxGroupItems'           => "INT DEFAULT -1",
+        'link_name'               => "VARCHAR(255) NULL"
     );
 }
 
@@ -286,7 +290,7 @@ function normalize_record($record) {
     foreach ($record as $k => $v) {
         if (is_array($v)) {
             // Special handling for priceOptions and thresholdDiscounts - we want to keep the types array
-            if ($k === 'priceOptions' || $k === 'thresholdDiscounts') {
+            if ($k === 'priceOptions' || $k === 'thresholdDiscounts' || $k === 'groupThresholdDiscounts') {
                 continue; // Skip processing for now, handle it separately
             }
             
@@ -313,7 +317,6 @@ function normalize_record($record) {
         }
     }
     
-    // CRITICAL FIX: Handle threshold discounts based on enableThresholdDiscounts flag
     // Check multiple possible representations of false values coming from JavaScript
     $threshold_disabled = false;
     if (isset($record['enableThresholdDiscounts'])) {
@@ -369,6 +372,73 @@ function normalize_record($record) {
     // Remove enableThresholdDiscounts field entirely
     if (isset($record['enableThresholdDiscounts'])) {
         unset($record['enableThresholdDiscounts']);
+    }
+    
+    // NEW CODE: Check enableGrouping flag before checking groupName
+    $group_disabled = false;
+    
+    // First check if enableGrouping is explicitly set to false
+    if (isset($record['enableGrouping'])) {
+        // Handle various representations of 'false'
+        if ($record['enableGrouping'] === false || 
+            $record['enableGrouping'] === 'false' || 
+            $record['enableGrouping'] === 0 || 
+            $record['enableGrouping'] === '0' ||
+            $record['enableGrouping'] === null ||
+            $record['enableGrouping'] === '') {
+            $group_disabled = true;
+        }
+    }
+    
+    // Store the original group values for the JSON
+    $original_group_name = isset($record['groupName']) ? $record['groupName'] : '';
+    $original_group_discounts = isset($record['groupThresholdDiscounts']) ? $record['groupThresholdDiscounts'] : null;
+    
+    // If enableGrouping is explicitly false, clear the groupName for DB storage
+    if ($group_disabled) {
+        // Set the actual value to empty, so DB storage doesn't use it
+        $record['groupName'] = '';
+    }
+    
+    // Standard logic: if groupName is empty, don't store groupThresholdDiscounts
+    $group_name_empty = empty($record['groupName']);
+    
+    // If no group name or enableGrouping is false, set groupThresholdDiscounts to null
+    if ($group_name_empty || $group_disabled) {
+        $record['groupThresholdDiscounts'] = null;
+    } else if (isset($record['groupThresholdDiscounts'])) {
+        if (is_array($record['groupThresholdDiscounts'])) {
+            $types_array = null;
+            
+            // If it has 'types' property, extract just the types array
+            if (isset($record['groupThresholdDiscounts']['types']) && is_array($record['groupThresholdDiscounts']['types'])) {
+                $types_array = $record['groupThresholdDiscounts']['types'];
+            } elseif (isset($record['groupThresholdDiscounts']['value']['types']) && is_array($record['groupThresholdDiscounts']['value']['types'])) {
+                // Handle nested value structure
+                $types_array = $record['groupThresholdDiscounts']['value']['types'];
+            } else {
+                // Otherwise use the array directly
+                $types_array = $record['groupThresholdDiscounts'];
+            }
+            
+            // If the array is empty or has no valid entries, set to null
+            if (empty($types_array) || !array_filter($types_array, function($item) {
+                return !empty($item['itemCount']) || !empty($item['discount']);
+            })) {
+                $record['groupThresholdDiscounts'] = null;
+            } else {
+                $record['groupThresholdDiscounts'] = json_encode($types_array);
+            }
+        } elseif (is_string($record['groupThresholdDiscounts'])) {
+            // Already a JSON string, check if it's valid and not empty
+            $decoded = json_decode($record['groupThresholdDiscounts'], true);
+            if (!is_array($decoded) || empty($decoded)) {
+                $record['groupThresholdDiscounts'] = null;
+            }
+        } else {
+            // Unexpected type
+            $record['groupThresholdDiscounts'] = null;
+        }
     }
     
     return $record;

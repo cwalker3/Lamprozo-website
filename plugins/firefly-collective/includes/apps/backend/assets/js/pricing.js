@@ -248,6 +248,7 @@ function expandFeature(featureDiv) {
 }
 
 // Refined toggleExpandCollapse with smoother transitions
+// Modify the toggleExpandCollapse function to update max group items UI when expanding
 function toggleExpandCollapse(element, forceExpand = false) {
   const content = element.querySelector('.content');
   const toggle = element.querySelector('.toggle-indicator');
@@ -278,11 +279,76 @@ function toggleExpandCollapse(element, forceExpand = false) {
     const safeHeight = Math.max(content.scrollHeight * 2, 1000) + 'px';
     content.style.maxHeight = safeHeight;
     
+    // Update the Max Group Items UI if this is an addon with a group
+    if (element.classList.contains('addon')) {
+      // Find the fIdx, oIdx, aIdx for this addon
+      const addon = findAddonFromElement(element);
+      if (addon && addon.data && addon.data.groupName) {
+        // Find the max group items field
+        const maxGroupItemsField = Array.from(content.querySelectorAll('.field-group')).find(field => {
+          const label = field.querySelector('label');
+          return label && label.textContent === 'Max Group Items:';
+        });
+        
+        if (maxGroupItemsField) {
+          const input = maxGroupItemsField.querySelector('input[type="number"]');
+          const checkbox = maxGroupItemsField.querySelector('input[type="checkbox"]');
+          
+          if (input && checkbox) {
+            // Update the UI to match the data
+            const maxGroupItems = addon.data.maxGroupItems;
+            if (maxGroupItems === -1) {
+              checkbox.checked = true;
+              input.disabled = true;
+              input.value = '';
+            } else {
+              checkbox.checked = false;
+              input.disabled = false;
+              input.value = maxGroupItems.toString();
+            }
+          }
+        }
+      }
+    }
+    
     // Update parent containers with a slight delay to ensure this element has started expanding
     setTimeout(() => {
       updateParentContainers(element);
     }, 50);
   }
+}
+
+// Helper function to find addon data from DOM element
+function findAddonFromElement(addonElement) {
+  // Find the feature and option containers
+  const optionEl = addonElement.closest('.option');
+  const featureEl = optionEl ? optionEl.closest('.feature') : null;
+  
+  if (!featureEl || !optionEl) return null;
+  
+  // Find indices
+  const features = Array.from(document.querySelectorAll('.feature'));
+  const fIdx = features.indexOf(featureEl);
+  
+  if (fIdx === -1) return null;
+  
+  const options = Array.from(featureEl.querySelectorAll('.option'));
+  const oIdx = options.indexOf(optionEl);
+  
+  if (oIdx === -1) return null;
+  
+  const addons = Array.from(optionEl.querySelectorAll('.addon'));
+  const aIdx = addons.indexOf(addonElement);
+  
+  if (aIdx === -1) return null;
+  
+  // Return the addon data and its indices
+  return {
+    data: window.pricingData.features[fIdx].options[oIdx].addons[aIdx],
+    fIdx: fIdx,
+    oIdx: oIdx,
+    aIdx: aIdx
+  };
 }
 
 function updateParentContainers(element) {
@@ -361,6 +427,7 @@ function updateAllOpenContainers() {
  **************************************************************/
 
 function showNewAddonForm(fIdx, oIdx) {
+
   const featEls = document.querySelectorAll('.feature'),
          optEls = featEls[fIdx].querySelectorAll('.option'),
          optEl  = optEls[oIdx];
@@ -492,6 +559,17 @@ function showNewAddonForm(fIdx, oIdx) {
         pricingType:{level:'admin',ui_type:'array',value:{types:['static price','price range'],selected:0}},
         priceModifierType:{level:'admin',ui_type:'array',value:{types:['add','multiply'],selected:0}},
         staticPriceMod:0,
+        // Add these fields
+        groupName: '',
+        groupThresholdDiscounts: {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ itemCount: "", discount: "" }]
+          }
+        },
+        enableGrouping: false,
+        maxGroupItems: -1,
         link_name:''
       };
     } else {
@@ -836,39 +914,83 @@ function createPriceOptionsUI(optionsData, onChange) {
   return container;
 }
 
-// Update the createThresholdDiscountsUI function to use placeholders
-function createThresholdDiscountsUI(discountsData, onChange) {
-  // Create main container as a field-group to match other fields
+// Improved debounce function with leading and trailing options
+function debounce(func, wait, options) {
+  let timeout;
+  let lastArgs;
+  let lastThis;
+  let result;
+  let lastCallTime = 0;
+  
+  options = options || {};
+  const leading = !!options.leading;
+  const trailing = 'trailing' in options ? !!options.trailing : true;
+  
+  function invokeFunc() {
+    result = func.apply(lastThis, lastArgs);
+    lastThis = lastArgs = null;
+    return result;
+  }
+  
+  return function() {
+    const time = Date.now();
+    const isInvoking = leading && (lastCallTime === 0);
+    
+    lastArgs = arguments;
+    lastThis = this;
+    lastCallTime = time;
+    
+    if (isInvoking) {
+      result = invokeFunc();
+    }
+    
+    clearTimeout(timeout);
+    
+    if (trailing) {
+      timeout = setTimeout(() => {
+        lastCallTime = 0;
+        if (!leading || (Date.now() - lastCallTime) >= wait) {
+          result = invokeFunc();
+        }
+      }, wait);
+    }
+    
+    return result;
+  };
+}
+
+// Improved createThresholdDiscountsUI function
+function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
+  // Create main container
   const container = document.createElement('div');
   container.className = 'field-group price-options-field';
-  container.style.display = 'none'; // Start hidden, controlled by threshold checkbox
+  container.style.display = 'none'; // Start hidden
   
-  // Create label (first column)
+  // Create label
   const label = document.createElement('label');
   label.textContent = 'Quantity Discounts:';
   container.appendChild(label);
   
-  // Handle potential string input (from DB)
+  // Process input data
   let thresholdsArray = [];
   if (typeof discountsData === 'string') {
     try {
       thresholdsArray = JSON.parse(discountsData);
     } catch(e) {
-      console.error('Failed to parse threshold discounts:', e);
-      thresholdsArray = [{ itemCount: '', discount: '' }]; // Empty defaults
+      thresholdsArray = [{ itemCount: "", discount: "" }];
     }
   } else if (Array.isArray(discountsData)) {
     thresholdsArray = discountsData;
   } else if (discountsData && discountsData.types) {
     thresholdsArray = discountsData.types;
   } else {
-    thresholdsArray = [{ itemCount: '', discount: '' }]; // Empty defaults
+    thresholdsArray = [{ itemCount: "", discount: "" }];
   }
   
-  // Create the working data structure - just the array, no selected property
-  const workingData = thresholdsArray;
-
-  // Create right-side container (second column)
+  // Create working data with deep copy
+  const workingData = JSON.parse(JSON.stringify(thresholdsArray));
+  
+  // Create container for discount rows
   const rightColumn = document.createElement('div');
   rightColumn.className = 'price-options-container';
   rightColumn.style.flex = '1';
@@ -876,7 +998,38 @@ function createThresholdDiscountsUI(discountsData, onChange) {
   rightColumn.style.flexDirection = 'column';
   container.appendChild(rightColumn);
   
-  function renderThresholds() {
+  // This flag prevents endless sync loop
+  let preventSync = false;
+  
+  // Function to render the threshold rows
+  function renderThresholds(externalData = null, preserveId = null) {
+    // Use external data if provided
+    if (externalData && !preventSync) {
+      workingData.length = 0;
+      externalData.forEach(item => {
+        workingData.push(JSON.parse(JSON.stringify(item)));
+      });
+    }
+    
+    // Store currently focused element details if any
+    let activeElement = document.activeElement;
+    let activeId = activeElement ? activeElement.id : null;
+    let activeValue = activeElement ? activeElement.value : null;
+    let selectionStart = activeElement ? activeElement.selectionStart : null;
+    let selectionEnd = activeElement ? activeElement.selectionEnd : null;
+    
+    // If preserveId is provided, use it instead
+    if (preserveId) {
+      activeId = preserveId;
+      activeElement = document.getElementById(preserveId);
+      if (activeElement) {
+        activeValue = activeElement.value;
+        selectionStart = activeElement.selectionStart;
+        selectionEnd = activeElement.selectionEnd;
+      }
+    }
+    
+    // Clear existing rows
     rightColumn.innerHTML = '';
     
     // Create each threshold row
@@ -884,16 +1037,54 @@ function createThresholdDiscountsUI(discountsData, onChange) {
       const row = document.createElement('div');
       row.className = 'price-option-row';
       
-      // Item count input
+      // Quantity input
       const countInput = document.createElement('input');
       countInput.type = 'number';
       countInput.min = '1';
       countInput.value = threshold.itemCount !== '' ? threshold.itemCount : '';
-      countInput.placeholder = 'Quantity'; // Placeholder instead of default value
-      countInput.addEventListener('input', e => {
-        workingData[idx].itemCount = parseInt(e.target.value, 10) || '';
-        onChange(workingData);
-      });
+      countInput.placeholder = 'Quantity';
+      
+      // Create stable ID for this input that won't change during re-renders
+      const countId = `count-input-${groupInfo?.groupName || 'local'}-${idx}`;
+      countInput.id = countId;
+      
+      // Use the improved debounce function with proper options
+      const debouncedCountUpdate = debounce((e) => {
+        if (preventSync) return;
+        
+        const val = e.target.value.trim() !== '' ? parseInt(e.target.value, 10) : '';
+        workingData[idx].itemCount = val;
+        
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData,
+            countId // Pass the ID to preserve focus
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
+          onChange(workingData);
+        }
+      }, 300, { leading: false, trailing: true }); // Only trigger on trailing edge
+      
+      // Use the debounced function for input events
+      countInput.addEventListener('input', debouncedCountUpdate);
       
       // Discount percentage input
       const discountInput = document.createElement('input');
@@ -901,13 +1092,51 @@ function createThresholdDiscountsUI(discountsData, onChange) {
       discountInput.min = '0';
       discountInput.max = '100';
       discountInput.value = threshold.discount !== '' ? threshold.discount : '';
-      discountInput.placeholder = '%'; // Placeholder instead of default value
-      discountInput.addEventListener('input', e => {
-        workingData[idx].discount = parseFloat(e.target.value) || '';
-        onChange(workingData);
-      });
+      discountInput.placeholder = '%';
       
-      // Controls container for buttons
+      // Create stable ID for this input
+      const discountId = `discount-input-${groupInfo?.groupName || 'local'}-${idx}`;
+      discountInput.id = discountId;
+      
+      // Use the improved debounce function with proper options
+      const debouncedDiscountUpdate = debounce((e) => {
+        if (preventSync) return;
+        
+        const val = e.target.value.trim() !== '' ? parseFloat(e.target.value) : '';
+        workingData[idx].discount = val;
+        
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData,
+            discountId // Pass the ID to preserve focus
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
+          onChange(workingData);
+        }
+      }, 300, { leading: false, trailing: true }); // Only trigger on trailing edge
+      
+      // Use the debounced function for input events
+      discountInput.addEventListener('input', debouncedDiscountUpdate);
+      
+      // Controls container
       const controlsContainer = document.createElement('div');
       controlsContainer.className = 'controls-container';
       
@@ -916,47 +1145,120 @@ function createThresholdDiscountsUI(discountsData, onChange) {
       deleteBtn.textContent = '−';
       deleteBtn.className = 'price-option-delete';
       deleteBtn.addEventListener('click', () => {
+        if (preventSync) return;
+        
         workingData.splice(idx, 1);
-        onChange(workingData);
-        renderThresholds();
+        
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
+          onChange(workingData);
+          renderThresholds();
+        }
       });
       
-      // Up arrow button
+      // Up arrow
       const upBtn = document.createElement('button');
-      upBtn.innerHTML = '&#9650;'; // Up arrow symbol
+      upBtn.innerHTML = '&#9650;';
       upBtn.className = 'price-option-arrow';
       upBtn.disabled = idx === 0;
       upBtn.addEventListener('click', () => {
-        if (idx > 0) {
-          // Swap current item with the one above it
-          [workingData[idx-1], workingData[idx]] = 
-          [workingData[idx], workingData[idx-1]];
+        if (preventSync || idx === 0) return;
+        
+        [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
+        
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
           onChange(workingData);
           renderThresholds();
         }
       });
       
-      // Down arrow button
+      // Down arrow
       const downBtn = document.createElement('button');
-      downBtn.innerHTML = '&#9660;'; // Down arrow symbol
+      downBtn.innerHTML = '&#9660;';
       downBtn.className = 'price-option-arrow';
       downBtn.disabled = idx === workingData.length - 1;
       downBtn.addEventListener('click', () => {
-        if (idx < workingData.length - 1) {
-          // Swap current item with the one below it
-          [workingData[idx], workingData[idx+1]] = 
-          [workingData[idx+1], workingData[idx]];
+        if (preventSync || idx === workingData.length - 1) return;
+        
+        [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
+        
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
           onChange(workingData);
           renderThresholds();
         }
       });
       
-      // Add buttons to controls container
+      // Add buttons to controls
       controlsContainer.appendChild(deleteBtn);
       controlsContainer.appendChild(upBtn);
       controlsContainer.appendChild(downBtn);
       
-      // Add all elements to row
+      // Add elements to row
       row.appendChild(countInput);
       row.appendChild(discountInput);
       row.appendChild(controlsContainer);
@@ -973,20 +1275,192 @@ function createThresholdDiscountsUI(discountsData, onChange) {
     addBtn.className = 'add-button';
     addBtn.style.marginTop = '0';
     addBtn.addEventListener('click', () => {
-      // Add a new empty threshold instead of calculating values
+      if (preventSync) return;
+      
       workingData.push({ itemCount: '', discount: '' });
-      onChange(workingData);
-      renderThresholds();
+      
+      // If part of a group, trigger synchronization
+      if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+        // Call onChange first to update the local data
+        onChange(workingData);
+        
+        // Set the flag to prevent recursive syncing
+        preventSync = true;
+        
+        // Then trigger synchronization across the group
+        synchronizeGroupThresholdDiscounts(
+          groupInfo.featureIdx,
+          groupInfo.optionIdx,
+          groupInfo.addonIdx,
+          groupInfo.groupName,
+          workingData
+        );
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          preventSync = false;
+        }, 10);
+      } else {
+        // Otherwise just update this addon
+        onChange(workingData);
+        renderThresholds();
+      }
     });
     
     addBtnRow.appendChild(addBtn);
     rightColumn.appendChild(addBtnRow);
+    
+    // Restore focus and cursor position if we had an active element
+    if (activeId) {
+      requestAnimationFrame(() => {
+        const elementToFocus = document.getElementById(activeId);
+        if (elementToFocus) {
+          elementToFocus.focus();
+          
+          if (activeValue !== null && elementToFocus.value !== activeValue) {
+            elementToFocus.value = activeValue;
+          }
+          
+          if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+            try {
+              elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+            } catch (err) {
+              // Ignore errors from setSelectionRange
+            }
+          }
+        }
+      });
+    }
+  }
+  
+  // Initialize the UI registry if needed
+  if (!window.groupThresholdUIRegistry) {
+    window.groupThresholdUIRegistry = {};
+  }
+  
+  // Register in global registry if this is part of a group
+  if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+    // Initialize the group if needed
+    if (!window.groupThresholdUIRegistry[groupInfo.groupName]) {
+      window.groupThresholdUIRegistry[groupInfo.groupName] = [];
+    }
+    
+    // Remove any existing entries for this addon
+    window.groupThresholdUIRegistry[groupInfo.groupName] = 
+      window.groupThresholdUIRegistry[groupInfo.groupName].filter(ui => 
+        !(ui.featureIdx === groupInfo.featureIdx && 
+          ui.optionIdx === groupInfo.optionIdx && 
+          ui.addonIdx === groupInfo.addonIdx));
+    
+    // Add this UI to the registry
+    window.groupThresholdUIRegistry[groupInfo.groupName].push({
+      featureIdx: groupInfo.featureIdx,
+      optionIdx: groupInfo.optionIdx,
+      addonIdx: groupInfo.addonIdx,
+      uiElement: container,
+      renderFunction: renderThresholds
+    });
   }
   
   // Initial render
   renderThresholds();
   
   return container;
+}
+
+// Improved synchronization function with focus preservation
+function synchronizeGroupThresholdDiscounts(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, newDiscounts, preserveFocusId = null) {
+  // Skip if no group name
+  if (!groupName || !groupName.trim()) return;
+  
+  // Initialize the registry if it doesn't exist
+  if (!window.groupThresholdUIRegistry) {
+    window.groupThresholdUIRegistry = {};
+  }
+  
+  // Create a clean deep copy of the discounts to avoid reference issues
+  const discountsCopy = JSON.parse(JSON.stringify(newDiscounts));
+  
+  // 1. Update the data structures for all addons in the group
+  let updateCount = 0;
+  window.pricingData.features.forEach((feature, featureIdx) => {
+    feature.options.forEach((option, optionIdx) => {
+      option.addons.forEach((addon, addonIdx) => {
+        // Update any addon with the matching group name
+        if (addon.groupName === groupName) {
+          updateCount++;
+          
+          // Skip the current addon that triggered the sync to avoid circular updates
+          if (featureIdx === currentFeatureIdx && 
+              optionIdx === currentOptionIdx && 
+              addonIdx === currentAddonIdx) {
+            return;
+          }
+          
+          // Update the groupThresholdDiscounts structure
+          if (!addon.groupThresholdDiscounts) {
+            addon.groupThresholdDiscounts = {
+              level: 'admin',
+              ui_type: 'array-obj',
+              value: {
+                types: JSON.parse(JSON.stringify(discountsCopy))
+              }
+            };
+          } else if (typeof addon.groupThresholdDiscounts === 'string') {
+            // Convert from string to proper object if it was loaded from DB
+            addon.groupThresholdDiscounts = {
+              level: 'admin',
+              ui_type: 'array-obj',
+              value: {
+                types: JSON.parse(JSON.stringify(discountsCopy))
+              }
+            };
+          } else {
+            // Update existing structure
+            addon.groupThresholdDiscounts.value = {
+              types: JSON.parse(JSON.stringify(discountsCopy))
+            };
+          }
+        }
+      });
+    });
+  });
+  
+  // Only save if we actually updated something
+  if (updateCount > 0) {
+    saveData();
+  }
+  
+  // 2. Update the UI for all other addons in the group
+  if (window.groupThresholdUIRegistry[groupName]) {
+    window.groupThresholdUIRegistry[groupName].forEach(uiInfo => {
+      // Skip the current addon to avoid circular updates
+      if (uiInfo.featureIdx === currentFeatureIdx && 
+          uiInfo.optionIdx === currentOptionIdx && 
+          uiInfo.addonIdx === currentAddonIdx) {
+        return;
+      }
+      
+      // Update this UI element if it's still in the DOM
+      if (uiInfo.uiElement && 
+          uiInfo.uiElement.parentNode && 
+          uiInfo.renderFunction) {
+        try {
+          // Batch DOM updates with requestAnimationFrame for better performance
+          requestAnimationFrame(() => {
+            uiInfo.renderFunction(discountsCopy, preserveFocusId);
+          });
+        } catch (err) {
+          // Silent error handling in case an element was removed
+        }
+      }
+    });
+  }
+  
+  // 3. Update container heights to ensure proper display
+  setTimeout(() => {
+    updateAllOpenContainers();
+  }, 100);
 }
 
 // Update the modifyCreateOptionElement function with a more direct approach
@@ -1294,6 +1768,308 @@ document.addEventListener('DOMContentLoaded', function() {
   attemptModification();
 });
 
+// Create a custom function for the max addons field with a checkbox for unlimited
+function createMaxAddonsField(opt) {
+  const container = document.createElement('div');
+  container.className = 'field-group';
+  
+  // Create label
+  const label = document.createElement('label');
+  label.textContent = 'Max Addons:';
+  container.appendChild(label);
+  
+  // Create a wrapper div for the input and checkbox
+  const inputWrapper = document.createElement('div');
+  inputWrapper.style.display = 'flex';
+  inputWrapper.style.alignItems = 'center';
+  inputWrapper.style.flex = '1';
+  
+  // Create number input
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '1';
+  input.style.flex = '1';
+  input.placeholder = 'Maximum allowed addons';
+  
+  // Determine initial state
+  const isUnlimited = opt.maxAddons === -1 || opt.maxAddons === undefined;
+  
+  // Set initial value
+  if (!isUnlimited) {
+    input.value = opt.maxAddons;
+  }
+  
+  // Add input change handler
+  input.addEventListener('input', e => {
+    const val = parseInt(e.target.value, 10) || 1;
+    opt.maxAddons = val;
+    saveData();
+  });
+  
+  // Create checkbox container
+  const checkboxContainer = document.createElement('div');
+  checkboxContainer.style.marginLeft = '10px';
+  checkboxContainer.style.display = 'flex';
+  checkboxContainer.style.alignItems = 'center';
+  
+  // Create checkbox
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = isUnlimited;
+  checkbox.id = 'unlimited-addons-' + Math.random().toString(36).substring(2, 9);
+  checkbox.style.marginRight = '5px';
+  
+  // Initial state of input based on checkbox
+  input.disabled = checkbox.checked;
+  
+  // Create checkbox label
+  const checkboxLabel = document.createElement('label');
+  checkboxLabel.htmlFor = checkbox.id;
+  checkboxLabel.textContent = 'Unlimited';
+  checkboxLabel.style.marginBottom = '0';
+  
+  // Add checkbox change handler
+  checkbox.addEventListener('change', e => {
+    const isUnlimited = e.target.checked;
+    input.disabled = isUnlimited;
+    
+    if (isUnlimited) {
+      input.value = '';
+      opt.maxAddons = -1;
+    } else {
+      input.value = input.value || '1';
+      opt.maxAddons = parseInt(input.value, 10) || 1;
+    }
+    saveData();
+  });
+  
+  // Assemble the elements
+  checkboxContainer.appendChild(checkbox);
+  checkboxContainer.appendChild(checkboxLabel);
+  
+  inputWrapper.appendChild(input);
+  inputWrapper.appendChild(checkboxContainer);
+  container.appendChild(inputWrapper);
+  
+  return container;
+}
+
+// Create a global registry for max group items UI elements
+if (!window.groupMaxItemsUIRegistry) window.groupMaxItemsUIRegistry = {};
+
+// Modify the createMaxGroupItemsField function to register in the registry
+function createMaxGroupItemsField(addon, fIdx, oIdx, aIdx, groupName) {
+  const container = document.createElement('div');
+  container.className = 'field-group';
+  
+  // Create label
+  const label = document.createElement('label');
+  label.textContent = 'Max Group Items:';
+  container.appendChild(label);
+  
+  // Create a wrapper div for the input and checkbox
+  const inputWrapper = document.createElement('div');
+  inputWrapper.style.display = 'flex';
+  inputWrapper.style.alignItems = 'center';
+  inputWrapper.style.flex = '1';
+  
+  // Create number input
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.style.flex = '1';
+  input.placeholder = 'Maximum allowed items';
+  
+  // Determine initial state
+  const isUnlimited = addon.maxGroupItems === -1 || addon.maxGroupItems === undefined;
+  
+  // Set initial value
+  if (!isUnlimited) {
+    input.value = addon.maxGroupItems;
+  }
+  
+  // Create checkbox container
+  const checkboxContainer = document.createElement('div');
+  checkboxContainer.style.marginLeft = '10px';
+  checkboxContainer.style.display = 'flex';
+  checkboxContainer.style.alignItems = 'center';
+  
+  // Create checkbox
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = isUnlimited;
+  checkbox.id = 'unlimited-group-items-' + Math.random().toString(36).substring(2, 9);
+  checkbox.style.marginRight = '5px';
+  
+  // Initial state of input based on checkbox
+  input.disabled = checkbox.checked;
+  
+  // Create checkbox label
+  const checkboxLabel = document.createElement('label');
+  checkboxLabel.htmlFor = checkbox.id;
+  checkboxLabel.textContent = 'Unlimited';
+  checkboxLabel.style.marginBottom = '0';
+  
+  // Create a render function to update this field
+  function renderMaxItems(newValue) {
+    if (newValue === -1) {
+      checkbox.checked = true;
+      input.disabled = true;
+      input.value = '';
+    } else if (newValue === 0) {
+      checkbox.checked = false;
+      input.disabled = false;
+      input.value = '';
+    } else {
+      checkbox.checked = false;
+      input.disabled = false;
+      input.value = newValue.toString();
+    }
+    
+    // Update the data model too
+    addon.maxGroupItems = newValue;
+  }
+  
+  // Register in global registry if this is part of a group
+  if (groupName && groupName.trim()) {
+    // Initialize the group if needed
+    if (!window.groupMaxItemsUIRegistry[groupName]) {
+      window.groupMaxItemsUIRegistry[groupName] = [];
+    }
+    
+    // Remove any existing entries for this addon
+    window.groupMaxItemsUIRegistry[groupName] = 
+      window.groupMaxItemsUIRegistry[groupName].filter(ui => 
+        !(ui.featureIdx === fIdx && 
+          ui.optionIdx === oIdx && 
+          ui.addonIdx === aIdx));
+    
+    // Add this UI to the registry
+    window.groupMaxItemsUIRegistry[groupName].push({
+      featureIdx: fIdx,
+      optionIdx: oIdx,
+      addonIdx: aIdx,
+      renderFunction: renderMaxItems
+    });
+  }
+  
+  // Modified input change handler
+  input.addEventListener('input', e => {
+    let newValue;
+    
+    if (e.target.value === '') {
+      newValue = 0; // Our special "not set" value
+    } else {
+      newValue = parseInt(e.target.value, 10);
+      if (isNaN(newValue)) newValue = 0;
+    }
+    
+    addon.maxGroupItems = newValue;
+    
+    // If part of a group, sync with other addons
+    if (groupName && groupName.trim()) {
+      synchronizeGroupMaxItems(fIdx, oIdx, aIdx, groupName, newValue);
+    } else {
+      saveData();
+    }
+  });
+  
+  // Modified checkbox change handler
+  checkbox.addEventListener('change', e => {
+    const isUnlimited = e.target.checked;
+    input.disabled = isUnlimited;
+    
+    let newValue;
+    if (isUnlimited) {
+      input.value = '';
+      newValue = -1;
+    } else {
+      if (input.value === '') {
+        newValue = 0;
+      } else {
+        newValue = parseInt(input.value, 10);
+        if (isNaN(newValue)) newValue = 0;
+      }
+    }
+    
+    addon.maxGroupItems = newValue;
+    
+    // If part of a group, sync with other addons
+    if (groupName && groupName.trim()) {
+      synchronizeGroupMaxItems(fIdx, oIdx, aIdx, groupName, newValue);
+    } else {
+      saveData();
+    }
+  });
+  
+  // Assemble the elements
+  checkboxContainer.appendChild(checkbox);
+  checkboxContainer.appendChild(checkboxLabel);
+  
+  inputWrapper.appendChild(input);
+  inputWrapper.appendChild(checkboxContainer);
+  container.appendChild(inputWrapper);
+  
+  return container;
+}
+
+// Update the synchronizeGroupMaxItems function to use the registry
+function synchronizeGroupMaxItems(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, maxGroupItems) {
+  // Skip if no group name
+  if (!groupName || !groupName.trim()) return;
+  
+  // 1. Update the data structures for all addons in the group
+  window.pricingData.features.forEach((feature, featureIdx) => {
+    feature.options.forEach((option, optionIdx) => {
+      option.addons.forEach((addon, addonIdx) => {
+        // Update any addon with the matching group name
+        if (addon.groupName === groupName) {
+          // Skip the current addon that triggered the sync
+          if (featureIdx === currentFeatureIdx && 
+              optionIdx === currentOptionIdx && 
+              addonIdx === currentAddonIdx) {
+            return;
+          }
+          
+          // Update the maxGroupItems value
+          addon.maxGroupItems = maxGroupItems;
+        }
+      });
+    });
+  });
+  
+  // 2. Save data after all updates
+  saveData();
+  
+  // 3. Update the UI for all group members using the registry
+  if (window.groupMaxItemsUIRegistry[groupName]) {
+    window.groupMaxItemsUIRegistry[groupName].forEach(uiInfo => {
+      // Skip the current addon to avoid circular updates
+      if (uiInfo.featureIdx === currentFeatureIdx && 
+          uiInfo.optionIdx === currentOptionIdx && 
+          uiInfo.addonIdx === currentAddonIdx) {
+        return;
+      }
+      
+      // Call the render function to update the UI
+      if (uiInfo.renderFunction) {
+        try {
+          requestAnimationFrame(() => {
+            uiInfo.renderFunction(maxGroupItems);
+          });
+        } catch (err) {
+          // Silent error handling
+        }
+      }
+    });
+  }
+  
+  // 4. Update container heights to ensure proper display
+  setTimeout(() => {
+    updateAllOpenContainers();
+  }, 100);
+}
+
 /**************************************************************
  * 10) clearSchemaValues — preserve dropdown.types
  **************************************************************/
@@ -1436,6 +2212,7 @@ function showNewOptionForm(fIdx) {
             types: [{ itemCount: 10, discount: 5 }]
           }
         },
+        maxAddons: -1, // -1 means unlimited
         optionMetric:'', addons:[], link_name:''
       };
     } else {
@@ -1679,6 +2456,17 @@ function showNewAddonForm(fIdx, oIdx) {
         pricingType:{level:'admin',ui_type:'array',value:{types:['static price','price range'],selected:0}},
         priceModifierType:{level:'admin',ui_type:'array',value:{types:['add','multiply'],selected:0}},
         staticPriceMod:0,
+        // Add these new fields (but not the UI flag)
+        groupName: '',
+        groupThresholdDiscounts: {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: [{ itemCount: "", discount: "" }]
+          }
+        },
+        enableGrouping: false,
+        maxGroupItems: -1,
         link_name:''
       };
     } else {
@@ -1790,6 +2578,7 @@ function showNewAddonForm(fIdx, oIdx) {
  * 13) Addon Element
  **************************************************************/
 function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aIdx) {
+
   const wrap = document.createElement('div');
   wrap.className = 'addon';
   
@@ -1818,7 +2607,6 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
   const cloneBtn = document.createElement('button');
   cloneBtn.className = 'clone-button';
   cloneBtn.textContent = 'Clone';
-  // Clone button in createAddonElement function
   cloneBtn.addEventListener('click', e => {
     e.stopPropagation();
     confirmClone(addon.addonName || 'this addon', () => {
@@ -1986,15 +2774,256 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
   }
   ptSel.addEventListener('change', applyA);
   applyA();
+  
+  // Price Modifier Type dropdown (add this BEFORE the grouping elements)
+  const pmtG = createFieldGroup(
+    'priceModifierType', 'dropdown',
+    () => addon.priceModifierType.value,
+    v => addon.priceModifierType.value = v
+  );
+  contentInner.append(pmtG);
+  
+  // NOW add the grouping elements AFTER the price modifier type
+  
+  // Group this addon checkbox (UI only)
+  const groupAddonGroup = document.createElement('div');
+  groupAddonGroup.className = 'field-group';
+  
+  const groupLabel = document.createElement('label');
+  groupLabel.textContent = 'Group this Addon:';
+  groupAddonGroup.appendChild(groupLabel);
+  
+  const groupCheckbox = document.createElement('input');
+  groupCheckbox.type = 'checkbox';
+  // Initialize checkbox based on whether groupName has a value
+  groupCheckbox.checked = !!(addon.groupName && addon.groupName.trim());
+  groupAddonGroup.appendChild(groupCheckbox);
+  
+  // Initialize groupName if not present
+  if (!addon.groupName) {
+    addon.groupName = '';
+  }
+  
+  // Create group name field
+  const groupNameGroup = createFieldGroup(
+    'groupName', 'text',
+    () => addon.groupName,
+    v => {
+      addon.groupName = v;
+      // If groupName is emptied and checkbox is unchecked, hide fields
+      if (!v.trim()) {
+        groupCheckbox.checked = false;
+        groupNameGroup.style.display = 'none';
+        groupThresholdDiscountsUI.style.display = 'none';
+      }
+    },
+    'Enter group name...'
+  );
+  
+  // Initialize groupThresholdDiscounts data if not present
+  if (!addon.groupThresholdDiscounts) {
+    addon.groupThresholdDiscounts = {
+      level: 'admin',
+      ui_type: 'array-obj',
+      value: {
+        types: [{ itemCount: "", discount: "" }]
+      }
+    };
+  }
+  
+  // Create the groupThresholdDiscounts UI
+  // In the createAddonElement function, modify the groupThresholdDiscountsUI onChange callback
+  const groupThresholdDiscountsUI = createThresholdDiscountsUI(
+    addon.groupThresholdDiscounts ? (
+      typeof addon.groupThresholdDiscounts === 'string' ? 
+      JSON.parse(addon.groupThresholdDiscounts) : 
+      (Array.isArray(addon.groupThresholdDiscounts) ? addon.groupThresholdDiscounts : 
+      (addon.groupThresholdDiscounts.value?.types || [{ itemCount: "", discount: "" }]))
+    ) : [{ itemCount: "", discount: "" }],
+    v => {
+      // First update this addon's discounts
+      if (!addon.groupThresholdDiscounts) {
+        addon.groupThresholdDiscounts = {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: v
+          }
+        };
+      } else if (typeof addon.groupThresholdDiscounts === 'string') {
+        // Convert from string to proper object if it was loaded from DB
+        addon.groupThresholdDiscounts = {
+          level: 'admin',
+          ui_type: 'array-obj',
+          value: {
+            types: v
+          }
+        };
+      } else {
+        addon.groupThresholdDiscounts.value = {
+          types: v
+        };
+      }
+      
+      // Then synchronize with other addons in the same group
+      if (addon.groupName && addon.groupName.trim()) {
+        synchronizeGroupThresholdDiscounts(fIdx, oIdx, aIdx, addon.groupName, v);
+      } else {
+        // If no grouping, just save the current addon's data
+        saveData();
+      }
+    },
+    // Pass group info for UI registry - only if the addon is actually in a group
+    addon.groupName && addon.groupName.trim() ? {
+      groupName: addon.groupName,
+      featureIdx: fIdx,
+      optionIdx: oIdx,
+      addonIdx: aIdx
+    } : null
+  );
+
+  // Create maxGroupItems field
+  const maxGroupItemsGroup = createMaxGroupItemsField(
+    addon, fIdx, oIdx, aIdx, addon.groupName
+  );
+  
+  // Add all new UI elements to content in the desired order
+  contentInner.appendChild(groupAddonGroup);
+  contentInner.appendChild(groupNameGroup);
+  contentInner.appendChild(maxGroupItemsGroup);
+  contentInner.appendChild(groupThresholdDiscountsUI);
+  
+  // Set initial visibility based on checkbox state
+  groupNameGroup.style.display = groupCheckbox.checked ? 'flex' : 'none';
+  maxGroupItemsGroup.style.display = groupCheckbox.checked ? 'flex' : 'none';
+  groupThresholdDiscountsUI.style.display = groupCheckbox.checked ? 'flex' : 'none';
+
+  let previousGroupName = addon.groupName || '';
+
+  // Handle checkbox state change
+  groupCheckbox.addEventListener('change', e => {
+    // Store the current group name before hiding the field
+    const groupNameInput = groupNameGroup.querySelector('input');
+    if (groupNameInput && groupNameInput.value) {
+      previousGroupName = groupNameInput.value;
+    }
+    
+    // Just hide the UI elements if unchecked
+    if (!e.target.checked) {
+      groupNameGroup.style.display = 'none';
+      maxGroupItemsGroup.style.display = 'none';
+      groupThresholdDiscountsUI.style.display = 'none';
+    } else {
+      // When rechecked, restore the previous name
+      if (groupNameInput && previousGroupName) {
+        groupNameInput.value = previousGroupName;
+        addon.groupName = previousGroupName;
+      }
+      
+      groupNameGroup.style.display = 'flex';
+      maxGroupItemsGroup.style.display = 'flex';
+      groupThresholdDiscountsUI.style.display = 'flex';
+    }
+    
+    addon.enableGrouping = e.target.checked;
+    saveData();
+    
+    // Update container heights
+    setTimeout(() => {
+      updateAllOpenContainers();
+    }, 100);
+  });
 
   // Add dynamic fields
   createDynamicFields(addon, contentInner, [
     'addonName', 'description', 'addOnMetric',
     'pricingType', 'floorPriceMod', 'ceilingPriceMod', 'staticPriceMod',
-    'link_name'
+    'priceModifierType', 'link_name', 'groupName', 'groupThresholdDiscounts',
+    'enableGrouping', 'maxGroupItems'
   ]);
 
   return wrap;
+}
+
+function synchronizeGroupMaxItems(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, maxGroupItems) {
+  // Skip if no group name
+  if (!groupName || !groupName.trim()) return;
+  
+  // 1. Update the data structures for all addons in the group
+  window.pricingData.features.forEach((feature, featureIdx) => {
+    feature.options.forEach((option, optionIdx) => {
+      option.addons.forEach((addon, addonIdx) => {
+        // Update any addon with the matching group name
+        if (addon.groupName === groupName) {
+          // Skip the current addon that triggered the sync
+          if (featureIdx === currentFeatureIdx && 
+              optionIdx === currentOptionIdx && 
+              addonIdx === currentAddonIdx) {
+            return;
+          }
+          
+          // Update the maxGroupItems value
+          addon.maxGroupItems = maxGroupItems;
+        }
+      });
+    });
+  });
+  
+  // 2. Save data after all updates
+  saveData();
+  
+  // 3. Update the UI for all group members (more specific selector)
+  document.querySelectorAll('.addon').forEach(addonEl => {
+    // Only process addons that are expanded so we can access their fields
+    const addonContent = addonEl.querySelector('.content');
+    if (!addonContent || !addonContent.classList.contains('open')) return;
+    
+    // Find the group name input field specifically
+    const groupNameField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
+      const label = field.querySelector('label');
+      return label && label.textContent === 'Group Name:';
+    });
+    
+    // If found, check if this addon is part of our target group
+    if (groupNameField) {
+      const groupNameInput = groupNameField.querySelector('input[type="text"]');
+      if (groupNameInput && groupNameInput.value === groupName) {
+        // Now find the max group items field
+        const maxGroupItemsField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
+          const label = field.querySelector('label');
+          return label && label.textContent === 'Max Group Items:';
+        });
+        
+        if (maxGroupItemsField) {
+          const input = maxGroupItemsField.querySelector('input[type="number"]');
+          const checkbox = maxGroupItemsField.querySelector('input[type="checkbox"]');
+          
+          if (input && checkbox) {
+            // Update the UI elements
+            if (maxGroupItems === -1) {
+              checkbox.checked = true;
+              input.disabled = true;
+              input.value = '';
+            } else if (maxGroupItems === 0) {
+              // For our special "empty/not set" case
+              checkbox.checked = false;
+              input.disabled = false;
+              input.value = ''; // Display as empty
+            } else {
+              checkbox.checked = false;
+              input.disabled = false;
+              input.value = maxGroupItems.toString();
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  // 4. Update container heights to ensure proper display
+  setTimeout(() => {
+    updateAllOpenContainers();
+  }, 100);
 }
 
 /**************************************************************
@@ -2240,12 +3269,15 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
     v => opt.optionMetric = v,
     'Enter metric...'
   ));
+
+  // Add the custom max addons field with checkbox
+  contentInner.appendChild(createMaxAddonsField(opt));
   
   // Add dynamic fields
   createDynamicFields(opt, contentInner, [
     'optionName', 'description', 'interval', 'pricingType',
     'priceFloor', 'priceCeiling', 'staticPrice', 'priceOptions', 'optionMetric', 'addons',
-    'link_name', 'thresholdDiscounts', 'enableThresholdDiscounts'
+    'link_name', 'thresholdDiscounts', 'enableThresholdDiscounts', 'maxAddons'
   ]);
   
   // Create addons header with option name

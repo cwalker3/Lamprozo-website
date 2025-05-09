@@ -1,60 +1,21 @@
 {
     "features": [
         {
-            "featureName": "Membership",
+            "featureName": "Pizza",
             "description": {
-                "text": "This is the membership description."
-            },
-            "recurring": true,
-            "normalText": {
-                "level": "admin",
-                "ui_type": "normal-text",
-                "value": "Hello"
-            },
-            "longText": {
-                "level": "admin",
-                "ui_type": "long-text",
-                "value": "Hello Thar"
-            },
-            "intFloat": {
-                "level": "admin",
-                "ui_type": "int-float",
-                "value": 90
-            },
-            "dateField": {
-                "level": "admin",
-                "ui_type": "date",
-                "value": "2025-04-29"
-            },
-            "multiple": {
-                "level": "admin",
-                "ui_type": "array",
-                "value": {
-                    "types": [
-                        "Choice 1",
-                        "Choice 2",
-                        "Choice 3"
-                    ],
-                    "selected": 1
-                }
+                "text": "This is pizza!"
             },
             "options": [
                 {
-                    "optionName": "Bronze",
+                    "optionName": "Pepperoni ",
                     "description": {
-                        "text": "This is the bronze description."
+                        "text": "This is the pepperoni."
                     },
                     "interval": {
                         "level": "admin",
                         "ui_type": "array",
                         "value": {
                             "types": [
-                                "daily",
-                                "bi-weekly",
-                                "weekly",
-                                "monthly",
-                                "bi-annually",
-                                "annually",
                                 "none"
                             ],
                             "selected": 0
@@ -69,20 +30,42 @@
                                 "price range",
                                 "price options"
                             ],
-                            "selected": 0
+                            "selected": 2
                         }
                     },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 5,
+                    "staticPrice": 0,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "small",
+                                    "price": 10
+                                },
+                                {
+                                    "label": "medium",
+                                    "price": 15
+                                },
+                                {
+                                    "label": "large",
+                                    "price": 20
+                                }
+                            ]
+                        }
+                    },
                     "optionMetric": "unit",
                     "addons": [
                         {
-                            "addonName": "Bonus Item",
+                            "addonName": "Chicken",
                             "description": {
-                                "text": "This is the bonus item description."
+                                "text": "Chicken addon."
                             },
                             "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
                             "pricingType": {
                                 "level": "admin",
                                 "ui_type": "array",
@@ -94,8 +77,6 @@
                                     "selected": 0
                                 }
                             },
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
                             "priceModifierType": {
                                 "level": "admin",
                                 "ui_type": "array",
@@ -107,11 +88,136 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 1
+                            "staticPriceMod": 0.75,
+                            "link_name": "",
+                            "groupName": "premium toppings",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 2,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": -1
+                        },
+                        {
+                            "addonName": "Artichoke Hearts",
+                            "description": {
+                                "text": "Artichoke hearts addon."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 0.75,
+                            "link_name": "",
+                            "groupName": "premium toppings",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 2,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "maxGroupItems": -1
+                        },
+                        {
+                            "addonName": "Anchovies",
+                            "description": {
+                                "text": "Anchovies addon."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 0.75,
+                            "link_name": "",
+                            "groupName": "premium toppings",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 2,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "maxGroupItems": -1
                         }
-                    ]
+                    ],
+                    "link_name": "",
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "itemCount": "",
+                                    "discount": ""
+                                }
+                            ]
+                        }
+                    }
                 }
-            ]
+            ],
+            "recurring": false,
+            "link_name": ""
         }
     ]
 }
