@@ -320,16 +320,40 @@ td .feature-fields-list {
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 5px;
 }
+
 .addon-item {
-    color: #333;
-    font-size: 13px;
-    display: block;
-    margin-bottom: 8px;
-    padding: 4px 0;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 4px 0;
+  height: 24px; /* Enforce consistent height */
+  line-height: 24px; /* Match line height to container height */
+  cursor: default; /* Important - no pointer cursor on the entire container */
 }
 
-.addon-item input[type="checkbox"] {
-    margin-right: 6px;
+.addon-checkbox {
+  flex: 0 0 16px; /* Fixed width */
+  height: 16px;
+  width: 16px;
+  margin: 0;
+  margin-right: 1.5rem;
+  padding: 0;
+  position: relative;
+  top: 0; /* No offset */
+  vertical-align: middle;
+  cursor: pointer; /* Cursor only on the checkbox itself */
+}
+
+.addon-text {
+  color: black; 
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  line-height: 24px;
+  vertical-align: middle;
+  position: relative;
+  top: 0; /* No offset */
+  cursor: default; /* Explicitly not clickable */
 }
 
 /* Add New Feature Button */
@@ -414,6 +438,86 @@ td .feature-fields-list {
 }
 #pay-now:hover {
     background: var(--secondaryColor);
+}
+
+/* Tooltip styles */
+.tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px; /* Fixed dimensions */
+  border-radius: 50%;
+  background-color: #ddd;
+  color: #555;
+  font-size: 10px;
+  font-weight: bold;
+  margin: 0 8px 0 8px; /* Even spacing on both sides */
+  padding: 0;
+  cursor: help; /* Special cursor for tooltip */
+  transition: background-color 0.2s ease;
+  position: relative;
+  top: 0; /* Ensure no vertical offset */
+  line-height: 16px; /* Match to height */
+}
+
+.tooltip-icon:hover {
+  background-color: var(--primaryColor);
+  color: white;
+}
+
+.tooltip-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.tooltip-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s ease;
+}
+
+.tooltip-content {
+  background-color: white;
+  padding: 15px 20px;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  touch-action: none; /* Prevent browser default touch actions */
+}
+
+.tooltip-overlay.active .tooltip-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.tooltip-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: var(--primaryColor);
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.tooltip-body {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #333;
 }
 
 /* Responsive adjustments */

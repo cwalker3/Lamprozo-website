@@ -1239,15 +1239,22 @@ document.addEventListener('DOMContentLoaded', function() {
             addonsDiv.appendChild(addonsTitle);
 
             selectedOption.addons.forEach((addon, aIndex) => {
-                const label = document.createElement('label');
-                label.classList.add('addon-item');
+                // Change from label to div as container
+                const container = document.createElement('div');
+                container.classList.add('addon-item');
 
+                // Create checkbox with explicit dimensions
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = aIndex;
+                // Fix: Use instance.optionIndex instead of oIdx
+                checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${aIndex}`;
+                checkbox.classList.add('addon-checkbox');
                 if (instance.addons && instance.addons.indexOf(aIndex) !== -1) {
                     checkbox.checked = true;
                 }
+                
+                // Restore checkbox functionality
                 checkbox.addEventListener('change', function() {
                     if (!instance.addons) {
                         instance.addons = [];
@@ -1263,37 +1270,153 @@ document.addEventListener('DOMContentLoaded', function() {
                     saveSelections();
                     updateInvoice();
                 });
-                label.appendChild(checkbox);
+                
+                container.appendChild(checkbox);
 
-                // Show the raw addon data. If floor/ceiling is non-zero, show a range.
-                const floorVal = parseSafe(addon.floorPriceMod);
-                const ceilVal  = parseSafe(addon.ceilingPriceMod);
-                const symbol   = isMultiply(addon) ? 'x' : '+';
-
-                // If there's a range
-                if (floorVal !== 0 || ceilVal !== 0) {
-                    label.appendChild(
-                        document.createTextNode(
-                            ` ${addon.addonName} (${symbol}$${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)})`
-                        )
-                    );
+                // Get description and add tooltip if needed
+                const addonDescription = getDescriptionText(addon.description);
+                
+                if (addonDescription) {
+                    const tooltipIcon = document.createElement('span');
+                    tooltipIcon.classList.add('tooltip-icon');
+                    tooltipIcon.textContent = '?';
+                    tooltipIcon.setAttribute('data-addon-name', addon.addonName);
+                    tooltipIcon.setAttribute('data-addon-desc', addonDescription);
+                    
+                    tooltipIcon.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showTooltip(addon.addonName, addonDescription);
+                    });
+                    
+                    container.appendChild(tooltipIcon);
                 } else {
-                    // Otherwise show staticPriceMod
-                    const addonStatic = parseSafe(addon.staticPriceMod, 0);
-                    label.appendChild(
-                        document.createTextNode(
-                            ` ${addon.addonName} (${symbol}$${addonStatic.toFixed(2)})`
-                        )
-                    );
+                    // Add a spacer element to maintain consistent layout
+                    const spacer = document.createElement('span');
+                    spacer.style.width = '16px';
+                    spacer.style.margin = '0 8px 0 8px';
+                    spacer.style.display = 'inline-block';
+                    container.appendChild(spacer);
                 }
+                
+                // Create addon text span with proper class
+                const addonTextSpan = document.createElement('span');
+                addonTextSpan.classList.add('addon-text');
+                
+                // Price calculation and display
+                const floorVal = parseSafe(addon.floorPriceMod);
+                const ceilVal = parseSafe(addon.ceilingPriceMod);
+                const symbol = isMultiply(addon) ? 'x' : '+';
 
-                addonsDiv.appendChild(label);
+                if (floorVal !== 0 || ceilVal !== 0) {
+                    addonTextSpan.textContent = `${addon.addonName} (${symbol}$${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)})`;
+                } else {
+                    const addonStatic = parseSafe(addon.staticPriceMod, 0);
+                    addonTextSpan.textContent = `${addon.addonName} (${symbol}$${addonStatic.toFixed(2)})`;
+                }
+                
+                container.appendChild(addonTextSpan);
+                addonsDiv.appendChild(container);
             });
             optionDetailsDiv.appendChild(addonsDiv);
         }
 
         saveSelections();
         updateInvoice();
+    }
+
+    // Global tooltip functions
+    function showTooltip(title, description) {
+        // Remove any existing tooltips
+        let existingTooltip = document.querySelector('.tooltip-overlay');
+        if (existingTooltip) {
+            document.body.removeChild(existingTooltip);
+        }
+        
+        // Create new tooltip
+        const overlay = document.createElement('div');
+        overlay.classList.add('tooltip-overlay');
+        
+        const content = document.createElement('div');
+        content.classList.add('tooltip-content');
+        
+        const tooltipTitle = document.createElement('div');
+        tooltipTitle.classList.add('tooltip-title');
+        tooltipTitle.textContent = title;
+        
+        const tooltipBody = document.createElement('div');
+        tooltipBody.classList.add('tooltip-body');
+        tooltipBody.textContent = description;
+        
+        content.appendChild(tooltipTitle);
+        content.appendChild(tooltipBody);
+        overlay.appendChild(content);
+        
+        // Add to body
+        document.body.appendChild(overlay);
+        
+        // Force a reflow before adding the active class
+        void overlay.offsetWidth;
+        
+        // Add active class to trigger animations
+        overlay.classList.add('active');
+        
+        // Click handler to close when clicking outside
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                closeTooltip(overlay);
+            }
+        });
+        
+        // Add swipe gesture support
+        let startX, startY, distX, distY;
+        let threshold = 100; // Minimum distance required for a swipe
+        
+        content.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            e.preventDefault();
+        }, false);
+        
+        content.addEventListener('touchmove', function(e) {
+            if (!startX || !startY) return;
+            
+            distX = e.touches[0].clientX - startX;
+            distY = e.touches[0].clientY - startY;
+            e.preventDefault();
+        }, false);
+        
+        content.addEventListener('touchend', function(e) {
+            if (!startX || !startY) return;
+            
+            // Check if horizontal swipe distance is greater than threshold
+            if (Math.abs(distX) >= threshold || Math.abs(distY) >= threshold) {
+                closeTooltip(overlay);
+            }
+            
+            // Reset values
+            startX = startY = distX = distY = null;
+            e.preventDefault();
+        }, false);
+        
+        // Also close when pressing escape
+        document.addEventListener('keydown', function escHandler(e) {
+            if (e.key === 'Escape') {
+                closeTooltip(overlay);
+                document.removeEventListener('keydown', escHandler);
+            }
+        });
+    }
+
+    function closeTooltip(overlay) {
+        overlay.classList.remove('active');
+        
+        // Remove from DOM after animation completes
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }, 300); // Match transition duration
     }
 
     // Helper to re-render all instances for a given feature type
