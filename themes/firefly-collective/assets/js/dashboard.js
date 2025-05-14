@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
@@ -33,6 +34,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof desc === 'object' && desc.text) return desc.text;
         if (typeof desc === 'string') return desc;
         return '';
+    }
+
+    function formatFieldLabel(key) {
+        // Remove _user suffix
+        let text = key.replace('_user', '');
+        
+        // Convert camelCase to Title Case With Spaces
+        return text
+            .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+            .replace(/^./, function(str) { return str.toUpperCase(); }) // Capitalize first letter
+            .trim();
     }
 
     // Smooth scroll helper
@@ -97,6 +109,27 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!option) return 0;
 
         let price = parseSafe(option.staticPrice, 0);
+        
+        let priceOptionsArray = [];
+        if (option.priceOptions) {
+            try {
+                if (typeof option.priceOptions === 'string') {
+                    priceOptionsArray = JSON.parse(option.priceOptions).types || [];
+                } else if (option.priceOptions.types) {
+                    priceOptionsArray = option.priceOptions.types;
+                }
+                
+                // If we have price options and a selection, use that price
+                if (priceOptionsArray.length > 0 && 
+                    instance.priceOptionIndex !== undefined &&
+                    priceOptionsArray[instance.priceOptionIndex]) {
+                    price = parseSafe(priceOptionsArray[instance.priceOptionIndex].price, price);
+                }
+            } catch(e) {
+                console.error("Error parsing price options:", e);
+            }
+        }
+        
         if (instance.addons && Array.isArray(instance.addons)) {
             instance.addons.forEach(addonIndex => {
                 const addon = option.addons[addonIndex];
@@ -206,6 +239,64 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (feature.recurring && option.interval) {
                     intervalLabel = option.interval;
                 }
+                
+                let selectedOptionText = '';
+                let priceOptionsArray = [];
+                
+                if (option.priceOptions) {
+                    try {
+                        if (typeof option.priceOptions === 'string') {
+                            priceOptionsArray = JSON.parse(option.priceOptions).types || [];
+                        } else if (option.priceOptions.types) {
+                            priceOptionsArray = option.priceOptions.types;
+                        }
+                        
+                        // If we have a valid selection, add the name to the display
+                        if (priceOptionsArray.length > 0 && 
+                            instance.priceOptionIndex !== undefined &&
+                            priceOptionsArray[instance.priceOptionIndex]) {
+                            selectedOptionText = ` (${priceOptionsArray[instance.priceOptionIndex].label})`;
+                        }
+                    } catch(e) {
+                        console.error("Error parsing price options:", e);
+                    }
+                }
+
+                // Include existing option-level user fields
+                let userFieldsText = '';
+                if (instance.userFields) {
+                    for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
+                        // Try to get the user field data
+                        const userField = option[`${fieldName}_user`];
+                        if (userField) {
+                            try {
+                                let fieldData;
+                                if (typeof userField === 'string') {
+                                    fieldData = JSON.parse(userField);
+                                } else {
+                                    fieldData = userField;
+                                }
+                                
+                                if (fieldData && fieldData.types && Array.isArray(fieldData.types) && 
+                                    fieldData.types[selectedIndex]) {
+                                    userFieldsText += ` ${fieldName}: ${fieldData.types[selectedIndex]},`;
+                                }
+                            } catch(e) {
+                                console.error(`Error processing user field ${fieldName}:`, e);
+                            }
+                        }
+                    }
+                    
+                    // Remove trailing comma if exists
+                    if (userFieldsText.endsWith(',')) {
+                        userFieldsText = userFieldsText.slice(0, -1);
+                    }
+                    
+                    // If we have user fields to display, wrap in parentheses
+                    if (userFieldsText) {
+                        userFieldsText = ` (${userFieldsText})`;
+                    }
+                }
 
                 // Check if we have a range
                 if (instanceHasRange(feature, instance)) {
@@ -217,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     tableHTML += `
                         <tr>
                             <td>${feature.featureName}</td>
-                            <td>${option.optionName}${qtyDisplay}</td>
+                            <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
                             <td>${intervalLabel}</td>
                             <td>$${lower.toFixed(2)} - $${upper.toFixed(2)}</td>
                         </tr>
@@ -261,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     tableHTML += `
                         <tr>
                             <td>${feature.featureName}</td>
-                            <td>${option.optionName}${qtyDisplay}</td>
+                            <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
                             <td>${intervalLabel}</td>
                             <td>$${price.toFixed(2)}</td>
                         </tr>
@@ -305,8 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         invoiceDetails.innerHTML = tableHTML;
 
-        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        // ADD THIS SNIPPET to handle toggling Pay Now vs. Request Estimate
+        // Handle toggling Pay Now vs. Request Estimate
         const payNowBtn = document.getElementById('pay-now');
         if (payNowBtn) {
             if (estimateMode) {
@@ -321,7 +411,263 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             }
         }
-        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    }
+
+    // Render feature-level user fields
+    function renderFeatureLevelFields(feature, fIndex, instanceDiv, instance) {
+        const featureFieldsDiv = document.createElement('div');
+        featureFieldsDiv.classList.add('feature-fields');
+        featureFieldsDiv.id = feature.featureName.toLowerCase();
+        featureFieldsDiv.id = `feature-${featureFieldsDiv.id.replace(/\s/, '-')}`;
+        
+        let hasUserFields = false;
+        
+        // Loop through feature properties to find user fields
+        for (const key in feature) {
+            // Check if it's a user field
+            if (key.endsWith('_user') || 
+                (typeof feature[key] === 'object' && feature[key] && feature[key].level === 'user')) {
+                
+                hasUserFields = true;
+                
+                try {
+                    let fieldData;
+                    let fieldType = 'normal-text'; // Default fallback
+                    let fieldValue = '';
+                    let placeholder = '';
+                    let dropdownOptions = [];
+                    let originalKey = key;
+                    
+                    // Standardize field data format
+                    if (typeof feature[key] === 'string') {
+                        try {
+                            // Parse the JSON string into an object
+                            fieldData = JSON.parse(feature[key]);
+                            
+                            // Extract ui_type, value, and placeholder if they exist
+                            if (fieldData) {
+                                fieldType = fieldData.ui_type || 'normal-text';
+                                
+                                // Special handling for array/dropdown type
+                                if (fieldType === 'array') {
+                                    if (fieldData.types && Array.isArray(fieldData.types)) {
+                                        dropdownOptions = fieldData.types;
+                                    } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
+                                        dropdownOptions = fieldData.value.types;
+                                    }
+                                } else {
+                                    fieldValue = fieldData.value !== undefined ? fieldData.value : '';
+                                }
+                                
+                                placeholder = fieldData.placeholder || '';
+                            }
+                        } catch (e) {
+                            // If parsing fails, use the string directly
+                            console.warn(`Failed to parse feature user field ${key}:`, e);
+                            fieldValue = feature[key];
+                        }
+                    } else if (typeof feature[key] === 'object') {
+                        fieldData = feature[key];
+                        
+                        // Handle object format for the field with a "level" property (indicating it's from the JSON)
+                        if (fieldData.level === 'user') {
+                            fieldType = fieldData.ui_type || 'normal-text';
+                            
+                            // Special handling for array/dropdown type
+                            if (fieldType === 'array') {
+                                if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
+                                    dropdownOptions = fieldData.value.types;
+                                }
+                            } else {
+                                fieldValue = fieldData.value !== undefined ? fieldData.value : '';
+                            }
+                            
+                            placeholder = fieldData.placeholder || '';
+                            originalKey = key.replace(/^(.+)(_user)?$/, '$1');
+                        }
+                        // Handling for already processed JSON user fields
+                        else if (fieldData.ui_type) {
+                            fieldType = fieldData.ui_type;
+                            
+                            if (fieldType === 'array') {
+                                if (fieldData.types && Array.isArray(fieldData.types)) {
+                                    dropdownOptions = fieldData.types;
+                                } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
+                                    dropdownOptions = fieldData.value.types;
+                                }
+                            } else {
+                                fieldValue = fieldData.value !== undefined ? fieldData.value : '';
+                            }
+                            
+                            placeholder = fieldData.placeholder || '';
+                        }
+                    } else {
+                        // Direct value (number, boolean, etc.)
+                        fieldValue = feature[key];
+                        fieldType = typeof fieldValue === 'number' ? 'int-float' : 'normal-text';
+                    }
+                    
+                    // Format the field name for display
+                    // Remove _user suffix and convert camelCase to Title Case
+                    const fieldName = originalKey.replace(/(_user)?$/, '');
+                    const displayName = formatFieldLabel(fieldName);
+                    
+                    // Create container for the field
+                    const userFieldDiv = document.createElement('div');
+                    userFieldDiv.classList.add('user-field', 'feature-level-field');
+                    
+                    // Create label
+                    const label = document.createElement('label');
+                    label.innerHTML = `<strong>${displayName}:</strong> `;
+                    
+                    let inputElement;
+                    
+                    // Initialize featureFields object if it doesn't exist
+                    if (!instance.featureFields) {
+                        instance.featureFields = {};
+                    }
+                    
+                    // Create the appropriate input based on ui_type
+                    switch (fieldType) {
+                        case 'array':
+                            // It's a dropdown/select field
+                            inputElement = document.createElement('select');
+                            inputElement.id = `feature-field-${fIndex}-${fieldName}`;
+                            
+                            // Make sure we have an array to work with
+                            if (!dropdownOptions.length) {
+                                dropdownOptions = ['No options available'];
+                            }
+                            
+                            // Initialize selection if undefined
+                            if (instance.featureFields[fieldName] === undefined) {
+                                instance.featureFields[fieldName] = 0;
+                            }
+                            
+                            // Create options
+                            dropdownOptions.forEach((option, i) => {
+                                const opt = document.createElement('option');
+                                opt.value = i;
+                                opt.textContent = option;
+                                if (i === instance.featureFields[fieldName]) {
+                                    opt.selected = true;
+                                }
+                                inputElement.appendChild(opt);
+                            });
+                            
+                            // Set up change event
+                            inputElement.addEventListener('change', function() {
+                                instance.featureFields[fieldName] = parseInt(this.value);
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'long-text':
+                            // Create textarea
+                            inputElement = document.createElement('textarea');
+                            inputElement.id = `feature-field-${fIndex}-${fieldName}`;
+                            inputElement.rows = 3;
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.featureFields[fieldName] === undefined) {
+                                instance.featureFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.featureFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                instance.featureFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'int-float':
+                            // Create number input
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'number';
+                            inputElement.id = `feature-field-${fIndex}-${fieldName}`;
+                            inputElement.step = 'any'; // Allow decimal points
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.featureFields[fieldName] === undefined) {
+                                instance.featureFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.featureFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                const val = parseFloat(this.value);
+                                instance.featureFields[fieldName] = isNaN(val) ? 0 : val;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'date':
+                            // Create date input
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'date';
+                            inputElement.id = `feature-field-${fIndex}-${fieldName}`;
+                            
+                            // Initialize value if undefined
+                            if (instance.featureFields[fieldName] === undefined) {
+                                instance.featureFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.featureFields[fieldName];
+                            
+                            // Set up change event
+                            inputElement.addEventListener('change', function() {
+                                instance.featureFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'normal-text':
+                        default:
+                            // Create text input (default)
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'text';
+                            inputElement.id = `feature-field-${fIndex}-${fieldName}`;
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.featureFields[fieldName] === undefined) {
+                                instance.featureFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.featureFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                instance.featureFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                    }
+                    
+                    // Append input to label
+                    label.appendChild(inputElement);
+                    userFieldDiv.appendChild(label);
+                    featureFieldsDiv.appendChild(userFieldDiv);
+                    
+                } catch (e) {
+                    console.error(`Error processing feature user field ${key}:`, e);
+                }
+            }
+        }
+        
+        if (hasUserFields) instanceDiv.appendChild(featureFieldsDiv);
+        
+        return hasUserFields;
     }
 
     // Render a single instance in the UI (option details)
@@ -354,6 +700,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         instanceDiv.appendChild(headerDiv);
 
+        // Render feature-level user fields before the options dropdown
+        renderFeatureLevelFields(feature, fIndex, instanceDiv, instance);
+
         // Dropdown for options
         const select = document.createElement('select');
         const defaultOption = document.createElement('option');
@@ -385,10 +734,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // On dropdown change
         select.addEventListener('change', function() {
+            let featureFieldsDivId = feature.featureName.toLowerCase();
+            featureFieldsDivId = featureFieldsDivId.replace(/\s/, '-');
+            let featureFieldsDiv = document.querySelector(`#feature-${featureFieldsDivId}`);
             if (this.value === '') {
                 instance.optionIndex = undefined;
+                featureFieldsDiv.style.display = 'none';
             } else {
                 instance.optionIndex = parseInt(this.value);
+                featureFieldsDiv.style.display = 'block';
             }
             // Reset addons and quantity if the user changes the option
             instance.addons = [];
@@ -444,11 +798,305 @@ document.addEventListener('DOMContentLoaded', function() {
             optionPriceText = `$${staticP.toFixed(2)}`;
         }
 
-        const detailsHTML = `
-            <p><strong>Description:</strong> ${descText}</p>
-            <p><strong>Price:</strong> ${optionPriceText}</p>
-        `;
+        let detailsHTML = `<p><strong>Description:</strong> ${descText}</p>`;
+        if (!selectedOption.priceOptions) detailsHTML += `<p><strong>Price:</strong> ${optionPriceText}</p>`;
         optionDetailsDiv.innerHTML = detailsHTML;
+        
+        let priceOptionsArray = [];
+        if (selectedOption.priceOptions) {
+            try {
+                if (typeof selectedOption.priceOptions === 'string') {
+                    priceOptionsArray = JSON.parse(selectedOption.priceOptions).types || [];
+                } else if (selectedOption.priceOptions.types) {
+                    priceOptionsArray = selectedOption.priceOptions.types;
+                }
+            } catch(e) {
+                console.error("Error parsing price options:", e);
+                priceOptionsArray = [];
+            }
+        }
+        
+        // If we have price options, create a dropdown
+        if (priceOptionsArray && priceOptionsArray.length > 0) {
+            const priceOptionDiv = document.createElement('div');
+            priceOptionDiv.classList.add('price-option-selector');
+            priceOptionDiv.style.marginTop = '10px';
+            
+            const label = document.createElement('label');
+            label.innerHTML = '<strong>Price Option:</strong> ';
+            
+            const select = document.createElement('select');
+            select.id = `price-option-select-${fIndex}-${instIndex}`;
+            
+            // Initialize the selection
+            if (instance.priceOptionIndex === undefined) {
+                // Default to first option (usually cheapest)
+                instance.priceOptionIndex = 0;
+            }
+            
+            priceOptionsArray.forEach((optData, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = `${optData.label} - $${parseSafe(optData.price).toFixed(2)}`;
+                if (idx === instance.priceOptionIndex) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+                const instanceDiv = optionDetailsDiv.parentNode;
+                const featureFieldsDiv = instanceDiv.querySelector(
+                `#feature-${feature.featureName.toLowerCase().replace(/\s+/g, '-')}`
+            );
+
+            if (featureFieldsDiv) {
+                featureFieldsDiv.style.display = 'block';
+            }
+
+            
+            select.addEventListener('change', function() {
+                instance.priceOptionIndex = parseInt(this.value);
+                saveSelections();
+                updateInvoice();
+            });
+            
+            label.appendChild(select);
+            priceOptionDiv.appendChild(label);
+            optionDetailsDiv.appendChild(priceOptionDiv);
+        }
+
+        for (const key in selectedOption) {
+            // Check if it's a user field
+            if (key.endsWith('_user')) {
+                try {
+                    let fieldData;
+                    let fieldType = 'normal-text'; // Default fallback
+                    let fieldValue = '';
+                    let placeholder = '';
+                    let dropdownOptions = [];
+                    
+                    // Try to parse the field data
+                    if (typeof selectedOption[key] === 'string') {
+                        try {
+                            // Parse the JSON string into an object
+                            fieldData = JSON.parse(selectedOption[key]);
+                            
+                            // Extract ui_type, value, and placeholder if they exist
+                            if (fieldData) {
+                                if (fieldData.ui_type) {
+                                    fieldType = fieldData.ui_type;
+                                }
+                                
+                                // Special handling for array/dropdown type
+                                if (fieldType === 'array') {
+                                    // Look for types array in different possible locations
+                                    if (fieldData.types && Array.isArray(fieldData.types)) {
+                                        dropdownOptions = fieldData.types;
+                                    } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
+                                        dropdownOptions = fieldData.value.types;
+                                    }
+                                } else {
+                                    // For non-array types, get the value
+                                    if (fieldData.value !== undefined) {
+                                        fieldValue = fieldData.value;
+                                    }
+                                }
+                                
+                                if (fieldData.placeholder) {
+                                    placeholder = fieldData.placeholder;
+                                }
+                            }
+                        } catch (e) {
+                            // If parsing fails, use the string directly
+                            console.warn(`Failed to parse user field ${key}:`, e);
+                            fieldValue = selectedOption[key];
+                        }
+                    } else if (typeof selectedOption[key] === 'object') {
+                        fieldData = selectedOption[key];
+                        
+                        // Handle object format
+                        if (fieldData.ui_type) {
+                            fieldType = fieldData.ui_type;
+                        }
+                        
+                        // Special handling for array/dropdown type
+                        if (fieldType === 'array') {
+                            if (fieldData.types && Array.isArray(fieldData.types)) {
+                                dropdownOptions = fieldData.types;
+                            } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
+                                dropdownOptions = fieldData.value.types;
+                            }
+                        } else {
+                            // For non-array types, get the value
+                            if (fieldData.value !== undefined) {
+                                fieldValue = fieldData.value;
+                            }
+                        }
+                        
+                        if (fieldData.placeholder) {
+                            placeholder = fieldData.placeholder;
+                        }
+                    } else {
+                        // Direct value (number, boolean, etc.)
+                        fieldValue = selectedOption[key];
+                        fieldType = typeof fieldValue === 'number' ? 'int-float' : 'normal-text';
+                    }
+                    
+                    // Format the field name for display
+                    const fieldName = key.replace('_user', '');
+                    const displayName = formatFieldLabel(key);
+                    
+                    // Create container for the field
+                    const userFieldDiv = document.createElement('div');
+                    userFieldDiv.classList.add('user-field');
+                    
+                    // Create label
+                    const label = document.createElement('label');
+                    label.innerHTML = `<strong>${displayName}:</strong> `;
+                    
+                    let inputElement;
+                    
+                    // Initialize userFields object if it doesn't exist
+                    if (!instance.userFields) {
+                        instance.userFields = {};
+                    }
+                    
+                    // Create the appropriate input based on ui_type
+                    switch (fieldType) {
+                        case 'array':
+                            // It's a dropdown/select field
+                            inputElement = document.createElement('select');
+                            inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+                            
+                            // Make sure we have an array to work with
+                            if (!dropdownOptions.length) {
+                                dropdownOptions = ['No options available'];
+                            }
+                            
+                            // Initialize selection if undefined
+                            if (instance.userFields[fieldName] === undefined) {
+                                instance.userFields[fieldName] = 0;
+                            }
+                            
+                            // Create options
+                            dropdownOptions.forEach((option, i) => {
+                                const opt = document.createElement('option');
+                                opt.value = i;
+                                opt.textContent = option;
+                                if (i === instance.userFields[fieldName]) {
+                                    opt.selected = true;
+                                }
+                                inputElement.appendChild(opt);
+                            });
+                            
+                            // Set up change event
+                            inputElement.addEventListener('change', function() {
+                                instance.userFields[fieldName] = parseInt(this.value);
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'long-text':
+                            // Create textarea
+                            inputElement = document.createElement('textarea');
+                            inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+                            inputElement.rows = 3;
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.userFields[fieldName] === undefined) {
+                                instance.userFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.userFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                instance.userFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'int-float':
+                            // Create number input
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'number';
+                            inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+                            inputElement.step = 'any'; // Allow decimal points
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.userFields[fieldName] === undefined) {
+                                instance.userFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.userFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                const val = parseFloat(this.value);
+                                instance.userFields[fieldName] = isNaN(val) ? 0 : val;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'date':
+                            // Create date input
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'date';
+                            inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+                            
+                            // Initialize value if undefined
+                            if (instance.userFields[fieldName] === undefined) {
+                                instance.userFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.userFields[fieldName];
+                            
+                            // Set up change event
+                            inputElement.addEventListener('change', function() {
+                                instance.userFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                        
+                        case 'normal-text':
+                        default:
+                            // Create text input (default)
+                            inputElement = document.createElement('input');
+                            inputElement.type = 'text';
+                            inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+                            inputElement.placeholder = placeholder;
+                            
+                            // Initialize value if undefined
+                            if (instance.userFields[fieldName] === undefined) {
+                                instance.userFields[fieldName] = fieldValue;
+                            }
+                            
+                            inputElement.value = instance.userFields[fieldName];
+                            
+                            // Set up input event
+                            inputElement.addEventListener('input', function() {
+                                instance.userFields[fieldName] = this.value;
+                                saveSelections();
+                                updateInvoice();
+                            });
+                            break;
+                    }
+                    
+                    // Append input to label
+                    label.appendChild(inputElement);
+                    userFieldDiv.appendChild(label);
+                    optionDetailsDiv.appendChild(userFieldDiv);
+                    
+                } catch (e) {
+                    console.error(`Error processing user field ${key}:`, e);
+                }
+            }
+        }
 
         // If non-recurring, let the user set quantity
         if (!feature.recurring) {
@@ -460,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             qtyDiv.classList.add('quantity-input');
             qtyDiv.innerHTML = `
                 <label><strong>Quantity:</strong>
-                    <input type="number" min="1" value="${quantity}" style="width:60px; margin-left:5px;">
+                    <input type="number" min="1" value="${quantity}">
                 </label>
             `;
             const qtyInput = qtyDiv.querySelector('input');

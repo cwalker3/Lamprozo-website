@@ -7,6 +7,7 @@
     --bgWhite: #fff;
     --textDark: #333;
     --textGray: #555;
+    --fieldColumnWidth: 150px; /* Fixed width for label column */
 }
 
 *, *::before, *::after {
@@ -126,43 +127,192 @@
     border-radius: 3px;
 }
 
+/* Feature-level fields container */
+.feature-fields {
+    display: none;
+    padding: 15px;
+    margin: 15px 0;
+    background: #f6f6f6;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+/* Feature fields title */
+.feature-fields-title {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: var(--primaryColor);
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 5px;
+}
+
+/* Feature-level fields should have a slightly different background to distinguish them */
+.feature-level-field {
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 10px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+}
+
+/* Style the feature fields on the invoice too */
+.feature-field-item {
+    font-size: 13px;
+    color: #555;
+    padding: 2px 0;
+}
+
+/* Add a subtle separator between feature name and feature fields in invoice */
+td .feature-fields-list {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dotted #eee;
+    font-size: 12px;
+}
+
 /* Option Details */
 .option-details {
-    padding: 10px;
+    padding: 15px;
     background: #fff;
     border: 1px solid #eee;
     border-radius: 3px;
     margin-top: 10px;
 }
+
+/* Standard paragraph styles in option details */
 .option-details p {
-    margin: 5px 0;
+    margin: 10px 0;
     font-size: 13px;
+    display: grid;
+    grid-template-columns: var(--fieldColumnWidth) 1fr;
+    gap: 10px;
+    align-items: start;
 }
 
-/* Quantity Input (for non recurring features) */
+.option-details p strong {
+    font-weight: bold;
+}
+
+/* Grid-based Layout for Form Fields */
+.price-option-selector,
+.user-field,
 .quantity-input {
-    margin-top: 10px;
-    text-align: right;
+    display: grid;
+    grid-template-columns: var(--fieldColumnWidth) 1fr;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 5px 0 10px;
+    border-bottom: 1px solid #f0f0f0;
+    width: 100%;
+    align-items: start;
+}
+
+/* Make label a grid container */
+.price-option-selector label,
+.user-field label,
+.quantity-input label {
+    display: contents; /* Let children participate in parent grid */
     color: black;
+}
+
+/* Style for label text */
+.price-option-selector strong,
+.user-field strong,
+.quantity-input strong {
+    grid-column: 1;
+    font-weight: bold;
+    padding-top: 6px; /* Vertical alignment with inputs */
+}
+
+/* Style all form inputs consistently */
+.price-option-selector select,
+.user-field select,
+.user-field input[type="text"],
+.user-field input[type="number"],
+.user-field input[type="date"],
+.user-field textarea,
+.quantity-input input {
+    grid-column: 2;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: #fff;
+}
+
+/* Special case for quantity input */
+.quantity-input input {
+    width: 80px;
+    justify-self: start; /* Align to left of grid cell */
+}
+
+/* Textarea styling */
+.user-field textarea {
+    min-height: 80px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* Focus styles for all input types */
+.price-option-selector select:focus,
+.user-field select:focus,
+.user-field input:focus,
+.user-field textarea:focus,
+.quantity-input input:focus {
+    outline: none;
+    border-color: var(--primaryColor);
+    box-shadow: 0 0 0 1px var(--primaryColor);
+}
+
+/* Dropdown field styles */
+.price-option-selector select,
+.user-field select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    padding-right: 30px;
+}
+
+/* Hide the price paragraph when price options are shown */
+.option-details:has(.price-option-selector) p:has(strong:contains("Price:")) {
+    display: none;
+}
+
+/* Fallback for browsers that don't support :has() */
+.option-details .price-option-selector ~ p:nth-of-type(2) {
+    display: none;
 }
 
 /* Addons */
 .addons {
-    margin-top: 10px;
-    padding: 10px;
+    margin-top: 15px;
+    padding: 12px;
     background: #f7f7f7;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 .addons h4 {
-    margin-bottom: 5px;
+    margin-top: 0;
+    margin-bottom: 10px;
     font-size: 15px;
     color: var(--primaryColor);
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 5px;
 }
 .addon-item {
     color: #333;
     font-size: 13px;
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+    padding: 4px 0;
+}
+
+.addon-item input[type="checkbox"] {
+    margin-right: 6px;
 }
 
 /* Add New Feature Button */
@@ -249,6 +399,7 @@
     background: var(--secondaryColor);
 }
 
+/* Responsive adjustments */
 @media (max-width: 800px) {
     :root {
         --profileMaxWidth: 300px;
@@ -256,5 +407,42 @@
     #price-calculator,
     #invoice-container {
         max-width: 95%;
+    }
+}
+
+@media (max-width: 600px) {
+    :root {
+        --fieldColumnWidth: 100%;
+    }
+    
+    /* Stack fields vertically on mobile */
+    .price-option-selector,
+    .user-field,
+    .quantity-input,
+    .option-details p {
+        grid-template-columns: 1fr;
+    }
+    
+    .price-option-selector strong,
+    .user-field strong,
+    .quantity-input strong {
+        margin-bottom: 5px;
+        padding-bottom: 2px;
+        border-bottom: 1px dotted #eee;
+    }
+    
+    .price-option-selector select,
+    .user-field select,
+    .user-field input[type="text"],
+    .user-field input[type="number"],
+    .user-field input[type="date"],
+    .user-field textarea,
+    .quantity-input input {
+        grid-column: 1;
+        width: 100%;
+    }
+    
+    .quantity-input input {
+        width: 100%;
     }
 }

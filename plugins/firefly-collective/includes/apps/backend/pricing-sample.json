@@ -1,15 +1,93 @@
 {
     "features": [
         {
-            "featureName": "Pizza",
+            "featureName": "Non-recurring Feature",
             "description": {
-                "text": "This is pizza!"
+                "text": "This is the non-recurring feature"
+            },
+            "normalText": {
+                "level": "user",
+                "ui_type": "normal-text",
+                "value": "This is normal text that only the user sees."
+            },
+            "longText": {
+                "level": "user",
+                "ui_type": "long-text",
+                "value": "This is long text only the user sees."
+            },
+            "intFloat": {
+                "level": "user",
+                "ui_type": "int-float",
+                "value": 100
+            },
+            "dateField": {
+                "level": "user",
+                "ui_type": "date",
+                "value": ""
+            },
+            "multiple": {
+                "level": "user",
+                "ui_type": "array",
+                "value": {
+                    "types": [
+                        "Choice 1",
+                        "Choice 2",
+                        "Choice 3"
+                    ]
+                }
             },
             "options": [
                 {
-                    "optionName": "Pepperoni ",
+                    "optionName": "Option 1 - static price",
                     "description": {
-                        "text": "This is the pepperoni."
+                        "text": "This is option 1"
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 10,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "",
+                                    "price": ""
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Option 2 - price options",
+                    "description": {
+                        "text": "This is option 2."
                     },
                     "interval": {
                         "level": "admin",
@@ -43,25 +121,73 @@
                             "types": [
                                 {
                                     "label": "small",
-                                    "price": 10
+                                    "price": 5
                                 },
                                 {
                                     "label": "medium",
-                                    "price": 15
+                                    "price": 10
                                 },
                                 {
                                     "label": "large",
-                                    "price": 20
+                                    "price": 15
                                 }
                             ]
                         }
                     },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Option 3 - max addons",
+                    "description": {
+                        "text": "This is option 3."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 10,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "",
+                                    "price": ""
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": 2,
                     "optionMetric": "unit",
                     "addons": [
                         {
-                            "addonName": "Chicken",
+                            "addonName": "Addon 1",
                             "description": {
-                                "text": "Chicken addon."
+                                "text": "This is addon 1."
                             },
                             "addOnMetric": "unit",
                             "floorPriceMod": 0,
@@ -88,28 +214,28 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 0.75,
-                            "link_name": "",
-                            "groupName": "premium toppings",
+                            "staticPriceMod": 1,
+                            "groupName": "",
                             "groupThresholdDiscounts": {
                                 "level": "admin",
                                 "ui_type": "array-obj",
                                 "value": {
                                     "types": [
                                         {
-                                            "itemCount": 2,
-                                            "discount": 10
+                                            "itemCount": "",
+                                            "discount": ""
                                         }
                                     ]
                                 }
                             },
-                            "enableGrouping": true,
-                            "maxGroupItems": -1
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
                         },
                         {
-                            "addonName": "Artichoke Hearts",
+                            "addonName": "Addon 2",
                             "description": {
-                                "text": "Artichoke hearts addon."
+                                "text": "This is addon 2."
                             },
                             "addOnMetric": "unit",
                             "floorPriceMod": 0,
@@ -136,27 +262,28 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 0.75,
-                            "link_name": "",
-                            "groupName": "premium toppings",
+                            "staticPriceMod": 1.5,
+                            "groupName": "",
                             "groupThresholdDiscounts": {
                                 "level": "admin",
                                 "ui_type": "array-obj",
                                 "value": {
                                     "types": [
                                         {
-                                            "itemCount": 2,
-                                            "discount": 10
+                                            "itemCount": "",
+                                            "discount": ""
                                         }
                                     ]
                                 }
                             },
-                            "maxGroupItems": -1
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
                         },
                         {
-                            "addonName": "Anchovies",
+                            "addonName": "Addon 3",
                             "description": {
-                                "text": "Anchovies addon."
+                                "text": "This is addon 3."
                             },
                             "addOnMetric": "unit",
                             "floorPriceMod": 0,
@@ -183,40 +310,347 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 0.75,
-                            "link_name": "",
-                            "groupName": "premium toppings",
+                            "staticPriceMod": 1.75,
+                            "groupName": "",
                             "groupThresholdDiscounts": {
                                 "level": "admin",
                                 "ui_type": "array-obj",
                                 "value": {
                                     "types": [
                                         {
-                                            "itemCount": 2,
-                                            "discount": 10
+                                            "itemCount": "",
+                                            "discount": ""
                                         }
                                     ]
                                 }
                             },
-                            "maxGroupItems": -1
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
                         }
                     ],
-                    "link_name": "",
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Option 4 - discount thresholds",
+                    "description": {
+                        "text": "This is option 4."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 10,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "",
+                                    "price": ""
+                                }
+                            ]
+                        }
+                    },
                     "thresholdDiscounts": {
                         "level": "admin",
                         "ui_type": "array-obj",
                         "value": {
                             "types": [
                                 {
-                                    "itemCount": "",
-                                    "discount": ""
+                                    "itemCount": 5,
+                                    "discount": 10
+                                },
+                                {
+                                    "itemCount": 10,
+                                    "discount": 10
                                 }
                             ]
                         }
-                    }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Option 5 - grouped addons w\/ discount thresholds and max addons",
+                    "description": {
+                        "text": "This is option 5."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 10,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "",
+                                    "price": ""
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [
+                        {
+                            "addonName": "Addon 1",
+                            "description": {
+                                "text": "This is addon 1."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1,
+                            "groupName": "addon group 1",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 3,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": 2,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Addon 2",
+                            "description": {
+                                "text": "This is addon 2."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1.5,
+                            "groupName": "addon group 1",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 3,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": 2,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Addon 3",
+                            "description": {
+                                "text": "This is addon 3."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1.7,
+                            "groupName": "addon group 1",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": 3,
+                                            "discount": 10
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": 2,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
                 }
             ],
             "recurring": false,
+            "link_name": ""
+        },
+        {
+            "featureName": "Recurring Feature",
+            "description": {
+                "text": "This is the recurring feature."
+            },
+            "options": [
+                {
+                    "optionName": "Option 1",
+                    "description": {
+                        "text": "This is option 1."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "daily",
+                                "bi-weekly",
+                                "weekly",
+                                "monthly",
+                                "bi-annually",
+                                "annually",
+                                "none"
+                            ],
+                            "selected": 3
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 25,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "",
+                                    "price": ""
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
+                }
+            ],
+            "recurring": true,
             "link_name": ""
         }
     ]
