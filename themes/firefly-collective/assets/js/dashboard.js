@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
@@ -37,8 +36,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function formatFieldLabel(key) {
-        // Remove _user suffix
-        let text = key.replace('_user', '');
+        // Remove _user/_display suffix
+        let text = key.replace(/_user$|_display$/, '');
         
         // Convert camelCase to Title Case With Spaces
         return text
@@ -425,8 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Loop through feature properties to find user fields
         for (const key in feature) {
             // Check if it's a user field
-            if (key.endsWith('_user') || 
-                (typeof feature[key] === 'object' && feature[key] && feature[key].level === 'user')) {
+            if ((key.endsWith('_user') || key.endsWith('_display')) && feature[key] !== null) {
                 
                 hasUserFields = true;
                 
@@ -437,6 +435,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     let placeholder = '';
                     let dropdownOptions = [];
                     let originalKey = key;
+                    let isDisplayField = key.endsWith('_display') || 
+                                        (typeof feature[key] === 'object' && 
+                                        feature[key].level === 'user-display');
                     
                     // Standardize field data format
                     if (typeof feature[key] === 'string') {
@@ -528,8 +529,35 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Create the appropriate input based on ui_type
-                    switch (fieldType) {
-                        case 'array':
+                    if (isDisplayField) {
+                        // For display-only fields, create a static text display instead of an input
+                        const displaySpan = document.createElement('span');
+                        displaySpan.className = 'user-display-value';
+                        
+                        // Format the display value based on field type
+                        if (fieldType === 'array' && dropdownOptions.length > 0) {
+                            // Try to get the selected index from different possible locations
+                            let selectedIndex = 0;
+                            
+                            if (fieldData && typeof fieldData === 'object') {
+                                if (fieldData.selected !== undefined) {
+                                    selectedIndex = fieldData.selected;
+                                } else if (fieldData.value && fieldData.value.selected !== undefined) {
+                                    selectedIndex = fieldData.value.selected;
+                                }
+                            }
+                            
+                            displaySpan.textContent = dropdownOptions[selectedIndex] || '';
+                        } else {
+                            displaySpan.textContent = fieldValue || '';
+                        }
+                        
+                        // Use the span as our "input element" for consistent handling
+                        inputElement = displaySpan;
+                    } else {
+                        // Original switch statement for regular user fields
+                        switch (fieldType) {
+                            case 'array':
                             // It's a dropdown/select field
                             inputElement = document.createElement('select');
                             inputElement.id = `feature-field-${fIndex}-${fieldName}`;
@@ -653,6 +681,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                             break;
                     }
+
+                }
                     
                     // Append input to label
                     label.appendChild(inputElement);
@@ -739,10 +769,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let featureFieldsDiv = document.querySelector(`#feature-${featureFieldsDivId}`);
             if (this.value === '') {
                 instance.optionIndex = undefined;
-                featureFieldsDiv.style.display = 'none';
+                if (featureFieldsDiv) featureFieldsDiv.style.display = 'none';
             } else {
                 instance.optionIndex = parseInt(this.value);
-                featureFieldsDiv.style.display = 'block';
+                if (featureFieldsDiv) featureFieldsDiv.style.display = 'block';
             }
             // Reset addons and quantity if the user changes the option
             instance.addons = [];
@@ -799,6 +829,61 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let detailsHTML = `<p><strong>Description:</strong> ${descText}</p>`;
+
+        // Process display fields first and add them immediately after description
+        for (const key in selectedOption) {
+            // Only process display fields here
+            if (key.endsWith('_display') && selectedOption[key] !== null) {
+                try {
+                    let fieldData;
+                    let fieldType = 'normal-text';
+                    let displayValue = '';
+                    
+                    // Try to parse the field data
+                    if (typeof selectedOption[key] === 'string') {
+                        try {
+                            fieldData = JSON.parse(selectedOption[key]);
+                            if (fieldData) {
+                                fieldType = fieldData.ui_type || 'normal-text';
+                                
+                                // Handle array type (dropdown)
+                                if (fieldType === 'array' && fieldData.types && Array.isArray(fieldData.types)) {
+                                    // Get selected index (default to 0)
+                                    const selectedIndex = fieldData.selected || 0;
+                                    displayValue = fieldData.types[selectedIndex] || '';
+                                } else {
+                                    // For other types, use the value directly
+                                    displayValue = fieldData.value || '';
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to parse display field ${key}:`, e);
+                            displayValue = selectedOption[key];
+                        }
+                    } else if (typeof selectedOption[key] === 'object') {
+                        fieldData = selectedOption[key];
+                        
+                        if (fieldData.ui_type === 'array' && fieldData.types && Array.isArray(fieldData.types)) {
+                            const selectedIndex = fieldData.selected || 0;
+                            displayValue = fieldData.types[selectedIndex] || '';
+                        } else if (fieldData.value !== undefined) {
+                            displayValue = fieldData.value;
+                        }
+                    } else {
+                        displayValue = selectedOption[key];
+                    }
+                    
+                    // Format the field name for display
+                    const fieldName = formatFieldLabel(key);
+                    
+                    // Add to detailsHTML
+                    detailsHTML += `<p><strong>${fieldName}:</strong> ${displayValue}</p>`;
+                } catch (e) {
+                    console.error(`Error processing display field ${key}:`, e);
+                }
+            }
+        }
+
         if (!selectedOption.priceOptions) detailsHTML += `<p><strong>Price:</strong> ${optionPriceText}</p>`;
         optionDetailsDiv.innerHTML = detailsHTML;
         
@@ -865,14 +950,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         for (const key in selectedOption) {
-            // Check if it's a user field
-            if (key.endsWith('_user')) {
+            // Check if it's a user field or display field
+             if (key.endsWith('_user') && !key.endsWith('_display') && selectedOption[key] !== null) {
                 try {
                     let fieldData;
                     let fieldType = 'normal-text'; // Default fallback
                     let fieldValue = '';
                     let placeholder = '';
                     let dropdownOptions = [];
+                    let isDisplayField = key.endsWith('_display');
                     
                     // Try to parse the field data
                     if (typeof selectedOption[key] === 'string') {
@@ -961,8 +1047,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Create the appropriate input based on ui_type
-                    switch (fieldType) {
-                        case 'array':
+                    if (isDisplayField) {
+                        // For display-only fields, create a static text display instead of an input
+                        const displaySpan = document.createElement('span');
+                        displaySpan.className = 'user-display-value';
+                        
+                        // Format the display value based on field type
+                        if (fieldType === 'array' && dropdownOptions.length > 0) {
+                            // For dropdown fields, show the selected option text
+                            const selectedIndex = instance.userFields[fieldName] || 0;
+                            displaySpan.textContent = dropdownOptions[selectedIndex] || '';
+                        } else {
+                            displaySpan.textContent = fieldValue || '';
+                        }
+                        
+                        // Use the span as our "input element" for consistent handling
+                        inputElement = displaySpan;
+                    } else {
+                        // Original switch statement for regular user fields
+                        switch (fieldType) {
+                            case 'array':
                             // It's a dropdown/select field
                             inputElement = document.createElement('select');
                             inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
@@ -1086,6 +1190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                             break;
                     }
+                }
                     
                     // Append input to label
                     label.appendChild(inputElement);

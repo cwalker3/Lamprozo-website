@@ -674,7 +674,7 @@ function determineFieldType(v){
   return (typeof v==='string' && v.length>80) ? 'textarea' : 'text';
 }
 
-function createDynamicField(key, raw, onChange){
+function createDynamicField(key, raw, onChange) {
   let wrapper = null, fieldType, valueHolder;
   if (raw && typeof raw==='object'
     && 'ui_type' in raw && 'value' in raw){
@@ -689,6 +689,13 @@ function createDynamicField(key, raw, onChange){
   const grp = document.createElement('div');
   grp.className='field-group';
   const lbl = document.createElement('label');
+
+  // Add a special class for user-display fields in admin UI
+  if (wrapper && wrapper.level === 'user-display' || 
+      (key.endsWith('_display') && wrapper && wrapper.is_display)) {
+      grp.classList.add('user-display-field');
+  }
+
   lbl.textContent = formatFieldName(key) + ':';
   grp.appendChild(lbl);
 
@@ -749,19 +756,20 @@ function createDynamicField(key, raw, onChange){
   return grp;
 }
 
-function createDynamicFields(obj, container, knownKeys){
-  for (const key in obj){
+function createDynamicFields(obj, container, knownKeys) {
+  for (const key in obj) {
     if (!obj.hasOwnProperty(key) || knownKeys.includes(key)) continue;
     const raw = obj[key];
-    // skip non-admin
-    if ( raw && typeof raw==='object'
+    // Update this condition to include user-display fields
+    if (raw && typeof raw === 'object'
       && 'level' in raw
       && 'ui_type' in raw
       && 'value' in raw
-      && raw.level!=='admin'
-    ) continue;
+      && raw.level !== 'admin'
+      && raw.level !== 'user-display') // Added check for user-display
+    continue;
     container.appendChild(
-      createDynamicField(key, raw, v=>obj[key]=v)
+      createDynamicField(key, raw, v => obj[key] = v)
     );
   }
 }

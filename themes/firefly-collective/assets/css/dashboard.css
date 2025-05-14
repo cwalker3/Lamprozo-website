@@ -149,7 +149,6 @@
 
 /* Feature-level fields should have a slightly different background to distinguish them */
 .feature-level-field {
-    background-color: rgba(255, 255, 255, 0.7);
     padding: 10px;
     border-radius: 3px;
     margin-bottom: 8px;
@@ -276,6 +275,24 @@ td .feature-fields-list {
     background-position: right 8px center;
     background-size: 12px;
     padding-right: 30px;
+}
+
+/* Styling for user-display values */
+.user-display-value {
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+    font-weight: normal;
+}
+
+/* Style the container when it has display fields */
+.user-field {
+    padding: .5rem;
+    padding-left: 0; 
+}
+
+.user-field strong {
+    padding-top: 0;
 }
 
 /* Hide the price paragraph when price options are shown */

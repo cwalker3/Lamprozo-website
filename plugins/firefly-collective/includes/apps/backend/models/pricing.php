@@ -100,28 +100,32 @@ function unwrap_pricing_json($data) {
     $out = array();
     foreach ($data as $key => $value) {
         if (is_array($value) && isset($value['level'], $value['ui_type'], $value['value'])) {
-            // Add suffix based on level - handle both admin and user levels
+            // Add suffix based on level - handle admin, user, and now user-display levels
             $suffix = in_array($key, $builtins, true)
                 ? ''
                 : ($value['level'] === 'admin' ? '_admin' : 
-                   ($value['level'] === 'user' ? '_user' : ''));
+                   ($value['level'] === 'user' ? '_user' : 
+                    ($value['level'] === 'user-display' ? '_display' : ''))); // Added user-display handling
             
             $newKey = $key . $suffix;
             
-            if ($value['level'] === 'user') {
+            if ($value['level'] === 'user' || $value['level'] === 'user-display') {
                 // Special handling for array type (dropdown) fields
                 if ($value['ui_type'] === 'array' && isset($value['value']['types'])) {
                     // For array/dropdown fields, put types at the top level for easier access
                     $jsonValue = array(
                         'ui_type' => 'array',
-                        'types' => $value['value']['types']
+                        'types' => $value['value']['types'],
+                        'selected' => $value['value']['selected'] ?? 0, // Add this line to preserve selection
+                        'is_display' => ($value['level'] === 'user-display')
                     );
                     $out[$newKey] = json_encode($jsonValue);
                 } else {
                     // For all other field types, use the standard format
                     $jsonValue = array(
                         'ui_type' => $value['ui_type'],
-                        'value' => unwrap_pricing_json($value['value'])
+                        'value' => unwrap_pricing_json($value['value']),
+                        'is_display' => ($value['level'] === 'user-display') // Add flag to identify display fields
                     );
                     
                     // Add placeholder if provided
@@ -350,50 +354,48 @@ function normalize_record($record) {
     
     // Process user fields to ensure proper JSON encoding
     foreach ($record as $k => $v) {
-        // Check for _user suffix directly
-        if (substr($k, -5) === '_user') {
-            // Special handling for array type fields
-            if (is_array($v) && isset($v['level']) && $v['level'] === 'user' && $v['ui_type'] === 'array') {
-                // For array (dropdown) type, use flattened structure with types at top level
+        // Check for _display suffix directly
+        if (substr($k, -8) === '_display') {
+            // Similar handling as _user fields
+            if (is_array($v) && isset($v['level']) && $v['level'] === 'user-display' && $v['ui_type'] === 'array') {
+                // Array type handling for user-display
                 $jsonData = array(
                     'ui_type' => 'array',
-                    'types' => $v['value']['types']
+                    'types' => $v['value']['types'],
+                    'selected' => $v['value']['selected'] ?? 0, // Include selected index
+                    'is_display' => true
                 );
                 $record[$k] = json_encode($jsonData);
             }
-            // For array-type fields already in string format, ensure proper structure
-            else if (is_string($v) && strpos($v, '"ui_type":"array"') !== false) {
-                $parsed = json_decode($v, true);
-                // If we have a nested structure, flatten it
-                if (isset($parsed['value']) && isset($parsed['value']['types'])) {
-                    $jsonData = array(
-                        'ui_type' => 'array',
-                        'types' => $parsed['value']['types']
-                    );
-                    $record[$k] = json_encode($jsonData);
-                }
-            }
-            // For other user field types
-            else if (is_array($v) && isset($v['level']) && $v['level'] === 'user') {
+            // For other user-display field types
+            else if (is_array($v) && isset($v['level']) && $v['level'] === 'user-display') {
                 $jsonData = array(
                     'ui_type' => $v['ui_type'],
-                    'value' => $v['value'] ?? ''
+                    'value' => $v['value'] ?? '',
+                    'is_display' => true
                 );
-                
-                // Add placeholder if provided
-                if (isset($v['placeholder'])) {
-                    $jsonData['placeholder'] = $v['placeholder'];
-                }
-                
                 $record[$k] = json_encode($jsonData);
             }
-            // If it's already a string that looks like JSON, leave it as is
+            // If it's already a string that looks like JSON, process it to preserve selected
             else if (is_string($v) && json_decode($v) !== null) {
-                // Already a valid JSON string, no change needed
+                $jsonData = json_decode($v, true);
+                
+                // If this is an array type without selected index, try to find it
+                if (isset($jsonData['ui_type']) && $jsonData['ui_type'] === 'array' && 
+                    isset($jsonData['types']) && !isset($jsonData['selected'])) {
+                    
+                    // Look for admin field with the same name for selection
+                    $adminKey = str_replace('_display', '_admin', $k);
+                    if (isset($record[$adminKey]) && is_array($record[$adminKey]) && 
+                        isset($record[$adminKey]['value']['selected'])) {
+                        
+                        $jsonData['selected'] = $record[$adminKey]['value']['selected'];
+                        $record[$k] = json_encode($jsonData);
+                    }
+                }
             } 
-            // Otherwise, encode any other value type
+            // Otherwise, encode other value types
             else {
-                // For simple values, create a default JSON structure
                 $ui_type = 'normal-text';
                 if (is_numeric($v)) {
                     $ui_type = 'int-float';
@@ -401,7 +403,8 @@ function normalize_record($record) {
                 
                 $jsonData = array(
                     'ui_type' => $ui_type,
-                    'value' => $v
+                    'value' => $v,
+                    'is_display' => true
                 );
                 
                 $record[$k] = json_encode($jsonData);
@@ -568,8 +571,8 @@ function upsert_pricing_data($payload) {
         // IMPORTANT: Filter fields to only include those defined for features
         $filtered_save = array();
         foreach ($save as $key => $value) {
-            // Include standard fields and any custom user fields
-            if (in_array($key, $feature_fields) || substr($key, -5) === '_user') {
+            // Include standard fields, user fields, and display fields
+            if (in_array($key, $feature_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                 $filtered_save[$key] = $value;
             }
         }
@@ -615,8 +618,8 @@ function upsert_pricing_data($payload) {
             // IMPORTANT: Filter fields to only include those defined for options
             $filtered_saveO = array();
             foreach ($saveO as $key => $value) {
-                // Include standard fields and any custom user fields
-                if (in_array($key, $option_fields) || substr($key, -5) === '_user') {
+                // Include standard fields, user fields, and display fields
+                if (in_array($key, $option_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                     $filtered_saveO[$key] = $value;
                 }
             }
@@ -674,8 +677,8 @@ function upsert_pricing_data($payload) {
                 // IMPORTANT: Filter fields to only include those defined for addons
                 $filtered_saveA = array();
                 foreach ($saveA as $key => $value) {
-                    // Include standard fields and any custom user fields
-                    if (in_array($key, $addon_fields) || substr($key, -5) === '_user') {
+                    // Include standard fields, user fields, and display fields
+                    if (in_array($key, $addon_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                         $filtered_saveA[$key] = $value;
                     }
                 }

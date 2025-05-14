@@ -608,3 +608,13 @@ html, body {
     padding: 5px;
     border-radius: 4px;
   }
+
+.user-display-field {
+    background-color: #f0f7ff;
+}
+
+.user-display-value {
+    display: inline-block;
+    font-weight: normal;
+    margin-left: 8px;
+}
