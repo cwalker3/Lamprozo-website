@@ -368,6 +368,41 @@ td .feature-fields-list {
     float: right;
     margin-top: 1rem;
 }
+
+/* Max addons message */
+.max-addons-message {
+    color: #d83838;
+    font-size: 12px;
+    margin-top: 8px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+/* Discount info */
+.quantity-discounts {
+    color: black;
+    position: relative;
+    margin-top: 12px; 
+    padding: 8px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.quantity-discounts:before {
+    content: '💰';
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    font-size: 18px;
+}
+
 .add-new-feature:hover {
     background: var(--secondaryColor);
 }

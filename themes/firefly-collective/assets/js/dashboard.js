@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
@@ -107,8 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const option = feature.options[instance.optionIndex];
         if (!option) return 0;
 
+        // Get base price
         let price = parseSafe(option.staticPrice, 0);
         
+        // Handle price options
         let priceOptionsArray = [];
         if (option.priceOptions) {
             try {
@@ -129,6 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Add addon prices
         if (instance.addons && Array.isArray(instance.addons)) {
             instance.addons.forEach(addonIndex => {
                 const addon = option.addons[addonIndex];
@@ -142,11 +146,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-        if (!feature.recurring) {
-            const qty = parseInt(instance.quantity) || 1;
-            price *= qty;
+        
+        // Get quantity (default to 1)
+        const qty = parseInt(instance.quantity) || 1;
+        
+        // Calculate total price before discount
+        let totalPrice = price * qty;
+        const originalPrice = totalPrice;
+        
+        // Apply highest applicable threshold discount
+        let appliedThreshold = null;
+        let discountPercentage = 0;
+        
+        if (option.thresholdDiscounts) {
+            try {
+                let thresholds = [];
+                if (typeof option.thresholdDiscounts === 'string') {
+                    thresholds = JSON.parse(option.thresholdDiscounts);
+                } else if (option.thresholdDiscounts.types) {
+                    thresholds = option.thresholdDiscounts.types;
+                } else if (Array.isArray(option.thresholdDiscounts)) {
+                    thresholds = option.thresholdDiscounts;
+                }
+                
+                // Find highest applicable discount
+                if (Array.isArray(thresholds)) {
+                    // Sort thresholds by itemCount in descending order
+                    const sortedThresholds = [...thresholds]
+                        .sort((a, b) => parseInt(b.itemCount) - parseInt(a.itemCount))
+                        .filter(t => parseInt(t.itemCount) > 0 && parseFloat(t.discount) > 0);
+                    
+                    // Find first threshold that applies (highest one)
+                    appliedThreshold = sortedThresholds.find(t => qty >= parseInt(t.itemCount));
+                    
+                    if (appliedThreshold) {
+                        discountPercentage = parseFloat(appliedThreshold.discount);
+                        totalPrice = originalPrice * (1 - discountPercentage/100);
+                        
+                        instance.appliedDiscount = {
+                            threshold: parseInt(appliedThreshold.itemCount),
+                            percentage: discountPercentage,
+                            originalPrice: originalPrice
+                        };
+                    }
+                }
+            } catch (e) {
+                console.error("Error processing threshold discounts:", e);
+            }
         }
-        return price;
+        
+        if (!appliedThreshold) {
+            delete instance.appliedDiscount;
+        }
+        
+        return totalPrice;
     }
 
     // Calculate lower bound for invoice if there's a range
@@ -348,14 +401,38 @@ document.addEventListener('DOMContentLoaded', function() {
                     const price = calculateInstancePrice(feature, instance);
                     totalLower += price;
                     totalUpper += price;
-                    tableHTML += `
-                        <tr>
-                            <td>${feature.featureName}</td>
-                            <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
-                            <td>${intervalLabel}</td>
-                            <td>$${price.toFixed(2)}</td>
-                        </tr>
-                    `;
+                    // Check if a discount is applied
+                    if (instance.appliedDiscount) {
+                            // Get the original price before discount
+                            const originalPrice = instance.appliedDiscount.originalPrice;
+                            
+                            tableHTML += `
+                                <tr>
+                                    <td>${feature.featureName}</td>
+                                    <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
+                                    <td>${intervalLabel}</td>
+                                    <td>
+                                        <div>
+                                            <span style="text-decoration: line-through; color: #999;">$${originalPrice.toFixed(2)}</span>
+                                            <span style="color: #d83838; font-weight: bold;"> $${price.toFixed(2)}</span>
+                                            <div style="font-size: 11px; color: #d83838;">
+                                                ${instance.appliedDiscount.percentage}% discount applied
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        } else {
+                        // No discount, show regular price
+                        tableHTML += `
+                            <tr>
+                                <td>${feature.featureName}</td>
+                                <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
+                                <td>${intervalLabel}</td>
+                                <td>$${price.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }
                     if (instance.addons && instance.addons.length > 0) {
                         instance.addons.forEach(aIndex => {
                             const addon = option.addons[aIndex];
@@ -386,6 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (estimateMode) {
             tableHTML += `$${totalLower.toFixed(2)} - $${totalUpper.toFixed(2)}`;
         } else {
+            // Simple total, no need for discount display here
             tableHTML += `$${totalLower.toFixed(2)}`;
         }
         tableHTML += `</td>
@@ -794,6 +872,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return instanceDiv;
     }
 
+    // Control max addons selection
+    function enforceMaxAddons(fIndex, instIndex, addonsDiv) {
+        const instance = selections[fIndex][instIndex];
+        const option = dashboardData.features[fIndex].options[instance.optionIndex];
+        
+        // If no max addons constraint or unlimited (-1), enable all checkboxes
+        if (!option || !option.maxAddons || option.maxAddons < 0) return;
+        
+        const maxAllowed = parseInt(option.maxAddons);
+        const checkboxes = addonsDiv.querySelectorAll('input[type="checkbox"]');
+        
+        // Count checked addons
+        const checkedCount = (instance.addons || []).length;
+        
+        // Disable unchecked boxes if limit reached, otherwise enable all
+        checkboxes.forEach(checkbox => {
+            if (!checkbox.checked) {
+                checkbox.disabled = checkedCount >= maxAllowed;
+            }
+        });
+        
+        // Add a message if needed
+        let maxAddonsMessage = addonsDiv.querySelector('.max-addons-message');
+        if (checkedCount >= maxAllowed) {
+            if (!maxAddonsMessage) {
+                maxAddonsMessage = document.createElement('div');
+                maxAddonsMessage.className = 'max-addons-message';
+                maxAddonsMessage.style.color = '#d83838';
+                maxAddonsMessage.style.fontSize = '12px';
+                maxAddonsMessage.style.marginTop = '8px';
+                maxAddonsMessage.style.fontWeight = 'bold';
+                addonsDiv.appendChild(maxAddonsMessage);
+            }
+            maxAddonsMessage.textContent = `Maximum of ${maxAllowed} toppings reached.`;
+        } else if (maxAddonsMessage) {
+            maxAddonsMessage.remove();
+        }
+    }
+
     // Render the raw option details (no addition with addons)
     function renderOptionDetails(fIndex, instIndex, feature, optionDetailsDiv) {
         optionDetailsDiv.innerHTML = '';
@@ -947,6 +1064,55 @@ document.addEventListener('DOMContentLoaded', function() {
             label.appendChild(select);
             priceOptionDiv.appendChild(label);
             optionDetailsDiv.appendChild(priceOptionDiv);
+
+            // Check for threshold discounts
+            if (selectedOption.thresholdDiscounts) {
+                try {
+                    let thresholds = [];
+                    if (typeof selectedOption.thresholdDiscounts === 'string') {
+                        thresholds = JSON.parse(selectedOption.thresholdDiscounts);
+                    } else if (selectedOption.thresholdDiscounts.types) {
+                        thresholds = selectedOption.thresholdDiscounts.types;
+                    } else if (Array.isArray(selectedOption.thresholdDiscounts)) {
+                        thresholds = selectedOption.thresholdDiscounts;
+                    }
+                    
+                    if (Array.isArray(thresholds) && thresholds.length > 0 && thresholds.some(t => t.itemCount && t.discount)) {
+                        const discountDiv = document.createElement('div');
+                        discountDiv.className = 'quantity-discounts';
+                        discountDiv.style.marginTop = '12px';
+                        discountDiv.style.padding = '8px';
+                        discountDiv.style.backgroundColor = '#f8f8f8';
+                        discountDiv.style.borderRadius = '4px';
+                        discountDiv.style.border = '1px solid #e0e0e0';
+                        
+                        const discountTitle = document.createElement('div');
+                        discountTitle.style.fontWeight = 'bold';
+                        discountTitle.style.marginBottom = '6px';
+                        discountTitle.textContent = 'Quantity Discounts Available:';
+                        discountDiv.appendChild(discountTitle);
+                        
+                        const discountList = document.createElement('ul');
+                        discountList.style.margin = '0';
+                        discountList.style.paddingLeft = '20px';
+                        discountList.style.fontSize = '12px';
+                        
+                        // Sort by item count
+                        thresholds.sort((a, b) => parseInt(a.itemCount) - parseInt(b.itemCount))
+                                .filter(t => t.itemCount && t.discount)
+                                .forEach(threshold => {
+                            const item = document.createElement('li');
+                            item.textContent = `${threshold.discount}% off when you order ${threshold.itemCount} or more`;
+                            discountList.appendChild(item);
+                        });
+                        
+                        discountDiv.appendChild(discountList);
+                        optionDetailsDiv.appendChild(discountDiv);
+                    }
+                } catch (e) {
+                    console.error("Error displaying threshold discounts:", e);
+                }
+            }
         }
 
         for (const key in selectedOption) {
@@ -1267,6 +1433,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             instance.addons.splice(idx, 1);
                         }
                     }
+
+                    // After changing selection, enforce max addons
+                    enforceMaxAddons(fIndex, instIndex, addonsDiv);
+
                     saveSelections();
                     updateInvoice();
                 });
@@ -1319,6 +1489,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 addonsDiv.appendChild(container);
             });
             optionDetailsDiv.appendChild(addonsDiv);
+
+            // Then add this line after all addons are added:
+            enforceMaxAddons(fIndex, instIndex, addonsDiv);
+
         }
 
         saveSelections();

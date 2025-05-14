@@ -1494,8 +1494,18 @@ function modifyCreateOptionElement() {
     
     const thresholdCheckbox = document.createElement('input');
     thresholdCheckbox.type = 'checkbox';
-    thresholdCheckbox.checked = opt.enableThresholdDiscounts || false;
+    thresholdCheckbox.checked = opt.enableThresholdDiscounts || 
+      (opt.thresholdDiscounts && 
+      opt.thresholdDiscounts.value && 
+      opt.thresholdDiscounts.value.types && 
+      opt.thresholdDiscounts.value.types.length > 0 && 
+      opt.thresholdDiscounts.value.types.some(t => t.itemCount && t.discount));
     thresholdCheckboxGroup.appendChild(thresholdCheckbox);
+    
+    // If checkbox is checked due to data existing, make sure the flag is updated
+    if (thresholdCheckbox.checked && !opt.enableThresholdDiscounts) {
+      opt.enableThresholdDiscounts = true;
+    }
     
     // Initialize thresholdDiscounts data if not present
     if (!opt.thresholdDiscounts) {
