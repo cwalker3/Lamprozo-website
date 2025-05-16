@@ -378,6 +378,14 @@ td .feature-fields-list {
     animation: pulse 1.5s infinite;
 }
 
+.addon-group {
+    color: black;
+}
+
+.discount-row td:last-of-type {
+    text-align: right;
+}
+
 @keyframes pulse {
     0% { opacity: 0.7; }
     50% { opacity: 1; }

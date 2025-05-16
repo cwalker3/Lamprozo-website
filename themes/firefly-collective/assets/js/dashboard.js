@@ -147,6 +147,66 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
+        // Before calculating the final price, check for group discounts
+        if (instance.addons && Array.isArray(instance.addons)) {
+            // Initialize or clear the groupDiscounts object
+            instance.groupDiscounts = {}; // Clear any existing discounts
+            
+            // Group selected addons by their group name
+            const addonsByGroup = {};
+            
+            instance.addons.forEach(addonIndex => {
+                const addon = option.addons[addonIndex];
+                if (addon && addon.groupName && addon.enableGrouping) {
+                    if (!addonsByGroup[addon.groupName]) {
+                        addonsByGroup[addon.groupName] = {
+                            addons: [],
+                            thresholdDiscounts: parseThresholdDiscounts(addon.groupThresholdDiscounts)
+                        };
+                    }
+                    addonsByGroup[addon.groupName].addons.push(addon);
+                }
+            });
+            
+            // Process each group for discounts
+            Object.values(addonsByGroup).forEach(group => {
+                if (group.thresholdDiscounts.length === 0 || group.addons.length === 0) return;
+                
+                // Sort discounts by item count in descending order
+                const sortedDiscounts = [...group.thresholdDiscounts]
+                    .sort((a, b) => parseInt(b.itemCount) - parseInt(a.itemCount));
+                
+                // Find the highest applicable discount
+                const applicableDiscount = sortedDiscounts.find(d => 
+                    group.addons.length >= parseInt(d.itemCount)
+                );
+                
+                if (applicableDiscount) {
+                    // Calculate the discount amount on the total price of this group's addons
+                    const groupItemsTotal = group.addons.reduce((sum, addon) => {
+                        // For premium toppings which are all additive, we just sum the static price modifiers
+                        return sum + parseSafe(addon.staticPriceMod, 0);
+                    }, 0);
+                    
+                    const discountPercent = parseFloat(applicableDiscount.discount);
+                    const discountAmount = groupItemsTotal * (discountPercent / 100);
+                    
+                    // Apply discount to the total price
+                    price -= discountAmount;
+                    
+                    // Store discount info for display in the invoice
+                    instance.groupDiscounts[group.addons[0].groupName] = {
+                        count: group.addons.length,
+                        threshold: parseInt(applicableDiscount.itemCount),
+                        percentage: discountPercent,
+                        amount: discountAmount,
+                        originalAmount: groupItemsTotal
+                    };
+                }
+                // If no discount applies, we don't add an entry (since we cleared the object above)
+            });
+        }
+        
         // Get quantity (default to 1)
         const qty = parseInt(instance.quantity) || 1;
         
@@ -200,6 +260,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         return totalPrice;
+    }
+
+    // Parse threshold discounts from JSON string
+    function parseThresholdDiscounts(discountsData) {
+        if (!discountsData) return [];
+        
+        try {
+            let thresholds = [];
+            
+            if (typeof discountsData === 'string') {
+                const parsed = JSON.parse(discountsData);
+                // Handle the case where it's parsed as an object with types
+                if (parsed && parsed.types) {
+                    thresholds = parsed.types;
+                } else {
+                    thresholds = parsed; // Assume it's directly an array
+                }
+            } else if (discountsData.types) {
+                thresholds = discountsData.types;
+            } else if (Array.isArray(discountsData)) {
+                thresholds = discountsData;
+            }
+            
+            // Make sure we convert itemCount and discount to numbers
+            const result = Array.isArray(thresholds) ? 
+                thresholds.filter(t => t.itemCount && t.discount).map(t => ({
+                    itemCount: parseInt(t.itemCount, 10),
+                    discount: parseFloat(t.discount)
+                })) : [];
+                
+            return result;
+        } catch (e) {
+            console.error("Error parsing threshold discounts:", e, discountsData);
+            return [];
+        }
     }
 
     // Calculate lower bound for invoice if there's a range
@@ -433,6 +528,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                         `;
                     }
+                    
+                    // If the instance has addons, show them as sub-rows
                     if (instance.addons && instance.addons.length > 0) {
                         instance.addons.forEach(aIndex => {
                             const addon = option.addons[aIndex];
@@ -449,6 +546,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                 `;
                             }
                         });
+                        
+                        // Add group discount rows if applicable
+                        if (instance.groupDiscounts) {
+                            Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
+                                tableHTML += `
+                                    <tr class="discount-row">
+                                        <td></td>
+                                        <td colspan="2">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</td>
+                                        <td>-$${discount.amount.toFixed(2)}</td>
+                                    </tr>
+                                `;
+                            });
+                        }
                     }
                 }
             });
@@ -1404,99 +1514,338 @@ document.addEventListener('DOMContentLoaded', function() {
             addonsTitle.textContent = 'Addons';
             addonsDiv.appendChild(addonsTitle);
 
-            selectedOption.addons.forEach((addon, aIndex) => {
-                // Change from label to div as container
-                const container = document.createElement('div');
-                container.classList.add('addon-item');
-
-                // Create checkbox with explicit dimensions
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = aIndex;
-                // Fix: Use instance.optionIndex instead of oIdx
-                checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${aIndex}`;
-                checkbox.classList.add('addon-checkbox');
-                if (instance.addons && instance.addons.indexOf(aIndex) !== -1) {
-                    checkbox.checked = true;
-                }
-                
-                // Restore checkbox functionality
-                checkbox.addEventListener('change', function() {
-                    if (!instance.addons) {
-                        instance.addons = [];
-                    }
-                    if (this.checked) {
-                        instance.addons.push(aIndex);
-                    } else {
-                        const idx = instance.addons.indexOf(aIndex);
-                        if (idx !== -1) {
-                            instance.addons.splice(idx, 1);
-                        }
-                    }
-
-                    // After changing selection, enforce max addons
-                    enforceMaxAddons(fIndex, instIndex, addonsDiv);
-
-                    saveSelections();
-                    updateInvoice();
-                });
-                
-                container.appendChild(checkbox);
-
-                // Get description and add tooltip if needed
-                const addonDescription = getDescriptionText(addon.description);
-                
-                if (addonDescription) {
-                    const tooltipIcon = document.createElement('span');
-                    tooltipIcon.classList.add('tooltip-icon');
-                    tooltipIcon.textContent = '?';
-                    tooltipIcon.setAttribute('data-addon-name', addon.addonName);
-                    tooltipIcon.setAttribute('data-addon-desc', addonDescription);
-                    
-                    tooltipIcon.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        showTooltip(addon.addonName, addonDescription);
-                    });
-                    
-                    container.appendChild(tooltipIcon);
-                } else {
-                    // Add a spacer element to maintain consistent layout
-                    const spacer = document.createElement('span');
-                    spacer.style.width = '16px';
-                    spacer.style.margin = '0 8px 0 8px';
-                    spacer.style.display = 'inline-block';
-                    container.appendChild(spacer);
-                }
-                
-                // Create addon text span with proper class
-                const addonTextSpan = document.createElement('span');
-                addonTextSpan.classList.add('addon-text');
-                
-                // Price calculation and display
-                const floorVal = parseSafe(addon.floorPriceMod);
-                const ceilVal = parseSafe(addon.ceilingPriceMod);
-                const symbol = isMultiply(addon) ? 'x' : '+';
-
-                if (floorVal !== 0 || ceilVal !== 0) {
-                    addonTextSpan.textContent = `${addon.addonName} (${symbol}$${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)})`;
-                } else {
-                    const addonStatic = parseSafe(addon.staticPriceMod, 0);
-                    addonTextSpan.textContent = `${addon.addonName} (${symbol}$${addonStatic.toFixed(2)})`;
-                }
-                
-                container.appendChild(addonTextSpan);
-                addonsDiv.appendChild(container);
+            // Organize addons by group
+            const { groups, ungrouped } = organizeAddonsByGroup(selectedOption.addons);
+            
+            // First render the ungrouped addons
+            ungrouped.forEach(({addon, index: aIndex}) => {
+            const addonItem = createAddonCheckboxItem(addon, aIndex, fIndex, instIndex, instance);
+            addonsDiv.appendChild(addonItem);
             });
+            
+            // Then render each group with its own container
+            Object.values(groups).forEach(group => {
+            // Create group container
+            const groupContainer = document.createElement('div');
+            groupContainer.classList.add('addon-group');
+            groupContainer.style.border = '1px solid #ccc';
+            groupContainer.style.borderRadius = '4px';
+            groupContainer.style.padding = '10px';
+            groupContainer.style.marginTop = '15px';
+            groupContainer.style.marginBottom = '15px';
+            
+            // Group header
+            const groupHeader = document.createElement('div');
+            groupHeader.classList.add('addon-group-header');
+            groupHeader.textContent = group.name;
+            groupHeader.style.fontWeight = 'bold';
+            groupHeader.style.marginBottom = '10px';
+            groupContainer.appendChild(groupHeader);
+            
+            // Add description of max items if applicable
+            if (group.maxItems > 0) {
+                const maxItemsDesc = document.createElement('div');
+                maxItemsDesc.classList.add('max-group-items-desc');
+                maxItemsDesc.textContent = `Select up to ${group.maxItems} items`;
+                maxItemsDesc.style.fontSize = '12px';
+                maxItemsDesc.style.fontStyle = 'italic';
+                maxItemsDesc.style.marginBottom = '8px';
+                groupContainer.appendChild(maxItemsDesc);
+            }
+            
+            // Add the addons to this group
+            group.addons.forEach(({addon, index: aIndex}) => {
+                const addonItem = createAddonCheckboxItem(addon, aIndex, fIndex, instIndex, instance);
+                groupContainer.appendChild(addonItem);
+            });
+            
+            // Add threshold discounts info if applicable
+            if (group.thresholdDiscounts && group.thresholdDiscounts.length > 0) {
+                const discountInfo = document.createElement('div');
+                discountInfo.classList.add('group-discount-info');
+                discountInfo.style.fontSize = '12px';
+                discountInfo.style.marginTop = '8px';
+                discountInfo.style.color = '#d83838';
+                
+                // Sort discounts by item count
+                const sortedDiscounts = [...group.thresholdDiscounts].sort((a, b) => 
+                    a.itemCount - b.itemCount
+                );
+                
+                // Get selected count
+                const selectedCount = getSelectedGroupCount(instance, group.name, selectedOption.addons);
+                
+                // Find applicable discount if any
+                const applicableDiscount = sortedDiscounts.filter(d => selectedCount >= d.itemCount)
+                    .pop();
+                
+                if (applicableDiscount) {
+                    discountInfo.innerHTML = `<strong>${applicableDiscount.discount}% discount</strong> applied for selecting ${selectedCount} items`;
+                } else {
+                    // Show next available discount
+                    const nextDiscount = sortedDiscounts.find(d => selectedCount < d.itemCount);
+                    if (nextDiscount) {
+                        discountInfo.innerHTML = `Select ${nextDiscount.itemCount} items for a <strong>${nextDiscount.discount}% discount</strong>`;
+                    }
+                }
+                
+                groupContainer.appendChild(discountInfo);
+            }
+            
+            // Add group container to addons div
+            addonsDiv.appendChild(groupContainer);
+            
+            // Store a reference to this group on the container for easier access
+            groupContainer.dataset.groupName = group.name;
+            groupContainer.dataset.maxItems = group.maxItems;
+            });
+            
             optionDetailsDiv.appendChild(addonsDiv);
-
-            // Then add this line after all addons are added:
+            
+            // Apply constraints
             enforceMaxAddons(fIndex, instIndex, addonsDiv);
-
+            enforceMaxGroupItems(fIndex, instIndex, addonsDiv);
         }
-
+        
         saveSelections();
         updateInvoice();
+    }
+
+    // Helper to create addon checkbox items
+    function createAddonCheckboxItem(addon, aIndex, fIndex, instIndex, instance) {
+        const container = document.createElement('div');
+        container.classList.add('addon-item');
+        
+        // Create checkbox with explicit dimensions
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = aIndex;
+        checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${aIndex}`;
+        checkbox.classList.add('addon-checkbox');
+        if (addon.groupName) {
+            checkbox.dataset.group = addon.groupName;
+        }
+        
+        if (instance.addons && instance.addons.indexOf(aIndex) !== -1) {
+            checkbox.checked = true;
+        }
+        
+        // Checkbox event handler
+        checkbox.addEventListener('change', function() {
+            if (!instance.addons) {
+                instance.addons = [];
+            }
+            if (this.checked) {
+                instance.addons.push(aIndex);
+            } else {
+                const idx = instance.addons.indexOf(aIndex);
+                if (idx !== -1) {
+                    instance.addons.splice(idx, 1);
+                }
+            }
+            
+            // After changing selection, enforce max addons and max group items
+            const addonsDiv = this.closest('.addons');
+            enforceMaxAddons(fIndex, instIndex, addonsDiv);
+            enforceMaxGroupItems(fIndex, instIndex, addonsDiv);
+            
+            // Update discount info displays for all groups
+            updateGroupDiscountDisplay(fIndex, instIndex, addonsDiv);
+            
+            saveSelections();
+            updateInvoice();
+        });
+        
+        container.appendChild(checkbox);
+        
+        // Get description and add tooltip if needed
+        const addonDescription = getDescriptionText(addon.description);
+        
+        if (addonDescription) {
+            const tooltipIcon = document.createElement('span');
+            tooltipIcon.classList.add('tooltip-icon');
+            tooltipIcon.textContent = '?';
+            tooltipIcon.setAttribute('data-addon-name', addon.addonName);
+            tooltipIcon.setAttribute('data-addon-desc', addonDescription);
+            
+            tooltipIcon.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            showTooltip(addon.addonName, addonDescription);
+            });
+            
+            container.appendChild(tooltipIcon);
+        } else {
+            // Add a spacer element to maintain consistent layout
+            const spacer = document.createElement('span');
+            spacer.style.width = '16px';
+            spacer.style.margin = '0 8px 0 8px';
+            spacer.style.display = 'inline-block';
+            container.appendChild(spacer);
+        }
+        
+        // Create addon text span with proper class
+        const addonTextSpan = document.createElement('span');
+        addonTextSpan.classList.add('addon-text');
+        
+        // Price calculation and display
+        const floorVal = parseSafe(addon.floorPriceMod);
+        const ceilVal = parseSafe(addon.ceilingPriceMod);
+        const symbol = isMultiply(addon) ? 'x' : '+';
+        
+        if (floorVal !== 0 || ceilVal !== 0) {
+            addonTextSpan.textContent = `${addon.addonName} (${symbol}$${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)})`;
+        } else {
+            const addonStatic = parseSafe(addon.staticPriceMod, 0);
+            addonTextSpan.textContent = `${addon.addonName} (${symbol}$${addonStatic.toFixed(2)})`;
+        }
+        
+        container.appendChild(addonTextSpan);
+        return container;
+        }
+
+        // Update the discount displays
+        function updateGroupDiscountDisplay(fIndex, instIndex, addonsDiv) {
+            const instance = selections[fIndex][instIndex];
+            const option = dashboardData.features[fIndex].options[instance.optionIndex];
+            if (!option || !option.addons) return;
+            
+            // Find all group containers
+            const groupContainers = addonsDiv.querySelectorAll('.addon-group');
+            
+            groupContainers.forEach(container => {
+                const groupName = container.dataset.groupName;
+                if (!groupName) return;
+                
+                // Find the discount info div
+                let discountInfo = container.querySelector('.group-discount-info');
+                if (!discountInfo) {
+                    // Create it if it doesn't exist
+                    discountInfo = document.createElement('div');
+                    discountInfo.classList.add('group-discount-info');
+                    discountInfo.style.fontSize = '12px';
+                    discountInfo.style.marginTop = '8px';
+                    discountInfo.style.color = '#d83838';
+                    container.appendChild(discountInfo);
+                }
+                
+                // Get the addons in this group
+                const groupAddons = option.addons.filter(a => a.groupName === groupName && a.enableGrouping);
+                if (!groupAddons.length) {
+                    discountInfo.style.display = 'none';
+                    return;
+                }
+                
+                // Get the thresholds from the first addon in this group (they should all be the same)
+                const thresholdDiscounts = parseThresholdDiscounts(groupAddons[0].groupThresholdDiscounts);
+                if (!thresholdDiscounts.length) {
+                    discountInfo.style.display = 'none';
+                    return;
+                }
+                
+                // Get selected count
+                const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
+                
+                // Sort discounts by item count
+                const sortedDiscounts = [...thresholdDiscounts].sort((a, b) => 
+                    a.itemCount - b.itemCount
+                );
+                
+                // Find applicable discount if any
+                const applicableDiscount = sortedDiscounts.filter(d => selectedCount >= d.itemCount)
+                    .pop();
+                
+                if (applicableDiscount) {
+                    discountInfo.style.display = 'block';
+                    discountInfo.innerHTML = `<strong>${applicableDiscount.discount}% discount</strong> applied for selecting ${selectedCount} items`;
+                } else {
+                    // Show next available discount
+                    const nextDiscount = sortedDiscounts.find(d => selectedCount < d.itemCount);
+                    if (nextDiscount) {
+                        discountInfo.style.display = 'block';
+                        discountInfo.innerHTML = `Select ${nextDiscount.itemCount} items for a <strong>${nextDiscount.discount}% discount</strong>`;
+                    } else {
+                        discountInfo.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        // Count selected addons in a specific group
+        function getSelectedGroupCount(instance, groupName, allAddons) {
+        if (!instance.addons || !Array.isArray(instance.addons)) return 0;
+        
+        return instance.addons.filter(addonIndex => {
+            const addon = allAddons[addonIndex];
+            return addon && addon.groupName === groupName && addon.enableGrouping;
+        }).length;
+    }
+
+    // Enforce max group items limitation
+    function enforceMaxGroupItems(fIndex, instIndex, addonsDiv) {
+        const instance = selections[fIndex][instIndex];
+        const option = dashboardData.features[fIndex].options[instance.optionIndex];
+        if (!option || !option.addons) return;
+        
+        // Find all group containers
+        const groupContainers = addonsDiv.querySelectorAll('.addon-group');
+        
+        groupContainers.forEach(container => {
+            const groupName = container.dataset.groupName;
+            const maxItems = parseInt(container.dataset.maxItems);
+            
+            // Skip groups with no limit
+            if (!groupName || maxItems <= 0 || isNaN(maxItems)) return;
+            
+            // Count selected items in this group
+            const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
+            
+            // Find all checkboxes for this group
+            const groupCheckboxes = container.querySelectorAll('input[type="checkbox"]');
+            
+            // Disable unchecked boxes if limit reached, otherwise enable all
+            groupCheckboxes.forEach(checkbox => {
+            if (!checkbox.checked) {
+                checkbox.disabled = selectedCount >= maxItems;
+            }
+            });
+            
+            // Update message if present
+            const maxItemsMessage = container.querySelector('.max-group-items-desc');
+            if (maxItemsMessage) {
+            if (selectedCount >= maxItems) {
+                maxItemsMessage.style.color = '#d83838';
+                maxItemsMessage.style.fontWeight = 'bold';
+            } else {
+                maxItemsMessage.style.color = '';
+                maxItemsMessage.style.fontWeight = '';
+            }
+            }
+        });
+    }
+
+    // Helper function to organize addons by group
+    function organizeAddonsByGroup(addons) {
+        const groups = {};
+        const ungrouped = [];
+        
+        addons.forEach((addon, index) => {
+            if (addon.groupName && addon.enableGrouping) {
+            if (!groups[addon.groupName]) {
+                groups[addon.groupName] = {
+                name: addon.groupName,
+                maxItems: addon.maxGroupItems,
+                addons: [],
+                thresholdDiscounts: parseThresholdDiscounts(addon.groupThresholdDiscounts)
+                };
+            }
+            groups[addon.groupName].addons.push({addon, index});
+            } else {
+            ungrouped.push({addon, index});
+            }
+        });
+        
+        return { groups, ungrouped };
     }
 
     // Global tooltip functions
