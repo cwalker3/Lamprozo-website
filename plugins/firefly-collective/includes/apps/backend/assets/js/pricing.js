@@ -1166,12 +1166,15 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
           preventSync = true;
           
           // Then trigger synchronization across the group
+          // Pass true for forceUpdateCurrent to make sure the current addon is updated too
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
             groupInfo.addonIdx,
             groupInfo.groupName,
-            workingData
+            workingData,
+            null,  // No need to preserve focus
+            true   // Force update current addon too
           );
           
           // Reset the flag after a short delay
@@ -1191,37 +1194,40 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       upBtn.className = 'price-option-arrow';
       upBtn.disabled = idx === 0;
       upBtn.addEventListener('click', () => {
-        if (preventSync || idx === 0) return;
+      if (preventSync || idx === 0) return;
+      
+      [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
+      
+      // If part of a group, trigger synchronization
+      if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+        // Call onChange first to update the local data
+        onChange(workingData);
         
-        [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
+        // Set the flag to prevent recursive syncing
+        preventSync = true;
         
-        // If part of a group, trigger synchronization
-        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
-          onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
-          preventSync = true;
-          
-          // Then trigger synchronization across the group
-          synchronizeGroupThresholdDiscounts(
-            groupInfo.featureIdx,
-            groupInfo.optionIdx,
-            groupInfo.addonIdx,
-            groupInfo.groupName,
-            workingData
-          );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
-        } else {
-          // Otherwise just update this addon
-          onChange(workingData);
-          renderThresholds();
-        }
-      });
+        // Then trigger synchronization across the group
+        // Use forceUpdateCurrent = true for UI consistency
+        synchronizeGroupThresholdDiscounts(
+          groupInfo.featureIdx,
+          groupInfo.optionIdx,
+          groupInfo.addonIdx,
+          groupInfo.groupName,
+          workingData,
+          null,
+          true  // Force update current addon too
+        );
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          preventSync = false;
+        }, 10);
+      } else {
+        // Otherwise just update this addon
+        onChange(workingData);
+        renderThresholds();
+      }
+    });
       
       // Down arrow
       const downBtn = document.createElement('button');
@@ -1229,37 +1235,40 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       downBtn.className = 'price-option-arrow';
       downBtn.disabled = idx === workingData.length - 1;
       downBtn.addEventListener('click', () => {
-        if (preventSync || idx === workingData.length - 1) return;
+      if (preventSync || idx === workingData.length - 1) return;
+      
+      [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
+      
+      // If part of a group, trigger synchronization
+      if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+        // Call onChange first to update the local data
+        onChange(workingData);
         
-        [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
+        // Set the flag to prevent recursive syncing
+        preventSync = true;
         
-        // If part of a group, trigger synchronization
-        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
-          onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
-          preventSync = true;
-          
-          // Then trigger synchronization across the group
-          synchronizeGroupThresholdDiscounts(
-            groupInfo.featureIdx,
-            groupInfo.optionIdx,
-            groupInfo.addonIdx,
-            groupInfo.groupName,
-            workingData
-          );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
-        } else {
-          // Otherwise just update this addon
-          onChange(workingData);
-          renderThresholds();
-        }
-      });
+        // Then trigger synchronization across the group
+        // Use forceUpdateCurrent = true for UI consistency  
+        synchronizeGroupThresholdDiscounts(
+          groupInfo.featureIdx,
+          groupInfo.optionIdx,
+          groupInfo.addonIdx,
+          groupInfo.groupName,
+          workingData,
+          null,
+          true  // Force update current addon too
+        );
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          preventSync = false;
+        }, 10);
+      } else {
+        // Otherwise just update this addon
+        onChange(workingData);
+        renderThresholds();
+      }
+    });
       
       // Add buttons to controls
       controlsContainer.appendChild(deleteBtn);
@@ -1296,12 +1305,15 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
         preventSync = true;
         
         // Then trigger synchronization across the group
+        // Pass true for forceUpdateCurrent to make sure the current addon is updated too
         synchronizeGroupThresholdDiscounts(
           groupInfo.featureIdx,
           groupInfo.optionIdx,
           groupInfo.addonIdx,
           groupInfo.groupName,
-          workingData
+          workingData,
+          null,  // No need to preserve focus
+          true   // Force update current addon too
         );
         
         // Reset the flag after a short delay
@@ -1377,7 +1389,7 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
 }
 
 // Improved synchronization function with focus preservation
-function synchronizeGroupThresholdDiscounts(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, newDiscounts, preserveFocusId = null) {
+function synchronizeGroupThresholdDiscounts(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, newDiscounts, preserveFocusId = null, forceUpdateCurrent = false) {
   // Skip if no group name
   if (!groupName || !groupName.trim()) return;
   
@@ -1399,7 +1411,8 @@ function synchronizeGroupThresholdDiscounts(currentFeatureIdx, currentOptionIdx,
           updateCount++;
           
           // Skip the current addon that triggered the sync to avoid circular updates
-          if (featureIdx === currentFeatureIdx && 
+          // UNLESS forceUpdateCurrent is true
+          if (!forceUpdateCurrent && featureIdx === currentFeatureIdx && 
               optionIdx === currentOptionIdx && 
               addonIdx === currentAddonIdx) {
             return;
@@ -1439,11 +1452,12 @@ function synchronizeGroupThresholdDiscounts(currentFeatureIdx, currentOptionIdx,
     saveData();
   }
   
-  // 2. Update the UI for all other addons in the group
+  // 2. Update the UI for all addons in the group
   if (window.groupThresholdUIRegistry[groupName]) {
     window.groupThresholdUIRegistry[groupName].forEach(uiInfo => {
       // Skip the current addon to avoid circular updates
-      if (uiInfo.featureIdx === currentFeatureIdx && 
+      // UNLESS forceUpdateCurrent is true
+      if (!forceUpdateCurrent && uiInfo.featureIdx === currentFeatureIdx && 
           uiInfo.optionIdx === currentOptionIdx && 
           uiInfo.addonIdx === currentAddonIdx) {
         return;
@@ -1773,7 +1787,6 @@ document.addEventListener('DOMContentLoaded', function() {
   function attemptModification() {
     if (typeof createOptionElement === 'function') {
       modifyCreateOptionElement();
-      console.log('Successfully modified createOptionElement function');
     } else if (attempts < maxAttempts) {
       attempts++;
       setTimeout(attemptModification, 100);
@@ -2029,63 +2042,6 @@ function createMaxGroupItemsField(addon, fIdx, oIdx, aIdx, groupName) {
   container.appendChild(inputWrapper);
   
   return container;
-}
-
-// Update the synchronizeGroupMaxItems function to use the registry
-function synchronizeGroupMaxItems(currentFeatureIdx, currentOptionIdx, currentAddonIdx, groupName, maxGroupItems) {
-  // Skip if no group name
-  if (!groupName || !groupName.trim()) return;
-  
-  // 1. Update the data structures for all addons in the group
-  window.pricingData.features.forEach((feature, featureIdx) => {
-    feature.options.forEach((option, optionIdx) => {
-      option.addons.forEach((addon, addonIdx) => {
-        // Update any addon with the matching group name
-        if (addon.groupName === groupName) {
-          // Skip the current addon that triggered the sync
-          if (featureIdx === currentFeatureIdx && 
-              optionIdx === currentOptionIdx && 
-              addonIdx === currentAddonIdx) {
-            return;
-          }
-          
-          // Update the maxGroupItems value
-          addon.maxGroupItems = maxGroupItems;
-        }
-      });
-    });
-  });
-  
-  // 2. Save data after all updates
-  saveData();
-  
-  // 3. Update the UI for all group members using the registry
-  if (window.groupMaxItemsUIRegistry[groupName]) {
-    window.groupMaxItemsUIRegistry[groupName].forEach(uiInfo => {
-      // Skip the current addon to avoid circular updates
-      if (uiInfo.featureIdx === currentFeatureIdx && 
-          uiInfo.optionIdx === currentOptionIdx && 
-          uiInfo.addonIdx === currentAddonIdx) {
-        return;
-      }
-      
-      // Call the render function to update the UI
-      if (uiInfo.renderFunction) {
-        try {
-          requestAnimationFrame(() => {
-            uiInfo.renderFunction(maxGroupItems);
-          });
-        } catch (err) {
-          // Silent error handling
-        }
-      }
-    });
-  }
-  
-  // 4. Update container heights to ensure proper display
-  setTimeout(() => {
-    updateAllOpenContainers();
-  }, 100);
 }
 
 /**************************************************************
@@ -2990,53 +2946,77 @@ function synchronizeGroupMaxItems(currentFeatureIdx, currentOptionIdx, currentAd
   // 2. Save data after all updates
   saveData();
   
-  // 3. Update the UI for all group members (more specific selector)
-  document.querySelectorAll('.addon').forEach(addonEl => {
-    // Only process addons that are expanded so we can access their fields
-    const addonContent = addonEl.querySelector('.content');
-    if (!addonContent || !addonContent.classList.contains('open')) return;
-    
-    // Find the group name input field specifically
-    const groupNameField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
-      const label = field.querySelector('label');
-      return label && label.textContent === 'Group Name:';
+  // 3. Update the UI for all group members - PREFERRED APPROACH: using the registry
+  if (window.groupMaxItemsUIRegistry && window.groupMaxItemsUIRegistry[groupName]) {
+    window.groupMaxItemsUIRegistry[groupName].forEach(uiInfo => {
+      // Skip the current addon to avoid circular updates
+      if (uiInfo.featureIdx === currentFeatureIdx && 
+          uiInfo.optionIdx === currentOptionIdx && 
+          uiInfo.addonIdx === currentAddonIdx) {
+        return;
+      }
+      
+      // Call the render function to update the UI
+      if (uiInfo.renderFunction) {
+        try {
+          requestAnimationFrame(() => {
+            uiInfo.renderFunction(maxGroupItems);
+          });
+        } catch (err) {
+          // Silent error handling
+        }
+      }
     });
-    
-    // If found, check if this addon is part of our target group
-    if (groupNameField) {
-      const groupNameInput = groupNameField.querySelector('input[type="text"]');
-      if (groupNameInput && groupNameInput.value === groupName) {
-        // Now find the max group items field
-        const maxGroupItemsField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
-          const label = field.querySelector('label');
-          return label && label.textContent === 'Max Group Items:';
-        });
-        
-        if (maxGroupItemsField) {
-          const input = maxGroupItemsField.querySelector('input[type="number"]');
-          const checkbox = maxGroupItemsField.querySelector('input[type="checkbox"]');
+  } 
+  // FALLBACK: If registry is not available or empty for this group, use direct DOM approach
+  else {
+    document.querySelectorAll('.addon').forEach(addonEl => {
+      // Only process addons that are expanded so we can access their fields
+      const addonContent = addonEl.querySelector('.content');
+      if (!addonContent || !addonContent.classList.contains('open')) return;
+      
+      // Find the group name input field specifically
+      const groupNameField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
+        const label = field.querySelector('label');
+        return label && label.textContent === 'Group Name:';
+      });
+      
+      // If found, check if this addon is part of our target group
+      if (groupNameField) {
+        const groupNameInput = groupNameField.querySelector('input[type="text"]');
+        if (groupNameInput && groupNameInput.value === groupName) {
+          // Now find the max group items field
+          const maxGroupItemsField = Array.from(addonContent.querySelectorAll('.field-group')).find(field => {
+            const label = field.querySelector('label');
+            return label && label.textContent === 'Max Group Items:';
+          });
           
-          if (input && checkbox) {
-            // Update the UI elements
-            if (maxGroupItems === -1) {
-              checkbox.checked = true;
-              input.disabled = true;
-              input.value = '';
-            } else if (maxGroupItems === 0) {
-              // For our special "empty/not set" case
-              checkbox.checked = false;
-              input.disabled = false;
-              input.value = ''; // Display as empty
-            } else {
-              checkbox.checked = false;
-              input.disabled = false;
-              input.value = maxGroupItems.toString();
+          if (maxGroupItemsField) {
+            const input = maxGroupItemsField.querySelector('input[type="number"]');
+            const checkbox = maxGroupItemsField.querySelector('input[type="checkbox"]');
+            
+            if (input && checkbox) {
+              // Update the UI elements
+              if (maxGroupItems === -1) {
+                checkbox.checked = true;
+                input.disabled = true;
+                input.value = '';
+              } else if (maxGroupItems === 0) {
+                // For our special "empty/not set" case
+                checkbox.checked = false;
+                input.disabled = false;
+                input.value = ''; // Display as empty
+              } else {
+                checkbox.checked = false;
+                input.disabled = false;
+                input.value = maxGroupItems.toString();
+              }
             }
           }
         }
       }
-    }
-  });
+    });
+  }
   
   // 4. Update container heights to ensure proper display
   setTimeout(() => {
