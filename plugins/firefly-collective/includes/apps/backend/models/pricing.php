@@ -77,6 +77,32 @@ function firefly_collective_pricing_dashboard() {
  * ------------------------------ */
 
 /**
+ * Filter out _stored* temporary fields from data structure
+ */
+function filter_stored_fields($data) {
+    if (!is_array($data)) {
+        return $data;
+    }
+    
+    $result = array();
+    foreach ($data as $key => $value) {
+        // Skip any fields starting with _stored
+        if (strpos($key, '_stored') === 0) {
+            continue;
+        }
+        
+        // Recursively filter arrays
+        if (is_array($value)) {
+            $result[$key] = filter_stored_fields($value);
+        } else {
+            $result[$key] = $value;
+        }
+    }
+    
+    return $result;
+} 
+
+/**
  * Recursively unwrap all { level, ui_type, value } wrappers
  */
 function unwrap_pricing_json($data) {
@@ -143,6 +169,31 @@ function unwrap_pricing_json($data) {
             $out[$key] = unwrap_pricing_json($value);
         }
     }
+
+    // Special handling for addons with enableGrouping=false
+    if (isset($out['enableGrouping']) && $out['enableGrouping'] === false) {
+        // Just clear these fields without storing them in _stored fields
+        if (isset($out['groupName']) && !empty($out['groupName'])) {
+            // Don't create _storedGroupName
+            $out['groupName'] = '';
+        }
+        if (isset($out['groupThresholdDiscounts']) && !empty($out['groupThresholdDiscounts'])) {
+            // Don't create _storedGroupThresholdDiscounts
+            $out['groupThresholdDiscounts'] = '{"types":[{"itemCount":"","discount":""}]}';
+        }
+        if (isset($out['maxGroupItems']) && $out['maxGroupItems'] !== -1) {
+            // Don't create _storedMaxGroupItems
+            $out['maxGroupItems'] = -1;
+        }
+    }
+    
+    // Remove any _stored fields that might still exist
+    foreach (array_keys($out) as $key) {
+        if (strpos($key, '_stored') === 0) {
+            unset($out[$key]);
+        }
+    }
+    
     return $out;
 }
 
@@ -220,6 +271,10 @@ function merge_extra_columns($records, $default_columns) {
     foreach ($records as $record) {
         foreach ($record as $key => $val) {
             if ($key === 'options' || $key === 'addons') {
+                continue;
+            }
+            // Skip _stored fields when determining columns
+            if (strpos($key, '_stored') === 0) {
                 continue;
             }
             if (! isset($columns[$key])) {
@@ -464,6 +519,43 @@ function normalize_record($record) {
         }
     }
     
+    // *** NEW CODE: Handle disabled group data properly ***
+    $group_disabled = false;
+    if (isset($record['enableGrouping'])) {
+        // Handle various false-like values that might come from JS
+        if ($record['enableGrouping'] === false ||
+            $record['enableGrouping'] === 'false' ||
+            $record['enableGrouping'] === 0 ||
+            $record['enableGrouping'] === '0' ||
+            $record['enableGrouping'] === '' ||
+            $record['enableGrouping'] === null) {
+            $group_disabled = true;
+        }
+    }
+    
+    // If grouping is explicitly disabled, clear group-related fields WITHOUT storing them
+    if ($group_disabled) {
+        // Simply clear the values without storing them
+        if (isset($record['groupName']) && !empty($record['groupName'])) {
+            $record['groupName'] = '';
+        }
+        
+        if (isset($record['groupThresholdDiscounts']) && !empty($record['groupThresholdDiscounts'])) {
+            $record['groupThresholdDiscounts'] = null;
+        }
+        
+        if (isset($record['maxGroupItems']) && $record['maxGroupItems'] !== -1) {
+            $record['maxGroupItems'] = -1;
+        }
+    }
+    
+    // Remove any _stored fields that might exist
+    foreach (array_keys($record) as $key) {
+        if (strpos($key, '_stored') === 0) {
+            unset($record[$key]);
+        }
+    }
+    
     // Remove enableThresholdDiscounts field entirely
     if (isset($record['enableThresholdDiscounts'])) {
         unset($record['enableThresholdDiscounts']);
@@ -558,19 +650,23 @@ function upsert_pricing_data($payload) {
 
         $save = $feat;
         unset($save['options']);
-        // include link_name automatically
         $save['featureName'] = $final;
         
-        // IMPORTANT: Convert boolean recurring value to integer
+        // Convert boolean recurring value to integer
         if (isset($save['recurring'])) {
             $save['recurring'] = (int)$save['recurring'];
         }
         
         $save = normalize_record($save);
         
-        // IMPORTANT: Filter fields to only include those defined for features
+        // Filter fields to only include those defined for features
         $filtered_save = array();
         foreach ($save as $key => $value) {
+            // Skip any _stored fields
+            if (strpos($key, '_stored') === 0) {
+                continue;
+            }
+            
             // Include standard fields, user fields, and display fields
             if (in_array($key, $feature_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                 $filtered_save[$key] = $value;
@@ -584,6 +680,7 @@ function upsert_pricing_data($payload) {
             $wpdb->insert($ft, $filtered_save);
             $fid = $wpdb->insert_id;
         }
+        
         $processed_features[] = $fid;
         $nameChanges['features'][$fi] = [];
 
@@ -615,9 +712,14 @@ function upsert_pricing_data($payload) {
             // Normalize the record
             $saveO = normalize_record($saveO);
             
-            // IMPORTANT: Filter fields to only include those defined for options
+            // Filter fields to only include those defined for options
             $filtered_saveO = array();
             foreach ($saveO as $key => $value) {
+                // Skip any _stored fields
+                if (strpos($key, '_stored') === 0) {
+                    continue;
+                }
+                
                 // Include standard fields, user fields, and display fields
                 if (in_array($key, $option_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                     $filtered_saveO[$key] = $value;
@@ -672,11 +774,17 @@ function upsert_pricing_data($payload) {
                     $saveA['enableGrouping'] = (int)$saveA['enableGrouping'];
                 }
                 
+                // Normalize record (will convert data types and handle JSON)
                 $saveA = normalize_record($saveA);
                 
-                // IMPORTANT: Filter fields to only include those defined for addons
+                // Filter fields to only include those defined for addons
                 $filtered_saveA = array();
                 foreach ($saveA as $key => $value) {
+                    // Skip any _stored fields
+                    if (strpos($key, '_stored') === 0) {
+                        continue;
+                    }
+                    
                     // Include standard fields, user fields, and display fields
                     if (in_array($key, $addon_fields) || substr($key, -5) === '_user' || substr($key, -8) === '_display') {
                         $filtered_saveA[$key] = $value;
@@ -899,10 +1007,11 @@ function firefly_collective_save_pricing($request) {
                                     }
                                 }
                             }
+                            
+                            // We don't need to add a _groupDisabled flag here anymore
+                            // We'll handle the enableGrouping logic directly in the upsert function
                         }
                     }
-                    
-                    // Rest of the function remains the same...
                     
                     // CRITICAL FIX: Check and properly handle enableThresholdDiscounts
                     // If enableThresholdDiscounts is false, null, 'false', 0, or '0', remove thresholdDiscounts
@@ -927,25 +1036,22 @@ function firefly_collective_save_pricing($request) {
                         // Remove enableThresholdDiscounts field after processing
                         unset($option['enableThresholdDiscounts']);
                     }
-
-                    // Check if this option uses static price or price range
-                    $uses_static_price = false;
-                    $uses_price_range = false;
-                    
-                    // Rest of the function remains the same...
                 }
             }
         }
     }
 
-    // 1) Persist raw JSON (will include link_name fields)
+    // Filter out _stored temporary fields before saving
+    $filtered_data = filter_stored_fields($data);
+
+    // 1) Persist FILTERED JSON (not the original data)
     file_put_contents(
         $pricing_json_path,
-        json_encode($data['pricingData'], JSON_PRETTY_PRINT)
+        json_encode($filtered_data['pricingData'], JSON_PRETTY_PRINT)
     );
 
-    // 2) Upsert into MySQL (also saves link_name)
-    upsert_pricing_data($data);
+    // 2) Upsert FILTERED data into MySQL (not the original data)
+    upsert_pricing_data($filtered_data);
 
     return array('success' => true, 'message' => 'Pricing data saved.');
 }

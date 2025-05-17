@@ -967,6 +967,397 @@ function debounce(func, wait, options) {
   };
 }
 
+function addGroupNameAutocomplete(inputField, fIdx, oIdx, aIdx, addon, maxGroupItemsGroup, groupThresholdDiscountsUI) {
+    
+    // Get the current option's addons to find existing groups
+    const option = window.pricingData.features[fIdx].options[oIdx];
+    if (!option || !option.addons) return;
+    
+    // Collect all existing group names
+    const existingGroups = [];
+    const groupAddonTemplates = {}; // Store a template addon for each group
+    
+    // First pass: collect all group names and template addons
+    option.addons.forEach(addonItem => {
+        if (addonItem.groupName && addonItem.groupName.trim() && 
+            !existingGroups.includes(addonItem.groupName)) {
+            existingGroups.push(addonItem.groupName);
+            // Store the first addon we find with this group name as template
+            if (!groupAddonTemplates[addonItem.groupName] && addonItem.enableGrouping) {
+                groupAddonTemplates[addonItem.groupName] = addonItem;
+            }
+        }
+        
+        // Also check for stored group names
+        if (addonItem._storedGroupName && addonItem._storedGroupName.trim() && 
+            !existingGroups.includes(addonItem._storedGroupName)) {
+            existingGroups.push(addonItem._storedGroupName);
+            // We might want to also collect stored data for templates
+        }
+    });
+    
+    // Add a datalist element for autocomplete
+    const datalistId = `group-names-${fIdx}-${oIdx}-${Math.random().toString(36).substring(2, 9)}`;
+    const datalist = document.createElement('datalist');
+    datalist.id = datalistId;
+    
+    // Add options for each group name
+    existingGroups.forEach(groupName => {
+        const option = document.createElement('option');
+        option.value = groupName;
+        datalist.appendChild(option);
+    });
+    
+    // Add the datalist to the document
+    document.body.appendChild(datalist);
+    
+    // Connect the input to the datalist
+    inputField.setAttribute('list', datalistId);
+    
+    // Add event listener to restore stored settings when a matching group is selected
+    inputField.addEventListener('change', function() {
+        const selectedGroupName = this.value.trim();
+        if (!selectedGroupName) return;
+        
+        // Find an addon with the same group name to use as a template
+        const templateAddon = groupAddonTemplates[selectedGroupName];
+        
+        if (templateAddon) {
+            // Update the fields and data with values from the template
+            updateAddonGroupFields(addon, templateAddon, maxGroupItemsGroup, groupThresholdDiscountsUI, fIdx, oIdx, aIdx);
+        }
+    });
+    
+    // Also check for stored group name and restore it if present
+    if (addon._storedGroupName && !addon.groupName) {
+        inputField.placeholder = `Previously: ${addon._storedGroupName}`;
+    }
+}
+
+// Helper function to update group fields from a template addon
+function updateAddonGroupFields(targetAddon, templateAddon, maxGroupItemsGroup, groupThresholdDiscountsUI, fIdx, oIdx, aIdx) {
+    // Make sure fields are visible
+    if (maxGroupItemsGroup) maxGroupItemsGroup.style.display = 'flex';
+    if (groupThresholdDiscountsUI) groupThresholdDiscountsUI.style.display = 'flex';
+    
+    const groupName = templateAddon.groupName;
+    
+    // 0. Update the group name property
+    targetAddon.groupName = groupName;
+    targetAddon.enableGrouping = true;
+    
+    // 1. Update maxGroupItems
+    targetAddon.maxGroupItems = templateAddon.maxGroupItems;
+    
+    // Update the max items UI
+    if (maxGroupItemsGroup) {
+        const input = maxGroupItemsGroup.querySelector('input[type="number"]');
+        const checkbox = maxGroupItemsGroup.querySelector('input[type="checkbox"]');
+        
+        if (input && checkbox) {
+            // Update the UI to match the templateAddon
+            if (templateAddon.maxGroupItems === -1) {
+                checkbox.checked = true;
+                input.disabled = true;
+                input.value = '';
+            } else {
+                checkbox.checked = false;
+                input.disabled = false;
+                input.value = templateAddon.maxGroupItems.toString();
+            }
+            
+            // RE-REGISTER WITH GROUP MAX ITEMS SYNC
+            registerMaxGroupItems(groupName, fIdx, oIdx, aIdx, input, checkbox);
+        }
+    }
+    
+    // 2. Update groupThresholdDiscounts with a deep copy
+    if (templateAddon.groupThresholdDiscounts) {
+        // Create a completely separate copy to avoid reference issues
+        targetAddon.groupThresholdDiscounts = JSON.parse(JSON.stringify(templateAddon.groupThresholdDiscounts));
+        
+        // Rebuild the discount thresholds UI
+        rebuildThresholdUI(groupThresholdDiscountsUI, targetAddon.groupThresholdDiscounts, groupName, fIdx, oIdx, aIdx);
+    }
+    
+    // Save the data
+    saveData();
+    
+    // Update container heights after a short delay
+    setTimeout(() => {
+        updateAllOpenContainers();
+    }, 100);
+}
+
+// Helper function to register with max group items sync system
+function registerMaxGroupItems(groupName, fIdx, oIdx, aIdx, input, checkbox) {
+    // Create a render function that updates the UI
+    function renderMaxItems(newValue) {
+        if (newValue === -1) {
+            checkbox.checked = true;
+            input.disabled = true;
+            input.value = '';
+        } else if (newValue === 0) {
+            checkbox.checked = false;
+            input.disabled = false;
+            input.value = '';
+        } else {
+            checkbox.checked = false;
+            input.disabled = false;
+            input.value = newValue.toString();
+        }
+    }
+    
+    // Ensure group registry exists
+    if (!window.groupMaxItemsUIRegistry) {
+        window.groupMaxItemsUIRegistry = {};
+    }
+    
+    // Initialize the group registry if needed
+    if (!window.groupMaxItemsUIRegistry[groupName]) {
+        window.groupMaxItemsUIRegistry[groupName] = [];
+    }
+    
+    // Remove any existing entries for this addon
+    window.groupMaxItemsUIRegistry[groupName] = 
+        window.groupMaxItemsUIRegistry[groupName].filter(ui => 
+            !(ui.featureIdx === fIdx && ui.optionIdx === oIdx && ui.addonIdx === aIdx));
+    
+    // Add this UI to the registry
+    window.groupMaxItemsUIRegistry[groupName].push({
+        featureIdx: fIdx,
+        optionIdx: oIdx,
+        addonIdx: aIdx,
+        renderFunction: renderMaxItems
+    });
+    
+    // Re-attach event handlers
+    checkbox.addEventListener('change', function() {
+        const addon = window.pricingData.features[fIdx].options[oIdx].addons[aIdx];
+        const newValue = this.checked ? -1 : (input.value ? parseInt(input.value, 10) : 0);
+        addon.maxGroupItems = newValue;
+        
+        // Sync with other addons
+        synchronizeGroupMaxItems(fIdx, oIdx, aIdx, groupName, newValue);
+    });
+    
+    input.addEventListener('input', function() {
+        const addon = window.pricingData.features[fIdx].options[oIdx].addons[aIdx];
+        const newValue = this.value ? parseInt(this.value, 10) : 0;
+        addon.maxGroupItems = newValue;
+        
+        // Sync with other addons
+        synchronizeGroupMaxItems(fIdx, oIdx, aIdx, groupName, newValue);
+    });
+}
+
+// Helper function to rebuild the threshold UI and register for sync
+function rebuildThresholdUI(groupThresholdDiscountsUI, thresholdData, groupName, fIdx, oIdx, aIdx) {
+    if (!groupThresholdDiscountsUI) return;
+    
+    // Extract the threshold data
+    let thresholdsArray = [];
+    try {
+        if (typeof thresholdData === 'string') {
+            thresholdsArray = JSON.parse(thresholdData);
+        } else if (thresholdData.types) {
+            thresholdsArray = thresholdData.types;
+        } else if (thresholdData.value && thresholdData.value.types) {
+            thresholdsArray = thresholdData.value.types;
+        }
+    } catch (e) {
+        console.error("Error parsing threshold data:", e);
+        thresholdsArray = [{ itemCount: "", discount: "" }];
+    }
+    
+    const workingData = JSON.parse(JSON.stringify(thresholdsArray));
+    
+    // Find the container for threshold rows
+    const container = groupThresholdDiscountsUI.querySelector('.price-options-container');
+    if (!container) return;
+    
+    // Clear current content
+    container.innerHTML = '';
+    
+    // Keep track of all input elements for re-registration
+    const inputElements = [];
+    
+    // Create function to update working data and trigger sync
+    function updateAndSync(index, field, value) {
+        if (!workingData[index]) return;
+        
+        workingData[index][field] = value;
+        
+        // Get the addon object
+        const addon = window.pricingData.features[fIdx].options[oIdx].addons[aIdx];
+        
+        // Update addon data
+        if (!addon.groupThresholdDiscounts) {
+            addon.groupThresholdDiscounts = {
+                level: 'admin',
+                ui_type: 'array-obj',
+                value: { types: workingData }
+            };
+        } else if (typeof addon.groupThresholdDiscounts === 'string') {
+            addon.groupThresholdDiscounts = {
+                level: 'admin',
+                ui_type: 'array-obj',
+                value: { types: workingData }
+            };
+        } else {
+            addon.groupThresholdDiscounts.value = { types: workingData };
+        }
+        
+        // Trigger synchronization
+        synchronizeGroupThresholdDiscounts(fIdx, oIdx, aIdx, groupName, workingData);
+    }
+    
+    // Rebuild all threshold rows
+    workingData.forEach((threshold, idx) => {
+        const row = document.createElement('div');
+        row.className = 'price-option-row';
+        
+        // Quantity input
+        const countInput = document.createElement('input');
+        countInput.type = 'number';
+        countInput.min = '1';
+        countInput.value = threshold.itemCount !== '' ? threshold.itemCount : '';
+        countInput.placeholder = 'Quantity';
+        countInput.dataset.index = idx;
+        countInput.dataset.field = 'itemCount';
+        inputElements.push(countInput);
+        
+        // Add event listener for sync
+        countInput.addEventListener('input', function() {
+            const val = this.value.trim() !== '' ? parseInt(this.value, 10) : '';
+            updateAndSync(idx, 'itemCount', val);
+        });
+        
+        // Discount percentage input
+        const discountInput = document.createElement('input');
+        discountInput.type = 'number';
+        discountInput.min = '0';
+        discountInput.max = '100';
+        discountInput.value = threshold.discount !== '' ? threshold.discount : '';
+        discountInput.placeholder = '%';
+        discountInput.dataset.index = idx;
+        discountInput.dataset.field = 'discount';
+        inputElements.push(discountInput);
+        
+        // Add event listener for sync
+        discountInput.addEventListener('input', function() {
+            const val = this.value.trim() !== '' ? parseFloat(this.value) : '';
+            updateAndSync(idx, 'discount', val);
+        });
+        
+        // Controls container
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'controls-container';
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '−';
+        deleteBtn.className = 'price-option-delete';
+        deleteBtn.dataset.index = idx;
+        
+        deleteBtn.addEventListener('click', function() {
+            workingData.splice(idx, 1);
+            updateAndSync(0, 'placeholder', ''); // Just triggers the sync
+            rebuildThresholdUI(groupThresholdDiscountsUI, { value: { types: workingData }}, groupName, fIdx, oIdx, aIdx);
+        });
+        
+        // Up arrow
+        const upBtn = document.createElement('button');
+        upBtn.innerHTML = '&#9650;';
+        upBtn.className = 'price-option-arrow';
+        upBtn.disabled = idx === 0;
+        upBtn.dataset.index = idx;
+        
+        upBtn.addEventListener('click', function() {
+            if (idx > 0) {
+                // Swap with previous row
+                [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
+                updateAndSync(0, 'placeholder', ''); // Just triggers the sync
+                rebuildThresholdUI(groupThresholdDiscountsUI, { value: { types: workingData }}, groupName, fIdx, oIdx, aIdx);
+            }
+        });
+        
+        // Down arrow
+        const downBtn = document.createElement('button');
+        downBtn.innerHTML = '&#9660;';
+        downBtn.className = 'price-option-arrow';
+        downBtn.disabled = idx === workingData.length - 1;
+        downBtn.dataset.index = idx;
+        
+        downBtn.addEventListener('click', function() {
+            if (idx < workingData.length - 1) {
+                // Swap with next row
+                [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
+                updateAndSync(0, 'placeholder', ''); // Just triggers the sync
+                rebuildThresholdUI(groupThresholdDiscountsUI, { value: { types: workingData }}, groupName, fIdx, oIdx, aIdx);
+            }
+        });
+        
+        // Add buttons to controls
+        controlsContainer.appendChild(deleteBtn);
+        controlsContainer.appendChild(upBtn);
+        controlsContainer.appendChild(downBtn);
+        
+        // Add elements to row
+        row.appendChild(countInput);
+        row.appendChild(discountInput);
+        row.appendChild(controlsContainer);
+        container.appendChild(row);
+    });
+    
+    // Add button row
+    const addBtnRow = document.createElement('div');
+    addBtnRow.style.textAlign = 'right';
+    addBtnRow.style.marginTop = '5px';
+    
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+';
+    addBtn.className = 'add-button';
+    addBtn.style.marginTop = '0';
+    
+    addBtn.addEventListener('click', function() {
+        workingData.push({ itemCount: '', discount: '' });
+        updateAndSync(0, 'placeholder', ''); // Just triggers the sync
+        rebuildThresholdUI(groupThresholdDiscountsUI, { value: { types: workingData }}, groupName, fIdx, oIdx, aIdx);
+    });
+    
+    addBtnRow.appendChild(addBtn);
+    container.appendChild(addBtnRow);
+    
+    // Register with threshold registry
+    if (!window.groupThresholdUIRegistry) {
+        window.groupThresholdUIRegistry = {};
+    }
+    
+    if (!window.groupThresholdUIRegistry[groupName]) {
+        window.groupThresholdUIRegistry[groupName] = [];
+    }
+    
+    // Create a render function for this UI
+    function renderThresholds(newData) {
+        rebuildThresholdUI(groupThresholdDiscountsUI, { value: { types: newData }}, groupName, fIdx, oIdx, aIdx);
+    }
+    
+    // Remove any existing entries
+    window.groupThresholdUIRegistry[groupName] = 
+        window.groupThresholdUIRegistry[groupName].filter(ui => 
+            !(ui.featureIdx === fIdx && ui.optionIdx === oIdx && ui.addonIdx === aIdx));
+    
+    // Add to registry
+    window.groupThresholdUIRegistry[groupName].push({
+        featureIdx: fIdx,
+        optionIdx: oIdx,
+        addonIdx: aIdx,
+        uiElement: groupThresholdDiscountsUI,
+        renderFunction: renderThresholds
+    });
+}
+
 // Improved createThresholdDiscountsUI function
 function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
   // Create main container
@@ -974,6 +1365,14 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
   container.className = 'field-group price-options-field';
   container.style.display = 'none'; // Start hidden
   
+  // Only add dataset attributes if groupInfo is provided
+  if (groupInfo) {
+    container.dataset.fIdx = groupInfo.featureIdx || '';
+    container.dataset.oIdx = groupInfo.optionIdx || '';
+    container.dataset.aIdx = groupInfo.addonIdx || '';
+    container.dataset.groupName = groupInfo.groupName || '';
+  }
+
   // Create label
   const label = document.createElement('label');
   label.textContent = 'Quantity Discounts:';
@@ -1053,8 +1452,13 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       countInput.placeholder = 'Quantity';
       
       // Create stable ID for this input that won't change during re-renders
-      const countId = `count-input-${groupInfo?.groupName || 'local'}-${idx}`;
-      countInput.id = countId;
+      // Add scope prefix to avoid ID collisions between option and addon levels
+      const scopePrefix = groupInfo ? 'addon-' : 'option-';
+      const uniqueGroupId = groupInfo ? 
+        `${groupInfo.groupName || 'local'}-${groupInfo.featureIdx || '0'}-${groupInfo.optionIdx || '0'}-${groupInfo.addonIdx || '0'}` : 
+        'local';
+      const countId = `${scopePrefix}count-input-${uniqueGroupId}-${idx}`;
+      const discountId = `${scopePrefix}discount-input-${uniqueGroupId}-${idx}`;
       
       // Use the improved debounce function with proper options
       const debouncedCountUpdate = debounce((e) => {
@@ -1101,10 +1505,6 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       discountInput.max = '100';
       discountInput.value = threshold.discount !== '' ? threshold.discount : '';
       discountInput.placeholder = '%';
-      
-      // Create stable ID for this input
-      const discountId = `discount-input-${groupInfo?.groupName || 'local'}-${idx}`;
-      discountInput.id = discountId;
       
       // Use the improved debounce function with proper options
       const debouncedDiscountUpdate = debounce((e) => {
@@ -1194,40 +1594,40 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       upBtn.className = 'price-option-arrow';
       upBtn.disabled = idx === 0;
       upBtn.addEventListener('click', () => {
-      if (preventSync || idx === 0) return;
-      
-      [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
-      
-      // If part of a group, trigger synchronization
-      if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-        // Call onChange first to update the local data
-        onChange(workingData);
+        if (preventSync || idx === 0) return;
         
-        // Set the flag to prevent recursive syncing
-        preventSync = true;
+        [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
         
-        // Then trigger synchronization across the group
-        // Use forceUpdateCurrent = true for UI consistency
-        synchronizeGroupThresholdDiscounts(
-          groupInfo.featureIdx,
-          groupInfo.optionIdx,
-          groupInfo.addonIdx,
-          groupInfo.groupName,
-          workingData,
-          null,
-          true  // Force update current addon too
-        );
-        
-        // Reset the flag after a short delay
-        setTimeout(() => {
-          preventSync = false;
-        }, 10);
-      } else {
-        // Otherwise just update this addon
-        onChange(workingData);
-        renderThresholds();
-      }
-    });
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          // Use forceUpdateCurrent = true for UI consistency
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData,
+            null,
+            true  // Force update current addon too
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
+          onChange(workingData);
+          renderThresholds();
+        }
+      });
       
       // Down arrow
       const downBtn = document.createElement('button');
@@ -1235,40 +1635,40 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       downBtn.className = 'price-option-arrow';
       downBtn.disabled = idx === workingData.length - 1;
       downBtn.addEventListener('click', () => {
-      if (preventSync || idx === workingData.length - 1) return;
-      
-      [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
-      
-      // If part of a group, trigger synchronization
-      if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-        // Call onChange first to update the local data
-        onChange(workingData);
+        if (preventSync || idx === workingData.length - 1) return;
         
-        // Set the flag to prevent recursive syncing
-        preventSync = true;
+        [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
         
-        // Then trigger synchronization across the group
-        // Use forceUpdateCurrent = true for UI consistency  
-        synchronizeGroupThresholdDiscounts(
-          groupInfo.featureIdx,
-          groupInfo.optionIdx,
-          groupInfo.addonIdx,
-          groupInfo.groupName,
-          workingData,
-          null,
-          true  // Force update current addon too
-        );
-        
-        // Reset the flag after a short delay
-        setTimeout(() => {
-          preventSync = false;
-        }, 10);
-      } else {
-        // Otherwise just update this addon
-        onChange(workingData);
-        renderThresholds();
-      }
-    });
+        // If part of a group, trigger synchronization
+        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+          // Call onChange first to update the local data
+          onChange(workingData);
+          
+          // Set the flag to prevent recursive syncing
+          preventSync = true;
+          
+          // Then trigger synchronization across the group
+          // Use forceUpdateCurrent = true for UI consistency  
+          synchronizeGroupThresholdDiscounts(
+            groupInfo.featureIdx,
+            groupInfo.optionIdx,
+            groupInfo.addonIdx,
+            groupInfo.groupName,
+            workingData,
+            null,
+            true  // Force update current addon too
+          );
+          
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            preventSync = false;
+          }, 10);
+        } else {
+          // Otherwise just update this addon
+          onChange(workingData);
+          renderThresholds();
+        }
+      });
       
       // Add buttons to controls
       controlsContainer.appendChild(deleteBtn);
@@ -2780,18 +3180,51 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
   
   // Create group name field
   const groupNameGroup = createFieldGroup(
-    'groupName', 'text',
-    () => addon.groupName,
-    v => {
-      addon.groupName = v;
-      // If groupName is emptied and checkbox is unchecked, hide fields
-      if (!v.trim()) {
-        groupCheckbox.checked = false;
-        groupNameGroup.style.display = 'none';
-        groupThresholdDiscountsUI.style.display = 'none';
-      }
-    },
-    'Enter group name...'
+      'groupName', 'text',
+      () => addon.groupName,
+      v => {
+          const oldGroupName = addon.groupName;
+          addon.groupName = v;
+          
+          // Update registry registrations if group name changed
+          if (oldGroupName !== v && window.groupThresholdUIRegistry) {
+              if (oldGroupName && window.groupThresholdUIRegistry[oldGroupName]) {
+                  // Remove from old group registry
+                  window.groupThresholdUIRegistry[oldGroupName] = 
+                      window.groupThresholdUIRegistry[oldGroupName].filter(ui => 
+                          !(ui.featureIdx === fIdx && ui.optionIdx === oIdx && ui.addonIdx === aIdx));
+              }
+              
+              // Add to new group registry if value is not empty
+              if (v && v.trim()) {
+                  if (!window.groupThresholdUIRegistry[v]) {
+                      window.groupThresholdUIRegistry[v] = [];
+                  }
+                  
+                  // Only add if not already present
+                  const exists = window.groupThresholdUIRegistry[v].some(ui => 
+                      ui.featureIdx === fIdx && ui.optionIdx === oIdx && ui.addonIdx === aIdx);
+                  
+                  if (!exists && groupThresholdDiscountsUI) {
+                      window.groupThresholdUIRegistry[v].push({
+                          featureIdx: fIdx,
+                          optionIdx: oIdx,
+                          addonIdx: aIdx,
+                          uiElement: groupThresholdDiscountsUI,
+                          renderFunction: groupThresholdDiscountsUI._renderFunction
+                      });
+                  }
+              }
+          }
+          
+          // Only hide fields if the checkbox is already unchecked
+          if (!v.trim() && !groupCheckbox.checked) {
+              groupNameGroup.style.display = 'none';
+              groupThresholdDiscountsUI.style.display = 'none';
+              maxGroupItemsGroup.style.display = 'none';
+          }
+      },
+      'Enter group name...'
   );
   
   // Initialize groupThresholdDiscounts data if not present
@@ -2804,62 +3237,90 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
       }
     };
   }
+
+  // Initialize groupThresholdDiscounts data if not present
+  if (!addon.groupThresholdDiscounts) {
+    addon.groupThresholdDiscounts = {
+      level: 'admin',
+      ui_type: 'array-obj',
+      value: {
+        types: [{ itemCount: "", discount: "" }]
+      }
+    };
+  }
   
-  // Create the groupThresholdDiscounts UI
-  // In the createAddonElement function, modify the groupThresholdDiscountsUI onChange callback
+  // Create the groupThresholdDiscounts UI first
   const groupThresholdDiscountsUI = createThresholdDiscountsUI(
-    addon.groupThresholdDiscounts ? (
-      typeof addon.groupThresholdDiscounts === 'string' ? 
-      JSON.parse(addon.groupThresholdDiscounts) : 
-      (Array.isArray(addon.groupThresholdDiscounts) ? addon.groupThresholdDiscounts : 
-      (addon.groupThresholdDiscounts.value?.types || [{ itemCount: "", discount: "" }]))
-    ) : [{ itemCount: "", discount: "" }],
-    v => {
-      // First update this addon's discounts
-      if (!addon.groupThresholdDiscounts) {
-        addon.groupThresholdDiscounts = {
-          level: 'admin',
-          ui_type: 'array-obj',
-          value: {
-            types: v
+      getThresholdData(addon.groupThresholdDiscounts),
+      v => {
+          // First update this addon's discounts
+          if (!addon.groupThresholdDiscounts) {
+              addon.groupThresholdDiscounts = {
+                  level: 'admin',
+                  ui_type: 'array-obj',
+                  value: { types: v }
+              };
+          } else if (typeof addon.groupThresholdDiscounts === 'string') {
+              // Convert from string to proper object if it was loaded from DB
+              addon.groupThresholdDiscounts = {
+                  level: 'admin',
+                  ui_type: 'array-obj',
+                  value: { types: v }
+              };
+          } else {
+              addon.groupThresholdDiscounts.value = { types: v };
           }
-        };
-      } else if (typeof addon.groupThresholdDiscounts === 'string') {
-        // Convert from string to proper object if it was loaded from DB
-        addon.groupThresholdDiscounts = {
-          level: 'admin',
-          ui_type: 'array-obj',
-          value: {
-            types: v
+          
+          // Then synchronize with other addons in the same group
+          if (addon.groupName && addon.groupName.trim()) {
+              synchronizeGroupThresholdDiscounts(fIdx, oIdx, aIdx, addon.groupName, v);
+          } else {
+              // If no grouping, just save the current addon's data
+              saveData();
           }
-        };
-      } else {
-        addon.groupThresholdDiscounts.value = {
-          types: v
-        };
-      }
-      
-      // Then synchronize with other addons in the same group
-      if (addon.groupName && addon.groupName.trim()) {
-        synchronizeGroupThresholdDiscounts(fIdx, oIdx, aIdx, addon.groupName, v);
-      } else {
-        // If no grouping, just save the current addon's data
-        saveData();
-      }
-    },
-    // Pass group info for UI registry - only if the addon is actually in a group
-    addon.groupName && addon.groupName.trim() ? {
-      groupName: addon.groupName,
-      featureIdx: fIdx,
-      optionIdx: oIdx,
-      addonIdx: aIdx
-    } : null
+      },
+      // Pass group info for UI registry - only if the addon is actually in a group
+      addon.groupName && addon.groupName.trim() ? {
+          groupName: addon.groupName,
+          featureIdx: fIdx,
+          optionIdx: oIdx,
+          addonIdx: aIdx
+      } : null
   );
 
-  // Create maxGroupItems field
+  // Store the render function for later use
+  groupThresholdDiscountsUI._renderFunction = groupThresholdDiscountsUI.querySelector('._render_function');
+
+  // Create maxGroupItems field second
   const maxGroupItemsGroup = createMaxGroupItemsField(
-    addon, fIdx, oIdx, aIdx, addon.groupName
+      addon, fIdx, oIdx, aIdx, addon.groupName
   );
+
+  // AFTER UI elements are created, add autocomplete to the group name
+  const groupNameInput = groupNameGroup.querySelector('input[type="text"]');
+  if (groupNameInput) {
+      // Set a unique class to help identify this is an addon group name input
+      groupNameInput.classList.add('addon-group-name-input');
+      groupNameInput.dataset.fIdx = fIdx;
+      groupNameInput.dataset.oIdx = oIdx;
+      groupNameInput.dataset.aIdx = aIdx;
+      
+      // Add autocomplete with all references properly defined
+      addGroupNameAutocomplete(
+          groupNameInput, 
+          fIdx, 
+          oIdx, 
+          aIdx, 
+          addon,
+          maxGroupItemsGroup,
+          groupThresholdDiscountsUI
+      );
+      
+      // Check for stored group name and show it as placeholder
+      if (addon._storedGroupName && !addon.groupName) {
+          groupNameInput.placeholder = `Previously: ${addon._storedGroupName}`;
+      }
+  }
   
   // Add all new UI elements to content in the desired order
   contentInner.appendChild(groupAddonGroup);
@@ -2874,38 +3335,140 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
 
   let previousGroupName = addon.groupName || '';
 
-  // Handle checkbox state change
-  groupCheckbox.addEventListener('change', e => {
-    // Store the current group name before hiding the field
-    const groupNameInput = groupNameGroup.querySelector('input');
-    if (groupNameInput && groupNameInput.value) {
-      previousGroupName = groupNameInput.value;
-    }
-    
-    // Just hide the UI elements if unchecked
-    if (!e.target.checked) {
-      groupNameGroup.style.display = 'none';
-      maxGroupItemsGroup.style.display = 'none';
-      groupThresholdDiscountsUI.style.display = 'none';
-    } else {
-      // When rechecked, restore the previous name
-      if (groupNameInput && previousGroupName) {
-        groupNameInput.value = previousGroupName;
-        addon.groupName = previousGroupName;
+  // Add this helper function
+  function getThresholdData(discountsData) {
+      try {
+          if (!discountsData) return [{ itemCount: "", discount: "" }];
+          
+          if (typeof discountsData === 'string') {
+              const parsed = JSON.parse(discountsData);
+              return Array.isArray(parsed) ? parsed : 
+                    (parsed.types ? parsed.types : [{ itemCount: "", discount: "" }]);
+          } 
+          
+          if (Array.isArray(discountsData)) {
+              return discountsData;
+          }
+          
+          if (discountsData.types) {
+              return discountsData.types;
+          }
+          
+          if (discountsData.value && discountsData.value.types) {
+              return discountsData.value.types;
+          }
+          
+          return [{ itemCount: "", discount: "" }];
+      } catch (e) {
+          console.error("Error parsing threshold data:", e);
+          return [{ itemCount: "", discount: "" }];
       }
-      
-      groupNameGroup.style.display = 'flex';
-      maxGroupItemsGroup.style.display = 'flex';
-      groupThresholdDiscountsUI.style.display = 'flex';
-    }
-    
-    addon.enableGrouping = e.target.checked;
-    saveData();
-    
-    // Update container heights
-    setTimeout(() => {
-      updateAllOpenContainers();
-    }, 100);
+  }
+
+  // Handle checkbox state change
+  groupCheckbox.addEventListener('change', function(e) {
+      addon.enableGrouping = e.target.checked;
+
+      if (e.target.checked) {
+          // When re-checked, first restore fields visibility
+          groupNameGroup.style.display = 'flex';
+          maxGroupItemsGroup.style.display = 'flex';
+          groupThresholdDiscountsUI.style.display = 'flex';
+          
+          // Restore the previous group name if available
+          if (addon._storedGroupName) {
+              // Set the value in the data model
+              addon.groupName = addon._storedGroupName;
+              
+              // Update the input field
+              const groupNameInput = groupNameGroup.querySelector('input');
+              if (groupNameInput) {
+                  // Set the value programmatically
+                  groupNameInput.value = addon._storedGroupName;
+                  
+                  // Force input event to trigger data synchronization
+                  const inputEvent = new Event('input', { bubbles: true });
+                  groupNameInput.dispatchEvent(inputEvent);
+                  
+                  // Force change event for good measure
+                  const changeEvent = new Event('change', { bubbles: true });
+                  groupNameInput.dispatchEvent(changeEvent);
+              }
+              
+              // Restore threshold discounts if available
+              if (addon._storedGroupThresholdDiscounts) {
+                  addon.groupThresholdDiscounts = JSON.parse(
+                      JSON.stringify(addon._storedGroupThresholdDiscounts)
+                  );
+                  
+                  // Update the threshold UI with the stored data
+                  if (groupThresholdDiscountsUI._renderFunction) {
+                      const discountsData = getThresholdData(addon._storedGroupThresholdDiscounts);
+                      groupThresholdDiscountsUI._renderFunction(discountsData);
+                  }
+              }
+              
+              // Restore max group items if available
+              if (addon._storedMaxGroupItems !== undefined) {
+                  addon.maxGroupItems = addon._storedMaxGroupItems;
+                  
+                  // Update the max items UI
+                  const input = maxGroupItemsGroup.querySelector('input[type="number"]');
+                  const checkbox = maxGroupItemsGroup.querySelector('input[type="checkbox"]');
+                  
+                  if (input && checkbox) {
+                      if (addon._storedMaxGroupItems === -1) {
+                          checkbox.checked = true;
+                          input.disabled = true;
+                          input.value = '';
+                      } else {
+                          checkbox.checked = false;
+                          input.disabled = false;
+                          input.value = addon._storedMaxGroupItems.toString();
+                      }
+                  }
+              }
+          }
+      } else {
+          // When unchecked, store current values but hide UI
+          const groupNameInput = groupNameGroup.querySelector('input');
+          if (groupNameInput && groupNameInput.value) {
+              addon._storedGroupName = groupNameInput.value;
+          }
+          
+          // Store threshold discounts
+          if (addon.groupThresholdDiscounts) {
+              addon._storedGroupThresholdDiscounts = JSON.parse(
+                  JSON.stringify(addon.groupThresholdDiscounts)
+              );
+          }
+          
+          // Store max items
+          if (addon.maxGroupItems !== -1) {
+              addon._storedMaxGroupItems = addon.maxGroupItems;
+          }
+          
+          // Clear the actual data values (not just hiding UI)
+          addon.groupName = '';
+          addon.groupThresholdDiscounts = { 
+              level: 'admin', 
+              ui_type: 'array-obj', 
+              value: { types: [{ itemCount: "", discount: "" }] } 
+          };
+          addon.maxGroupItems = -1;
+          
+          // Hide all group-related fields
+          groupNameGroup.style.display = 'none';
+          maxGroupItemsGroup.style.display = 'none';
+          groupThresholdDiscountsUI.style.display = 'none';
+      }
+
+      saveData();
+
+      // Update container heights
+      setTimeout(() => {
+          updateAllOpenContainers();
+      }, 100);
   });
 
   // Add dynamic fields
