@@ -4,6 +4,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
 
+    // Keeps track of mode
+    let estimateMode = false;
+
+    // Check for corrupt or invalid session data and clean it
+    try {
+        const orderData = sessionStorage.getItem('placedOrder');
+        if (orderData) {
+            const orderInfo = JSON.parse(orderData);
+            if (!orderInfo || !orderInfo.orderID || orderInfo.status !== 'pending') {
+                // If the data doesn't look like a valid order, clear it
+                console.log('Clearing invalid order data');
+                sessionStorage.removeItem('placedOrder');
+            }
+        }
+    } catch (e) {
+        console.error('Error parsing order data on load', e);
+        sessionStorage.removeItem('placedOrder');
+    }
+
+    if (hasValidOrder()) disableFormInteraction();
+
     // Load any saved state from sessionStorage
     if (sessionStorage.getItem('priceCalcSelections')) {
         selections = JSON.parse(sessionStorage.getItem('priceCalcSelections'));
@@ -97,6 +118,269 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
+    function disableFormInteraction() {
+        // Disable the features container (the form)
+        const featuresContainer = document.getElementById('features-container');
+        if (featuresContainer) {
+            featuresContainer.style.pointerEvents = 'none';
+        }
+        
+        // Optionally add a subtle visual indicator that the form is locked
+        const lockIndicator = document.createElement('div');
+        lockIndicator.className = 'order-placed-indicator';
+        lockIndicator.innerHTML = `
+            <div class="lock-message">
+                <i class="fa fa-check-circle"></i> Order placed successfully! Pay Below.
+            </div>
+        `;
+        
+        // Style the indicator
+        lockIndicator.style.position = 'absolute';
+        lockIndicator.style.top = '10px';
+        lockIndicator.style.right = '10px';
+        lockIndicator.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
+        lockIndicator.style.color = 'white';
+        lockIndicator.style.padding = '8px 12px';
+        lockIndicator.style.borderRadius = '4px';
+        lockIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        lockIndicator.style.zIndex = '1';
+        lockIndicator.style.fontSize = '14px';
+        
+        // Find a good container to append to
+        const container = document.querySelector('.price-calculator-container') || 
+                        document.querySelector('.dashboard-content') ||
+                        featuresContainer.parentNode;
+                        
+        if (container) {
+            // Check if we already added the indicator
+            const existingIndicator = document.querySelector('.order-placed-indicator');
+            if (!existingIndicator) {
+                container.style.position = 'relative';
+                container.appendChild(lockIndicator);
+            }
+        }
+    }
+
+    function showOrderConfirmation() {
+        const modal = document.createElement('div');
+        modal.className = 'order-confirm-modal';
+        modal.innerHTML = `
+            <div class="order-confirm-content">
+                <h3>Confirm Your Order</h3>
+                <p>Are you sure you want to place this order?</p>
+                <div class="order-confirm-buttons">
+                    <button class="confirm-button">Confirm</button>
+                    <button class="cancel-button">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Force reflow for animation
+        void modal.offsetWidth;
+        modal.classList.add('active');
+        
+        // Add event listeners
+        modal.querySelector('.confirm-button').addEventListener('click', function() {
+            modal.remove();
+            submitOrder();
+        });
+        
+        modal.querySelector('.cancel-button').addEventListener('click', function() {
+            modal.remove();
+        });
+    }
+
+    function showLoadingOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `<div class="loading-spinner">
+            <img src="${dashboardData.theme_path}/images/loading.gif" alt="Loading">
+        </div>`;
+        document.body.appendChild(overlay);
+        
+        // Force reflow for animation
+        void overlay.offsetWidth;
+        overlay.classList.add('active');
+        return overlay;
+    }
+
+    function hideLoadingOverlay(overlay) {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 300);
+    }
+
+    function submitOrder() {
+        const overlay = showLoadingOverlay();
+        
+        // Find all selections that have an optionIndex
+        let orderItems = [];
+        let foundSelections = false;
+
+        // Extract data from selections
+        for (const [fIdx, instances] of Object.entries(selections)) {
+            for (const instance of instances) {
+                if (instance.optionIndex !== undefined) {
+                    // Only count as a valid selection if it points to a real option
+                    const feature = dashboardData.features[fIdx];
+                    if (feature && feature.options && feature.options[instance.optionIndex]) {
+                        const option = feature.options[instance.optionIndex];
+                        
+                        // Use actual database IDs instead of array indices
+                        const orderItem = {
+                            featureId: feature.id, // Use actual feature ID
+                            optionId: option.id,   // Use actual option ID
+                            addonIds: instance.addons || [],
+                            userData: {},
+                            clientCalculatedPrice: calculateInstancePrice(feature, instance)
+                        };
+
+                        // Add price option index as a dedicated field
+                        if (instance.priceOptionIndex !== undefined) {
+                            orderItem.priceOptionIndex = instance.priceOptionIndex;
+                        }
+
+                        // Add quantity for non-recurring features
+                        if (!feature.recurring && instance.quantity) {
+                            orderItem.quantity = parseInt(instance.quantity);
+                        }
+
+                        // Collect user fields
+                        if (instance.userFields) {
+                            orderItem.userData = {...orderItem.userData, ...instance.userFields};
+                        }
+
+                        // Add feature-level fields if they exist
+                        if (instance.featureFields) {
+                            orderItem.userData = {...orderItem.userData, ...instance.featureFields};
+                        }
+                        
+                        orderItems.push(orderItem);
+                        foundSelections = true;
+                    }
+                }
+            }
+        }
+
+        if (!foundSelections || orderItems.length === 0) {
+            hideLoadingOverlay(overlay);
+            alert('Please select at least one item to order.');
+            return;
+        }
+
+        // Check if we already have an ongoing order
+        let orderID = null;
+        const existingOrder = sessionStorage.getItem('placedOrder');
+        if (existingOrder) {
+            try {
+                const orderInfo = JSON.parse(existingOrder);
+                if (orderInfo.orderID) {
+                    orderID = orderInfo.orderID;
+                }
+            } catch (e) {
+                console.error('Error parsing existing order data', e);
+            }
+        }
+        
+        // Create the batch request
+        const orderData = {
+            items: orderItems
+        };
+        
+        // Add orderID if we have one
+        if (orderID) {
+            orderData.orderID = orderID;
+        }
+        
+        // Submit all items in a single request
+        fetch(`${myApi.api_url}place-order`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': myApi.nonce 
+            },
+            body: JSON.stringify(orderData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Order placement failed');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Order response:', data);
+            if (data.success) {
+                // Store the response in session
+                sessionStorage.setItem('placedOrder', JSON.stringify({
+                    recordId: data.records[0].recordId, // First record ID for backward compatibility
+                    orderID: data.orderID,
+                    status: 'pending',
+                    itemCount: orderItems.length,
+                    totalValue: data.totalOrderValue
+                }));
+                
+                // Update UI
+                updateOrderButton();
+                
+                // Disable the form
+                disableFormInteraction();
+            }
+            
+            hideLoadingOverlay(overlay);
+        })
+        .catch(error => {
+            hideLoadingOverlay(overlay);
+            alert(error.message || 'An error occurred while placing your order.');
+            console.error('Order submission error:', error);
+        });
+    }
+
+    // Check if there's actually a valid order
+    function hasValidOrder() {
+        const orderData = sessionStorage.getItem('placedOrder');
+        if (!orderData) return false;
+        
+        try {
+            const orderInfo = JSON.parse(orderData);
+            // Make sure the order data has required fields that would indicate
+            // it's a properly formed order
+            return orderInfo && orderInfo.orderID && orderInfo.status === 'pending';
+        } catch (e) {
+            console.error('Error parsing order data', e);
+            // If there's an error parsing the data, it's not valid
+            sessionStorage.removeItem('placedOrder'); // Clear invalid data
+            return false;
+        }
+    }
+    
+    function updateOrderButton() {
+        const payNowBtn = document.getElementById('pay-now');
+        if (!payNowBtn) return;
+        
+        if (hasValidOrder()) {
+            // Valid order already placed - show Pay Now
+            payNowBtn.textContent = 'Pay Now';
+            payNowBtn.onclick = function() {
+                alert('Payment functionality coming soon!');
+            };
+        } else {
+            // No valid order placed yet
+            if (estimateMode) {
+                // If we have any price ranges, change to Request Estimate
+                payNowBtn.textContent = 'Request Estimate';
+                payNowBtn.onclick = function() {
+                    alert('Estimate request functionality coming soon!');
+                };
+            } else {
+                // Otherwise, use the Place Order button
+                payNowBtn.textContent = 'Place Order';
+                payNowBtn.onclick = showOrderConfirmation;
+            }
+        }
+    }
+
     // -------------------------
     // INVOICE CALCULATION LOGIC
     // (All addition of addons is done here, not in the option details)
@@ -134,8 +418,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add addon prices
         if (instance.addons && Array.isArray(instance.addons)) {
-            instance.addons.forEach(addonIndex => {
-                const addon = option.addons[addonIndex];
+            instance.addons.forEach(addonId => {
+                // Find addon by ID instead of index
+                const addon = option.addons.find(a => a.id === addonId);
                 if (addon) {
                     const modVal = parseSafe(addon.staticPriceMod, 0);
                     if (isMultiply(addon)) {
@@ -150,13 +435,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Before calculating the final price, check for group discounts
         if (instance.addons && Array.isArray(instance.addons)) {
             // Initialize or clear the groupDiscounts object
-            instance.groupDiscounts = {}; // Clear any existing discounts
+            instance.groupDiscounts = {};
             
             // Group selected addons by their group name
             const addonsByGroup = {};
             
-            instance.addons.forEach(addonIndex => {
-                const addon = option.addons[addonIndex];
+            instance.addons.forEach(addonId => {
+                // Find addon by ID
+                const addon = option.addons.find(a => a.id === addonId);
                 if (addon && addon.groupName && addon.enableGrouping) {
                     if (!addonsByGroup[addon.groupName]) {
                         addonsByGroup[addon.groupName] = {
@@ -353,7 +639,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateInvoice() {
         let totalLower = 0;
         let totalUpper = 0;
-        let estimateMode = false;
+        estimateMode = false;
 
         let tableHTML = `
             <table class="invoice-table">
@@ -455,7 +741,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     tableHTML += `
                         <tr>
                             <td>${feature.featureName}</td>
-                            <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
+                            <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
                             <td>${intervalLabel}</td>
                             <td>$${lower.toFixed(2)} - $${upper.toFixed(2)}</td>
                         </tr>
@@ -504,7 +790,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             tableHTML += `
                                 <tr>
                                     <td>${feature.featureName}</td>
-                                    <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
+                                    <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
                                     <td>${intervalLabel}</td>
                                     <td>
                                         <div>
@@ -522,7 +808,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         tableHTML += `
                             <tr>
                                 <td>${feature.featureName}</td>
-                                <td>${option.optionName}${selectedOptionText}${userFieldsText}${qtyDisplay}</td>
+                                <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
                                 <td>${intervalLabel}</td>
                                 <td>$${price.toFixed(2)}</td>
                             </tr>
@@ -583,21 +869,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         invoiceDetails.innerHTML = tableHTML;
 
-        // Handle toggling Pay Now vs. Request Estimate
-        const payNowBtn = document.getElementById('pay-now');
-        if (payNowBtn) {
-            if (estimateMode) {
-                payNowBtn.textContent = 'Request Estimate';
-                payNowBtn.onclick = function() {
-                    alert('Request Estimate functionality coming soon!');
-                };
-            } else {
-                payNowBtn.textContent = 'Pay Now';
-                payNowBtn.onclick = function() {
-                    alert('Pay Now functionality coming soon!');
-                };
-            }
-        }
+        updateOrderButton();
     }
 
     // Render feature-level user fields
@@ -1616,17 +1888,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.createElement('div');
         container.classList.add('addon-item');
         
-        // Create checkbox with explicit dimensions
+        // Create checkbox
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.value = aIndex;
-        checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${aIndex}`;
+        checkbox.value = addon.id; // Use the actual addon ID instead of index
+        checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${addon.id}`;
         checkbox.classList.add('addon-checkbox');
         if (addon.groupName) {
             checkbox.dataset.group = addon.groupName;
         }
         
-        if (instance.addons && instance.addons.indexOf(aIndex) !== -1) {
+        // Check if this addon is selected by ID instead of index
+        if (instance.addons && instance.addons.includes(addon.id)) {
             checkbox.checked = true;
         }
         
@@ -1636,9 +1909,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 instance.addons = [];
             }
             if (this.checked) {
-                instance.addons.push(aIndex);
+                instance.addons.push(addon.id); // Store actual addon ID
             } else {
-                const idx = instance.addons.indexOf(aIndex);
+                const idx = instance.addons.indexOf(addon.id);
                 if (idx !== -1) {
                     instance.addons.splice(idx, 1);
                 }
@@ -2071,8 +2344,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Stub pay-now button
     const payNowBtn = document.getElementById('pay-now');
     if (payNowBtn) {
-        payNowBtn.addEventListener('click', function() {
-            alert('Pay Now functionality coming soon!');
-        });
+        payNowBtn.removeEventListener('click', payNowBtn.onclick);
+        updateOrderButton();
     }
 });

@@ -36,5 +36,11 @@ function register_plugin_custom_api_endpoints() {
         'callback'            => 'firefly_collective_save_pricing',
         'permission_callback' => 'verify_rest_nonce'
     ));
+
+    register_rest_route('custom-api/v1', '/place-order', array(
+    'methods'             => 'POST',
+    'callback'            => 'firefly_collective_place_order',
+    'permission_callback' => 'verify_rest_nonce'
+));
 }
 add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

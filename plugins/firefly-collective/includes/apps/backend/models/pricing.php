@@ -899,6 +899,7 @@ function get_features_options_addons() {
         if (!isset($out[$fid])) {
             $feat = [];
             foreach ($f_cols as $c=>$t) $feat[$c] = $cast($r["f_$c"],$t);
+            $feat['id'] = $fid;
             $feat['options'] = [];
             $out[$fid] = $feat;
         }
@@ -907,12 +908,14 @@ function get_features_options_addons() {
             if (!isset($out[$fid]['options'][$oid])) {
                 $opt = [];
                 foreach ($o_cols as $c=>$t) $opt[$c] = $cast($r["o_$c"],$t);
+                $opt['id'] = $oid;
                 $opt['addons'] = [];
                 $out[$fid]['options'][$oid] = $opt;
             }
             if ($r['a_id']) {
                 $add = [];
                 foreach ($a_cols as $c=>$t) $add[$c] = $cast($r["a_$c"],$t);
+                $add['id'] = $r['a_id'];
                 $out[$fid]['options'][$oid]['addons'][] = $add;
             }
         }
@@ -954,10 +957,390 @@ function get_features_options_addons() {
 }
 
 /**
+ * Creates the _ffc_orders table for storing order data
+ */
+function create_ffc_orders_table_if_not_exist() {
+    global $wpdb;
+    $collate = $wpdb->get_charset_collate();
+    
+    $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ffc_orders (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        orderID VARCHAR(36) DEFAULT NULL,
+        userId INT UNSIGNED NOT NULL,
+        featureId INT UNSIGNED NOT NULL,
+        optionId INT UNSIGNED NOT NULL,
+        addonIds JSON DEFAULT NULL,
+        priceSelected INT DEFAULT NULL,
+        quantity INT DEFAULT NULL,
+        totalPrice DECIMAL(10,2) DEFAULT NULL,
+        userData JSON NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY(id),
+        INDEX idx_order (orderID),
+        INDEX idx_user (userId),
+        INDEX idx_feature (featureId),
+        INDEX idx_option (optionId),
+        INDEX idx_status (status),
+        INDEX idx_created (createdAt)
+    ) {$collate};";
+    
+    require_once(ABSPATH.'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+/**
+ * Initialize pricing on plugin activation
+ * Creates tables and syncs JSON with database
+ */
+function firefly_collective_pricing_init() {
+    // Always create the orders table
+    create_ffc_orders_table_if_not_exist();
+    
+    // Check if pricing.json exists and has data
+    $plugin_root_path = dirname(plugin_dir_path(__FILE__));
+    $pricing_json_path = $plugin_root_path . '/pricing.json';
+    
+    if (file_exists($pricing_json_path)) {
+        $content = file_get_contents($pricing_json_path);
+        $pricing_data = json_decode($content, true);
+        
+        // Only proceed if we have valid JSON with features
+        if (is_array($pricing_data) && !empty($pricing_data['features'])) {
+            // Create the other tables
+            create_pricing_tables_if_not_exist();
+            
+            // Format the data to match what the upsert function expects
+            $payload = array(
+                'pricingData' => $pricing_data,
+                'nameChanges' => array('features' => array(), 'options' => array(), 'addons' => array())
+            );
+            
+            // Sync the JSON with the database
+            upsert_pricing_data($payload);
+        }
+    }
+}
+
+function firefly_collective_place_order($request) {
+    global $wpdb;
+    $data = $request->get_json_params();
+    
+    // Check if we're receiving a single item or multiple items
+    $is_batch = isset($data['items']) && is_array($data['items']);
+    $order_items = $is_batch ? $data['items'] : [$data];
+    
+    // Get current user ID
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
+    }
+    
+    // Generate order ID if not provided
+    $order_id = isset($data['orderID']) ? sanitize_text_field($data['orderID']) : wp_generate_uuid4();
+    
+    $inserted_records = [];
+    $total_order_value = 0;
+    
+    // Process each order item
+    foreach ($order_items as $item) {
+        // Extract item data
+        $feature_id = intval($item['featureId']);
+        $option_id = intval($item['optionId']);
+        $addon_ids = isset($item['addonIds']) ? $item['addonIds'] : [];
+        $user_data = isset($item['userData']) ? $item['userData'] : [];
+        $price_option_index = isset($item['priceOptionIndex']) ? intval($item['priceOptionIndex']) : 0;
+        $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
+        
+        // Calculate price on server-side - we can directly use the IDs now
+        $calculated_price = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
+        
+        // Insert order item into database
+        $result = $wpdb->insert(
+            $wpdb->prefix . 'ffc_orders',
+            array(
+                'orderID' => $order_id,
+                'userId' => $user_id,
+                'featureId' => $feature_id,
+                'optionId' => $option_id,
+                'addonIds' => json_encode($addon_ids),
+                'priceSelected' => $price_option_index,
+                'quantity' => $quantity,
+                'totalPrice' => $calculated_price,
+                'userData' => json_encode($user_data),
+                'status' => 'pending',
+                'createdAt' => current_time('mysql')
+            )
+        );
+        
+        if ($result === false) {
+            return new WP_Error('db_error', 'Failed to save order item: ' . $wpdb->last_error, array('status' => 500));
+        }
+        
+        $inserted_records[] = [
+            'recordId' => $wpdb->insert_id,
+            'featureId' => $feature_id,
+            'calculatedPrice' => $calculated_price
+        ];
+        
+        $total_order_value += $calculated_price;
+    }
+    
+    // Return success with orderID and all record IDs
+    return array(
+        'success' => true,
+        'orderID' => $order_id,
+        'records' => $inserted_records,
+        'totalOrderValue' => $total_order_value
+    );
+}
+
+/**
+ * Calculate order price using the same logic as the frontend
+ */
+function calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity) {
+    global $wpdb;
+    
+    // Get feature data
+    $feature = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d", $feature_id),
+        ARRAY_A
+    );
+    
+    if (!$feature) {
+        return 0;
+    }
+    
+    // Get option data
+    $option = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d", $option_id),
+        ARRAY_A
+    );
+    
+    if (!$option) {
+        return 0;
+    }
+    
+    // Get base price
+    $price = parse_safe($option['staticPrice'], 0);
+    
+    // Handle price options
+    if (!empty($option['priceOptions'])) {
+        $price_options_array = [];
+        
+        if (is_string($option['priceOptions'])) {
+            $decoded = json_decode($option['priceOptions'], true);
+            $price_options_array = isset($decoded['types']) ? $decoded['types'] : [];
+        } elseif (isset($option['priceOptions']['types'])) {
+            $price_options_array = $option['priceOptions']['types'];
+        }
+        
+        if (!empty($price_options_array) && isset($price_options_array[$price_option_index])) {
+            $price = parse_safe($price_options_array[$price_option_index]['price'], $price);
+        }
+    }
+    
+    // Get selected addons
+    $selected_addons = [];
+    if (!empty($addon_ids)) {
+        // Convert array to comma-separated string for IN clause
+        $placeholders = implode(',', array_fill(0, count($addon_ids), '%d'));
+        
+        // Prepare query parameters
+        $query_params = $addon_ids;
+        array_unshift($query_params, $option_id);
+        
+        // Get all selected addons in one query
+        $selected_addons = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_addons 
+                 WHERE optionId = %d AND id IN ($placeholders)",
+                $query_params
+            ),
+            ARRAY_A
+        );
+    }
+    
+    // Apply addon prices
+    foreach ($selected_addons as $addon) {
+        $mod_val = parse_safe($addon['staticPriceMod'], 0);
+        if (is_multiply($addon)) {
+            $price *= ($mod_val ?: 1);
+        } else {
+            $price += $mod_val;
+        }
+    }
+    
+    // Process group discounts
+    $addons_by_group = [];
+    
+    foreach ($selected_addons as $addon) {
+        if (!empty($addon['groupName']) && !empty($addon['enableGrouping'])) {
+            if (!isset($addons_by_group[$addon['groupName']])) {
+                $addons_by_group[$addon['groupName']] = [
+                    'addons' => [],
+                    'thresholdDiscounts' => parse_threshold_discounts($addon['groupThresholdDiscounts'])
+                ];
+            }
+            $addons_by_group[$addon['groupName']]['addons'][] = $addon;
+        }
+    }
+    
+    // Apply group discounts
+    foreach ($addons_by_group as $group_name => $group) {
+        if (empty($group['thresholdDiscounts']) || empty($group['addons'])) {
+            continue;
+        }
+        
+        // Sort discounts by item count in descending order
+        $sorted_discounts = $group['thresholdDiscounts'];
+        usort($sorted_discounts, function($a, $b) {
+            return intval($b['itemCount']) - intval($a['itemCount']);
+        });
+        
+        // Find the highest applicable discount
+        $applicable_discount = null;
+        foreach ($sorted_discounts as $discount) {
+            if (count($group['addons']) >= intval($discount['itemCount'])) {
+                $applicable_discount = $discount;
+                break;
+            }
+        }
+        
+        if ($applicable_discount) {
+            // Calculate the discount amount
+            $group_items_total = 0;
+            foreach ($group['addons'] as $addon) {
+                $group_items_total += parse_safe($addon['staticPriceMod'], 0);
+            }
+            
+            $discount_percent = floatval($applicable_discount['discount']);
+            $discount_amount = $group_items_total * ($discount_percent / 100);
+            
+            // Apply discount to the total price
+            $price -= $discount_amount;
+        }
+    }
+    
+    // Calculate total price before quantity discount
+    $total_price = $price * $quantity;
+    $original_price = $total_price;
+    
+    // Apply highest applicable threshold discount
+    if (!empty($option['thresholdDiscounts'])) {
+        $thresholds = [];
+        
+        if (is_string($option['thresholdDiscounts'])) {
+            $thresholds = json_decode($option['thresholdDiscounts'], true);
+        } elseif (isset($option['thresholdDiscounts']['types'])) {
+            $thresholds = $option['thresholdDiscounts']['types'];
+        } elseif (is_array($option['thresholdDiscounts'])) {
+            $thresholds = $option['thresholdDiscounts'];
+        }
+        
+        if (is_array($thresholds)) {
+            // Sort thresholds by itemCount in descending order
+            usort($thresholds, function($a, $b) {
+                return intval($b['itemCount']) - intval($a['itemCount']);
+            });
+            
+            // Filter valid thresholds
+            $valid_thresholds = array_filter($thresholds, function($t) {
+                return intval($t['itemCount']) > 0 && floatval($t['discount']) > 0;
+            });
+            
+            // Find first threshold that applies (highest one)
+            $applied_threshold = null;
+            foreach ($valid_thresholds as $threshold) {
+                if ($quantity >= intval($threshold['itemCount'])) {
+                    $applied_threshold = $threshold;
+                    break;
+                }
+            }
+            
+            if ($applied_threshold) {
+                $discount_percentage = floatval($applied_threshold['discount']);
+                $total_price = $original_price * (1 - $discount_percentage/100);
+            }
+        }
+    }
+    
+    // Return the final price rounded to two decimal places
+    return round($total_price, 2);
+}
+
+/**
+ * Parse numeric values safely
+ */
+function parse_safe($val, $fallback = 0) {
+    $parsed = is_numeric($val) ? (float)$val : $fallback;
+    return !is_finite($parsed) ? $fallback : $parsed;
+}
+
+/**
+ * Check if an addon uses multiplication
+ */
+function is_multiply($addon) {
+    if (isset($addon['priceModifierType']) && is_array($addon['priceModifierType'])) {
+        return isset($addon['priceModifierType']['selected']) && $addon['priceModifierType']['selected'] == 1;
+    }
+    if (isset($addon['priceModifierType']) && is_string($addon['priceModifierType'])) {
+        return strtolower($addon['priceModifierType']) === 'multiply';
+    }
+    return false;
+}
+
+/**
+ * Parse threshold discounts from JSON string
+ */
+function parse_threshold_discounts($discounts_data) {
+    if (empty($discounts_data)) {
+        return [];
+    }
+    
+    try {
+        $thresholds = [];
+        
+        if (is_string($discounts_data)) {
+            $parsed = json_decode($discounts_data, true);
+            if (isset($parsed['types'])) {
+                $thresholds = $parsed['types'];
+            } else {
+                $thresholds = $parsed;
+            }
+        } elseif (isset($discounts_data['types'])) {
+            $thresholds = $discounts_data['types'];
+        } elseif (is_array($discounts_data)) {
+            $thresholds = $discounts_data;
+        }
+        
+        // Convert to numeric values and filter
+        $result = [];
+        if (is_array($thresholds)) {
+            foreach ($thresholds as $threshold) {
+                if (!empty($threshold['itemCount']) && !empty($threshold['discount'])) {
+                    $result[] = [
+                        'itemCount' => intval($threshold['itemCount']),
+                        'discount' => floatval($threshold['discount'])
+                    ];
+                }
+            }
+        }
+        
+        return $result;
+    } catch (Exception $e) {
+        error_log("Error parsing threshold discounts: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
  * Drop all pricing tables.
  */
-function drop_ffc_tables() {
+function drop_ffc_pricing_tables() {
     global $wpdb;
+    $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_orders");
     $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_addons");
     $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_options");
     $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}ffc_features");

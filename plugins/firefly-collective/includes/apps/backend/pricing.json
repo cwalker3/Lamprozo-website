@@ -11,6 +11,17 @@
                     "description": {
                         "text": "This is the base cheese pizza."
                     },
+                    "dineInTakeOutDelivery": {
+                        "level": "user",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "Dine In",
+                                "Take Out",
+                                "Delivery"
+                            ]
+                        }
+                    },
                     "interval": {
                         "level": "admin",
                         "ui_type": "array",
@@ -557,6 +568,132 @@
                             },
                             "enableGrouping": true,
                             "maxGroupItems": 2,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
+                }
+            ],
+            "recurring": false,
+            "link_name": ""
+        },
+        {
+            "featureName": "Salad",
+            "description": {
+                "text": "These are the salads."
+            },
+            "options": [
+                {
+                    "optionName": "Italian Salad",
+                    "description": {
+                        "text": "This is the italian salad. "
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 2
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 0,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "small",
+                                    "price": 10
+                                },
+                                {
+                                    "label": "medium",
+                                    "price": 15
+                                },
+                                {
+                                    "label": "large",
+                                    "price": 20
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "itemCount": 3,
+                                    "discount": 10
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [
+                        {
+                            "addonName": "Extra Dressing",
+                            "description": {
+                                "text": "This is the extra dressing."
+                            },
+                            "addOnMetric": "unit",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1.5,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
                             "link_name": ""
                         }
                     ],
