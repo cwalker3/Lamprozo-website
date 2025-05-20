@@ -23,48 +23,100 @@ function firefly_collective_add_pricing_link() {
 }
 add_action('admin_menu', 'firefly_collective_add_pricing_link');
 
+function firefly_collective_add_orders_link() {
+    add_menu_page(
+        'Orders',
+        'Orders',
+        'manage_options',
+        'orders',
+        'firefly_collective_orders_dashboard',
+        'dashicons-cart'
+    );
+}
+add_action('admin_menu', 'firefly_collective_add_orders_link');
+
 function enqueue_pricing_styles_and_scripts($hook) {
-    if ($hook !== 'toplevel_page_pricing') {
+    if ($hook !== 'toplevel_page_pricing' && $hook !== 'toplevel_page_orders') {
         return;
     }
 
     $plugin_root_url = dirname(plugin_dir_url(__FILE__)) . '/';
     $unique_id       = uniqid();
-
-    // Enqueue CSS & JS
-    wp_enqueue_style('pricing-css',  $plugin_root_url . 'assets/css/pricing.css', array(), $unique_id);
-    wp_enqueue_script('pricing-js', $plugin_root_url . 'assets/js/pricing.js', array(), $unique_id, true);
-
-    // Load pricing.json
-    $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
-    $pricing_json_path = $plugin_root_path . '/pricing.json';
-    $pricing_data      = array();
-    if (file_exists($pricing_json_path)) {
-        $content = file_get_contents($pricing_json_path);
-        $decoded = json_decode($content, true);
-        if (is_array($decoded)) {
-            $pricing_data = $decoded;
-        }
-    }
-
-    // Localize into JS
+    $hookName = '';
     $nonce   = wp_create_nonce('wp_rest');
     $api_url = get_rest_url(null, 'custom-api/v1/');
-    wp_localize_script('pricing-js', 'pricingData', array(
-        'data'   => $pricing_data,
-        'nonce'  => $nonce,
-        'apiUrl' => $api_url
-    ));
-    wp_localize_script('pricing-js', 'pricingDataSettings', array(
-        'nonce'  => $nonce,
-        'apiUrl' => $api_url
-    ));
+    
+    switch ($hook) {
+
+        // Pricing admin
+        case "toplevel_page_pricing":
+
+            // Enqueue CSS & JS
+            wp_enqueue_style('pricing-css', $plugin_root_url . 'assets/css/pricing.css', array(), $unique_id);
+            wp_enqueue_script('pricing-js', $plugin_root_url . 'assets/js/pricing.js', array(), $unique_id, true);
+
+            // Load pricing.json
+            $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
+            $pricing_json_path = $plugin_root_path . '/pricing.json';
+            $pricing_data      = array();
+            if (file_exists($pricing_json_path)) {
+                $content = file_get_contents($pricing_json_path);
+                $decoded = json_decode($content, true);
+                if (is_array($decoded)) {
+                    $pricing_data = $decoded;
+                }
+            }
+
+            // Localize into JS
+            $nonce   = wp_create_nonce('wp_rest');
+            $api_url = get_rest_url(null, 'custom-api/v1/');
+            wp_localize_script('pricing-js', 'pricingData', array(
+                'data'   => $pricing_data,
+                'nonce'  => $nonce,
+                'apiUrl' => $api_url
+            ));
+            wp_localize_script('pricing-js', 'pricingDataSettings', array(
+                'nonce'  => $nonce,
+                'apiUrl' => $api_url
+            ));
+            break;
+
+        // Orders admin
+        case "toplevel_page_orders":
+            // Enqueue CSS & JS
+            wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
+            wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
+            wp_enqueue_script('vue-js', 'https://unpkg.com/vue@3/dist/vue.global.js', array(), null, true);
+
+            $obj = new stdClass();
+
+            // Localize into JS
+            $nonce   = wp_create_nonce('wp_rest');
+            $api_url = get_rest_url(null, 'custom-api/v1/');
+            wp_localize_script('orders-js', 'ordersData', array(
+                'data'   => $obj,
+                'nonce'  => $nonce,
+                'apiUrl' => $api_url
+            ));
+            break;
+
+    }
 }
 add_action('admin_enqueue_scripts', 'enqueue_pricing_styles_and_scripts');
 
 function firefly_collective_pricing_dashboard() {
     $plugin_root = dirname(plugin_dir_path(__FILE__));
     $view_path   = $plugin_root . '/views/pricing.php';
+    if (file_exists($view_path)) {
+        require_once $view_path;
+    } else {
+        wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
+    }
+}
+
+function firefly_collective_orders_dashboard() {
+    $plugin_root = dirname(plugin_dir_path(__FILE__));
+    $view_path   = $plugin_root . '/views/orders.php';
     if (file_exists($view_path)) {
         require_once $view_path;
     } else {

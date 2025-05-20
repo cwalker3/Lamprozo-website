@@ -12,7 +12,7 @@
                 'init',     'rest',     
                 'db',       'bookings',
                 'util',     'projects',
-                'pricing');
+                'pricing',  'orders');
     foreach($models as $model) {
         require_once(plugin_dir_path(__FILE__) . "apps/backend/models/$model.php");
     }

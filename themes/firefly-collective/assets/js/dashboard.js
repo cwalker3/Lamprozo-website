@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
@@ -310,7 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-            console.log('Order response:', data);
             if (data.success) {
                 // Store the response in session
                 sessionStorage.setItem('placedOrder', JSON.stringify({
