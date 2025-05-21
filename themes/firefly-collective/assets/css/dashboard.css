@@ -6,6 +6,11 @@
     --bgLight: #f9f9f9;
     --bgWhite: #fff;
     --textDark: #333;
+    --fontSizeLarge: 2rem;
+    --fontSizeMedium: 1.6rem;
+    --fontSizeSmall: 1.4rem;
+    --fontSizeSmaller: 1.2rem;
+    --fontSizeSmallest: 1rem;
     --textGray: #555;
     --fieldColumnWidth: 150px; /* Fixed width for label column */
 }
@@ -61,7 +66,7 @@
     border-radius: 5px;
 }
 #price-calculator h2 {
-    font-size: 24px;
+    font-size: var(--fontSizeLarge);
     margin-bottom: 15px;
     color: var(--textDark);
 }
@@ -73,12 +78,12 @@
     border-bottom: 2px solid #ddd;
 }
 .feature-type h3 {
-    font-size: 20px;
+    font-size: var(--fontSizeMedium);
     margin-bottom: 5px;
     color: var(--primaryColor);
 }
 .feature-type p {
-    font-size: 14px;
+    font-size: var(--fontSizeSmall);
     color: var(--textGray);
     margin-bottom: 10px;
 }
@@ -102,7 +107,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
-    font-size: 16px;
+    font-size: var(--fontSizeMedium);
     font-weight: bold;
 }
 .delete-instance {
@@ -120,7 +125,7 @@
 /* Select dropdown */
 .feature select {
     padding: 8px;
-    font-size: 14px;
+    font-size: var(--fontSizeSmall);
     width: 100%;
     margin-bottom: 10px;
     border: 1px solid #ccc;
@@ -141,7 +146,7 @@
 .feature-fields-title {
     margin-top: 0;
     margin-bottom: 10px;
-    font-size: 16px;
+    font-size: var(--fontSizeMedium);
     color: var(--primaryColor);
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 5px;
@@ -156,7 +161,7 @@
 
 /* Style the feature fields on the invoice too */
 .feature-field-item {
-    font-size: 13px;
+    font-size: var(--fontSizeSmaller);
     color: #555;
     padding: 2px 0;
 }
@@ -166,7 +171,7 @@ td .feature-fields-list {
     margin-top: 4px;
     padding-top: 4px;
     border-top: 1px dotted #eee;
-    font-size: 12px;
+    font-size: var(--fontSizeSmaller);
 }
 
 /* Option Details */
@@ -181,7 +186,7 @@ td .feature-fields-list {
 /* Standard paragraph styles in option details */
 .option-details p {
     margin: 10px 0;
-    font-size: 13px;
+    font-size: var(--fontSizeSmaller);
     display: grid;
     grid-template-columns: var(--fieldColumnWidth) 1fr;
     gap: 10px;
@@ -236,7 +241,7 @@ td .feature-fields-list {
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: var(--fontSizeSmall);
     background-color: #fff;
 }
 
@@ -315,7 +320,7 @@ td .feature-fields-list {
 .addons h4 {
     margin-top: 0;
     margin-bottom: 10px;
-    font-size: 15px;
+    font-size: var(--fontSizeMedium);
     color: var(--primaryColor);
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 5px;
@@ -372,7 +377,7 @@ td .feature-fields-list {
 /* Max addons message */
 .max-addons-message {
     color: #d83838;
-    font-size: 12px;
+    font-size: var(--fontSizeSmaller);
     margin-top: 8px;
     font-weight: bold;
     animation: pulse 1.5s infinite;
@@ -380,10 +385,6 @@ td .feature-fields-list {
 
 .addon-group {
     color: black;
-}
-
-.discount-row td:last-of-type {
-    text-align: right;
 }
 
 @keyframes pulse {
@@ -408,7 +409,7 @@ td .feature-fields-list {
     position: absolute;
     right: 10px;
     top: 8px;
-    font-size: 18px;
+    font-size: var(--fontSizeLarge);
 }
 
 .add-new-feature:hover {
@@ -424,12 +425,12 @@ td .feature-fields-list {
     border-radius: 5px;
 }
 #invoice-container h2 {
-    font-size: 24px;
+    font-size: var(--fontSizeLarge);
     margin-bottom: 15px;
     color: var(--textDark);
 }
 
-/* Invoice Table */
+/* Invoice Table - 2 Column Layout */
 .invoice-table {
     width: 100%;
     border-collapse: collapse;
@@ -437,27 +438,142 @@ td .feature-fields-list {
     margin-bottom: 15px;
     color: black;
 }
+
 .invoice-table th,
 .invoice-table td {
     border: 1px solid #ccc;
-    padding: 10px;
-    vertical-align: middle;
+    padding: 12px;
+    vertical-align: top;
     text-align: left;
 }
+
 .invoice-table thead {
     background-color: #eee;
 }
+
 .invoice-table tfoot td {
     background-color: #eee;
     font-weight: bold;
 }
-.invoice-table th:nth-child(4),
-.invoice-table td:nth-child(4) {
+
+/* Price column alignment */
+.invoice-table th:nth-child(2),
+.invoice-table td:nth-child(2) {
     text-align: right;
+    width: 150px;
 }
+
+/* Main item styling */
+.item-main {
+    line-height: 1.4;
+}
+
+.feature-name {
+    font-weight: bold;
+    color: var(--primaryColor);
+    font-size: var(--fontSizeSmall);
+    margin-bottom: 4px;
+}
+
+.option-details {
+    font-size: var(--fontSizeSmaller);
+    color: #333;
+}
+
+.option-name {
+    font-weight: 500;
+    margin-bottom: 3px;
+}
+
+.option-detail-line {
+    font-size: var(--fontSizeSmaller);
+    color: #666;
+    margin-left: 8px;
+    margin-bottom: 2px;
+    line-height: 1.3;
+}
+
+/* Legacy classes for backward compatibility */
+.quantity-display,
+.interval-display,
+.user-fields-display {
+    font-size: var(--fontSizeSmaller);
+    color: #666;
+    font-style: italic;
+}
+
+.interval-display {
+    color: var(--secondaryColor);
+    font-weight: 500;
+}
+
+/* Addon row styling */
 .addon-row td {
     color: #666;
-    padding-left: 20px;
+    padding-left: 24px;
+    border-top: none;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.addon-item-name {
+    font-size: var(--fontSizeSmaller);
+    position: relative;
+}
+
+.addon-item-name::before {
+    content: "└ ";
+    color: #ccc;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+/* Discount row styling */
+.discount-row td {
+    color: #d83838;
+    padding-left: 24px;
+    border-top: none;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: var(--fontSizeSmaller);
+    font-weight: bold;
+}
+
+.discount-item-name {
+    position: relative;
+}
+
+.discount-item-name::before {
+    content: "└ ";
+    color: #d83838;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+/* Price with discount styling */
+.price-with-discount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: #999;
+    font-size: var(--fontSizeSmaller);
+}
+
+.discounted-price {
+    color: #d83838;
+    font-weight: bold;
+    font-size: var(--fontSizeSmall);
+}
+
+.discount-note {
+    font-size: var(--fontSizeSmallest);
+    color: #d83838;
+    font-style: italic;
 }
 
 /* Invoice Total Text */
@@ -566,7 +682,7 @@ td .feature-fields-list {
     border-radius: 3px;
     background: var(--primaryColor);
     color: #fff;
-    font-size: 16px;
+    font-size: var(--fontSizeMedium);
     cursor: pointer;
     transition: background 0.3s ease;
     margin-top: 10px;
@@ -586,7 +702,7 @@ td .feature-fields-list {
   border-radius: 50%;
   background-color: #ddd;
   color: #555;
-  font-size: 10px;
+  font-size: var(--fontSizeSmallest);
   font-weight: bold;
   margin: 0 8px 0 8px; /* Even spacing on both sides */
   padding: 0;
@@ -650,7 +766,7 @@ td .feature-fields-list {
 }
 
 .tooltip-body {
-  font-size: 14px;
+  font-size: var(--fontSizeSmall);
   line-height: 1.4;
   color: #333;
 }
@@ -669,6 +785,11 @@ td .feature-fields-list {
 @media (max-width: 600px) {
     :root {
         --fieldColumnWidth: 100%;
+        --fontSizeLarge:    1.4rem;
+        --fontSizeMedium:   1.2rem;
+        --fontSizeSmall:    0.9rem;
+        --fontSizeSmaller:  0.8rem;
+        --fontSizeSmallest: 0.7rem;
     }
     
     /* Stack fields vertically on mobile */
@@ -700,5 +821,28 @@ td .feature-fields-list {
     
     .quantity-input input {
         width: 100%;
+    }
+    
+    /* Invoice table responsive adjustments */
+    .invoice-table th,
+    .invoice-table td {
+        padding: 8px;
+    }
+    
+    .invoice-table th:nth-child(2),
+    .invoice-table td:nth-child(2) {
+        width: 120px;
+    }
+    
+    .feature-name {
+        font-size: var(--fontSizeSmaller);
+    }
+    
+    .option-details {
+        font-size: var(--fontSizeSmaller);
+    }
+    
+    .price-with-discount {
+        align-items: flex-end;
     }
 }

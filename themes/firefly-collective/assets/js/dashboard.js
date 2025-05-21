@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
         lockIndicator.style.right = '10px';
         lockIndicator.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
         lockIndicator.style.color = 'white';
-        lockIndicator.style.padding = '8px 12px';
+        lockIndicator.style.padding = '8px (--fontSizeSmallest)';
         lockIndicator.style.borderRadius = '4px';
         lockIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
         lockIndicator.style.zIndex = '1';
@@ -643,9 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <table class="invoice-table">
                 <thead>
                     <tr>
-                        <th>Feature</th>
                         <th>Item</th>
-                        <th>Interval</th>
                         <th>Price</th>
                     </tr>
                 </thead>
@@ -659,18 +657,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const option = feature.options[instance.optionIndex];
                 if (!option) return;
 
-                // If not recurring, show (Qty: X)
-                let qtyDisplay = '';
-                if (!feature.recurring) {
-                    const qty = parseInt(instance.quantity) || 1;
-                    qtyDisplay = ` (Qty: ${qty})`;
-                }
+                // Build the combined item description
+                let itemDescription = `<div class="item-main">
+                    <div class="feature-name">${feature.featureName}</div>
+                    <div class="option-details">`;
 
-                let intervalLabel = '';
-                if (feature.recurring && option.interval) {
-                    intervalLabel = option.interval;
-                }
-                
+                // Add option name with price option if selected
                 let selectedOptionText = '';
                 let priceOptionsArray = [];
                 
@@ -693,8 +685,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
+                itemDescription += `<div class="option-name">${option.optionName}${selectedOptionText}</div>`;
+
+                // Create array for additional details
+                let additionalDetails = [];
+
+                // Add quantity if not recurring
+                if (!feature.recurring) {
+                    const qty = parseInt(instance.quantity) || 1;
+                    additionalDetails.push(`Qty: ${qty}`);
+                }
+
+                // Add interval if recurring
+                if (feature.recurring && option.interval) {
+                    additionalDetails.push(`${option.interval}`);
+                }
+
                 // Include existing option-level user fields
-                let userFieldsText = '';
                 if (instance.userFields) {
                     for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
                         // Try to get the user field data
@@ -710,24 +717,25 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 if (fieldData && fieldData.types && Array.isArray(fieldData.types) && 
                                     fieldData.types[selectedIndex]) {
-                                    userFieldsText += ` ${fieldName}: ${fieldData.types[selectedIndex]},`;
+                                    // Format field name nicely
+                                    const formattedFieldName = fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, function(str) { return str.toUpperCase(); }).trim();
+                                    additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
                                 }
                             } catch(e) {
                                 console.error(`Error processing user field ${fieldName}:`, e);
                             }
                         }
                     }
-                    
-                    // Remove trailing comma if exists
-                    if (userFieldsText.endsWith(',')) {
-                        userFieldsText = userFieldsText.slice(0, -1);
-                    }
-                    
-                    // If we have user fields to display, wrap in parentheses
-                    if (userFieldsText) {
-                        userFieldsText = ` (${userFieldsText})`;
-                    }
                 }
+
+                // Add additional details as separate lines
+                if (additionalDetails.length > 0) {
+                    additionalDetails.forEach(detail => {
+                        itemDescription += `<div class="option-detail-line">• ${detail}</div>`;
+                    });
+                }
+
+                itemDescription += `</div></div>`;
 
                 // Check if we have a range
                 if (instanceHasRange(feature, instance)) {
@@ -738,9 +746,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     totalUpper += upper;
                     tableHTML += `
                         <tr>
-                            <td>${feature.featureName}</td>
-                            <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
-                            <td>${intervalLabel}</td>
+                            <td>${itemDescription}</td>
                             <td>$${lower.toFixed(2)} - $${upper.toFixed(2)}</td>
                         </tr>
                     `;
@@ -755,9 +761,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (floorVal !== 0 || ceilVal !== 0) {
                                     tableHTML += `
                                         <tr class="addon-row">
-                                            <td></td>
-                                            <td>${addon.addonName}</td>
-                                            <td></td>
+                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
                                             <td>${symbol} $${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)}</td>
                                         </tr>
                                     `;
@@ -765,9 +769,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     const addonStatic = parseSafe(addon.staticPriceMod, 0);
                                     tableHTML += `
                                         <tr class="addon-row">
-                                            <td></td>
-                                            <td>${addon.addonName}</td>
-                                            <td></td>
+                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
                                             <td>${symbol} $${addonStatic.toFixed(2)}</td>
                                         </tr>
                                     `;
@@ -782,32 +784,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     totalUpper += price;
                     // Check if a discount is applied
                     if (instance.appliedDiscount) {
-                            // Get the original price before discount
-                            const originalPrice = instance.appliedDiscount.originalPrice;
-                            
-                            tableHTML += `
-                                <tr>
-                                    <td>${feature.featureName}</td>
-                                    <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
-                                    <td>${intervalLabel}</td>
-                                    <td>
-                                        <div>
-                                            <span style="text-decoration: line-through; color: #999;">$${originalPrice.toFixed(2)}</span>
-                                            <span style="color: #d83838; font-weight: bold;"> $${price.toFixed(2)}</span>
-                                            <div style="font-size: 11px; color: #d83838;">
-                                                ${instance.appliedDiscount.percentage}% discount applied
-                                            </div>
+                        // Get the original price before discount
+                        const originalPrice = instance.appliedDiscount.originalPrice;
+                        
+                        tableHTML += `
+                            <tr>
+                                <td>${itemDescription}</td>
+                                <td>
+                                    <div class="price-with-discount">
+                                        <span class="original-price">$${originalPrice.toFixed(2)}</span>
+                                        <span class="discounted-price">$${price.toFixed(2)}</span>
+                                        <div class="discount-note">
+                                            ${instance.appliedDiscount.percentage}% discount applied
                                         </div>
-                                    </td>
-                                </tr>
-                            `;
-                        } else {
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
                         // No discount, show regular price
                         tableHTML += `
                             <tr>
-                                <td>${feature.featureName}</td>
-                                <td>${option.optionName}${selectedOptionText}${qtyDisplay}</td>
-                                <td>${intervalLabel}</td>
+                                <td>${itemDescription}</td>
                                 <td>$${price.toFixed(2)}</td>
                             </tr>
                         `;
@@ -822,9 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const addonStatic = parseSafe(addon.staticPriceMod, 0);
                                 tableHTML += `
                                     <tr class="addon-row">
-                                        <td></td>
-                                        <td>${addon.addonName}</td>
-                                        <td></td>
+                                        <td><div class="addon-item-name">${addon.addonName}</div></td>
                                         <td>${symbol} $${addonStatic.toFixed(2)}</td>
                                     </tr>
                                 `;
@@ -836,8 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
                                 tableHTML += `
                                     <tr class="discount-row">
-                                        <td></td>
-                                        <td colspan="2">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</td>
+                                        <td><div class="discount-item-name">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</div></td>
                                         <td>-$${discount.amount.toFixed(2)}</td>
                                     </tr>
                                 `;
@@ -852,12 +847,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="3" style="text-align: right; font-weight: bold;">Total:</td>
+                        <td style="text-align: right; font-weight: bold;">Total:</td>
                         <td id="invoice-total">`;
         if (estimateMode) {
             tableHTML += `$${totalLower.toFixed(2)} - $${totalUpper.toFixed(2)}`;
         } else {
-            // Simple total, no need for discount display here
             tableHTML += `$${totalLower.toFixed(2)}`;
         }
         tableHTML += `</td>
@@ -1280,7 +1274,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 maxAddonsMessage = document.createElement('div');
                 maxAddonsMessage.className = 'max-addons-message';
                 maxAddonsMessage.style.color = '#d83838';
-                maxAddonsMessage.style.fontSize = '12px';
+                maxAddonsMessage.style.fontSize = '(--fontSizeSmallest)';
                 maxAddonsMessage.style.marginTop = '8px';
                 maxAddonsMessage.style.fontWeight = 'bold';
                 addonsDiv.appendChild(maxAddonsMessage);
@@ -1460,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (Array.isArray(thresholds) && thresholds.length > 0 && thresholds.some(t => t.itemCount && t.discount)) {
                         const discountDiv = document.createElement('div');
                         discountDiv.className = 'quantity-discounts';
-                        discountDiv.style.marginTop = '12px';
+                        discountDiv.style.marginTop = '(--fontSizeSmallest)';
                         discountDiv.style.padding = '8px';
                         discountDiv.style.backgroundColor = '#f8f8f8';
                         discountDiv.style.borderRadius = '4px';
@@ -1475,7 +1469,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const discountList = document.createElement('ul');
                         discountList.style.margin = '0';
                         discountList.style.paddingLeft = '20px';
-                        discountList.style.fontSize = '12px';
+                        discountList.style.fontSize = '(--fontSizeSmallest)';
                         
                         // Sort by item count
                         thresholds.sort((a, b) => parseInt(a.itemCount) - parseInt(b.itemCount))
@@ -1817,7 +1811,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const maxItemsDesc = document.createElement('div');
                 maxItemsDesc.classList.add('max-group-items-desc');
                 maxItemsDesc.textContent = `Select up to ${group.maxItems} items`;
-                maxItemsDesc.style.fontSize = '12px';
+                maxItemsDesc.style.fontSize = '(--fontSizeSmallest)';
                 maxItemsDesc.style.fontStyle = 'italic';
                 maxItemsDesc.style.marginBottom = '8px';
                 groupContainer.appendChild(maxItemsDesc);
@@ -1833,7 +1827,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (group.thresholdDiscounts && group.thresholdDiscounts.length > 0) {
                 const discountInfo = document.createElement('div');
                 discountInfo.classList.add('group-discount-info');
-                discountInfo.style.fontSize = '12px';
+                discountInfo.style.fontSize = '(--fontSizeSmallest)';
                 discountInfo.style.marginTop = '8px';
                 discountInfo.style.color = '#d83838';
                 
@@ -1994,7 +1988,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Create it if it doesn't exist
                     discountInfo = document.createElement('div');
                     discountInfo.classList.add('group-discount-info');
-                    discountInfo.style.fontSize = '12px';
+                    discountInfo.style.fontSize = '(--fontSizeSmallest)';
                     discountInfo.style.marginTop = '8px';
                     discountInfo.style.color = '#d83838';
                     container.appendChild(discountInfo);

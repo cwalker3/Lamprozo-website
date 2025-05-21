@@ -13,8 +13,7 @@
                 'blogs',    'bookings',
                 'mail',     'view',
                 'pages',    'util',
-                'encrypt',  'profile',
-                'payment');
+                'encrypt',  'profile');
     foreach($models as $model) {
         require_once(get_template_directory()."/models/$model.php");
     }
