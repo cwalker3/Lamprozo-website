@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.
     // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
     let selections = {};
@@ -588,8 +589,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let price = parseSafe(option.priceFloor, parseSafe(option.staticPrice, 0));
         if (instance.addons && Array.isArray(instance.addons)) {
-            instance.addons.forEach(aIndex => {
-                const addon = option.addons[aIndex];
+            instance.addons.forEach(addonId => {
+                const addon = option.addons.find(a => a.id === addonId);
                 if (addon) {
                     const floorVal = parseSafe(addon.floorPriceMod, parseSafe(addon.staticPriceMod, 0));
                     if (isMultiply(addon)) {
@@ -614,8 +615,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let price = parseSafe(option.priceCeiling, parseSafe(option.staticPrice, 0));
         if (instance.addons && Array.isArray(instance.addons)) {
-            instance.addons.forEach(aIndex => {
-                const addon = option.addons[aIndex];
+            instance.addons.forEach(addonId => {
+                const addon = option.addons.find(a => a.id === addonId);
                 if (addon) {
                     const ceilVal = parseSafe(addon.ceilingPriceMod, parseSafe(addon.staticPriceMod, 0));
                     if (isMultiply(addon)) {
@@ -752,8 +753,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                     // If the instance has addons, show them as sub-rows
                     if (instance.addons && instance.addons.length > 0) {
-                        instance.addons.forEach(aIndex => {
-                            const addon = option.addons[aIndex];
+                        instance.addons.forEach(addonId => {
+                            const addon = option.addons.find(a => a.id === addonId);
                             if (addon) {
                                 const symbol = isMultiply(addon) ? 'x' : '+';
                                 const floorVal = parseSafe(addon.floorPriceMod, parseSafe(addon.staticPriceMod, 0));
@@ -813,8 +814,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // If the instance has addons, show them as sub-rows
                     if (instance.addons && instance.addons.length > 0) {
-                        instance.addons.forEach(aIndex => {
-                            const addon = option.addons[aIndex];
+                        instance.addons.forEach(addonId => {
+                            const addon = option.addons.find(a => a.id === addonId);
                             if (addon) {
                                 const symbol = isMultiply(addon) ? 'x' : '+';
                                 const addonStatic = parseSafe(addon.staticPriceMod, 0);
@@ -2040,8 +2041,8 @@ document.addEventListener('DOMContentLoaded', function() {
         function getSelectedGroupCount(instance, groupName, allAddons) {
         if (!instance.addons || !Array.isArray(instance.addons)) return 0;
         
-        return instance.addons.filter(addonIndex => {
-            const addon = allAddons[addonIndex];
+        return instance.addons.filter(addonId => {
+            const addon = allAddons.find(a => a.id === addonId);
             return addon && addon.groupName === groupName && addon.enableGrouping;
         }).length;
     }
