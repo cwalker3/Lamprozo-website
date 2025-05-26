@@ -85,6 +85,12 @@
             'state'         => $state,
             'access_type'   => 'online'
         ];
+        
+        // Force account selection if auth_id is not set
+        if (empty($_COOKIE['auth_id'])) {
+            $params['prompt'] = 'select_account';
+        }
+        
         $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
         
         $response = new WP_REST_Response('', 302, ['Location' => $auth_url]);
