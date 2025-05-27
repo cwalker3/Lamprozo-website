@@ -16,13 +16,14 @@ window.addEventListener('message', function(event) {
         if (googleSignInBtnEle) {
             googleSignInBtnEle.innerHTML = event.data.message;
         }
-        if (event.data.auth_id) {
-            let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
-            if (window.location.protocol === "https:") {
-                cookieStr += "; secure";
-            }
-            document.cookie = cookieStr;
-        }
+        // For local host use only
+        // if (event.data.auth_id) {
+        //     let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
+        //     if (window.location.protocol === "https:") {
+        //         cookieStr += "; secure";
+        //     }
+        //     document.cookie = cookieStr;
+        // }
         window.location.href = '/dashboard';
     }
 });
