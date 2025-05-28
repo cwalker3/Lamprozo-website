@@ -674,6 +674,43 @@ td .feature-fields-list {
     z-index: 1;
 }
 
+/* Payment */
+#payment-element-container {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+#payment-form {
+    margin-bottom: 15px;
+}
+
+#payment-element {
+    margin-bottom: 15px;
+}
+
+#payment-error {
+    color: #d83838;
+    background-color: #ffeaea;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+    display: none;
+}
+
+/* Styling for successful payment */
+#pay-now.success {
+    background-color: #4caf50 !important;
+}
+
+/* Disabled button style */
+#pay-now:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 /* "Pay Now" / "Request Estimate" Button */
 #pay-now {
     width: 100%;

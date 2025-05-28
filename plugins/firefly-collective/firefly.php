@@ -5,6 +5,15 @@ Description: Core website features.
 Author: Alex Strait
 */
 
+// Stripe
+if ( ! file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+    error_log( 'Composer autoload not found in Firefly Collective plugin.' );
+    return;
+}
+
+require_once __DIR__ . '/vendor/autoload.php';
+\Stripe\Stripe::setApiKey( STRIPE_SECRET_KEY );
+
 require_once plugin_dir_path(__FILE__) . 'includes/firefly-functions.php';
 
 register_activation_hook(__FILE__, 'firefly_collective_create_tables');

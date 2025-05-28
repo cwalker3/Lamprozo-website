@@ -162,34 +162,47 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showOrderConfirmation() {
+        // Create modal (only once per click)
         const modal = document.createElement('div');
         modal.className = 'order-confirm-modal';
         modal.innerHTML = `
             <div class="order-confirm-content">
-                <h3>Confirm Your Order</h3>
-                <p>Are you sure you want to place this order?</p>
-                <div class="order-confirm-buttons">
-                    <button class="confirm-button">Confirm</button>
-                    <button class="cancel-button">Cancel</button>
-                </div>
+            <h3>Confirm Your Order</h3>
+            <p>Are you sure you want to place this order?</p>
+            <div class="order-confirm-buttons">
+                <button class="confirm-button">Confirm</button>
+                <button class="cancel-button">Cancel</button>
+            </div>
             </div>
         `;
         document.body.appendChild(modal);
-        
-        // Force reflow for animation
-        void modal.offsetWidth;
-        modal.classList.add('active');
-        
-        // Add event listeners
-        modal.querySelector('.confirm-button').addEventListener('click', function() {
-            modal.remove();
+
+        // Force reflow and fade-in
+        requestAnimationFrame(() => modal.classList.add('active'));
+
+        const cleanup = () => {
+            modal.classList.remove('active');
+            // remove after fade
+            setTimeout(() => modal.remove(), 300);
+        };
+
+        // Confirm: once, then cleanup + proceed
+        modal.querySelector('.confirm-button')
+        .addEventListener('click', () => {
+            cleanup();
             submitOrder();
-        });
-        
-        modal.querySelector('.cancel-button').addEventListener('click', function() {
-            modal.remove();
-        });
-    }
+        }, { once: true });
+
+        // Cancel: once, cleanup only
+        modal.querySelector('.cancel-button')
+            .addEventListener('click', () => cleanup(), { once: true });
+
+        // Click outside content also cancels
+        modal.addEventListener('click', e => {
+            if (e.target === modal) cleanup();
+        }, { once: true });
+        }
+
 
     function showLoadingOverlay() {
         const overlay = document.createElement('div');
@@ -291,49 +304,48 @@ document.addEventListener('DOMContentLoaded', function() {
         if (orderID) {
             orderData.orderID = orderID;
         }
-        
-        // Submit all items in a single request
+
+        // Submit all items in a single request and intialize payment flow
         fetch(`${myApi.api_url}place-order`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'X-WP-Nonce': myApi.nonce 
+                'X-WP-Nonce': myApi.nonce
             },
             body: JSON.stringify(orderData)
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
                     throw new Error(data.message || 'Order placement failed');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // Store the response in session
-                sessionStorage.setItem('placedOrder', JSON.stringify({
-                    recordId: data.records[0].recordId, // First record ID for backward compatibility
-                    orderID: data.orderID,
-                    status: 'pending',
-                    itemCount: orderItems.length,
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    sessionStorage.setItem('placedOrder', JSON.stringify({
+                    recordId:   data.records[0].recordId,
+                    orderID:    data.orderID,
+                    status:     'pending',
+                    itemCount:  orderItems.length,
                     totalValue: data.totalOrderValue
-                }));
+                    }));
+                    
+                    updateOrderButton();
+                    disableFormInteraction();
+                    
+                    initializeStripePayment();
+                }
                 
-                // Update UI
-                updateOrderButton();
-                
-                // Disable the form
-                disableFormInteraction();
-            }
-            
-            hideLoadingOverlay(overlay);
-        })
-        .catch(error => {
-            hideLoadingOverlay(overlay);
-            alert(error.message || 'An error occurred while placing your order.');
-            console.error('Order submission error:', error);
-        });
+                hideLoadingOverlay(overlay);
+                })
+            .catch(error => {
+                hideLoadingOverlay(overlay);
+                alert(error.message || 'An error occurred while placing your order.');
+                console.error('Order submission error:', error);
+            });
+
     }
 
     // Check if there's actually a valid order
@@ -355,28 +367,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function updateOrderButton() {
-        const payNowBtn = document.getElementById('pay-now');
-        if (!payNowBtn) return;
-        
+        const btn = document.getElementById('pay-now');
+        if (!btn) return;
+
+        btn.onclick = null;
+
         if (hasValidOrder()) {
-            // Valid order already placed - show Pay Now
-            payNowBtn.textContent = 'Pay Now';
-            payNowBtn.onclick = function() {
-                alert('Payment functionality coming soon!');
+            btn.textContent = 'Pay Now';
+            btn.onclick = function(e) {
+            e.preventDefault();
+            initializeStripePayment();
             };
-        } else {
-            // No valid order placed yet
-            if (estimateMode) {
-                // If we have any price ranges, change to Request Estimate
-                payNowBtn.textContent = 'Request Estimate';
-                payNowBtn.onclick = function() {
-                    alert('Estimate request functionality coming soon!');
-                };
-            } else {
-                // Otherwise, use the Place Order button
-                payNowBtn.textContent = 'Place Order';
-                payNowBtn.onclick = showOrderConfirmation;
-            }
+        }
+        else if (estimateMode) {
+            btn.textContent = 'Request Estimate';
+            btn.onclick = function(e) {
+            e.preventDefault();
+            alert('Estimate request functionality coming soon!');
+            };
+        }
+        else {
+            btn.textContent = 'Place Order';
+            btn.onclick = function(e) {
+            e.preventDefault();
+            showOrderConfirmation();
+            };
         }
     }
 
@@ -2340,4 +2355,293 @@ document.addEventListener('DOMContentLoaded', function() {
         payNowBtn.removeEventListener('click', payNowBtn.onclick);
         updateOrderButton();
     }
+
+    // ---------------------------------------------------------------
+    // Stripe integration
+    // ---------------------------------------------------------------
+    let stripe, elements, paymentElement;
+    
+    // Initialize Stripe if the library is loaded
+    if (typeof Stripe !== 'undefined' && dashboardData.stripeKey) {
+        stripe = Stripe(dashboardData.stripeKey);
+        
+        // Check URL parameters for payment status
+        checkPaymentStatus();
+        
+        // Initialize payment if there's a valid order
+        if (hasValidOrder()) {
+            initializeStripePayment();
+        }
+    }
+    
+    // Function to initialize Stripe payment form
+    function initializeStripePayment() {
+        if (!stripe) {
+            console.error('Stripe not properly configured');
+            return;
+        }
+        
+        // Get existing order data
+        const orderData = sessionStorage.getItem('placedOrder');
+        if (!orderData) {
+            console.error('No order data found');
+            return;
+        }
+        
+        const orderInfo = JSON.parse(orderData);
+        if (!orderInfo || !orderInfo.orderID) {
+            console.error('Invalid order data');
+            return;
+        }
+        
+        // Create payment intent
+        const overlay = showLoadingOverlay();
+        
+        fetch(`${myApi.api_url}create-payment-intent`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': myApi.nonce
+            },
+            body: JSON.stringify({
+                orderID: orderInfo.orderID
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Failed to create payment intent');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.clientSecret) {
+                // Create the payment form
+                createPaymentForm(data.clientSecret);
+            } else {
+                throw new Error('Invalid response from server');
+            }
+            hideLoadingOverlay(overlay);
+        })
+        .catch(error => {
+            console.error('Payment intent error:', error);
+            alert('Error initializing payment: ' + error.message);
+            hideLoadingOverlay(overlay);
+        });
+    }
+    
+    // Create and mount the Stripe payment form
+    function createPaymentForm(clientSecret) {
+        // Create a container for the payment form
+        const paymentContainer = document.createElement('div');
+        paymentContainer.id = 'payment-element-container';
+        paymentContainer.style.marginBottom = '20px';
+        
+        // Create the form element
+        const form = document.createElement('form');
+        form.id = 'payment-form';
+        
+        // Create the payment element container
+        const paymentElementDiv = document.createElement('div');
+        paymentElementDiv.id = 'payment-element';
+        form.appendChild(paymentElementDiv);
+        
+        // Create an error message container
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'payment-error';
+        errorDiv.style.color = 'red';
+        errorDiv.style.marginTop = '10px';
+        errorDiv.style.display = 'none';
+        form.appendChild(errorDiv);
+        
+        // Append the form to the container
+        paymentContainer.appendChild(form);
+        
+        // Insert the payment container before the pay now button
+        const payNowBtn = document.getElementById('pay-now');
+        payNowBtn.parentNode.insertBefore(paymentContainer, payNowBtn);
+        
+        // Initialize Stripe Elements
+        elements = stripe.elements({
+            clientSecret: clientSecret,
+            appearance: {
+                theme: 'stripe',
+                variables: {
+                    colorPrimary: '#0073aa',
+                    colorBackground: '#ffffff',
+                    colorText: '#333333',
+                    colorDanger: '#d83838',
+                    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                    borderRadius: '4px'
+                }
+            }
+        });
+        
+        // Create and mount the Payment Element
+        paymentElement = elements.create('payment');
+        paymentElement.mount('#payment-element');
+        
+        // Update the Pay Now button text and handler
+        payNowBtn.textContent = 'Pay Now';
+        payNowBtn.onclick = handlePayment;
+    }
+    
+    // Handle the payment submission
+    async function handlePayment(event) {
+        event.preventDefault();
+        
+        if (!stripe || !elements) {
+            console.error('Stripe not initialized');
+            return;
+        }
+        
+        const payNowBtn = document.getElementById('pay-now');
+        const errorDisplay = document.getElementById('payment-error');
+        
+        // Disable the button and show loading state
+        payNowBtn.disabled = true;
+        payNowBtn.textContent = 'Processing...';
+        errorDisplay.style.display = 'none';
+        
+        try {
+            // Get return URL for after payment (current page)
+            const returnUrl = window.location.href;
+            
+            // Confirm payment with Stripe
+            const result = await stripe.confirmPayment({
+                elements,
+                confirmParams: {
+                    return_url: returnUrl,
+                },
+                redirect: 'if_required'
+            });
+            
+            if (result.error) {
+                // Show error to customer
+                errorDisplay.textContent = result.error.message;
+                errorDisplay.style.display = 'block';
+                
+                // Reset button state
+                payNowBtn.disabled = false;
+                payNowBtn.textContent = 'Pay Now';
+            } else {
+                // Payment succeeded
+                payNowBtn.textContent = 'Payment Successful!';
+                
+                // If we're still on the page (no redirect happened), update the UI
+                if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+                    // Update order status in the database
+                    updateOrderAfterPayment(result.paymentIntent);
+                }
+            }
+        } catch (error) {
+            console.error('Payment error:', error);
+            
+            // Show error to customer
+            errorDisplay.textContent = 'An unexpected error occurred. Please try again.';
+            errorDisplay.style.display = 'block';
+            
+            // Reset button state
+            payNowBtn.disabled = false;
+            payNowBtn.textContent = 'Pay Now';
+        }
+    }
+    
+    // Update order status after successful payment
+    function updateOrderAfterPayment(paymentIntent) {
+        const orderData = sessionStorage.getItem('placedOrder');
+        if (!orderData) {
+            console.error('No order data found');
+            return;
+        }
+        
+        const orderInfo = JSON.parse(orderData);
+        if (!orderInfo || !orderInfo.orderID) {
+            console.error('Invalid order data');
+            return;
+        }
+        
+        // Update order status to 'paid'
+        fetch(`${myApi.api_url}update-payment-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': myApi.nonce
+            },
+            body: JSON.stringify({
+                orderID: orderInfo.orderID,
+                status: 'paid',
+                paymentIntentId: paymentIntent.id
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Failed to update order status');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Update UI to reflect paid status
+                const payNowBtn = document.getElementById('pay-now');
+                payNowBtn.textContent = 'Payment Successful!';
+                payNowBtn.disabled = true;
+                
+                // You could redirect to a thank you page or show a success message
+                // window.location.href = '/thank-you';
+            } else {
+                console.error('Failed to update order status:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating order status:', error);
+        });
+    }
+    
+    // Check for URL parameters indicating payment status
+    function checkPaymentStatus() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentIntent = urlParams.get('payment_intent');
+        const paymentIntentClientSecret = urlParams.get('payment_intent_client_secret');
+        const redirectStatus = urlParams.get('redirect_status');
+        
+        if (paymentIntent && paymentIntentClientSecret && redirectStatus) {
+            // Handle the redirect back from Stripe
+            if (redirectStatus === 'succeeded') {
+                // Payment was successful
+                const payNowBtn = document.getElementById('pay-now');
+                if (payNowBtn) {
+                    payNowBtn.textContent = 'Payment Successful!';
+                    payNowBtn.disabled = true;
+                }
+                
+                // Retrieve the payment intent to update the order
+                stripe.retrievePaymentIntent(paymentIntentClientSecret)
+                    .then(({paymentIntent}) => {
+                        if (paymentIntent && paymentIntent.status === 'succeeded') {
+                            updateOrderAfterPayment(paymentIntent);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error retrieving payment intent:', error);
+                    });
+            } else {
+                // Payment failed or was cancelled
+                const errorDisplay = document.getElementById('payment-error');
+                if (errorDisplay) {
+                    errorDisplay.textContent = 'Payment failed or was cancelled. Please try again.';
+                    errorDisplay.style.display = 'block';
+                }
+            }
+            
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+    
+    // Override the existing updateOrderButton function
+    window.updateOrderButton = updateOrderButton;
 });

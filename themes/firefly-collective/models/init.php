@@ -64,13 +64,22 @@
             global $features_options_addons;
             $features_options_addons = get_features_options_addons();
             $theme_path = get_template_directory_uri();
+            
             wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
             wp_enqueue_style('dashboard-css', $theme_path . '/assets/css/dashboard.css', array(), $unique_id);
+            
+            // Add Stripe.js
+            wp_enqueue_script('stripe-js', 'https://js.stripe.com/v3/', array(), null, true);
             wp_enqueue_script('dashboard-js', $theme_path . '/assets/js/dashboard.js', array(), $unique_id, true);
+            
+            // Get Stripe configuration
+            $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
+
             wp_localize_script('dashboard-js', 'dashboardData', array(
                 'nonce'          => $nonce,
                 'features'       => $features_options_addons,
-                'theme_path'     => $theme_path
+                'theme_path'     => $theme_path,
+                'stripeKey'      => $publishable_key
             ));
         }
     }
