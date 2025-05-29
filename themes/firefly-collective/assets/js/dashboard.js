@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const orderData = sessionStorage.getItem('placedOrder');
         if (orderData) {
             const orderInfo = JSON.parse(orderData);
-            if (!orderInfo || !orderInfo.orderID || orderInfo.status !== 'pending') {
+            if (!orderInfo || !orderInfo.orderID || (orderInfo.status !== 'pending' && orderInfo.status !== 'paid')) {
                 // If the data doesn't look like a valid order, clear it
                 console.log('Clearing invalid order data');
                 sessionStorage.removeItem('placedOrder');
@@ -24,10 +24,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (hasValidOrder()) disableFormInteraction();
+    if (hasValidOrder()) {
+        disableFormInteraction();
+        
+        // If the order is already paid, show success immediately
+        if (isOrderPaid()) {
+            setTimeout(() => {
+                showPaymentSuccess();
+            }, 100);
+        }
+    }
 
     // Load any saved state from sessionStorage
     if (sessionStorage.getItem('priceCalcSelections')) {
         selections = JSON.parse(sessionStorage.getItem('priceCalcSelections'));
+    }
+
+    if (isOrderPaid()) {
+        setTimeout(() => {
+            disableFormInteraction();
+        }, 0);
     }
 
     const featuresContainer = document.getElementById('features-container');
@@ -119,10 +135,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function disableFormInteraction() {
-        // Disable the features container (the form)
+         // Disable the features container (the form)
         const featuresContainer = document.getElementById('features-container');
         if (featuresContainer) {
             featuresContainer.style.pointerEvents = 'none';
+            featuresContainer.style.opacity = '0.7';
         }
         
         // Optionally add a subtle visual indicator that the form is locked
@@ -372,25 +389,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
         btn.onclick = null;
 
-        if (hasValidOrder()) {
+        // Check if order is paid AFTER getting the button element
+        if (isOrderPaid()) {
+            btn.textContent = 'Payment Successful';
+            btn.disabled = true;
+            btn.style.backgroundColor = '#4CAF50';
+            btn.style.cursor = 'not-allowed';
+            return;
+        }
+        else if (hasValidOrder()) {
             btn.textContent = 'Pay Now';
             btn.onclick = function(e) {
-            e.preventDefault();
-            initializeStripePayment();
+                e.preventDefault();
+                initializeStripePayment();
             };
         }
         else if (estimateMode) {
             btn.textContent = 'Request Estimate';
             btn.onclick = function(e) {
-            e.preventDefault();
-            alert('Estimate request functionality coming soon!');
+                e.preventDefault();
+                alert('Estimate request functionality coming soon!');
             };
         }
         else {
             btn.textContent = 'Place Order';
             btn.onclick = function(e) {
-            e.preventDefault();
-            showOrderConfirmation();
+                e.preventDefault();
+                showOrderConfirmation();
             };
         }
     }
@@ -2401,14 +2426,23 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check URL parameters for payment status
         checkPaymentStatus();
         
-        // Initialize payment if there's a valid order
-        if (hasValidOrder()) {
+        // Initialize payment if there's a valid order that's not yet paid
+        if (hasValidOrder() && !isOrderPaid()) {
             initializeStripePayment();
+        } else if (isOrderPaid()) {
+            // If order is already paid, show success
+            showPaymentSuccess();
         }
     }
     
     // Function to initialize Stripe payment form
     function initializeStripePayment() {
+
+        if (isOrderPaid()) {
+            showPaymentSuccess();
+            return;
+        }
+
         if (!stripe) {
             console.error('Stripe not properly configured');
             return;
@@ -2466,6 +2500,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Create and mount the Stripe payment form
     function createPaymentForm(clientSecret) {
+
+        if (isOrderPaid()) {
+            showPaymentSuccess();
+            return;
+        }
+
         // Create a container for the payment form
         const paymentContainer = document.createElement('div');
         paymentContainer.id = 'payment-element-container';
@@ -2518,6 +2558,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update the Pay Now button text and handler
         payNowBtn.textContent = 'Pay Now';
         payNowBtn.onclick = handlePayment;
+
+        setTimeout(() => {
+            smoothScrollToElement(paymentContainer, 120);
+        }, 100);
     }
     
     // Handle the payment submission
@@ -2623,8 +2667,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 payNowBtn.textContent = 'Payment Successful!';
                 payNowBtn.disabled = true;
                 
-                // You could redirect to a thank you page or show a success message
-                // window.location.href = '/thank-you';
+                // Save order in session
+                orderInfo.status = 'paid';
+                orderInfo.paymentIntentId = paymentIntent.id;
+                orderInfo.paidAt = new Date().toISOString();
+                sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
             } else {
                 console.error('Failed to update order status:', data);
             }
@@ -2634,6 +2681,75 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function isOrderPaid() {
+        const orderData = sessionStorage.getItem('placedOrder');
+        if (!orderData) return false;
+        
+        try {
+            const orderInfo = JSON.parse(orderData);
+            return orderInfo && orderInfo.status === 'paid';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function showPaymentSuccess() {
+        const payNowBtn = document.getElementById('pay-now');
+        
+        // Remove any existing payment form
+        const existingPaymentContainer = document.getElementById('payment-element-container');
+        if (existingPaymentContainer) {
+            existingPaymentContainer.remove();
+        }
+        
+        // Remove any existing success container to avoid duplicates
+        const existingSuccessContainer = document.getElementById('payment-success-container');
+        if (existingSuccessContainer) {
+            existingSuccessContainer.remove();
+        }
+        
+        // Create success message with new order button
+        const successContainer = document.createElement('div');
+        successContainer.id = 'payment-success-container';
+        successContainer.style.marginBottom = '20px';
+        successContainer.innerHTML = `
+            <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
+                <p style="margin: 0;">Your order has been paid. Thank you for your purchase!</p>
+            </div>
+            <button id="start-new-order" style="
+                display: block;
+                width: 100%;
+                padding: 12px 20px;
+                background-color: #0073aa;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+            ">
+                Start a New Order
+            </button>
+        `;
+        
+        // Insert before the pay now button
+        if (payNowBtn && payNowBtn.parentNode) {
+            payNowBtn.parentNode.insertBefore(successContainer, payNowBtn);
+            payNowBtn.style.display = 'none';
+            
+            // Add event listener to new order button
+            document.getElementById('start-new-order').addEventListener('click', function() {
+                // Clear the session storage
+                sessionStorage.removeItem('placedOrder');
+                sessionStorage.removeItem('priceCalcSelections');
+                
+                // Reload the page to start fresh
+                window.location.reload();
+            });
+        }
+    }
+
     // Check for URL parameters indicating payment status
     function checkPaymentStatus() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -2649,6 +2765,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (payNowBtn) {
                     payNowBtn.textContent = 'Payment Successful!';
                     payNowBtn.disabled = true;
+                }
+
+                // Update order session
+                const orderData = sessionStorage.getItem('placedOrder');
+                if (orderData) {
+                    const orderInfo = JSON.parse(orderData);
+                    orderInfo.status = 'paid';
+                    sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
                 }
                 
                 // Retrieve the payment intent to update the order
@@ -2677,4 +2801,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Override the existing updateOrderButton function
     window.updateOrderButton = updateOrderButton;
+
+    if (isOrderPaid()) {
+        disableFormInteraction();
+        showPaymentSuccess();
+    }
 });
