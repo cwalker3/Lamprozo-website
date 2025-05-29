@@ -149,6 +149,7 @@
         $updated = firefly_collective_update_order_payment_status($order_id, $status);
         
         if ($updated) {
+            firefly_collective_orders_email($order_id, $status);
             return array(
                 'success' => true,
                 'message' => 'Order status updated'

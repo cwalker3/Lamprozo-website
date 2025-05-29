@@ -142,6 +142,18 @@
             ];
         }
         
+        // Fetch order data before deletion
+        $order_data = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s",
+                $order_id
+            ),
+            ARRAY_A
+        );
+        
+        // Store the order data before deletion
+        $order_data_copy = $order_data;
+        
         $result = $wpdb->delete(
             $wpdb->prefix . 'ffc_orders',
             ['orderID' => $order_id],
@@ -155,6 +167,9 @@
             ];
         }
         
+        // Send email with the stored order data
+        firefly_collective_orders_email($order_id, 'deleted', $order_data_copy);
+
         return [
             'success' => true,
             'message' => 'Order deleted successfully',
@@ -209,6 +224,8 @@
             ];
         }
         
+        firefly_collective_orders_email($order_id, $status);
+
         return [
             'success' => true,
             'message' => 'Order status updated successfully',
@@ -234,21 +251,44 @@
         // Sanitize order IDs
         $order_ids = array_map('sanitize_text_field', $order_ids);
         
-        // Build placeholders for the query
+        // Fetch all order data before deletion
         $placeholders = implode(',', array_fill(0, count($order_ids), '%s'));
+        $order_data_by_id = [];
         
-        $query = $wpdb->prepare(
+        $orders_query = $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID IN ($placeholders)",
+            $order_ids
+        );
+        
+        $all_order_data = $wpdb->get_results($orders_query, ARRAY_A);
+        
+        // Group order data by orderID
+        foreach ($all_order_data as $order_item) {
+            $order_id = $order_item['orderID'];
+            if (!isset($order_data_by_id[$order_id])) {
+                $order_data_by_id[$order_id] = [];
+            }
+            $order_data_by_id[$order_id][] = $order_item;
+        }
+        
+        // Delete the orders
+        $delete_query = $wpdb->prepare(
             "DELETE FROM {$wpdb->prefix}ffc_orders WHERE orderID IN ($placeholders)",
             $order_ids
         );
         
-        $result = $wpdb->query($query);
+        $result = $wpdb->query($delete_query);
         
         if ($result === false) {
             return [
                 'success' => false,
                 'message' => 'Failed to delete orders: ' . $wpdb->last_error
             ];
+        }
+        
+        // Send emails for each deleted order
+        foreach ($order_data_by_id as $order_id => $order_data) {
+            firefly_collective_orders_email($order_id, 'deleted', $order_data);
         }
         
         return [
@@ -311,6 +351,11 @@
                 'success' => false,
                 'message' => 'Failed to update orders: ' . $wpdb->last_error
             ];
+        }
+        
+        // Send emails to all updated orders
+        foreach ($order_ids as $order_id) {
+            firefly_collective_orders_email($order_id, $status);
         }
         
         return [
@@ -390,4 +435,340 @@
             'success' => true,
             'users' => $users
         ];
+    }
+
+    /**
+     * Send order status update notifications to admin and user with detailed invoice for all items in order
+     */
+    function firefly_collective_orders_email($order_id, $new_status = '', $order_data = null) {
+        global $wpdb;
+        
+        // If order data is provided (e.g., for deleted orders), use it
+        // Otherwise, fetch from database
+        if ($order_data !== null) {
+            $order_items = $order_data;
+        } else {
+            // Get all order items with this order ID
+            $order_items = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s ORDER BY id ASC",
+                    $order_id
+                ),
+                ARRAY_A
+            );
+        }
+        
+        if (empty($order_items)) {
+            return false; // Order not found
+        }
+        
+        // Get the first item to extract common order information
+        $first_item = $order_items[0];
+        
+        // Get user data
+        $user = get_userdata($first_item['userId']);
+        if (!$user) {
+            return false; // User not found
+        }
+        
+        // Status messaging
+        $status = !empty($new_status) ? $new_status : $first_item['status'];
+        $status_formatted = ucfirst($status);
+        $status_color = '';
+        
+        switch ($status) {
+            case 'completed':
+                $status_color = '#28a745'; // Green
+                break;
+            case 'pending':
+                $status_color = '#ffc107'; // Yellow
+                break;
+            case 'cancelled':
+                $status_color = '#dc3545'; // Red
+                break;
+            case 'deleted':
+                $status_color = '#6c757d'; // Gray
+                break;
+            default:
+                $status_color = '#6c757d'; // Gray
+        }
+        
+        // Format dates
+        $order_date = date('F j, Y, g:i a', strtotime($first_item['createdAt']));
+        $invoice_number = str_replace('-', '', substr($first_item['orderID'], 0, 8));
+        
+        // Calculate order total
+        $order_total = 0;
+        foreach ($order_items as $item) {
+            $order_total += floatval($item['totalPrice']);
+        }
+        $formatted_order_total = '$' . number_format($order_total, 2);
+        
+        // Order service type (dine in, take out, delivery)
+        $service_type = '';
+        if (!empty($first_item['userData'])) {
+            $user_data = json_decode($first_item['userData'], true);
+            if (isset($user_data['dineInTakeOutDelivery'])) {
+                $service_types = ['Dine In', 'Take Out', 'Delivery'];
+                $selected_type = intval($user_data['dineInTakeOutDelivery']);
+                if (isset($service_types[$selected_type])) {
+                    $service_type = $service_types[$selected_type];
+                }
+            }
+        }
+        
+        // Build HTML for all order items
+        $items_html = '';
+        
+        foreach ($order_items as $item_index => $item) {
+            // Get feature details
+            $feature = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
+                    $item['featureId']
+                ),
+                ARRAY_A
+            );
+            
+            // Get option details
+            $option = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
+                    $item['optionId']
+                ),
+                ARRAY_A
+            );
+            
+            // Skip if feature or option not found
+            if (!$feature || !$option) {
+                continue;
+            }
+            
+            // Get pricing information for the selected option
+            $size_label = '';
+            $base_price = 0;
+            
+            if (!empty($option['pricingType']) && $option['pricingType'] == 'price options') {
+                $price_options = json_decode($option['priceOptions'], true);
+                if (isset($price_options['types']) && isset($item['priceSelected'])) {
+                    $selected_index = intval($item['priceSelected']);
+                    if (isset($price_options['types'][$selected_index])) {
+                        $size_label = $price_options['types'][$selected_index]['label'];
+                        $base_price = floatval($price_options['types'][$selected_index]['price']);
+                    }
+                }
+            }
+            
+            // Format item price
+            $formatted_item_price = '$' . number_format($item['totalPrice'], 2);
+            $formatted_base_price = '$' . number_format($base_price, 2);
+            
+            // Item header row with feature name and option
+            $items_html .= "
+                <tr class='item-header'>
+                    <td><strong>{$feature['featureName']} - {$option['optionName']} ({$size_label})</strong></td>
+                    <td><strong>{$item['quantity']}</strong></td>
+                    <td><strong>{$formatted_base_price}</strong></td>
+                </tr>
+            ";
+            
+            // Decode addons and get their details
+            if (!empty($item['addonIds'])) {
+                $addon_ids = json_decode($item['addonIds'], true);
+                $grouped_addons = [];
+                
+                if (is_array($addon_ids)) {
+                    foreach ($addon_ids as $addon_id) {
+                        $addon = $wpdb->get_row(
+                            $wpdb->prepare(
+                                "SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                                $addon_id
+                            ),
+                            ARRAY_A
+                        );
+                        
+                        if ($addon) {
+                            $group = !empty($addon['groupName']) ? $addon['groupName'] : 'Standard Addons';
+                            if (!isset($grouped_addons[$group])) {
+                                $grouped_addons[$group] = [];
+                            }
+                            $grouped_addons[$group][] = $addon;
+                        }
+                    }
+                    
+                    // Generate addon HTML with grouping
+                    foreach ($grouped_addons as $group_name => $group_addons) {
+                        $items_html .= "<tr><td colspan='3'>&nbsp;&nbsp;&nbsp;<em>{$group_name}:</em></td></tr>";
+                        
+                        foreach ($group_addons as $addon) {
+                            $addon_price = floatval($addon['staticPriceMod']);
+                            $addon_price_formatted = '$' . number_format($addon_price, 2);
+                            $items_html .= "
+                                <tr>
+                                    <td>&nbsp;&nbsp;&nbsp;- {$addon['addonName']}</td>
+                                    <td>1</td>
+                                    <td>{$addon_price_formatted}</td>
+                                </tr>
+                            ";
+                        }
+                    }
+                }
+            }
+            
+            // Item subtotal
+            $items_html .= "
+                <tr class='item-subtotal'>
+                    <td></td>
+                    <td>Item Total:</td>
+                    <td>{$formatted_item_price}</td>
+                </tr>
+                <tr class='item-spacer'><td colspan='3'>&nbsp;</td></tr>
+            ";
+        }
+        
+        // Common CSS for both emails
+        $email_css = "
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
+            .invoice-header { background-color: #f8f9fa; padding: 20px; border-bottom: 2px solid #dee2e6; }
+            .invoice-body { padding: 20px; }
+            .invoice-footer { background-color: #f8f9fa; padding: 20px; border-top: 2px solid #dee2e6; margin-top: 20px; }
+            .company-name { font-size: 24px; font-weight: bold; color: #007bff; }
+            .status-badge { display: inline-block; padding: 8px 15px; border-radius: 4px; color: white; font-weight: bold; }
+            .invoice-details { margin: 20px 0; }
+            .invoice-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .invoice-table th { background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; text-align: left; padding: 10px; }
+            .invoice-table td { padding: 10px; border-bottom: 1px solid #dee2e6; }
+            .invoice-table .total-row { font-weight: bold; border-top: 2px solid #dee2e6; }
+            .item-header { background-color: #f8f9fa; }
+            .item-subtotal { border-bottom: 1px solid #dee2e6; }
+            .item-spacer { border: none; }
+            .contact-info { font-size: 14px; }
+            .customer-details { margin: 20px 0; }
+            .invoice-table th:nth-child(1) { width: 60%; }
+            .invoice-table th:nth-child(2) { width: 15%; }
+            .invoice-table th:nth-child(3) { width: 25%; }
+        ";
+        
+        // User Email
+        // ----------------------------------------------------------------------------------------
+        $user_subject = "Your Order #{$invoice_number} is now {$status_formatted}";
+        $user_html = "
+            <html>
+            <head>
+                <title>Order {$status_formatted} - Invoice #{$invoice_number}</title>
+                <style>{$email_css}</style>
+            </head>
+            <body>
+                <div class='invoice-header'>
+                    <div class='company-name'>Firefly Collective</div>
+                    <div>Order Invoice #{$invoice_number}</div>
+                    <div class='status-badge' style='background-color: {$status_color};'>Status: {$status_formatted}</div>
+                </div>
+                
+                <div class='invoice-body'>
+                    <div class='invoice-details'>
+                        <strong>Order Date:</strong> {$order_date}<br>
+                        <strong>Order ID:</strong> {$first_item['orderID']}<br>
+                        <strong>Service Type:</strong> {$service_type}
+                    </div>
+                    
+                    <div class='customer-details'>
+                        <strong>Customer:</strong> {$user->display_name}<br>
+                        <strong>Email:</strong> {$user->user_email}
+                    </div>
+                    
+                    <table class='invoice-table'>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {$items_html}
+                            <tr class='total-row'>
+                                <td></td>
+                                <td>Order Total:</td>
+                                <td>{$formatted_order_total}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <p>Thank you for your order! If you have any questions, please contact us.</p>
+                </div>
+                
+                <div class='invoice-footer'>
+                    <div class='contact-info'>
+                        Firefly Collective<br>
+                        Email: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ";
+        $user_sent = send_html_mail($user->user_email, $user_subject, $user_html);
+        
+        // Admin Email
+        // ----------------------------------------------------------------------------------------
+        $admin_subject = "Order #{$invoice_number} from {$user->display_name} is now {$status_formatted}";
+        $admin_html = "
+            <html>
+            <head>
+                <title>Order {$status_formatted} - Invoice #{$invoice_number}</title>
+                <style>{$email_css}</style>
+            </head>
+            <body>
+                <div class='invoice-header'>
+                    <div class='company-name'>Firefly Collective</div>
+                    <div>Order Invoice #{$invoice_number}</div>
+                    <div class='status-badge' style='background-color: {$status_color};'>Status: {$status_formatted}</div>
+                </div>
+                
+                <div class='invoice-body'>
+                    <div class='invoice-details'>
+                        <strong>Order Date:</strong> {$order_date}<br>
+                        <strong>Order ID:</strong> {$first_item['orderID']}<br>
+                        <strong>Service Type:</strong> {$service_type}
+                    </div>
+                    
+                    <div class='customer-details'>
+                        <strong>Customer Information:</strong><br>
+                        <strong>Name:</strong> {$user->display_name}<br>
+                        <strong>Email:</strong> {$user->user_email}<br>
+                        <strong>User ID:</strong> {$first_item['userId']}
+                    </div>
+                    
+                    <table class='invoice-table'>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {$items_html}
+                            <tr class='total-row'>
+                                <td></td>
+                                <td>Order Total:</td>
+                                <td>{$formatted_order_total}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <p><strong>Order Status Change:</strong> Order is now <span style='color: {$status_color}; font-weight: bold;'>{$status_formatted}</span></p>
+                </div>
+                
+                <div class='invoice-footer'>
+                    <div class='contact-info'>
+                        This is an automated notification from the order management system.
+                    </div>
+                </div>
+            </body>
+            </html>
+        ";
+        $admin_sent = send_html_mail(NULL, $admin_subject, $admin_html, true);
+
+        return ($user_sent && $admin_sent);
     }
