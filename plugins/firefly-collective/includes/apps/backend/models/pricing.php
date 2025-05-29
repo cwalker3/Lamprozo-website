@@ -1214,7 +1214,7 @@ function calculate_server_price($feature_id, $option_id, $addon_ids, $price_opti
         );
     }
     
-    // Apply addon prices
+    // Apply addon prices (without group discounts yet)
     foreach ($selected_addons as $addon) {
         $mod_val = parse_safe($addon['staticPriceMod'], 0);
         if (is_multiply($addon)) {
@@ -1224,7 +1224,11 @@ function calculate_server_price($feature_id, $option_id, $addon_ids, $price_opti
         }
     }
     
-    // Process group discounts
+    // Calculate total price before group discounts
+    $total_price = $price * $quantity;
+    $original_price = $total_price;
+    
+    // NOW apply group discounts to the total addon cost
     $addons_by_group = [];
     
     foreach ($selected_addons as $addon) {
@@ -1261,23 +1265,20 @@ function calculate_server_price($feature_id, $option_id, $addon_ids, $price_opti
         }
         
         if ($applicable_discount) {
-            // Calculate the discount amount
-            $group_items_total = 0;
+            // Calculate the discount amount on the TOTAL price of this group's addons (including quantity)
+            $group_items_per_unit = 0;
             foreach ($group['addons'] as $addon) {
-                $group_items_total += parse_safe($addon['staticPriceMod'], 0);
+                $group_items_per_unit += parse_safe($addon['staticPriceMod'], 0);
             }
             
+            $group_items_total = $group_items_per_unit * $quantity; // Apply quantity here
             $discount_percent = floatval($applicable_discount['discount']);
             $discount_amount = $group_items_total * ($discount_percent / 100);
             
             // Apply discount to the total price
-            $price -= $discount_amount;
+            $total_price -= $discount_amount;
         }
     }
-    
-    // Calculate total price before quantity discount
-    $total_price = $price * $quantity;
-    $original_price = $total_price;
     
     // Apply highest applicable threshold discount
     if (!empty($option['thresholdDiscounts'])) {

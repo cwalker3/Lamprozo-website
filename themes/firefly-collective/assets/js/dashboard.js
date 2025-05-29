@@ -430,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Add addon prices
+        // Add addon prices (without group discounts yet)
         if (instance.addons && Array.isArray(instance.addons)) {
             instance.addons.forEach(addonId => {
                 // Find addon by ID instead of index
@@ -446,7 +446,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Before calculating the final price, check for group discounts
+        // Get quantity (default to 1)
+        const qty = parseInt(instance.quantity) || 1;
+        
+        // Calculate total price before group discounts
+        let totalPrice = price * qty;
+        const originalPrice = totalPrice;
+        
+        // NOW apply group discounts to the total addon cost
         if (instance.addons && Array.isArray(instance.addons)) {
             // Initialize or clear the groupDiscounts object
             instance.groupDiscounts = {};
@@ -482,17 +489,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 );
                 
                 if (applicableDiscount) {
-                    // Calculate the discount amount on the total price of this group's addons
-                    const groupItemsTotal = group.addons.reduce((sum, addon) => {
+                    // Calculate the discount amount on the TOTAL price of this group's addons (including quantity)
+                    const groupItemsPerUnit = group.addons.reduce((sum, addon) => {
                         // For premium toppings which are all additive, we just sum the static price modifiers
                         return sum + parseSafe(addon.staticPriceMod, 0);
                     }, 0);
                     
+                    const groupItemsTotal = groupItemsPerUnit * qty; // Apply quantity here
                     const discountPercent = parseFloat(applicableDiscount.discount);
                     const discountAmount = groupItemsTotal * (discountPercent / 100);
                     
                     // Apply discount to the total price
-                    price -= discountAmount;
+                    totalPrice -= discountAmount;
                     
                     // Store discount info for display in the invoice
                     instance.groupDiscounts[group.addons[0].groupName] = {
@@ -506,13 +514,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // If no discount applies, we don't add an entry (since we cleared the object above)
             });
         }
-        
-        // Get quantity (default to 1)
-        const qty = parseInt(instance.quantity) || 1;
-        
-        // Calculate total price before discount
-        let totalPrice = price * qty;
-        const originalPrice = totalPrice;
         
         // Apply highest applicable threshold discount
         let appliedThreshold = null;
@@ -753,63 +754,65 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 itemDescription += `</div></div>`;
 
-                // Check if we have a range
+                // Calculate base price (option only, no addons)
+                let basePrice = parseSafe(option.staticPrice, 0);
+                
+                // Handle price options for base price
+                if (priceOptionsArray.length > 0 && 
+                    instance.priceOptionIndex !== undefined &&
+                    priceOptionsArray[instance.priceOptionIndex]) {
+                    basePrice = parseSafe(priceOptionsArray[instance.priceOptionIndex].price, basePrice);
+                }
+                
+                // Get quantity
+                const qty = parseInt(instance.quantity) || 1;
+                
+                // Check if we have a range for the base option
                 if (instanceHasRange(feature, instance)) {
                     estimateMode = true;
                     const lower = calculateInstancePriceLower(feature, instance);
                     const upper = calculateInstancePriceUpper(feature, instance);
                     totalLower += lower;
                     totalUpper += upper;
+                    
+                    // For ranges, show the base price range
+                    const baseLower = parseSafe(option.priceFloor, basePrice) * qty;
+                    const baseUpper = parseSafe(option.priceCeiling, basePrice) * qty;
+                    
                     tableHTML += `
                         <tr>
                             <td>${itemDescription}</td>
-                            <td>$${lower.toFixed(2)} - $${upper.toFixed(2)}</td>
+                            <td>$${baseLower.toFixed(2)} - $${baseUpper.toFixed(2)}</td>
                         </tr>
                     `;
-                    // If the instance has addons, show them as sub-rows
-                    if (instance.addons && instance.addons.length > 0) {
-                        instance.addons.forEach(addonId => {
-                            const addon = option.addons.find(a => a.id === addonId);
-                            if (addon) {
-                                const symbol = isMultiply(addon) ? 'x' : '+';
-                                const floorVal = parseSafe(addon.floorPriceMod, parseSafe(addon.staticPriceMod, 0));
-                                const ceilVal  = parseSafe(addon.ceilingPriceMod, parseSafe(addon.staticPriceMod, 0));
-                                if (floorVal !== 0 || ceilVal !== 0) {
-                                    tableHTML += `
-                                        <tr class="addon-row">
-                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                            <td>${symbol} $${floorVal.toFixed(2)} - $${ceilVal.toFixed(2)}</td>
-                                        </tr>
-                                    `;
-                                } else {
-                                    const addonStatic = parseSafe(addon.staticPriceMod, 0);
-                                    tableHTML += `
-                                        <tr class="addon-row">
-                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                            <td>${symbol} $${addonStatic.toFixed(2)}</td>
-                                        </tr>
-                                    `;
-                                }
-                            }
-                        });
-                    }
                 } else {
-                    // No range => single price
-                    const price = calculateInstancePrice(feature, instance);
-                    totalLower += price;
-                    totalUpper += price;
-                    // Check if a discount is applied
+                    // Calculate full price for discount calculations
+                    const fullPrice = calculateInstancePrice(feature, instance);
+                    totalLower += fullPrice;
+                    totalUpper += fullPrice;
+                    
+                    // Calculate base price with quantity
+                    let totalBasePrice = basePrice * qty;
+                    let displayPrice = totalBasePrice;
+                    
+                    // Check if a discount is applied to the full order
                     if (instance.appliedDiscount) {
-                        // Get the original price before discount
-                        const originalPrice = instance.appliedDiscount.originalPrice;
+                        // Show original base price crossed out and discounted price
+                        const originalFullPrice = instance.appliedDiscount.originalPrice;
+                        const discountedFullPrice = fullPrice;
+                        
+                        // Calculate what portion of the discount applies to the base
+                        const basePortionOfOriginal = totalBasePrice / originalFullPrice;
+                        const baseDiscountAmount = (originalFullPrice - discountedFullPrice) * basePortionOfOriginal;
+                        displayPrice = totalBasePrice - baseDiscountAmount;
                         
                         tableHTML += `
                             <tr>
                                 <td>${itemDescription}</td>
                                 <td>
                                     <div class="price-with-discount">
-                                        <span class="original-price">$${originalPrice.toFixed(2)}</span>
-                                        <span class="discounted-price">$${price.toFixed(2)}</span>
+                                        <span class="original-price">$${totalBasePrice.toFixed(2)}</span>
+                                        <span class="discounted-price">$${displayPrice.toFixed(2)}</span>
                                         <div class="discount-note">
                                             ${instance.appliedDiscount.percentage}% discount applied
                                         </div>
@@ -818,42 +821,72 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                         `;
                     } else {
-                        // No discount, show regular price
+                        // No discount on base, show regular price
                         tableHTML += `
                             <tr>
                                 <td>${itemDescription}</td>
-                                <td>$${price.toFixed(2)}</td>
+                                <td>$${displayPrice.toFixed(2)}</td>
                             </tr>
                         `;
                     }
-                    
-                    // If the instance has addons, show them as sub-rows
-                    if (instance.addons && instance.addons.length > 0) {
-                        instance.addons.forEach(addonId => {
-                            const addon = option.addons.find(a => a.id === addonId);
-                            if (addon) {
-                                const symbol = isMultiply(addon) ? 'x' : '+';
-                                const addonStatic = parseSafe(addon.staticPriceMod, 0);
+                }
+
+                // If the instance has addons, show them as sub-rows with their total price
+                if (instance.addons && instance.addons.length > 0) {
+                    instance.addons.forEach(addonId => {
+                        const addon = option.addons.find(a => a.id === addonId);
+                        if (addon) {
+                            const symbol = isMultiply(addon) ? 'x' : '+';
+                            
+                            if (instanceHasRange(feature, instance)) {
+                                // For ranges, show addon price ranges
+                                const floorVal = parseSafe(addon.floorPriceMod, parseSafe(addon.staticPriceMod, 0));
+                                const ceilVal = parseSafe(addon.ceilingPriceMod, parseSafe(addon.staticPriceMod, 0));
+                                
+                                const addonFloorTotal = floorVal * qty;
+                                const addonCeilTotal = ceilVal * qty;
+                                
+                                if (floorVal !== 0 || ceilVal !== 0) {
+                                    tableHTML += `
+                                        <tr class="addon-row">
+                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
+                                            <td>${symbol} $${addonFloorTotal.toFixed(2)} - $${addonCeilTotal.toFixed(2)}</td>
+                                        </tr>
+                                    `;
+                                } else {
+                                    const addonStaticTotal = parseSafe(addon.staticPriceMod, 0) * qty;
+                                    tableHTML += `
+                                        <tr class="addon-row">
+                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
+                                            <td>${symbol} $${addonStaticTotal.toFixed(2)}</td>
+                                        </tr>
+                                    `;
+                                }
+                            } else {
+                                // For fixed prices, show total addon price (addon price × quantity)
+                                const addonPricePerUnit = parseSafe(addon.staticPriceMod, 0);
+                                const addonTotalPrice = addonPricePerUnit * qty;
+                                
                                 tableHTML += `
                                     <tr class="addon-row">
                                         <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                        <td>${symbol} $${addonStatic.toFixed(2)}</td>
+                                        <td>${symbol} $${addonTotalPrice.toFixed(2)}</td>
                                     </tr>
                                 `;
                             }
-                        });
-                        
-                        // Add group discount rows if applicable
-                        if (instance.groupDiscounts) {
-                            Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
-                                tableHTML += `
-                                    <tr class="discount-row">
-                                        <td><div class="discount-item-name">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</div></td>
-                                        <td>-$${discount.amount.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            });
                         }
+                    });
+                    
+                    // Add group discount rows if applicable
+                    if (instance.groupDiscounts) {
+                        Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
+                            tableHTML += `
+                                <tr class="discount-row">
+                                    <td><div class="discount-item-name">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</div></td>
+                                    <td>-$${discount.amount.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        });
                     }
                 }
             });
