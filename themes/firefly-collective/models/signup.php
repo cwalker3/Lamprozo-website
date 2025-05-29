@@ -90,15 +90,7 @@
         send_html_mail(NULL, $subject, $html, true);
 
         $encrypted_user_id = encrypt_with_auth_key($user_id);
-        
-        $cookie_options = [
-            'expires'  => time() + 3600,
-            'path'     => '/',
-            'secure'   => is_ssl(),
-            'httponly' => true,
-            'samesite' => 'Lax'
-        ];
-        setcookie('auth_id', $encrypted_user_id, $cookie_options);
+        setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
 
         wp_set_current_user($user_id);
         wp_set_auth_cookie($user_id, true, is_ssl());
