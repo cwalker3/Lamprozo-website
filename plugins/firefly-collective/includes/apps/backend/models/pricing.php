@@ -23,18 +23,6 @@ function firefly_collective_add_pricing_link() {
 }
 add_action('admin_menu', 'firefly_collective_add_pricing_link');
 
-function firefly_collective_add_orders_link() {
-    add_menu_page(
-        'Orders',
-        'Orders',
-        'manage_options',
-        'orders',
-        'firefly_collective_orders_dashboard',
-        'dashicons-cart'
-    );
-}
-add_action('admin_menu', 'firefly_collective_add_orders_link');
-
 function enqueue_pricing_styles_and_scripts($hook) {
     if ($hook !== 'toplevel_page_pricing' && $hook !== 'toplevel_page_orders') {
         return;
@@ -107,16 +95,6 @@ add_action('admin_enqueue_scripts', 'enqueue_pricing_styles_and_scripts');
 function firefly_collective_pricing_dashboard() {
     $plugin_root = dirname(plugin_dir_path(__FILE__));
     $view_path   = $plugin_root . '/views/pricing.php';
-    if (file_exists($view_path)) {
-        require_once $view_path;
-    } else {
-        wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
-    }
-}
-
-function firefly_collective_orders_dashboard() {
-    $plugin_root = dirname(plugin_dir_path(__FILE__));
-    $view_path   = $plugin_root . '/views/orders.php';
     if (file_exists($view_path)) {
         require_once $view_path;
     } else {
@@ -1009,40 +987,6 @@ function get_features_options_addons() {
 }
 
 /**
- * Creates the _ffc_orders table for storing order data
- */
-function create_ffc_orders_table_if_not_exist() {
-    global $wpdb;
-    $collate = $wpdb->get_charset_collate();
-    
-    $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ffc_orders (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        orderID VARCHAR(36) DEFAULT NULL,
-        userId INT UNSIGNED NOT NULL,
-        featureId INT UNSIGNED NOT NULL,
-        optionId INT UNSIGNED NOT NULL,
-        addonIds JSON DEFAULT NULL,
-        priceSelected INT DEFAULT NULL,
-        quantity INT DEFAULT NULL,
-        totalPrice DECIMAL(10,2) DEFAULT NULL,
-        userData JSON NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'pending',
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY(id),
-        INDEX idx_order (orderID),
-        INDEX idx_user (userId),
-        INDEX idx_feature (featureId),
-        INDEX idx_option (optionId),
-        INDEX idx_status (status),
-        INDEX idx_created (createdAt)
-    ) {$collate};";
-    
-    require_once(ABSPATH.'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
-}
-
-/**
  * Initialize pricing on plugin activation
  * Creates tables and syncs JSON with database
  */
@@ -1073,79 +1017,6 @@ function firefly_collective_pricing_init() {
             upsert_pricing_data($payload);
         }
     }
-}
-
-function firefly_collective_place_order($request) {
-    global $wpdb;
-    $data = $request->get_json_params();
-    
-    // Check if we're receiving a single item or multiple items
-    $is_batch = isset($data['items']) && is_array($data['items']);
-    $order_items = $is_batch ? $data['items'] : [$data];
-    
-    // Get current user ID
-    $user_id = get_current_user_id();
-    if (!$user_id) {
-        return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
-    }
-    
-    // Generate order ID if not provided
-    $order_id = isset($data['orderID']) ? sanitize_text_field($data['orderID']) : wp_generate_uuid4();
-    
-    $inserted_records = [];
-    $total_order_value = 0;
-    
-    // Process each order item
-    foreach ($order_items as $item) {
-        // Extract item data
-        $feature_id = intval($item['featureId']);
-        $option_id = intval($item['optionId']);
-        $addon_ids = isset($item['addonIds']) ? $item['addonIds'] : [];
-        $user_data = isset($item['userData']) ? $item['userData'] : [];
-        $price_option_index = isset($item['priceOptionIndex']) ? intval($item['priceOptionIndex']) : 0;
-        $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
-        
-        // Calculate price on server-side - we can directly use the IDs now
-        $calculated_price = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
-        
-        // Insert order item into database
-        $result = $wpdb->insert(
-            $wpdb->prefix . 'ffc_orders',
-            array(
-                'orderID' => $order_id,
-                'userId' => $user_id,
-                'featureId' => $feature_id,
-                'optionId' => $option_id,
-                'addonIds' => json_encode($addon_ids),
-                'priceSelected' => $price_option_index,
-                'quantity' => $quantity,
-                'totalPrice' => $calculated_price,
-                'userData' => json_encode($user_data),
-                'status' => 'pending',
-                'createdAt' => current_time('mysql')
-            )
-        );
-        
-        if ($result === false) {
-            return new WP_Error('db_error', 'Failed to save order item: ' . $wpdb->last_error, array('status' => 500));
-        }
-        
-        $inserted_records[] = [
-            'recordId' => $wpdb->insert_id,
-            'featureId' => $feature_id,
-            'calculatedPrice' => $calculated_price
-        ];
-        
-        $total_order_value += $calculated_price;
-    }
-    
-    // Return success with orderID and all record IDs
-    return array(
-        'success' => true,
-        'orderID' => $order_id,
-        'records' => $inserted_records,
-        'totalOrderValue' => $total_order_value
-    );
 }
 
 /**
