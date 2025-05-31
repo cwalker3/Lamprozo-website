@@ -39,6 +39,8 @@
             priceSelected INT DEFAULT NULL,
             quantity INT DEFAULT NULL,
             totalPrice DECIMAL(10,2) DEFAULT NULL,
+            totalPriceDiscount DECIMAL(10,2) DEFAULT NULL,
+            priceDiscountsInfo JSON DEFAULT NULL,
             userData JSON NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'pending',
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -86,8 +88,8 @@
             $price_option_index = isset($item['priceOptionIndex']) ? intval($item['priceOptionIndex']) : 0;
             $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
             
-            // Calculate price on server-side - we can directly use the IDs now
-            $calculated_price = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
+            // Calculate price and get discount information
+            $price_data = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
             
             // Insert order item into database
             $result = $wpdb->insert(
@@ -100,7 +102,9 @@
                     'addonIds' => json_encode($addon_ids),
                     'priceSelected' => $price_option_index,
                     'quantity' => $quantity,
-                    'totalPrice' => $calculated_price,
+                    'totalPrice' => $price_data['totalPrice'],
+                    'totalPriceDiscount' => $price_data['totalPriceDiscount'],
+                    'priceDiscountsInfo' => json_encode($price_data['priceDiscountsInfo']),
                     'userData' => json_encode($user_data),
                     'status' => 'pending',
                     'createdAt' => current_time('mysql')
@@ -114,10 +118,12 @@
             $inserted_records[] = [
                 'recordId' => $wpdb->insert_id,
                 'featureId' => $feature_id,
-                'calculatedPrice' => $calculated_price
+                'calculatedPrice' => $price_data['totalPrice'],
+                'discountAmount' => $price_data['totalPriceDiscount'],
+                'discountInfo' => $price_data['priceDiscountsInfo']
             ];
             
-            $total_order_value += $calculated_price;
+            $total_order_value += $price_data['totalPrice'];
         }
         
         // Return success with orderID and all record IDs

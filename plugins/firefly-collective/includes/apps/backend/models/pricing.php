@@ -1068,7 +1068,7 @@ function calculate_server_price($feature_id, $option_id, $addon_ids, $price_opti
     foreach ($optionThresholds as $th) {
         if ($qty >= $th['itemCount']) {
             $thresholdDiscountAmt = round($baseTotal * ($th['discount']/100), 2);
-            $optionNote = "*{$th['discount']}% discount applied for {$qty}+ items*";
+            $optionNote = "{$th['discount']}% discount applied for {$qty}+ items";
             break;
         }
     }
@@ -1120,8 +1120,8 @@ function calculate_server_price($feature_id, $option_id, $addon_ids, $price_opti
             $groupTotal    = $sumUnit * $qty;
             $discountAmt   = round($groupTotal * ($applicable['discount']/100), 2);
             $groupDiscountTotal += $discountAmt;
-            $addonNotes[] = "**Group Discount: {$groupName} ({$applicable['discount']}% off for " 
-                            . count($grp['addons']) . " items)**";
+            $addonNotes[] = "Group Discount: {$groupName} ({$applicable['discount']}% off for " 
+                            . count($grp['addons']) . " items)";
         }
     }
 
