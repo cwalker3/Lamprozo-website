@@ -1,4 +1,7 @@
 <?php
+
+    // theme/models/init.php
+    
     // Register Navigation Menu
     function register_website_menu() {
         register_nav_menu('website-menu', __('Main Website Menu', 'firefly-collective'));

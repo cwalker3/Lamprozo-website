@@ -1,3 +1,5 @@
+// plugin/assets/js/orders.js
+
 /**
  * Orders Management JavaScript
  */

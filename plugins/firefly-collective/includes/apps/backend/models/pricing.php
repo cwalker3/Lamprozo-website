@@ -1,12 +1,6 @@
 <?php
-/**
- * Pricing Model File
- *
- * This file adds a Pricing menu to the admin, enqueues assets,
- * and provides functions to create/update the pricing database tables.
- * When "Apply Changes" is clicked, the JSON control data along with a mapping
- * of name changes is used to UPSERT the database so that existing IDs are preserved.
- */
+
+    // plugin/models/orders.php
 
 /* ------------------------------ *
  * Admin Menu & Assets

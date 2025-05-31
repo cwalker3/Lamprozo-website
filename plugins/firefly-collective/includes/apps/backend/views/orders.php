@@ -1,3 +1,5 @@
+<!-- plugin/views/orders.php -->
+
 <div class="wrap" id="ffc-orders-app" v-cloak>
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
     

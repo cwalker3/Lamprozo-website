@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/orders.php
+
     function firefly_collective_add_orders_link() {
         add_menu_page(
             'Orders',
