@@ -1024,175 +1024,123 @@ function firefly_collective_pricing_init() {
  */
 function calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity) {
     global $wpdb;
-    
-    // Get feature data
+
+    // 1) Fetch feature & option
     $feature = $wpdb->get_row(
-        $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d", $feature_id),
+        $wpdb->prepare("SELECT featureName FROM {$wpdb->prefix}ffc_features WHERE id = %d", $feature_id),
         ARRAY_A
     );
-    
-    if (!$feature) {
-        return 0;
-    }
-    
-    // Get option data
     $option = $wpdb->get_row(
         $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d", $option_id),
         ARRAY_A
     );
-    
-    if (!$option) {
-        return 0;
+    if (!$feature || !$option) {
+        return [
+            'totalPrice' => 0,
+            'totalPriceDiscount' => 0,
+            'priceDiscountsInfo' => ['option'=>'','addons'=>[]],
+            'feature' => $feature['featureName'] ?? ''
+        ];
     }
-    
-    // Get base price
-    $price = parse_safe($option['staticPrice'], 0);
-    
-    // Handle price options
+
+    // 2) Base price (staticPrice + priceOptions) × qty
+    $basePrice = parse_safe($option['staticPrice'], 0);
+    $priceOptions = [];
     if (!empty($option['priceOptions'])) {
-        $price_options_array = [];
-        
-        if (is_string($option['priceOptions'])) {
-            $decoded = json_decode($option['priceOptions'], true);
-            $price_options_array = isset($decoded['types']) ? $decoded['types'] : [];
-        } elseif (isset($option['priceOptions']['types'])) {
-            $price_options_array = $option['priceOptions']['types'];
-        }
-        
-        if (!empty($price_options_array) && isset($price_options_array[$price_option_index])) {
-            $price = parse_safe($price_options_array[$price_option_index]['price'], $price);
+        $decoded = is_string($option['priceOptions'])
+            ? json_decode($option['priceOptions'], true)
+            : $option['priceOptions'];
+        if (!empty($decoded['types'])) {
+            $priceOptions = $decoded['types'];
         }
     }
-    
-    // Get selected addons
-    $selected_addons = [];
+    if (isset($priceOptions[$price_option_index]['price'])) {
+        $basePrice = parse_safe($priceOptions[$price_option_index]['price'], $basePrice);
+    }
+    $qty       = max(1, (int)$quantity);
+    $baseTotal = $basePrice * $qty;
+
+    // 3) Apply the best option-level threshold discount
+    $optionThresholds = parse_threshold_discounts($option['thresholdDiscounts']);
+    usort($optionThresholds, fn($a,$b)=> $b['itemCount'] - $a['itemCount']);
+    $thresholdDiscountAmt = 0;
+    $optionNote = '';
+    foreach ($optionThresholds as $th) {
+        if ($qty >= $th['itemCount']) {
+            $thresholdDiscountAmt = round($baseTotal * ($th['discount']/100), 2);
+            $optionNote = "*{$th['discount']}% discount applied for {$qty}+ items*";
+            break;
+        }
+    }
+    $baseAfterThreshold = $baseTotal - $thresholdDiscountAmt;
+
+    // 4) Fetch selected addons and build grouping
+    $selectedAddons = [];
     if (!empty($addon_ids)) {
-        // Convert array to comma-separated string for IN clause
         $placeholders = implode(',', array_fill(0, count($addon_ids), '%d'));
-        
-        // Prepare query parameters
-        $query_params = $addon_ids;
-        array_unshift($query_params, $option_id);
-        
-        // Get all selected addons in one query
-        $selected_addons = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM {$wpdb->prefix}ffc_addons 
-                 WHERE optionId = %d AND id IN ($placeholders)",
-                $query_params
-            ),
-            ARRAY_A
-        );
+        $params       = array_merge([$option_id], $addon_ids);
+        $sql = "
+          SELECT * FROM {$wpdb->prefix}ffc_addons 
+          WHERE optionId = %d AND id IN ($placeholders)
+        ";
+        $selectedAddons = $wpdb->get_results($wpdb->prepare($sql, $params), ARRAY_A);
     }
-    
-    // Apply addon prices (without group discounts yet)
-    foreach ($selected_addons as $addon) {
-        $mod_val = parse_safe($addon['staticPriceMod'], 0);
-        if (is_multiply($addon)) {
-            $price *= ($mod_val ?: 1);
-        } else {
-            $price += $mod_val;
-        }
-    }
-    
-    // Calculate total price before group discounts
-    $total_price = $price * $quantity;
-    $original_price = $total_price;
-    
-    // NOW apply group discounts to the total addon cost
-    $addons_by_group = [];
-    
-    foreach ($selected_addons as $addon) {
+
+    // 5) Compute raw addon total and collect groups
+    $rawAddonTotal    = 0;
+    $groups           = [];
+    foreach ($selectedAddons as $addon) {
+        $unit = parse_safe($addon['staticPriceMod'], 0);
+        $rawAddonTotal += $unit * $qty;
+
         if (!empty($addon['groupName']) && !empty($addon['enableGrouping'])) {
-            if (!isset($addons_by_group[$addon['groupName']])) {
-                $addons_by_group[$addon['groupName']] = [
-                    'addons' => [],
-                    'thresholdDiscounts' => parse_threshold_discounts($addon['groupThresholdDiscounts'])
-                ];
-            }
-            $addons_by_group[$addon['groupName']]['addons'][] = $addon;
+            $groups[$addon['groupName']]['addons'][] = $addon;
         }
     }
-    
-    // Apply group discounts
-    foreach ($addons_by_group as $group_name => $group) {
-        if (empty($group['thresholdDiscounts']) || empty($group['addons'])) {
-            continue;
-        }
-        
-        // Sort discounts by item count in descending order
-        $sorted_discounts = $group['thresholdDiscounts'];
-        usort($sorted_discounts, function($a, $b) {
-            return intval($b['itemCount']) - intval($a['itemCount']);
-        });
-        
-        // Find the highest applicable discount
-        $applicable_discount = null;
-        foreach ($sorted_discounts as $discount) {
-            if (count($group['addons']) >= intval($discount['itemCount'])) {
-                $applicable_discount = $discount;
+
+    // 6) Apply each group’s best discount
+    $groupDiscountTotal = 0;
+    $addonNotes         = [];
+    foreach ($groups as $groupName => $grp) {
+        // every addon in the group carries the same thresholds, so take the first
+        $thresholds = parse_threshold_discounts($grp['addons'][0]['groupThresholdDiscounts'] ?? null);
+        usort($thresholds, fn($a,$b)=> $b['itemCount'] - $a['itemCount']);
+        $applicable = null;
+        foreach ($thresholds as $th) {
+            if (count($grp['addons']) >= $th['itemCount']) {
+                $applicable = $th;
                 break;
             }
         }
-        
-        if ($applicable_discount) {
-            // Calculate the discount amount on the TOTAL price of this group's addons (including quantity)
-            $group_items_per_unit = 0;
-            foreach ($group['addons'] as $addon) {
-                $group_items_per_unit += parse_safe($addon['staticPriceMod'], 0);
+        if ($applicable) {
+            $sumUnit = 0;
+            foreach ($grp['addons'] as $addon) {
+                $sumUnit += parse_safe($addon['staticPriceMod'], 0);
             }
-            
-            $group_items_total = $group_items_per_unit * $quantity; // Apply quantity here
-            $discount_percent = floatval($applicable_discount['discount']);
-            $discount_amount = $group_items_total * ($discount_percent / 100);
-            
-            // Apply discount to the total price
-            $total_price -= $discount_amount;
+            $groupTotal    = $sumUnit * $qty;
+            $discountAmt   = round($groupTotal * ($applicable['discount']/100), 2);
+            $groupDiscountTotal += $discountAmt;
+            $addonNotes[] = "**Group Discount: {$groupName} ({$applicable['discount']}% off for " 
+                            . count($grp['addons']) . " items)**";
         }
     }
-    
-    // Apply highest applicable threshold discount
-    if (!empty($option['thresholdDiscounts'])) {
-        $thresholds = [];
-        
-        if (is_string($option['thresholdDiscounts'])) {
-            $thresholds = json_decode($option['thresholdDiscounts'], true);
-        } elseif (isset($option['thresholdDiscounts']['types'])) {
-            $thresholds = $option['thresholdDiscounts']['types'];
-        } elseif (is_array($option['thresholdDiscounts'])) {
-            $thresholds = $option['thresholdDiscounts'];
-        }
-        
-        if (is_array($thresholds)) {
-            // Sort thresholds by itemCount in descending order
-            usort($thresholds, function($a, $b) {
-                return intval($b['itemCount']) - intval($a['itemCount']);
-            });
-            
-            // Filter valid thresholds
-            $valid_thresholds = array_filter($thresholds, function($t) {
-                return intval($t['itemCount']) > 0 && floatval($t['discount']) > 0;
-            });
-            
-            // Find first threshold that applies (highest one)
-            $applied_threshold = null;
-            foreach ($valid_thresholds as $threshold) {
-                if ($quantity >= intval($threshold['itemCount'])) {
-                    $applied_threshold = $threshold;
-                    break;
-                }
-            }
-            
-            if ($applied_threshold) {
-                $discount_percentage = floatval($applied_threshold['discount']);
-                $total_price = $original_price * (1 - $discount_percentage/100);
-            }
-        }
-    }
-    
-    // Return the final price rounded to two decimal places
-    return round($total_price, 2);
+
+    // 7) Final assembly
+    $totalPrice        = round($baseAfterThreshold + ($rawAddonTotal - $groupDiscountTotal), 2);
+    $totalDiscount     = round($thresholdDiscountAmt + $groupDiscountTotal, 2);
+    $priceDiscountsInfo = [
+        'option' => $optionNote,
+        'addons' => $addonNotes
+    ];
+
+    return [
+        'totalPrice'         => $totalPrice,
+        'totalPriceDiscount' => $totalDiscount,
+        'priceDiscountsInfo' => $priceDiscountsInfo,
+        'feature'            => $feature['featureName']
+    ];
 }
+
 
 /**
  * Parse numeric values safely

@@ -679,6 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateInvoice() {
         let totalLower = 0;
         let totalUpper = 0;
+        let totalFinal = 0;
         estimateMode = false;
 
         let tableHTML = `
@@ -831,6 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const baseDiscountAmount = (originalFullPrice - discountedFullPrice) * basePortionOfOriginal;
                         displayPrice = totalBasePrice - baseDiscountAmount;
                         
+                        totalFinal += displayPrice;
                         tableHTML += `
                             <tr>
                                 <td>${itemDescription}</td>
@@ -891,7 +893,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // For fixed prices, show total addon price (addon price × quantity)
                                 const addonPricePerUnit = parseSafe(addon.staticPriceMod, 0);
                                 const addonTotalPrice = addonPricePerUnit * qty;
-                                
+                                totalFinal += addonTotalPrice;
+
                                 tableHTML += `
                                     <tr class="addon-row">
                                         <td><div class="addon-item-name">${addon.addonName}</div></td>
@@ -905,6 +908,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Add group discount rows if applicable
                     if (instance.groupDiscounts) {
                         Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
+                            totalFinal -= discount.amount;
                             tableHTML += `
                                 <tr class="discount-row">
                                     <td><div class="discount-item-name">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</div></td>
@@ -926,7 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (estimateMode) {
             tableHTML += `$${totalLower.toFixed(2)} - $${totalUpper.toFixed(2)}`;
         } else {
-            tableHTML += `$${totalLower.toFixed(2)}`;
+            tableHTML += `$${totalFinal.toFixed(2)}`;
         }
         tableHTML += `</td>
                     </tr>
