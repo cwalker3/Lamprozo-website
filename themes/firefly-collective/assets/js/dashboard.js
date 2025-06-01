@@ -851,6 +851,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         `;
                     } else {
                         // No discount on base, show regular price
+                        totalFinal += displayPrice;
                         tableHTML += `
                             <tr>
                                 <td>${itemDescription}</td>
