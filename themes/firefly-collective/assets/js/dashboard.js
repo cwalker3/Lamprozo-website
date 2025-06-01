@@ -1,3 +1,5 @@
+// plugin/assets/js/dashboard.js
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log(dashboardData);
     // Global state: keys are feature type indexes; each value is an array of instance objects.

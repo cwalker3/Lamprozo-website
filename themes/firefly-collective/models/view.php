@@ -24,7 +24,8 @@
             $valid_views = array('contact',
                                 'signup',
                                 'request-an-appointment',
-                                'dashboard');
+                                'dashboard',
+                                'order-history');
 
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists

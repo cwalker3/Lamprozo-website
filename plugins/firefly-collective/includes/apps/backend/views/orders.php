@@ -1,5 +1,11 @@
 <!-- plugin/views/orders.php -->
 
+<?php
+
+    global $currentUserIdAdmin;
+
+?>
+
 <div class="wrap" id="ffc-orders-app" v-cloak>
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
     
@@ -10,6 +16,7 @@
     </div>
     
     <!-- Filters Section -->
+    <?php if ($currentUserIdAdmin): ?>
     <div class="ffc-filters-container">
         <div class="ffc-filters">
             <div class="ffc-filter-item">
@@ -56,15 +63,20 @@
             <button class="button" @click="applyBulkAction" :disabled="!bulkAction">Apply</button>
         </div>
     </div>
+    <?php endif; ?>
     
     <!-- Orders Table -->
     <div class="ffc-table-container" v-if="!loading && orders.length > 0">
         <table class="wp-list-table widefat fixed striped ffc-orders-table">
             <thead>
                 <tr>
+
+                    <?php if ($currentUserIdAdmin): ?>
                     <th class="check-column">
                         <input type="checkbox" @change="toggleSelectAll" :checked="allSelected">
                     </th>
+                    <?php endif; ?>
+
                     <th @click="sortBy('orderID')" :class="getSortClass('orderID')">Order ID</th>
                     <th @click="sortBy('userId')" :class="getSortClass('userId')">Customer</th>
                     <th>Items</th>
@@ -77,10 +89,14 @@
             <tbody>
                 <template v-for="(group, groupIndex) in groupedOrders" :key="'order-' + groupIndex">
                     <tr :class="{'ffc-order-row': true, 'expanded': expandedOrders.includes(group.orderID)}">
+                        
+                    <?php if ($currentUserIdAdmin): ?>
                         <td>
                             <input type="checkbox" :value="group.orderID" 
                                 v-model="selectedOrders" @change="handleOrderSelection">
                         </td>
+                        <?php endif; ?>
+
                         <td>{{ formatOrderID(group.orderID) }}</td>
                         <td>{{ getUserName(group.userId) }}</td>
                         <td>
@@ -99,8 +115,18 @@
                         <td class="ffc-actions-cell">
                             <div class="ffc-row-actions">
                                 <button class="button button-small" @click="viewOrderDetails(group)">View</button>
+
+                                <?php if ($currentUserIdAdmin): ?>
                                 <button class="button button-small" @click="updateOrderStatus(group.orderID)">Status</button>
                                 <button class="button button-small button-link-delete" @click="confirmDelete(group.orderID)">Delete</button>
+                                <?php endif; ?>
+                                <button
+                                    class="button button-small button-link-delete"
+                                    @click="confirmRefund(group.orderID)"
+                                    :disabled="group.status === 'refunded'"
+                                    >
+                                    Refund
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -279,11 +305,28 @@
                 <button class="ffc-modal-close" @click="showDeleteModal = false">×</button>
             </div>
             <div class="ffc-modal-body">
-                <p>Are you sure you want to delete this order? This action cannot be undone.</p>
+                <p>Are you sure you want to DELETE this order? This action cannot be undone.</p>
             </div>
             <div class="ffc-modal-footer">
                 <button class="button" @click="showDeleteModal = false">Cancel</button>
                 <button class="button button-link-delete" @click="deleteOrder()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Refund Confirmation Modal -->
+    <div class="ffc-modal" v-if="showRefundModal" v-cloak>
+        <div class="ffc-modal-content ffc-small-modal">
+            <div class="ffc-modal-header">
+                <h2>Confirm Refund</h2>
+                <button class="ffc-modal-close" @click="showRefundModal = false">×</button>
+            </div>
+            <div class="ffc-modal-body">
+                <p>Are you sure you want to REFUND this order? This action cannot be undone.</p>
+            </div>
+            <div class="ffc-modal-footer">
+                <button class="button" @click="showRefundModal = false">Cancel</button>
+                <button class="button button-link-delete" @click="refundOrder()">Refund</button>
             </div>
         </div>
     </div>

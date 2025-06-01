@@ -1,7 +1,7 @@
 <?php
 
     // theme/models/init.php
-    
+
     // Register Navigation Menu
     function register_website_menu() {
         register_nav_menu('website-menu', __('Main Website Menu', 'firefly-collective'));
@@ -13,10 +13,15 @@
 
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
+
+        global $plugin_path, $plugin_path_web;
+        $plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
+        $plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
-        $auth_id = $_COOKIE['auth_id'];
+        $auth_id = isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : '';
+        $api_url = esc_url_raw(rest_url('custom-api/v1/'));
 
         // Enqueue Stylesheets
         wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
@@ -38,7 +43,7 @@
         // Localize main.js with the nonce and API URL for security
         wp_localize_script('main-js', 'myApi', array(
             'nonce'   => $nonce,
-            'api_url' => esc_url_raw(rest_url('custom-api/v1/')), // Base API URL
+            'api_url' => $api_url,
             'themePath' => $theme_path,
             'maxBlogs' => 15,
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
@@ -85,6 +90,27 @@
                 'stripeKey'      => $publishable_key
             ));
         }
+
+        // Order history
+        if (determine_view() === 'order-history') {
+            global $currentUserIdAdmin;
+            $currentUserIdAdmin = current_user_can('manage_options');
+            wp_enqueue_style('order-history-css', $plugin_path_web . '/assets/css/orders.css', array(), $unique_id);
+            wp_enqueue_script('order-history-js', $plugin_path_web . '/assets/js/orders.js', array(), $unique_id, true);
+            wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
+
+            $obj = new stdClass();
+
+            // Localize into JS
+            wp_localize_script('order-history-js', 'ordersData', array(
+                'data'               => $obj,
+                'nonce'              => $nonce,
+                'theme_path'         => $theme_path,
+                'apiUrl'             => $api_url,
+                'currentUserIsAdmin' => $currentUserIdAdmin,
+                'currentUserId'      => get_current_user_id()
+            ));
+        }
     }
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
 
@@ -106,11 +132,11 @@
 
     add_action('login_init', function() {
         $theme_path = get_template_directory_uri();
-        wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
-        wp_enqueue_script('auth', $theme_path . '/assets/js/auth.js', array(), $unique_id, true);
+        $nonce = wp_create_nonce('wp_rest');
+        wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $nonce);
+        wp_enqueue_script('auth', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
         wp_localize_script('auth', 'myApi', array(
-            'nonce'   => $nonce,
-            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+            'nonce'     => $nonce,
+            'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
         ));
     });
-    

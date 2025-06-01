@@ -24,9 +24,6 @@
         }
     }
 
-    /**
-     * Creates the _ffc_orders table for storing order data
-     */
     function create_ffc_orders_table_if_not_exist() {
         global $wpdb;
         $collate = $wpdb->get_charset_collate();
@@ -34,6 +31,7 @@
         $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ffc_orders (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             orderID VARCHAR(36) DEFAULT NULL,
+            payment_intent_id VARCHAR(255) NULL,
             userId INT UNSIGNED NOT NULL,
             featureId INT UNSIGNED NOT NULL,
             optionId INT UNSIGNED NOT NULL,
@@ -62,27 +60,25 @@
 
     function firefly_collective_place_order($request) {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
+        }
         $data = $request->get_json_params();
         
-        // Check if we're receiving a single item or multiple items
         $is_batch = isset($data['items']) && is_array($data['items']);
         $order_items = $is_batch ? $data['items'] : [$data];
         
-        // Get current user ID
         $user_id = get_current_user_id();
         if (!$user_id) {
             return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
         }
         
-        // Generate order ID if not provided
         $order_id = isset($data['orderID']) ? sanitize_text_field($data['orderID']) : wp_generate_uuid4();
         
         $inserted_records = [];
         $total_order_value = 0;
         
-        // Process each order item
         foreach ($order_items as $item) {
-            // Extract item data
             $feature_id = intval($item['featureId']);
             $option_id = intval($item['optionId']);
             $addon_ids = isset($item['addonIds']) ? $item['addonIds'] : [];
@@ -90,26 +86,24 @@
             $price_option_index = isset($item['priceOptionIndex']) ? intval($item['priceOptionIndex']) : 0;
             $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
             
-            // Calculate price and get discount information
             $price_data = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
             
-            // Insert order item into database
             $result = $wpdb->insert(
                 $wpdb->prefix . 'ffc_orders',
                 array(
-                    'orderID' => $order_id,
-                    'userId' => $user_id,
-                    'featureId' => $feature_id,
-                    'optionId' => $option_id,
-                    'addonIds' => json_encode($addon_ids),
-                    'priceSelected' => $price_option_index,
-                    'quantity' => $quantity,
-                    'totalPrice' => $price_data['totalPrice'],
+                    'orderID'            => $order_id,
+                    'userId'             => $user_id,
+                    'featureId'          => $feature_id,
+                    'optionId'           => $option_id,
+                    'addonIds'           => json_encode($addon_ids),
+                    'priceSelected'      => $price_option_index,
+                    'quantity'           => $quantity,
+                    'totalPrice'         => $price_data['totalPrice'],
                     'totalPriceDiscount' => $price_data['totalPriceDiscount'],
                     'priceDiscountsInfo' => json_encode($price_data['priceDiscountsInfo']),
-                    'userData' => json_encode($user_data),
-                    'status' => 'pending',
-                    'createdAt' => current_time('mysql')
+                    'userData'           => json_encode($user_data),
+                    'status'             => 'pending',
+                    'createdAt'          => current_time('mysql')
                 )
             );
             
@@ -118,30 +112,29 @@
             }
             
             $inserted_records[] = [
-                'recordId' => $wpdb->insert_id,
-                'featureId' => $feature_id,
+                'recordId'        => $wpdb->insert_id,
+                'featureId'       => $feature_id,
                 'calculatedPrice' => $price_data['totalPrice'],
-                'discountAmount' => $price_data['totalPriceDiscount'],
-                'discountInfo' => $price_data['priceDiscountsInfo']
+                'discountAmount'  => $price_data['totalPriceDiscount'],
+                'discountInfo'    => $price_data['priceDiscountsInfo']
             ];
             
             $total_order_value += $price_data['totalPrice'];
         }
         
-        // Return success with orderID and all record IDs
         return array(
-            'success' => true,
-            'orderID' => $order_id,
-            'records' => $inserted_records,
+            'success'         => true,
+            'orderID'         => $order_id,
+            'records'         => $inserted_records,
             'totalOrderValue' => $total_order_value
         );
     }
 
-    /**
-     * Get all orders with optional filtering and pagination
-     */
     function firefly_collective_get_orders($request) {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view orders.', array('status' => 401));
+        }
         
         $page = $request->get_param('page') ? intval($request->get_param('page')) : 1;
         $per_page = $request->get_param('per_page') ? intval($request->get_param('per_page')) : 10;
@@ -153,17 +146,19 @@
         $sort_field = $request->get_param('sort_field') ? sanitize_text_field($request->get_param('sort_field')) : 'createdAt';
         $sort_direction = $request->get_param('sort_direction') ? sanitize_text_field($request->get_param('sort_direction')) : 'desc';
         
-        // Build query
         $where_clauses = [];
         $query_params = [];
         
-        // Filter by status
+        if ( ! current_user_can('manage_options') ) {
+            $where_clauses[] = 'userId = %d';
+            $query_params[] = get_current_user_id();
+        }
+        
         if ($status) {
             $where_clauses[] = 'status = %s';
             $query_params[] = $status;
         }
         
-        // Filter by date range
         if ($date_from) {
             $where_clauses[] = 'createdAt >= %s';
             $query_params[] = $date_from . ' 00:00:00';
@@ -174,15 +169,12 @@
             $query_params[] = $date_to . ' 23:59:59';
         }
         
-        // Filter by order ID
         if ($order_id) {
             $where_clauses[] = 'orderID LIKE %s';
             $query_params[] = '%' . $wpdb->esc_like($order_id) . '%';
         }
         
-        // Filter by search term (in orderID, user data, or user ID)
         if ($search) {
-            // Get user IDs that match the search term
             $user_query = $wpdb->prepare(
                 "SELECT ID FROM {$wpdb->users} 
                 WHERE display_name LIKE %s OR user_login LIKE %s OR user_email LIKE %s",
@@ -193,7 +185,7 @@
             
             $matching_user_ids = $wpdb->get_col($user_query);
             
-            $search_clauses = ['orderID LIKE %s', 'userData LIKE %s'];
+            $search_clauses = array('orderID LIKE %s', 'userData LIKE %s');
             $query_params[] = '%' . $wpdb->esc_like($search) . '%';
             $query_params[] = '%' . $wpdb->esc_like($search) . '%';
             
@@ -205,39 +197,32 @@
             $where_clauses[] = '(' . implode(' OR ', $search_clauses) . ')';
         }
         
-        // Build WHERE clause
         $where_sql = '';
         if (!empty($where_clauses)) {
             $where_sql = 'WHERE ' . implode(' AND ', $where_clauses);
         }
         
-        // Validate sort field against allowed fields
-        $allowed_sort_fields = [
+        $allowed_sort_fields = array(
             'orderID', 'userId', 'featureId', 'optionId', 
             'totalPrice', 'quantity', 'status', 'createdAt'
-        ];
+        );
         
         if (!in_array($sort_field, $allowed_sort_fields)) {
             $sort_field = 'createdAt';
         }
         
-        // Validate sort direction
         $sort_direction = strtoupper($sort_direction) === 'ASC' ? 'ASC' : 'DESC';
         
-        // Count total results for pagination
         $count_query = "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders $where_sql";
         
-        // If there are query parameters, prepare the count query
         if (!empty($query_params)) {
             $count_query = $wpdb->prepare($count_query, $query_params);
         }
         
         $total_items = $wpdb->get_var($count_query);
         
-        // Calculate offset
         $offset = ($page - 1) * $per_page;
         
-        // Main query
         $orders_query = "
             SELECT * FROM {$wpdb->prefix}ffc_orders
             $where_sql
@@ -245,7 +230,6 @@
             LIMIT %d OFFSET %d
         ";
         
-        // Add pagination parameters
         $query_params[] = $per_page;
         $query_params[] = $offset;
         
@@ -254,14 +238,82 @@
             ARRAY_A
         );
         
-        return [
-            'success' => true,
-            'orders' => $orders,
-            'total' => intval($total_items),
-            'page' => $page,
-            'per_page' => $per_page,
+        return array(
+            'success'     => true,
+            'orders'      => $orders,
+            'total'       => intval($total_items),
+            'page'        => $page,
+            'per_page'    => $per_page,
             'total_pages' => ceil($total_items / $per_page)
-        ];
+        );
+    }
+
+    function firefly_collective_refund_order($request) {
+        global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return array(
+                'success' => false,
+                'message' => 'You must be logged in to refund an order.'
+            );
+        }
+        
+        $order_id = sanitize_text_field($request->get_param('orderID'));
+        
+        if (empty($order_id)) {
+            return array(
+                'success' => false,
+                'message' => 'Order ID is required'
+            );
+        }
+        
+        $order_data = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s",
+                $order_id
+            ),
+            ARRAY_A
+        );
+        
+        if (empty($order_data)) {
+            return array(
+                'success' => false,
+                'message' => 'Order not found'
+            );
+        }
+        
+        $first_item = $order_data[0];
+        $order_user_id = intval($first_item['userId']);
+        $current_user_id = get_current_user_id();
+        
+        if (!current_user_can('manage_options') && $order_user_id !== $current_user_id) {
+            return array(
+                'success' => false,
+                'message' => 'You do not have permission to refund this order'
+            );
+        }
+        
+        $result = $wpdb->update(
+            $wpdb->prefix . 'ffc_orders',
+            array('status' => 'refunded'),
+            array('orderID' => $order_id),
+            array('%s'),
+            array('%s')
+        );
+        
+        if ($result === false) {
+            return array(
+                'success' => false,
+                'message' => 'Failed to refund order: ' . $wpdb->last_error
+            );
+        }
+        
+        firefly_collective_orders_email($order_id, 'refunded');
+        
+        return array(
+            'success' => true,
+            'message' => 'Order refunded successfully',
+            'refunded' => $result
+        );
     }
 
     /**
@@ -311,62 +363,6 @@
             'success' => true,
             'message' => 'Order deleted successfully',
             'deleted' => $result // Number of rows affected
-        ];
-    }
-
-    /**
-     * Update an order's status
-     */
-    function firefly_collective_update_order_status($request) {
-        global $wpdb;
-        
-        $order_id = sanitize_text_field($request->get_param('orderID'));
-        $status = sanitize_text_field($request->get_param('status'));
-        
-        if (empty($order_id)) {
-            return [
-                'success' => false,
-                'message' => 'Order ID is required'
-            ];
-        }
-        
-        if (empty($status)) {
-            return [
-                'success' => false,
-                'message' => 'Status is required'
-            ];
-        }
-        
-        // Validate status
-        $allowed_statuses = ['pending', 'completed', 'cancelled'];
-        if (!in_array($status, $allowed_statuses)) {
-            return [
-                'success' => false,
-                'message' => 'Invalid status value'
-            ];
-        }
-        
-        $result = $wpdb->update(
-            $wpdb->prefix . 'ffc_orders',
-            ['status' => $status],
-            ['orderID' => $order_id],
-            ['%s'],
-            ['%s']
-        );
-        
-        if ($result === false) {
-            return [
-                'success' => false,
-                'message' => 'Failed to update order status: ' . $wpdb->last_error
-            ];
-        }
-        
-        firefly_collective_orders_email($order_id, $status);
-
-        return [
-            'success' => true,
-            'message' => 'Order status updated successfully',
-            'updated' => $result // Number of rows affected
         ];
     }
 
@@ -435,157 +431,166 @@
         ];
     }
 
-    /**
-     * Update multiple orders' status (bulk update)
-     */
-    function firefly_collective_update_orders_status_bulk($request) {
+    function firefly_collective_update_order_status($request) {
         global $wpdb;
-        
-        $order_ids = $request->get_param('orderIDs');
-        $status = sanitize_text_field($request->get_param('status'));
-        
-        if (empty($order_ids) || !is_array($order_ids)) {
-            return [
+        if ( ! is_user_logged_in() ) {
+            return array(
                 'success' => false,
-                'message' => 'Order IDs are required'
-            ];
+                'message' => 'You must be logged in to update order status.'
+            );
+        }
+        
+        $order_id = sanitize_text_field($request->get_param('orderID'));
+        $status   = sanitize_text_field($request->get_param('status'));
+        
+        if (empty($order_id)) {
+            return array(
+                'success' => false,
+                'message' => 'Order ID is required'
+            );
         }
         
         if (empty($status)) {
-            return [
+            return array(
                 'success' => false,
                 'message' => 'Status is required'
-            ];
+            );
         }
         
-        // Validate status
-        $allowed_statuses = ['pending', 'completed', 'cancelled'];
+        $allowed_statuses = array('pending', 'completed', 'cancelled', 'refunded');
         if (!in_array($status, $allowed_statuses)) {
-            return [
+            return array(
                 'success' => false,
                 'message' => 'Invalid status value'
-            ];
+            );
         }
         
-        // Sanitize order IDs
-        $order_ids = array_map('sanitize_text_field', $order_ids);
-        
-        // Build placeholders for the query
-        $placeholders = implode(',', array_fill(0, count($order_ids), '%s'));
-        
-        // Create query parameters array with status as first parameter
-        $query_params = array_merge([$status], $order_ids);
-        
-        $query = $wpdb->prepare(
-            "UPDATE {$wpdb->prefix}ffc_orders SET status = %s WHERE orderID IN ($placeholders)",
-            $query_params
+        $order_data = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s",
+                $order_id
+            ),
+            ARRAY_A
         );
         
-        $result = $wpdb->query($query);
+        if (!$order_data) {
+            return array(
+                'success' => false,
+                'message' => 'Order not found'
+            );
+        }
+        
+        $order_user_id = intval($order_data['userId']);
+        $current_user_id = get_current_user_id();
+        if (!current_user_can('manage_options') && $order_user_id !== $current_user_id) {
+            return array(
+                'success' => false,
+                'message' => 'You do not have permission to update this order status'
+            );
+        }
+        
+        $result = $wpdb->update(
+            $wpdb->prefix . 'ffc_orders',
+            array('status' => $status),
+            array('orderID' => $order_id),
+            array('%s'),
+            array('%s')
+        );
         
         if ($result === false) {
-            return [
+            return array(
                 'success' => false,
-                'message' => 'Failed to update orders: ' . $wpdb->last_error
-            ];
+                'message' => 'Failed to update order status: ' . $wpdb->last_error
+            );
         }
         
-        // Send emails to all updated orders
-        foreach ($order_ids as $order_id) {
-            firefly_collective_orders_email($order_id, $status);
-        }
+        firefly_collective_orders_email($order_id, $status);
         
-        return [
+        return array(
             'success' => true,
-            'message' => 'Orders updated successfully',
-            'updated' => $result // Number of rows affected
-        ];
+            'message' => 'Order status updated successfully',
+            'updated' => $result
+        );
     }
 
-    /**
-     * Get features for lookups
-     */
     function firefly_collective_get_features() {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view features.', array('status' => 401));
+        }
         
         $features = $wpdb->get_results(
             "SELECT id, featureName FROM {$wpdb->prefix}ffc_features",
             ARRAY_A
         );
         
-        return [
-            'success' => true,
+        return array(
+            'success'  => true,
             'features' => $features
-        ];
+        );
     }
 
-    /**
-     * Get options for lookups
-     */
     function firefly_collective_get_options() {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view options.', array('status' => 401));
+        }
         
         $options = $wpdb->get_results(
             "SELECT id, featureId, optionName FROM {$wpdb->prefix}ffc_options",
             ARRAY_A
         );
         
-        return [
+        return array(
             'success' => true,
             'options' => $options
-        ];
+        );
     }
 
-    /**
-     * Get addons for lookups
-     */
     function firefly_collective_get_addons() {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view addons.', array('status' => 401));
+        }
         
         $addons = $wpdb->get_results(
             "SELECT id, optionId, addonName FROM {$wpdb->prefix}ffc_addons",
             ARRAY_A
         );
         
-        return [
+        return array(
             'success' => true,
-            'addons' => $addons
-        ];
+            'addons'  => $addons
+        );
     }
 
-    /**
-     * Get users for lookups
-     */
     function firefly_collective_get_users() {
         global $wpdb;
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view users.', array('status' => 401));
+        }
         
-        $users = [];
-        $user_query = new WP_User_Query([
-            'fields' => ['ID', 'display_name', 'user_email']
-        ]);
+        $users = array();
+        $user_query = new WP_User_Query(array(
+            'fields' => array('ID', 'display_name', 'user_email')
+        ));
         
         foreach ($user_query->get_results() as $user) {
             $users[$user->ID] = $user->display_name . ' (' . $user->user_email . ')';
         }
         
-        return [
+        return array(
             'success' => true,
-            'users' => $users
-        ];
+            'users'   => $users
+        );
     }
 
-    /**
-     * Send order status update notifications to admin and user with detailed invoice for all items in order
-     */
     function firefly_collective_orders_email($order_id, $new_status = '', $order_data = null) {
         global $wpdb;
         
-        // If order data is provided (e.g., for deleted orders), use it
-        // Otherwise, fetch from database
         if ($order_data !== null) {
             $order_items = $order_data;
         } else {
-            // Get all order items with this order ID
             $order_items = $wpdb->get_results(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s ORDER BY id ASC",
@@ -596,57 +601,51 @@
         }
         
         if (empty($order_items)) {
-            return false; // Order not found
+            return false;
         }
         
-        // Get the first item to extract common order information
         $first_item = $order_items[0];
         
-        // Get user data
         $user = get_userdata($first_item['userId']);
         if (!$user) {
-            return false; // User not found
+            return false;
         }
         
-        // Status messaging
         $status = !empty($new_status) ? $new_status : $first_item['status'];
         $status_formatted = ucfirst($status);
         $status_color = '';
         
         switch ($status) {
             case 'completed':
-                $status_color = '#28a745'; // Green
+                $status_color = '#28a745';
                 break;
             case 'pending':
-                $status_color = '#ffc107'; // Yellow
+                $status_color = '#ffc107';
                 break;
             case 'cancelled':
-                $status_color = '#dc3545'; // Red
+                $status_color = '#dc3545';
                 break;
-            case 'deleted':
-                $status_color = '#6c757d'; // Gray
+            case 'refunded':
+                $status_color = '#6c757d';
                 break;
             default:
-                $status_color = '#6c757d'; // Gray
+                $status_color = '#6c757d';
         }
         
-        // Format dates
         $order_date = date('F j, Y, g:i a', strtotime($first_item['createdAt']));
         $invoice_number = str_replace('-', '', substr($first_item['orderID'], 0, 8));
         
-        // Calculate order total
         $order_total = 0;
         foreach ($order_items as $item) {
             $order_total += floatval($item['totalPrice']);
         }
         $formatted_order_total = '$' . number_format($order_total, 2);
         
-        // Order service type (dine in, take out, delivery)
         $service_type = '';
         if (!empty($first_item['userData'])) {
             $user_data = json_decode($first_item['userData'], true);
             if (isset($user_data['dineInTakeOutDelivery'])) {
-                $service_types = ['Dine In', 'Take Out', 'Delivery'];
+                $service_types = array('Dine In', 'Take Out', 'Delivery');
                 $selected_type = intval($user_data['dineInTakeOutDelivery']);
                 if (isset($service_types[$selected_type])) {
                     $service_type = $service_types[$selected_type];
@@ -654,11 +653,9 @@
             }
         }
         
-        // Build HTML for all order items
         $items_html = '';
         
         foreach ($order_items as $item_index => $item) {
-            // Get feature details
             $feature = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
@@ -667,7 +664,6 @@
                 ARRAY_A
             );
             
-            // Get option details
             $option = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
@@ -676,12 +672,10 @@
                 ARRAY_A
             );
             
-            // Skip if feature or option not found
             if (!$feature || !$option) {
                 continue;
             }
             
-            // Get pricing information for the selected option
             $size_label = '';
             $base_price = 0;
             
@@ -696,11 +690,9 @@
                 }
             }
             
-            // Format item price
             $formatted_item_price = '$' . number_format($item['totalPrice'], 2);
             $formatted_base_price = '$' . number_format($base_price, 2);
             
-            // Item header row with feature name and option
             $items_html .= "
                 <tr class='item-header'>
                     <td><strong>{$feature['featureName']} - {$option['optionName']} ({$size_label})</strong></td>
@@ -709,10 +701,9 @@
                 </tr>
             ";
             
-            // Decode addons and get their details
             if (!empty($item['addonIds'])) {
                 $addon_ids = json_decode($item['addonIds'], true);
-                $grouped_addons = [];
+                $grouped_addons = array();
                 
                 if (is_array($addon_ids)) {
                     foreach ($addon_ids as $addon_id) {
@@ -727,13 +718,12 @@
                         if ($addon) {
                             $group = !empty($addon['groupName']) ? $addon['groupName'] : 'Standard Addons';
                             if (!isset($grouped_addons[$group])) {
-                                $grouped_addons[$group] = [];
+                                $grouped_addons[$group] = array();
                             }
                             $grouped_addons[$group][] = $addon;
                         }
                     }
                     
-                    // Generate addon HTML with grouping
                     foreach ($grouped_addons as $group_name => $group_addons) {
                         $items_html .= "<tr><td colspan='3'>&nbsp;&nbsp;&nbsp;<em>{$group_name}:</em></td></tr>";
                         
@@ -752,7 +742,6 @@
                 }
             }
             
-            // Item subtotal
             $items_html .= "
                 <tr class='item-subtotal'>
                     <td></td>
@@ -763,7 +752,6 @@
             ";
         }
         
-        // Common CSS for both emails
         $email_css = "
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
             .invoice-header { background-color: #f8f9fa; padding: 20px; border-bottom: 2px solid #dee2e6; }
@@ -786,8 +774,6 @@
             .invoice-table th:nth-child(3) { width: 25%; }
         ";
         
-        // User Email
-        // ----------------------------------------------------------------------------------------
         $user_subject = "Your Order #{$invoice_number} is now {$status_formatted}";
         $user_html = "
             <html>
@@ -846,8 +832,6 @@
         ";
         $user_sent = send_html_mail($user->user_email, $user_subject, $user_html);
         
-        // Admin Email
-        // ----------------------------------------------------------------------------------------
         $admin_subject = "Order #{$invoice_number} from {$user->display_name} is now {$status_formatted}";
         $admin_html = "
             <html>

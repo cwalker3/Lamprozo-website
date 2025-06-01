@@ -65,10 +65,14 @@ function enqueue_pricing_styles_and_scripts($hook) {
 
         // Orders admin
         case "toplevel_page_orders":
+
+            global $currentUserIdAdmin;
+            $currentUserIdAdmin = current_user_can('manage_options');
+
             // Enqueue CSS & JS
             wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
             wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
-            wp_enqueue_script('vue-js', 'https://unpkg.com/vue@3/dist/vue.global.js', array(), null, true);
+            wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
 
             $obj = new stdClass();
 
@@ -78,7 +82,9 @@ function enqueue_pricing_styles_and_scripts($hook) {
             wp_localize_script('orders-js', 'ordersData', array(
                 'data'   => $obj,
                 'nonce'  => $nonce,
-                'apiUrl' => $api_url
+                'apiUrl' => $api_url,
+                'currentUserIsAdmin' => $currentUserIdAdmin,
+                'currentUserId'      => get_current_user_id()
             ));
             break;
 

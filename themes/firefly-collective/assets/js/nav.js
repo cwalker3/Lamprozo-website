@@ -35,10 +35,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (navData.auth_id) {
-        const loginBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
-        const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
-        const logoutBtn = document.querySelector('body > nav ul > li:last-of-type');
+        const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
+        const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
+        const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+        const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+        const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
+        signupBtn.style.display = 'none';
         loginBtn.style.display = 'none';
+        orderHistoryBtn.style.display = 'block';
         dashboardBtn.style.display = 'block';
         logoutBtn.style.display = 'block';
     }

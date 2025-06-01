@@ -35,6 +35,7 @@ function initOrdersApp() {
             const showDetailModal = ref(false);
             const showStatusModal = ref(false);
             const showDeleteModal = ref(false);
+            const showRefundModal = ref(false);
             const newStatus = ref('pending');
             
             // Sorting
@@ -412,6 +413,47 @@ function initOrdersApp() {
                     loading.value = false;
                 });
             }
+
+            function confirmRefund(orderID) {
+                currentOrderId.value = orderID;
+                showRefundModal.value = true;
+            }
+            
+            function refundOrder() {
+                loading.value = true;
+
+                fetch(`${ordersData.apiUrl}refund-payment`, {
+                    method: 'POST',
+                    headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': ordersData.nonce
+                    },
+                    body: JSON.stringify({
+                    orderID: currentOrderId.value
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                    showRefundModal.value = false;
+                    // Update the local UI status immediately:
+                    const idx = groupedOrders.value.findIndex(g => g.orderID === currentOrderId.value);
+                    if (idx !== -1) {
+                        groupedOrders.value[idx].status = 'refunded';
+                    }
+                    selectedOrders.value = selectedOrders.value.filter(id => id !== currentOrderId.value);
+                    } else {
+                    console.error('Error refunding order:', data.message || data);
+                    }
+                    loading.value = false;
+                })
+                .catch(err => {
+                    console.error('Error refunding order:', err);
+                    loading.value = false;
+                });
+            }
+
+
             
             function applyBulkAction() {
                 if (!bulkAction.value || selectedOrders.value.length === 0) return;
@@ -553,6 +595,7 @@ function initOrdersApp() {
                 showDetailModal,
                 showStatusModal,
                 showDeleteModal,
+                showRefundModal,
                 currentOrder,
                 currentOrderId,
                 newStatus,
@@ -574,7 +617,9 @@ function initOrdersApp() {
                 updateOrderStatus,
                 saveOrderStatus,
                 confirmDelete,
+                confirmRefund,
                 deleteOrder,
+                refundOrder,
                 applyBulkAction,
                 printOrder,
                 

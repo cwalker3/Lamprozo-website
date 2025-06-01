@@ -2,11 +2,12 @@
 
     function custom_theme_setup_pages() {
         $pages = array(
-            'home'      => array('title' => 'Home',      'content' => 'This is the homepage.'),
-            'blog'      => array('title' => 'Blog',      'content' => 'This is the blog.'),
-            'contact'   => array('title' => 'Contact',   'content' => 'This is the contact page.'),
-            'signup'    => array('title' => 'Signup',    'content' => 'This is the signup page.'),
-            'dashboard' => array('title' => 'Dashboard', 'content' => 'This is the dashboard page.'),
+            'home'              => array('title' => 'Home',             'content' => 'This is the homepage.'),
+            'blog'              => array('title' => 'Blog',             'content' => 'This is the blog.'),
+            'contact'           => array('title' => 'Contact',          'content' => 'This is the contact page.'),
+            'signup'            => array('title' => 'Signup',           'content' => 'This is the signup page.'),
+            'order-history'     => array('title' => 'Order History',    'content' => 'This is the order history page.'),
+            'dashboard'         => array('title' => 'Dashboard',        'content' => 'This is the dashboard page.'),
         );
 
         // 1. Create pages if they don't exist
@@ -55,9 +56,6 @@
         // 5. If newly created, add all pages *except* the Dashboard page
         if ($new_menu) {
             foreach ($page_ids as $slug => $page_id) {
-                if ($slug === 'dashboard') {
-                    continue; // skip the Dashboard page
-                }
                 wp_update_nav_menu_item($menu_id, 0, array(
                     'menu-item-title'     => $pages[$slug]['title'],
                     'menu-item-object'    => 'page',
@@ -72,11 +70,10 @@
         $existing_items  = wp_get_nav_menu_items($menu_id) ?: array();
         $existing_titles = wp_list_pluck($existing_items, 'title');
 
-        // 7. Append custom links in the exact order: Log In, Dashboard, Log Out
+        // 7. Append custom links in the exact order
         $custom_links = array(
-            array('title' => 'Log In',    'url' => '/admin'),
-            array('title' => 'Dashboard', 'url' => '/dashboard'),
-            array('title' => 'Log Out',   'url' => '/logout'),
+            array('title' => 'Log Out',         'url' => '/logout'),
+            array('title' => 'Log In',          'url' => '/admin'),
         );
         foreach ($custom_links as $link) {
             if (! in_array($link['title'], $existing_titles, true)) {

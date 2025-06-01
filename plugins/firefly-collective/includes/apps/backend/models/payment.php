@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/payment.php
+
     // Initialize Stripe with your API keys
     function firefly_collective_stripe_init() {
         // Use constant if defined, fallback to option if not
@@ -55,6 +57,15 @@
                 ],
                 'description' => 'Order #' . $order_id
             ]);
+            
+            // Save the payment intent ID to the database
+            $wpdb->update(
+                $table_name,
+                array('payment_intent_id' => $payment_intent->id),
+                array('orderID' => $order_id),
+                array('%s'),
+                array('%s')
+            );
             
             // Return client secret to the frontend
             return array(
@@ -156,6 +167,102 @@
             );
         } else {
             return new WP_Error('update_failed', 'Failed to update order status', array('status' => 500));
+        }
+    }
+
+    /**
+     * Issue a refund for a given orderID.
+     */
+    function firefly_collective_refund_payment($request) {
+        // 1. Verify user is logged in
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error(
+                'not_logged_in', 
+                'You must be logged in to refund an order.', 
+                ['status' => 401]
+            );
+        }
+
+        // 2. Get orderID from the request body
+        $params   = $request->get_json_params();
+        $order_id = isset( $params['orderID'] ) ? sanitize_text_field( $params['orderID'] ) : '';
+
+        if ( empty( $order_id ) ) {
+            return new WP_Error(
+                'missing_order_id', 
+                'Order ID is required.', 
+                ['status' => 400]
+            );
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'ffc_orders';
+
+        // 3. Fetch the stored payment_intent_id (and ensure the order exists)
+        $pi_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT payment_intent_id FROM $table WHERE orderID = %s",
+            $order_id
+        ) );
+
+        if ( ! $pi_id ) {
+            return new WP_Error(
+                'no_payment_intent', 
+                'No payment intent found for this order or order not found.', 
+                ['status' => 404]
+            );
+        }
+
+        // 4. Initialize Stripe
+        firefly_collective_stripe_init();
+
+        try {
+            // 5. Create a full refund via Stripe
+            $refund = \Stripe\Refund::create([
+                'payment_intent' => sanitize_text_field( $pi_id ),
+            ]);
+
+            if ( $refund->status !== 'succeeded' ) {
+                // If Stripe didn’t return `succeeded`, treat as failure
+                return new WP_Error(
+                    'refund_failed', 
+                    'Stripe refund status: ' . $refund->status, 
+                    ['status' => 500]
+                );
+            }
+
+            // 6. Update our DB: set status = 'refunded'
+            $updated = $wpdb->update(
+                $table,
+                ['status' => 'refunded'],
+                ['orderID' => $order_id],
+                ['%s'],
+                ['%s']
+            );
+
+            if ( $updated === false ) {
+                return new WP_Error(
+                    'db_error', 
+                    'Failed to update order status: ' . $wpdb->last_error, 
+                    ['status' => 500]
+                );
+            }
+
+            // 7. Optionally, send confirmation emails (reuse your existing function)
+            firefly_collective_orders_email( $order_id, 'refunded' );
+
+            return [
+                'success' => true,
+                'message' => 'Order refunded successfully.',
+                'refund_id' => $refund->id,
+            ];
+
+        } catch ( \Stripe\Exception\ApiErrorException $e ) {
+            // Catch any Stripe API error (e.g. insufficient funds, invalid PI ID, etc.)
+            return new WP_Error(
+                'stripe_refund_error',
+                'Stripe error: ' . $e->getMessage(),
+                ['status' => 500]
+            );
         }
     }
 
