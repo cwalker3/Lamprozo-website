@@ -1,4 +1,5 @@
-// assets/js/pricing.js
+// plugin/assets/js/pricing.js
+
 // Pricing Editor JavaScript
 
 /**************************************************************

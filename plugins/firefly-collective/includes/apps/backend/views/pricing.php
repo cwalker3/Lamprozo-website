@@ -1,3 +1,5 @@
+<!-- plugin/views/pricing.php -->
+
 <div class="container">
     <h1>Pricing Dashboard</h1>
     <div id="pricing-form"></div>
