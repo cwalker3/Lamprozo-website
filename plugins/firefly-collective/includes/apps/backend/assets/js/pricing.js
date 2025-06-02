@@ -3637,7 +3637,6 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
       // Clone the option
       const optClone = JSON.parse(JSON.stringify(opt));
       optClone.optionName += ' (Copy)';
-      optClone.addons = []; // Don't clone addons
       
       // Add to data structure
       window.pricingData.features[fIdx].options.push(optClone);
