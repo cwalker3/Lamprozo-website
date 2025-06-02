@@ -617,6 +617,7 @@
         
         switch ($status) {
             case 'completed':
+            case 'paid':        // if you ever use “paid” as distinct
                 $status_color = '#28a745';
                 break;
             case 'pending':
@@ -635,11 +636,22 @@
         $order_date = date('F j, Y, g:i a', strtotime($first_item['createdAt']));
         $invoice_number = str_replace('-', '', substr($first_item['orderID'], 0, 8));
         
+        // Compute “order total”:
         $order_total = 0;
         foreach ($order_items as $item) {
             $order_total += floatval($item['totalPrice']);
         }
         $formatted_order_total = '$' . number_format($order_total, 2);
+        
+        // Sum up all item‐level discounts (we’ll use this under “Order Total”) ──
+        $total_discount = 0;
+        foreach ($order_items as $item) {
+            $item_discount = floatval($item['totalPriceDiscount']);
+            if ($item_discount > 0) {
+                $total_discount += $item_discount;
+            }
+        }
+        $formatted_discount = '$' . number_format($total_discount, 2);
         
         $service_type = '';
         if (!empty($first_item['userData'])) {
@@ -653,107 +665,150 @@
             }
         }
         
+        // rRebuild $items_html so that prices/right‐align, item column is first and wide,
+        // “Addons:” appears under that same first column, not in its own column. ──
         $items_html = '';
-        
-        foreach ($order_items as $item_index => $item) {
+        foreach ($order_items as $item) {
+            // Fetch feature + option as before
             $feature = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
-                    $item['featureId']
+                    intval($item['featureId'])
                 ),
                 ARRAY_A
             );
-            
             $option = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
-                    $item['optionId']
+                    intval($item['optionId'])
                 ),
                 ARRAY_A
             );
-            
             if (!$feature || !$option) {
                 continue;
             }
             
+            // If “price options” exist
             $size_label = '';
             $base_price = 0;
-            
-            if (!empty($option['pricingType']) && $option['pricingType'] == 'price options') {
+            if (!empty($option['pricingType']) && $option['pricingType'] === 'price options') {
                 $price_options = json_decode($option['priceOptions'], true);
                 if (isset($price_options['types']) && isset($item['priceSelected'])) {
-                    $selected_index = intval($item['priceSelected']);
-                    if (isset($price_options['types'][$selected_index])) {
-                        $size_label = $price_options['types'][$selected_index]['label'];
-                        $base_price = floatval($price_options['types'][$selected_index]['price']);
+                    $sel = intval($item['priceSelected']);
+                    if (isset($price_options['types'][$sel])) {
+                        $size_label = $price_options['types'][$sel]['label'];
+                        $base_price = floatval($price_options['types'][$sel]['price']);
                     }
                 }
             }
             
-            $formatted_item_price = '$' . number_format($item['totalPrice'], 2);
-            $formatted_base_price = '$' . number_format($base_price, 2);
+            $formatted_item_price = '$' . number_format(floatval($item['totalPrice']), 2);
             
+            // Decode any discount info JSON
+            $info = array();
+            if (!empty($item['priceDiscountsInfo'])) {
+                $decoded = json_decode($item['priceDiscountsInfo'], true);
+                if (is_array($decoded)) {
+                    $info = $decoded;
+                }
+            }
+            
+            // 1) Print the “Item - Option (size)” + Quantity + Price row
             $items_html .= "
-                <tr class='item-header'>
-                    <td><strong>{$feature['featureName']} - {$option['optionName']} ({$size_label})</strong></td>
-                    <td><strong>{$item['quantity']}</strong></td>
-                    <td><strong>{$formatted_base_price}</strong></td>
+                <tr>
+                    <td style='width:70%; vertical-align: top;'>
+                        <strong>{$feature['featureName']} - {$option['optionName']}" .
+                            (!empty($size_label) ? " ({$size_label})" : "") .
+                        "</strong>
+                    </td>
+                    <td style='width:15%; text-align:center; vertical-align: top;'>
+                        <strong>" . intval($item['quantity']) . "</strong>
+                    </td>
+                    <td style='width:15%; text-align:right; vertical-align: top;'>
+                        <strong>{$formatted_item_price}</strong>
+                    </td>
                 </tr>
             ";
             
+            // 2) Option‐level discount (if present):
+            if (!empty($info['option']) && trim($info['option']) !== '') {
+                $opt_disc = esc_html($info['option']);
+                $items_html .= "
+                    <tr>
+                        <td colspan='3' style='font-size:0.85em; font-style:italic; color:#0066cc; padding-left:12px;'>
+                            - {$opt_disc}
+                        </td>
+                    </tr>
+                ";
+            }
+            
+            // 3) “Addons:” under the same first column, not a separate column
+            $decoded_addon_ids = array();
             if (!empty($item['addonIds'])) {
-                $addon_ids = json_decode($item['addonIds'], true);
-                $grouped_addons = array();
-                
-                if (is_array($addon_ids)) {
-                    foreach ($addon_ids as $addon_id) {
-                        $addon = $wpdb->get_row(
-                            $wpdb->prepare(
-                                "SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                                $addon_id
-                            ),
-                            ARRAY_A
-                        );
-                        
-                        if ($addon) {
-                            $group = !empty($addon['groupName']) ? $addon['groupName'] : 'Standard Addons';
-                            if (!isset($grouped_addons[$group])) {
-                                $grouped_addons[$group] = array();
-                            }
-                            $grouped_addons[$group][] = $addon;
-                        }
-                    }
-                    
-                    foreach ($grouped_addons as $group_name => $group_addons) {
-                        $items_html .= "<tr><td colspan='3'>&nbsp;&nbsp;&nbsp;<em>{$group_name}:</em></td></tr>";
-                        
-                        foreach ($group_addons as $addon) {
-                            $addon_price = floatval($addon['staticPriceMod']);
-                            $addon_price_formatted = '$' . number_format($addon_price, 2);
-                            $items_html .= "
-                                <tr>
-                                    <td>&nbsp;&nbsp;&nbsp;- {$addon['addonName']}</td>
-                                    <td>1</td>
-                                    <td>{$addon_price_formatted}</td>
-                                </tr>
-                            ";
-                        }
-                    }
+                $decoded_addon_ids = json_decode($item['addonIds'], true);
+                if (!is_array($decoded_addon_ids)) {
+                    $decoded_addon_ids = array();
                 }
             }
             
+            if (!empty($decoded_addon_ids)) {
+                $addon_names = array();
+                foreach ($decoded_addon_ids as $aid) {
+                    $aid = intval($aid);
+                    $addon_row = $wpdb->get_row(
+                        $wpdb->prepare(
+                            "SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                            $aid
+                        ),
+                        ARRAY_A
+                    );
+                    if ($addon_row) {
+                        $addon_names[] = $addon_row['addonName'];
+                    }
+                }
+                $join_names = implode(', ', $addon_names);
+                $items_html .= "
+                    <tr>
+                        <td colspan='3' style='padding-left:10px;'>
+                            <em>Addons:</em> {$join_names}
+                        </td>
+                    </tr>
+                ";
+            } else {
+                $items_html .= "
+                    <tr>
+                        <td colspan='3' style='padding-left:10px;'>
+                            <em>Addons:</em> None
+                        </td>
+                    </tr>
+                ";
+            }
+            
+            // 4) Addon‐level discounts (if any)
+            if (!empty($info['addons']) && is_array($info['addons'])) {
+                $addon_discounts = array_filter($info['addons'], function($x) {
+                    return (is_string($x) && trim($x) !== '');
+                });
+                if (!empty($addon_discounts)) {
+                    $join_addon_disc = implode(', ', $addon_discounts);
+                    $items_html .= "
+                        <tr>
+                            <td colspan='3' style='font-size:0.85em; font-style:italic; color:#0066cc; padding-left:12px;'>
+                                - {$join_addon_disc}
+                            </td>
+                        </tr>
+                    ";
+                }
+            }
+            
+            // 5) Spacer row between items
             $items_html .= "
-                <tr class='item-subtotal'>
-                    <td></td>
-                    <td>Item Total:</td>
-                    <td>{$formatted_item_price}</td>
-                </tr>
                 <tr class='item-spacer'><td colspan='3'>&nbsp;</td></tr>
             ";
         }
         
         $email_css = "
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; background-color: #fff; }
             .invoice-header { background-color: #f8f9fa; padding: 20px; border-bottom: 2px solid #dee2e6; }
             .invoice-body { padding: 20px; }
             .invoice-footer { background-color: #f8f9fa; padding: 20px; border-top: 2px solid #dee2e6; margin-top: 20px; }
@@ -762,18 +817,28 @@
             .invoice-details { margin: 20px 0; }
             .invoice-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
             .invoice-table th { background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; text-align: left; padding: 10px; }
-            .invoice-table td { padding: 10px; border-bottom: 1px solid #dee2e6; }
+            .invoice-table td { padding: 8px 10px; border-bottom: 1px solid #dee2e6; }
             .invoice-table .total-row { font-weight: bold; border-top: 2px solid #dee2e6; }
-            .item-header { background-color: #f8f9fa; }
-            .item-subtotal { border-bottom: 1px solid #dee2e6; }
             .item-spacer { border: none; }
-            .contact-info { font-size: 14px; }
+            .contact-info { font-size: 14px; margin-top: 20px; }
             .customer-details { margin: 20px 0; }
-            .invoice-table th:nth-child(1) { width: 60%; }
-            .invoice-table th:nth-child(2) { width: 15%; }
-            .invoice-table th:nth-child(3) { width: 25%; }
         ";
         
+        //
+        // Build the dynamic “thank‐you” or “if you have questions” message ──
+        //
+        if ($status === 'completed' || $status === 'paid') {
+            $closing_paragraph = "<p>Thank you for your order! If you have any questions, please contact us.</p>";
+        } else {
+            // for cancelled / refunded / deleted, no “thank you,” just “please contact us.”
+            $closing_paragraph = "<p>If you have any questions, please contact us.</p>";
+        }
+        //
+        // ── end CHANGED ──
+        //
+        
+        // Update the <table> so that prices are right‐aligned, item column is wide,
+        // and print the single “order‐level” discount under “Order Total.” ──
         $user_subject = "Your Order #{$invoice_number} is now {$status_formatted}";
         $user_html = "
             <html>
@@ -785,7 +850,9 @@
                 <div class='invoice-header'>
                     <div class='company-name'>Firefly Collective</div>
                     <div>Order Invoice #{$invoice_number}</div>
-                    <div class='status-badge' style='background-color: {$status_color};'>Status: {$status_formatted}</div>
+                    <div class='status-badge' style='background-color: {$status_color};'>
+                        Status: {$status_formatted}
+                    </div>
                 </div>
                 
                 <div class='invoice-body'>
@@ -803,22 +870,36 @@
                     <table class='invoice-table'>
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
+                                <th style='width:70%;'>Item</th>
+                                <th style='width:15%; text-align:center;'>Quantity</th>
+                                <th style='width:15%; text-align:right;'>Price</th>
                             </tr>
                         </thead>
                         <tbody>
                             {$items_html}
+                        </tbody>
+                        <tfoot>
                             <tr class='total-row'>
                                 <td></td>
-                                <td>Order Total:</td>
-                                <td>{$formatted_order_total}</td>
-                            </tr>
-                        </tbody>
+                                <td style='text-align:right;'>Order Total:</td>
+                                <td style='text-align:right;'>{$formatted_order_total}</td>
+                            </tr>"
+                            . (
+                                $total_discount > 0
+                                ? "
+                                <tr>
+                                    <td colspan='2'></td>
+                                    <td style='font-size:0.85em; font-style:italic; color:#0066cc; text-align:right;'>
+                                        - {$formatted_discount} discount
+                                    </td>
+                                </tr>
+                                "
+                                : ""
+                            ) . "
+                        </tfoot>
                     </table>
                     
-                    <p>Thank you for your order! If you have any questions, please contact us.</p>
+                    {$closing_paragraph}
                 </div>
                 
                 <div class='invoice-footer'>
@@ -843,7 +924,9 @@
                 <div class='invoice-header'>
                     <div class='company-name'>Firefly Collective</div>
                     <div>Order Invoice #{$invoice_number}</div>
-                    <div class='status-badge' style='background-color: {$status_color};'>Status: {$status_formatted}</div>
+                    <div class='status-badge' style='background-color: {$status_color};'>
+                        Status: {$status_formatted}
+                    </div>
                 </div>
                 
                 <div class='invoice-body'>
@@ -863,22 +946,41 @@
                     <table class='invoice-table'>
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
+                                <th style='width:70%;'>Item</th>
+                                <th style='width:15%; text-align:center;'>Quantity</th>
+                                <th style='width:15%; text-align:right;'>Price</th>
                             </tr>
                         </thead>
                         <tbody>
                             {$items_html}
+                        </tbody>
+                        <tfoot>
                             <tr class='total-row'>
                                 <td></td>
-                                <td>Order Total:</td>
-                                <td>{$formatted_order_total}</td>
-                            </tr>
-                        </tbody>
+                                <td style='text-align:right;'>Order Total:</td>
+                                <td style='text-align:right;'>{$formatted_order_total}</td>
+                            </tr>"
+                            . (
+                                $total_discount > 0
+                                ? "
+                                <tr>
+                                    <td colspan='2'></td>
+                                    <td style='font-size:0.85em; font-style:italic; color:#0066cc; text-align:right;'>
+                                        - {$formatted_discount} discount
+                                    </td>
+                                </tr>
+                                "
+                                : ""
+                            ) . "
+                        </tfoot>
                     </table>
                     
-                    <p><strong>Order Status Change:</strong> Order is now <span style='color: {$status_color}; font-weight: bold;'>{$status_formatted}</span></p>
+                    <p>
+                        <strong>Order Status Change:</strong>
+                        Order is now <span style='color: {$status_color}; font-weight: bold;'>{$status_formatted}</span>
+                    </p>
+                    
+                    {$closing_paragraph}
                 </div>
                 
                 <div class='invoice-footer'>

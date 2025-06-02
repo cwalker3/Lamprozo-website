@@ -254,14 +254,14 @@ function initOrdersApp() {
             }
             
             function printOrder() {
-                // Create a printable version of the current order
+                // Build a hidden <div> containing our new “inline-discount” HTML
                 const printContent = document.createElement('div');
                 printContent.innerHTML = `
-                    <h1>Order #${formatOrderID(currentOrder.value.orderID)}</h1>
+                    <h1>Order #${this.formatOrderID(this.currentOrder.orderID)}</h1>
                     <div style="margin-bottom: 20px;">
-                        <div><strong>Customer:</strong> ${getUserName(currentOrder.value.userId)}</div>
-                        <div><strong>Date:</strong> ${formatDate(currentOrder.value.createdAt)}</div>
-                        <div><strong>Status:</strong> ${capitalizeFirst(currentOrder.value.status)}</div>
+                        <div><strong>Customer:</strong> ${this.getUserName(this.currentOrder.userId)}</div>
+                        <div><strong>Date:</strong> ${this.formatDate(this.currentOrder.createdAt)}</div>
+                        <div><strong>Status:</strong> ${this.capitalizeFirst(this.currentOrder.status)}</div>
                     </div>
                     
                     <h2>Order Items</h2>
@@ -276,43 +276,95 @@ function initOrdersApp() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${currentOrder.value.items.map(item => `
+                            ${this.currentOrder.items.map(item => `
                                 <tr>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">${getFeatureName(item.featureId)}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">${getOptionName(item.optionId)}</td>
+                                    <!-- Item Name -->
                                     <td style="padding: 8px; border: 1px solid #ddd;">
-                                        ${getAddonNames(item.addonIds).length ? getAddonNames(item.addonIds).join(', ') : 'No addons'}
+                                        ${this.getFeatureName(item.featureId)}
                                     </td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">${item.quantity}</td>
-                                    <td style="padding: 8px; border: 1px solid #ddd;">$${formatPrice(item.totalPrice)}</td>
+                                    
+                                    <!-- Options + inline option discount -->
+                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                        ${this.getOptionName(item.optionId)}
+                                        ${this.hasOptionDiscount(item)
+                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
+                                                - ${this.getOptionDiscountText(item)}
+                                            </div>`
+                                            : ''}
+                                    </td>
+                                    
+                                    <!-- Addons + inline addon discounts -->
+                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                        ${this.getAddonNames(item.addonIds).length
+                                            ? this.getAddonNames(item.addonIds).join(', ')
+                                            : 'No addons'}
+                                        ${this.getAllAddonDiscounts(item).length
+                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
+                                                - ${this.getAllAddonDiscounts(item).join(', ')}
+                                            </div>`
+                                            : ''}
+                                    </td>
+                                    
+                                    <!-- Quantity -->
+                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                        ${item.quantity}
+                                    </td>
+                                    
+                                    <!-- Price + inline item-level discount -->
+                                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">
+                                        $${this.formatPrice(item.totalPrice)}
+                                        ${parseFloat(item.totalPriceDiscount) > 0
+                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
+                                                - $${this.formatPrice(item.totalPriceDiscount)}
+                                            </div>`
+                                            : ''}
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
                         <tfoot>
+                            <!-- Order-level Total -->
                             <tr>
-                                <td colspan="4" style="text-align: right; padding: 8px; border: 1px solid #ddd;"><strong>Total</strong></td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">$${formatPrice(currentOrder.value.totalValue)}</td>
+                                <td colspan="4" style="text-align: right; padding: 8px; border: 1px solid #ddd;">
+                                    <strong>Total</strong>
+                                </td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">
+                                    $${this.formatPrice(this.currentOrder.totalValue)}
+                                </td>
                             </tr>
+                            
+                            <!-- Order-level Discount (right-aligned under Total) -->
+                            ${parseFloat(this.getTotalDiscount(this.currentOrder)) > 0
+                                ? `
+                                <tr>
+                                    <td colspan="4"></td>
+                                    <td style="padding: 8px; font-size:0.85em; font-style:italic; color:#0066cc; text-align: right;">
+                                        - $${this.formatPrice(this.getTotalDiscount(this.currentOrder))} discount
+                                    </td>
+                                </tr>
+                                `
+                                : ''}
                         </tfoot>
                     </table>
                     
-                    ${Object.keys(currentOrder.value.userData || {}).length > 0 ? `
+                    ${Object.keys(this.currentOrder.userData || {}).length > 0 ? `
                         <h2>Additional Information</h2>
                         <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
-                            ${Object.entries(currentOrder.value.userData).map(([key, value]) => `
+                            ${Object.entries(this.currentOrder.userData).map(([key, value]) => `
                                 <div style="margin-bottom: 5px;">
-                                    <strong>${formatKey(key)}:</strong> ${formatValue(value)}
+                                    <strong>${this.formatKey(key)}:</strong> ${this.formatValue(value)}
                                 </div>
                             `).join('')}
                         </div>
                     ` : ''}
                 `;
-                
+
+                // Open a new window/tab and write our inline-discount HTML into it
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
                         <head>
-                            <title>Order #${formatOrderID(currentOrder.value.orderID)}</title>
+                            <title>Order #${this.formatOrderID(this.currentOrder.orderID)}</title>
                             <style>
                                 body { font-family: Arial, sans-serif; margin: 30px; }
                                 h1 { margin-bottom: 20px; }
@@ -326,17 +378,17 @@ function initOrdersApp() {
                         </body>
                     </html>
                 `);
-                
                 printWindow.document.close();
                 printWindow.focus();
-                
-                // Wait for content to load
+
+                // Delay slightly so the content fully renders, then trigger print
                 setTimeout(() => {
                     printWindow.print();
                     printWindow.close();
                 }, 250);
             }
-            
+
+
             function updateOrderStatus(orderID) {
                 currentOrderId.value = orderID;
                 
@@ -452,9 +504,7 @@ function initOrdersApp() {
                     loading.value = false;
                 });
             }
-
-
-            
+        
             function applyBulkAction() {
                 if (!bulkAction.value || selectedOrders.value.length === 0) return;
                 
@@ -547,6 +597,48 @@ function initOrdersApp() {
                 
                 return value.toString();
             }
+
+            function hasDiscounts(order) {
+                return order.items.some(item => 
+                    parseFloat(item.totalPriceDiscount) > 0
+                );
+            }
+
+            function getTotalDiscount(order) {
+                return order.items.reduce((total, item) => 
+                    total + parseFloat(item.totalPriceDiscount || 0), 0
+                );
+            }
+
+            function getDiscountDescriptions(order) {
+                const descriptions = [];
+                
+                order.items.forEach(item => {
+                    if (item.priceDiscountsInfo) {
+                        try {
+                            const info = typeof item.priceDiscountsInfo === 'string' 
+                                ? JSON.parse(item.priceDiscountsInfo) 
+                                : item.priceDiscountsInfo;
+                            
+                            if (info.option && info.option.trim()) {
+                                descriptions.push(info.option);
+                            }
+                            
+                            if (info.addons && Array.isArray(info.addons)) {
+                                info.addons.forEach(addon => {
+                                    if (addon && addon.trim()) {
+                                        descriptions.push(addon);
+                                    }
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing discount info:', e);
+                        }
+                    }
+                });
+                
+                return [...new Set(descriptions)];
+            }
             
             function getUserName(userId) {
                 return users.value[userId] || `User #${userId}`;
@@ -633,7 +725,128 @@ function initOrdersApp() {
                 getOptionName,
                 getAddonNames,
                 formatKey,
-                formatValue
+                formatValue,
+                hasDiscounts,
+                getTotalDiscount,
+                getDiscountDescriptions,
+
+                /**
+                 * Parse the item.addonIds JSON into an array of numeric IDs.
+                 */
+                getAddonIds(item) {
+                    try {
+                        return JSON.parse(item.addonIds || '[]');
+                    } catch {
+                        return [];
+                    }
+                },
+
+                /**
+                 * Return true if the “option” field in priceDiscountsInfo is non‐empty.
+                 */
+                hasOptionDiscount(item) {
+                    if (!item.priceDiscountsInfo) return false;
+                    try {
+                        const info = typeof item.priceDiscountsInfo === 'string'
+                        ? JSON.parse(item.priceDiscountsInfo)
+                        : item.priceDiscountsInfo;
+                        return !!(info.option && info.option.trim());
+                    } catch {
+                        return false;
+                    }
+                },
+
+                /**
+                 * Return the option‐level discount text (e.g. "10% off Cheese upgrade").
+                 */
+                getOptionDiscountText(item) {
+                    if (!item.priceDiscountsInfo) return '';
+                    try {
+                        const info = typeof item.priceDiscountsInfo === 'string'
+                        ? JSON.parse(item.priceDiscountsInfo)
+                        : item.priceDiscountsInfo;
+                        return info.option || '';
+                    } catch {
+                        return '';
+                    }
+                },
+
+                /**
+                 * Return true if the addon at index `idx` has a non‐empty discount string.
+                 */
+                hasAddonDiscount(item, idx) {
+                    if (!item.priceDiscountsInfo) return false;
+                    try {
+                        const info = typeof item.priceDiscountsInfo === 'string'
+                        ? JSON.parse(item.priceDiscountsInfo)
+                        : item.priceDiscountsInfo;
+                        return Array.isArray(info.addons) && !!(info.addons[idx] && info.addons[idx].trim());
+                    } catch {
+                        return false;
+                    }
+                },
+
+                /**
+                 * Return the discount text for the addon at index `idx` (e.g. "5% off Pepperoni").
+                 */
+                getAddonDiscountText(item, idx) {
+                    if (!item.priceDiscountsInfo) return '';
+                    try {
+                        const info = typeof item.priceDiscountsInfo === 'string'
+                        ? JSON.parse(item.priceDiscountsInfo)
+                        : item.priceDiscountsInfo;
+                        return info.addons[idx] || '';
+                    } catch {
+                        return '';
+                    }
+                },
+
+                /**
+                 * Return the display name for a given numeric addonId.
+                 */
+                getAddonName(addonId) {
+                    const addon = addons.value.find(a => a.id == addonId);
+                    return addon ? addon.addonName : `Addon #${addonId}`;
+                },
+
+                getAllAddonDiscounts(item) {
+                    if (!item.priceDiscountsInfo) {
+                        return [];
+                    }
+                    try {
+                        const info = typeof item.priceDiscountsInfo === 'string'
+                            ? JSON.parse(item.priceDiscountsInfo)
+                            : item.priceDiscountsInfo;
+                        // info.addons should be an array of strings.
+                        if (Array.isArray(info.addons)) {
+                            // Filter out any empty or whitespace-only entries:
+                            return info.addons.filter(d => typeof d === 'string' && d.trim() !== '');
+                        }
+                        return [];
+                    } catch {
+                        return [];
+                    }
+                },
+
+                /**
+                 * (Optional helper, only if you want to centralize parsing logic.)
+                 * Example usage inside getAllAddonDiscounts; not strictly required if
+                 * you put the parsing inline, but shown here for clarity.
+                 */
+                extractAddonDiscountsFromInfo(item) {
+                    try {
+                    const info = typeof item.priceDiscountsInfo === 'string'
+                        ? JSON.parse(item.priceDiscountsInfo)
+                        : item.priceDiscountsInfo;
+                    return Array.isArray(info.addons)
+                        ? info.addons.filter(d => typeof d === 'string' && d.trim() !== '')
+                        : [];
+                    } catch {
+                    return [];
+                    }
+                }
+
+                
             };
         }
     }).mount('#ffc-orders-app');

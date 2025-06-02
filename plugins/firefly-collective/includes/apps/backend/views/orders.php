@@ -25,7 +25,9 @@
                     <option value="">All</option>
                     <option value="pending">Pending</option>
                     <option value="completed">Completed</option>
+                    <option value="paid">Paid</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="refunded">Refunded</option>
                 </select>
             </div>
             
@@ -147,15 +149,35 @@
                                     <tbody>
                                         <tr v-for="(item, itemIndex) in group.items" :key="'item-' + itemIndex">
                                             <td>{{ getFeatureName(item.featureId) }}</td>
-                                            <td>{{ getOptionName(item.optionId) }}</td>
                                             <td>
+                                                {{ getOptionName(item.optionId) }}
+
+                                                <!-- If this option got a discount, show it right below -->
+                                                <div v-if="hasOptionDiscount(item)" class="ffc-discount-inline">
+                                                    - {{ getOptionDiscountText(item) }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <!-- First: show all addons as a comma-separated list (or “No addons”). -->
                                                 <span v-if="getAddonNames(item.addonIds).length">
                                                     {{ getAddonNames(item.addonIds).join(', ') }}
                                                 </span>
                                                 <span v-else>No addons</span>
+
+                                                <!-- Then: if there are one or more addon-discount messages, show them all on one line. -->
+                                                <div v-if="getAllAddonDiscounts(item).length" class="ffc-discount-inline">
+                                                    - {{ getAllAddonDiscounts(item).join(', ') }}
+                                                </div>
                                             </td>
                                             <td>{{ item.quantity }}</td>
-                                            <td>${{ formatPrice(item.totalPrice) }}</td>
+                                            <td>
+                                                ${{ formatPrice(item.totalPrice) }}
+
+                                                <!-- If this item had a “totalPriceDiscount” > 0, show it immediately below -->
+                                                <div v-if="parseFloat(item.totalPriceDiscount) > 0" class="ffc-discount-inline">
+                                                    - ${{ formatPrice(item.totalPriceDiscount) }}
+                                                </div>
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -240,21 +262,47 @@
                     <tbody>
                         <tr v-for="(item, itemIndex) in currentOrder.items" :key="'modal-item-' + itemIndex">
                             <td>{{ getFeatureName(item.featureId) }}</td>
-                            <td>{{ getOptionName(item.optionId) }}</td>
                             <td>
+                                {{ getOptionName(item.optionId) }}
+
+                                <!-- If this option got a discount, show it right below -->
+                                <div v-if="hasOptionDiscount(item)" class="ffc-discount-inline">
+                                    - {{ getOptionDiscountText(item) }}
+                                </div>
+                            </td>
+                            <td>
+                                <!-- First: show all addons as a comma-separated list (or “No addons”). -->
                                 <span v-if="getAddonNames(item.addonIds).length">
                                     {{ getAddonNames(item.addonIds).join(', ') }}
                                 </span>
                                 <span v-else>No addons</span>
+
+                                <!-- Then: if there are one or more addon-discount messages, show them all on one line. -->
+                                <div v-if="getAllAddonDiscounts(item).length" class="ffc-discount-inline">
+                                    - {{ getAllAddonDiscounts(item).join(', ') }}
+                                </div>
                             </td>
                             <td>{{ item.quantity }}</td>
-                            <td>${{ formatPrice(item.totalPrice) }}</td>
+                            <td>
+                                ${{ formatPrice(item.totalPrice) }}
+
+                                <!-- If this item had a “totalPriceDiscount” > 0, show it immediately below -->
+                                <div v-if="parseFloat(item.totalPriceDiscount) > 0" class="ffc-discount-inline">
+                                    - ${{ formatPrice(item.totalPriceDiscount) }}
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                     <tfoot>
                         <tr>
                             <td colspan="4" class="ffc-total-label">Total</td>
                             <td>${{ formatPrice(currentOrder.totalValue) }}</td>
+                        </tr>
+                        <tr v-if="parseFloat(getTotalDiscount(currentOrder)) > 0">
+                            <td colspan="4"></td>
+                            <td class="ffc-discount-inline" style="text-align: right;">
+                            - ${{ formatPrice(getTotalDiscount(currentOrder)) }} discount
+                            </td>
                         </tr>
                     </tfoot>
                 </table>
