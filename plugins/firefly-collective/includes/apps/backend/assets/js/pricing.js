@@ -3048,9 +3048,20 @@ function createAddonElement(fIdx, oIdx, addon, availAdd, featureRecCheckbox, aId
     confirmDeletion(addon.addonName || 'this addon', () => {
       wrap.classList.add('fade-out');
       wrap.addEventListener('animationend', () => {
-        // Remove from data structure
-        window.pricingData.features[fIdx].options[oIdx].addons =
-          window.pricingData.features[fIdx].options[oIdx].addons.filter(a => a !== addon);
+        // Find parent option and feature, then get current indexes
+        const optionEl = wrap.closest('.option');
+        const featureEl = optionEl ? optionEl.closest('.feature') : null;
+        
+        if (featureEl && optionEl) {
+          const currentFIdx = Array.from(document.querySelectorAll('.feature')).indexOf(featureEl);
+          const currentOIdx = Array.from(featureEl.querySelectorAll('.option')).indexOf(optionEl);
+          const currentAIdx = Array.from(optionEl.querySelectorAll('.addon')).indexOf(wrap);
+          
+          if (currentFIdx !== -1 && currentOIdx !== -1 && currentAIdx !== -1) {
+            // Use current indexes to find and remove the addon
+            window.pricingData.features[currentFIdx].options[currentOIdx].addons.splice(currentAIdx, 1);
+          }
+        }
         saveData();
         
         // Remove from DOM
@@ -3664,18 +3675,28 @@ function createOptionElement(fIdx, oIdx, opt, availOpt, availAdd, featureRecChec
     confirmDeletion(opt.optionName || 'this option', () => {
       wrap.classList.add('fade-out');
       wrap.addEventListener('animationend', () => {
-        // Remove from data structure
-        window.pricingData.features[fIdx].options.splice(oIdx, 1);
+        // Find parent feature and get current indexes
+        const featureEl = wrap.closest('.feature');
+        if (featureEl) {
+          const currentFIdx = Array.from(document.querySelectorAll('.feature')).indexOf(featureEl);
+          const currentOIdx = Array.from(featureEl.querySelectorAll('.option')).indexOf(wrap);
+          
+          if (currentFIdx !== -1 && currentOIdx !== -1) {
+            // Remove from data structure using current indexes
+            window.pricingData.features[currentFIdx].options.splice(currentOIdx, 1);
+          }
+        }
         saveData();
         
         // Remove from DOM
         wrap.remove();
         
         // Update parent container heights
-        const featureEl = document.querySelectorAll('.feature')[fIdx];
-        const featureContent = featureEl.querySelector('.feature-content');
-        if (featureContent.classList.contains('open')) {
-          featureContent.style.maxHeight = featureContent.scrollHeight + 'px';
+        if (featureEl) {
+          const featureContent = featureEl.querySelector('.feature-content');
+          if (featureContent && featureContent.classList.contains('open')) {
+            featureContent.style.maxHeight = featureContent.scrollHeight + 'px';
+          }
         }
       });
     });
@@ -3940,12 +3961,16 @@ function createFeatureElement(idx, feat, availOpt, availAdd){
   const delF  = document.createElement('button');
   delF.className = 'delete-button';
   delF.textContent = 'Delete Feature';
-  delF.addEventListener('click', e=>{
+  delF.addEventListener('click', e => {
     e.stopPropagation();
-    confirmDeletion(feat.featureName||'this feature', ()=>{
+    confirmDeletion(feat.featureName||'this feature', () => {
       outer.classList.add('fade-out');
-      outer.addEventListener('animationend', ()=>{
-        window.pricingData.features.splice(idx,1);
+      outer.addEventListener('animationend', () => {
+        // Get current index at deletion time
+        const currentIdx = Array.from(document.querySelectorAll('.feature')).indexOf(outer);
+        if (currentIdx !== -1) {
+          window.pricingData.features.splice(currentIdx, 1);
+        }
         saveData();
         outer.remove();
       });
