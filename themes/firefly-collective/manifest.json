@@ -1,0 +1,23 @@
+{
+  "short_name": "FFC App",
+  "name": "FFC App",
+  "icons": [
+    {
+      "src": "/wp-content/themes/firefly-collective/images/ffc-logo-192.webp",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/wp-content/themes/firefly-collective/images/ffc-logo.webp",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/wp-content/themes/firefly-collective/views/app.html",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "scope": "/wp-content/themes/firefly-collective",
+  "theme_color": "#FFFFFF"
+}

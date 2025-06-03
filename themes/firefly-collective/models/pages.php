@@ -3,6 +3,7 @@
     function custom_theme_setup_pages() {
         $pages = array(
             'home'              => array('title' => 'Home',             'content' => 'This is the homepage.'),
+            'app'               => array('title' => 'App',              'content' => 'This is the PWA front end page.'),
             'blog'              => array('title' => 'Blog',             'content' => 'This is the blog.'),
             'contact'           => array('title' => 'Contact',          'content' => 'This is the contact page.'),
             'signup'            => array('title' => 'Signup',           'content' => 'This is the signup page.'),

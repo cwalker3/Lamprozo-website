@@ -14,9 +14,9 @@
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
-        global $plugin_path, $plugin_path_web;
-        $plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
-        $plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
+        global $backend_plugin_path, $backend_plugin_path_web;
+        $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
+        $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
@@ -48,6 +48,19 @@
             'maxBlogs' => 15,
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
+
+        // Frontend PWA
+        if (determine_view() === 'app') {
+
+            wp_enqueue_style('app-css', $theme_path . '/assets/css/app.css', array(), $unique_id);
+
+            wp_enqueue_script('app-js', $theme_path . '/assets/js/app.js', array(), $unique_id, true);
+            wp_localize_script('app-js', 'appData', array(
+                'nonce'         => $nonce,
+                'pluginWebPath' => $theme_path
+            ));
+
+        }
 
         // Request an Appointment
         if (determine_view() === 'request-an-appointment') {
@@ -95,8 +108,8 @@
         if (determine_view() === 'order-history') {
             global $currentUserIdAdmin;
             $currentUserIdAdmin = current_user_can('manage_options');
-            wp_enqueue_style('order-history-css', $plugin_path_web . '/assets/css/orders.css', array(), $unique_id);
-            wp_enqueue_script('order-history-js', $plugin_path_web . '/assets/js/orders.js', array(), $unique_id, true);
+            wp_enqueue_style('order-history-css', $backend_plugin_path_web . '/assets/css/orders.css', array(), $unique_id);
+            wp_enqueue_script('order-history-js', $backend_plugin_path_web . '/assets/js/orders.js', array(), $unique_id, true);
             wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
 
             $obj = new stdClass();
@@ -113,6 +126,17 @@
         }
     }
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
+
+    function add_pwa_manifest() {
+        if (determine_view() !== 'app') return;
+
+        $manifest_url = get_stylesheet_directory_uri() . '/manifest.json';
+
+        // Output the link tag
+        echo '<link crossorigin="use-credentials" rel="manifest" href="' . esc_url( $manifest_url ) . '">';
+    }
+    // Hook into wp_head to print the manifest link in the <head> section
+    add_action( 'wp_head', 'add_pwa_manifest' );
 
     function disable_comments() {
         // Remove from admin menu

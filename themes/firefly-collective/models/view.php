@@ -21,12 +21,14 @@
             $view = sanitize_title($aCmd[0]);
 
             // Valid custom URLs
-            $valid_views = array('contact',
+            $valid_views = array(
+                                'app',
+                                'contact',
                                 'signup',
                                 'request-an-appointment',
                                 'dashboard',
                                 'order-history');
-
+            
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists
                 $view_path = get_template_directory() . '/views/' . $view . '.php';
