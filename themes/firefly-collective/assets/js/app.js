@@ -90,53 +90,130 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Fetch API with offline support (never fetch if offline)
-  function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
-    // If offline now, go straight to IndexedDB
-    if (!navigator.onLine) {
-      debugLog('Offline detected, going straight to IndexedDB');
-      return getFromIndexedDB(endpoint, params)
-        .then(cachedData => ({ ...cachedData, _fromCache: true }))
-        .catch(err => {
-          console.error('No cached data available:', err);
-          throw new Error('You are offline and no cached data is available');
+  // Fetch API with offline support and 1-hour cache strategy
+function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
+  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+  
+  // First, try to get from IndexedDB regardless of online status
+  return getFromIndexedDB(endpoint, params)
+    .then(cachedData => {
+      // Check if we have cached data
+      if (cachedData) {
+        // Get the timestamp from IndexedDB (need to modify getFromIndexedDB to return the full item)
+        return new Promise((resolve, reject) => {
+          if (!db) {
+            reject('Database not initialized');
+            return;
+          }
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const id = `${endpoint}:${JSON.stringify(params)}`;
+          const request = store.get(id);
+          
+          request.onsuccess = event => {
+            const result = event.target.result;
+            if (result) {
+              const age = Date.now() - result.timestamp;
+              
+              // If offline OR cache is fresh (less than 1 hour old), use it
+              if (!navigator.onLine || age < CACHE_DURATION) {
+                debugLog(`Using cached data (age: ${Math.round(age / 1000 / 60)} minutes)`);
+                resolve({ ...result.data, _fromCache: true });
+                return;
+              }
+              
+              // Cache is stale and we're online, fetch fresh data
+              debugLog('Cache is stale, fetching fresh data');
+              fetchFreshData();
+            } else {
+              // No cached data, fetch if online
+              if (navigator.onLine) {
+                fetchFreshData();
+              } else {
+                reject('You are offline and no cached data is available');
+              }
+            }
+          };
+          
+          request.onerror = event => {
+            reject(event.target.error);
+          };
+          
+          // Helper function to fetch fresh data
+          function fetchFreshData() {
+            const fetchOptions = {
+              method,
+              headers: { 'Content-Type': 'application/json' }
+            };
+            if (method === 'POST') {
+              fetchOptions.body = JSON.stringify(params);
+            }
+            
+            fetch(`${api_url}${endpoint}`, fetchOptions)
+              .then(response => {
+                if (!response.ok) {
+                  return response.json()
+                    .then(data => Promise.reject(new Error(data.message || 'API request failed')))
+                    .catch(() => Promise.reject(new Error('API request failed')));
+                }
+                return response.json().catch(() => Promise.reject(new Error('Invalid JSON response')));
+              })
+              .then(data => {
+                // Save to IndexedDB with timestamp
+                saveToIndexedDB(endpoint, params, data).catch(err => {
+                  console.warn('Could not save to IndexedDB:', err);
+                });
+                resolve(data);
+              })
+              .catch(error => {
+                // Network failed but we have stale cache, use it
+                if (result && result.data) {
+                  console.warn('Network failed, using stale cache:', error);
+                  resolve({ ...result.data, _fromCache: true, _stale: true });
+                } else {
+                  reject(new Error('Network request failed and no cache available'));
+                }
+              });
+          }
         });
-    }
-
-    // Otherwise, do a network POST or GET and then save to IndexedDB
-    const fetchOptions = {
-      method,
-      headers: { 'Content-Type': 'application/json' }
-    };
-    if (method === 'POST') {
-      fetchOptions.body = JSON.stringify(params);
-    }
-
-    return fetch(`${api_url}${endpoint}`, fetchOptions)
-      .then(response => {
-        if (!response.ok) {
-          return response.json()
-            .then(data => Promise.reject(new Error(data.message || 'API request failed')))
-            .catch(() => Promise.reject(new Error('API request failed')));
-        }
-        return response.json().catch(() => Promise.reject(new Error('Invalid JSON response')));
-      })
-      .then(data => {
-        saveToIndexedDB(endpoint, params, data).catch(err => {
-          console.warn('Could not save to IndexedDB:', err);
-        });
-        return data;
-      })
-      .catch(error => {
-        console.error('API error, trying IndexedDB:', error);
-        return getFromIndexedDB(endpoint, params)
-          .then(cachedData => ({ ...cachedData, _fromCache: true }))
-          .catch(err => {
-            console.error('Could not retrieve from IndexedDB:', err);
-            throw new Error('You are offline and no cached data is available');
+      } else {
+        // No cached data at all
+        throw new Error('No cached data');
+      }
+    })
+    .catch(err => {
+      // No cached data, try network if online
+      if (!navigator.onLine) {
+        throw new Error('You are offline and no cached data is available');
+      }
+      
+      // Fetch from network
+      const fetchOptions = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (method === 'POST') {
+        fetchOptions.body = JSON.stringify(params);
+      }
+      
+      return fetch(`${api_url}${endpoint}`, fetchOptions)
+        .then(response => {
+          if (!response.ok) {
+            return response.json()
+              .then(data => Promise.reject(new Error(data.message || 'API request failed')))
+              .catch(() => Promise.reject(new Error('API request failed')));
+          }
+          return response.json().catch(() => Promise.reject(new Error('Invalid JSON response')));
+        })
+        .then(data => {
+          // Save to IndexedDB with timestamp
+          saveToIndexedDB(endpoint, params, data).catch(err => {
+            console.warn('Could not save to IndexedDB:', err);
           });
-      });
-  }
+          return data;
+        });
+    });
+}
 
   // Insert menu HTML into the DOM
   function insertMenuIntoDOM(menuHTML) {

@@ -1,26 +1,15 @@
 {
     "features": [
         {
-            "featureName": "Pizza",
+            "featureName": "Website",
             "description": {
-                "text": "These are the pizzas."
+                "text": "These are the website bundles."
             },
             "options": [
                 {
-                    "optionName": "Cheese",
+                    "optionName": "Singe Page",
                     "description": {
-                        "text": "This is the base cheese pizza."
-                    },
-                    "dineInTakeOutDelivery": {
-                        "level": "user",
-                        "ui_type": "array",
-                        "value": {
-                            "types": [
-                                "Dine In",
-                                "Take Out",
-                                "Delivery"
-                            ]
-                        }
+                        "text": "This is a single page WordPress website with a beautiful template design."
                     },
                     "interval": {
                         "level": "admin",
@@ -41,594 +30,20 @@
                                 "price range",
                                 "price options"
                             ],
-                            "selected": 2
-                        }
-                    },
-                    "priceFloor": 0,
-                    "priceCeiling": 0,
-                    "staticPrice": 0,
-                    "priceOptions": {
-                        "level": "admin",
-                        "ui_type": "array-obj",
-                        "value": {
-                            "types": [
-                                {
-                                    "label": "small",
-                                    "price": 10
-                                },
-                                {
-                                    "label": "medium",
-                                    "price": 15
-                                },
-                                {
-                                    "label": "large",
-                                    "price": 20
-                                }
-                            ]
-                        }
-                    },
-                    "thresholdDiscounts": {
-                        "level": "admin",
-                        "ui_type": "array-obj",
-                        "value": {
-                            "types": [
-                                {
-                                    "itemCount": 5,
-                                    "discount": 10
-                                },
-                                {
-                                    "itemCount": 10,
-                                    "discount": 15
-                                },
-                                {
-                                    "itemCount": 15,
-                                    "discount": 20
-                                }
-                            ]
-                        }
-                    },
-                    "maxAddons": 5,
-                    "optionMetric": "unit",
-                    "addons": [
-                        {
-                            "addonName": "Pepperoni",
-                            "description": {
-                                "text": "This is the pepperoni topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Black Olive",
-                            "description": {
-                                "text": "This is the black olive topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Mushroom",
-                            "description": {
-                                "text": "This is the mushroom topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Green Pepper",
-                            "description": {
-                                "text": "This is the green pepper topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Onion",
-                            "description": {
-                                "text": "This is the onion topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Ham",
-                            "description": {
-                                "text": "This is the ham topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Pineapple",
-                            "description": {
-                                "text": "This is the pineapple topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 0,
-                            "groupName": "",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": "",
-                                            "discount": ""
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": false,
-                            "maxGroupItems": -1,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Chicken",
-                            "description": {
-                                "text": "This is the chicken topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 1,
-                            "groupName": "Premium Toppings",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": 2,
-                                            "discount": 10
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": true,
-                            "maxGroupItems": 2,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Artichokes",
-                            "description": {
-                                "text": "This is the artichokes topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 1,
-                            "groupName": "Premium Toppings",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": 2,
-                                            "discount": 10
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": true,
-                            "maxGroupItems": 2,
-                            "link_name": ""
-                        },
-                        {
-                            "addonName": "Anchovies",
-                            "description": {
-                                "text": "This is the anchovies topping."
-                            },
-                            "addOnMetric": "unit",
-                            "floorPriceMod": 0,
-                            "ceilingPriceMod": 0,
-                            "pricingType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "static price",
-                                        "price range"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "priceModifierType": {
-                                "level": "admin",
-                                "ui_type": "array",
-                                "value": {
-                                    "types": [
-                                        "add",
-                                        "multiply"
-                                    ],
-                                    "selected": 0
-                                }
-                            },
-                            "staticPriceMod": 1,
-                            "groupName": "Premium Toppings",
-                            "groupThresholdDiscounts": {
-                                "level": "admin",
-                                "ui_type": "array-obj",
-                                "value": {
-                                    "types": [
-                                        {
-                                            "itemCount": 2,
-                                            "discount": 10
-                                        }
-                                    ]
-                                }
-                            },
-                            "enableGrouping": true,
-                            "maxGroupItems": 2,
-                            "link_name": ""
-                        }
-                    ],
-                    "link_name": ""
-                }
-            ],
-            "recurring": false,
-            "link_name": ""
-        },
-        {
-            "featureName": "Salad",
-            "description": {
-                "text": "These are the salads."
-            },
-            "options": [
-                {
-                    "optionName": "Italian Salad",
-                    "description": {
-                        "text": "This is the italian salad. "
-                    },
-                    "interval": {
-                        "level": "admin",
-                        "ui_type": "array",
-                        "value": {
-                            "types": [
-                                "none"
-                            ],
                             "selected": 0
                         }
                     },
-                    "pricingType": {
-                        "level": "admin",
-                        "ui_type": "array",
-                        "value": {
-                            "types": [
-                                "static price",
-                                "price range",
-                                "price options"
-                            ],
-                            "selected": 2
-                        }
-                    },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 0,
+                    "staticPrice": 750,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",
                         "value": {
                             "types": [
                                 {
-                                    "label": "small",
-                                    "price": 10
-                                },
-                                {
-                                    "label": "medium",
-                                    "price": 15
-                                },
-                                {
-                                    "label": "large",
-                                    "price": 20
+                                    "label": "Default",
+                                    "price": 0
                                 }
                             ]
                         }
@@ -637,21 +52,64 @@
                         "level": "admin",
                         "ui_type": "array-obj",
                         "value": {
-                            "types": [
-                                {
-                                    "itemCount": 3,
-                                    "discount": 10
-                                }
-                            ]
+                            "types": []
                         }
                     },
                     "maxAddons": -1,
                     "optionMetric": "unit",
                     "addons": [
                         {
-                            "addonName": "Extra Dressing",
+                            "addonName": "Email Catcher",
                             "description": {
-                                "text": "This is the extra dressing."
+                                "text": "This is an email catcher."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 250,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Contact Form",
+                            "description": {
+                                "text": "This is a contact form."
                             },
                             "addOnMetric": "unit",
                             "floorPriceMod": 0,
@@ -678,7 +136,7 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 1.5,
+                            "staticPriceMod": 250,
                             "groupName": "",
                             "groupThresholdDiscounts": {
                                 "level": "admin",
