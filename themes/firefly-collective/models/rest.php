@@ -1,5 +1,7 @@
 <?php
 
+    // theme/models/rest.php
+
     function register_custom_api_endpoints() {
         register_rest_route('custom-api/v1', '/submit-contact', array(
             'methods'             => 'POST',
@@ -64,6 +66,12 @@
         register_rest_route('custom-api/v1', '/google-auth-callback', array(
             'methods'             => 'GET',
             'callback'            => 'google_auth_callback',
+            'permission_callback' => '__return_true',
+        ));
+
+        register_rest_route('custom-api/v1', '/app-get-menu', array(
+            'methods'             => 'POST',
+            'callback'            => 'app_get_menu',
             'permission_callback' => '__return_true',
         ));
     }

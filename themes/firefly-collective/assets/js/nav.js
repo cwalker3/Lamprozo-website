@@ -1,9 +1,23 @@
+// theme/assets/js/nav.js
+
 document.addEventListener('DOMContentLoaded', function () {
+    // Initialize navigation system - this function can be called from app.js
+    initNavigation();
+});
+
+// Extract initialization into a function that can be called after dynamic menu insertion
+function initNavigation() {
     const hamburger = document.getElementById('hamburger');
     const closeNavBtn = document.getElementById('close-nav-btn');
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
     const body = document.body;
+
+    // Skip if elements don't exist yet
+    if (!hamburger || !closeNavBtn || !nav || !backdrop) {
+        console.log('Navigation elements not found, skipping initialization');
+        return;
+    }
 
     // Handle Submenus
     const menuItems = nav.querySelectorAll('.menu-item-has-children');
@@ -34,17 +48,20 @@ document.addEventListener('DOMContentLoaded', function () {
         closeWebsiteMenu();
     });
 
-    if (navData.auth_id) {
+    // Make sure navData exists before using it
+    if (typeof navData !== 'undefined' && navData.auth_id) {
         const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
         const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
         const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
         const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
         const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
-        signupBtn.style.display = 'none';
-        loginBtn.style.display = 'none';
-        orderHistoryBtn.style.display = 'block';
-        dashboardBtn.style.display = 'block';
-        logoutBtn.style.display = 'block';
+        
+        // Check that the elements exist before modifying them
+        if (signupBtn) signupBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
+        if (dashboardBtn) dashboardBtn.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'block';
     }
 
     function openWebsiteMenu() {
@@ -74,4 +91,4 @@ document.addEventListener('DOMContentLoaded', function () {
             expandIcon.textContent = '-';
         }
     }
-});
+}

@@ -1,17 +1,28 @@
 // theme/service-worker.js
 
 // Use content hashing to detect changes automatically
-const CACHE_PREFIX = 'ffc-';
-const STATIC_CACHE = `${CACHE_PREFIX}static`;
-const ASSETS_CACHE = `${CACHE_PREFIX}assets`;
-const DYNAMIC_CACHE = `${CACHE_PREFIX}dynamic`;
-const theme_path = '/wp-content/themes/firefly-collective';
+const CACHE_PREFIX    = 'ffc-';
+const STATIC_CACHE    = `${CACHE_PREFIX}static`;
+const ASSETS_CACHE    = `${CACHE_PREFIX}assets`;
+const DYNAMIC_CACHE   = `${CACHE_PREFIX}dynamic`;
+const API_CACHE       = `${CACHE_PREFIX}api`;
+const theme_path      = '/wp-content/themes/firefly-collective';
+
+// API endpoints to cache separately
+const API_ROUTES = [
+  '/wp-json/custom-api/v1/app-get-menu'
+];
 
 // List of assets to cache on install
 const CORE_ASSETS = [
+  '/',
   theme_path + '/views/app.html',
+  theme_path + '/assets/css/main.css',
   theme_path + '/assets/css/app.css',
-  theme_path + '/assets/js/app.js'
+  theme_path + '/assets/css/animations.css',
+  theme_path + '/assets/css/nav.css',
+  theme_path + '/assets/js/app.js',
+  theme_path + '/assets/js/manifest.json',
 ];
 
 // Audio assets (cached separately)
@@ -20,7 +31,10 @@ const AUDIO_ASSETS = [];
 // Image assets (cached separately for efficient updates)
 const IMAGE_ASSETS = [
   theme_path + '/images/ffc-logo.webp',
-  theme_path + '/images/ffc-logo-192.webp'
+  theme_path + '/images/ffc-logo-192.webp',
+  theme_path + '/images/logo.webp',
+  theme_path + '/images/hamburger.webp',
+  theme_path + '/images/close-nav.webp'
 ];
 
 // Font assets
@@ -35,42 +49,60 @@ const ALL_ASSETS = [
 ];
 
 /**
- * Extract the ETag or Last-Modified header to use as a version identifier
- * This helps detect changed files without requiring manual version changes
+ * Get a cache key that includes the resource's version
+ * We simply use the plain URL, so cache.match works regardless of queries
  */
-async function getResourceVersion(url, defaultVersion = Date.now().toString()) {
-  try {
-    const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-    if (!response.ok) return defaultVersion;
-    
-    // Try to get ETag or Last-Modified headers
-    const etag = response.headers.get('ETag');
-    if (etag) return etag.replace(/"/g, '');
-    
-    const lastModified = response.headers.get('Last-Modified');
-    if (lastModified) return new Date(lastModified).getTime().toString();
-    
-    // Check for query parameter version (?v=)
-    const urlObj = new URL(url, self.location.origin);
-    if (urlObj.searchParams.has('v')) {
-      return urlObj.searchParams.get('v');
-    }
-    
-    // If cannot determine version, use current timestamp
-    return defaultVersion;
-  } catch (error) {
-    console.log('[SW] Error getting resource version:', error);
-    return defaultVersion;
-  }
+async function getCacheKey(url) {
+  return url;
 }
 
 /**
- * Get a cache key that includes the resource's version
- * This allows multiple versions of the same resource to coexist in cache
+ * Store a POST request and its response in the cache
+ * Uses a special key format to handle POST requests with bodies
  */
-async function getCacheKey(url) {
-  const version = await getResourceVersion(url);
-  return `${url}?v=${version}`;
+async function cachePostRequest(request, response) {
+  if (!request.clone().bodyUsed) {
+    try {
+      const body = await request.clone().json().catch(() => ({}));
+      const url = request.url;
+      const cacheKey = `${url}:${JSON.stringify(body)}`;
+      const cache = await caches.open(API_CACHE);
+      const modifiedRequest = new Request(cacheKey, {
+        method: 'POST',
+        headers: request.headers,
+        body: JSON.stringify(body),
+        mode: 'cors'
+      });
+      await cache.put(modifiedRequest, response.clone());
+      console.log('[SW] POST request cached:', cacheKey);
+      return true;
+    } catch (error) {
+      console.log('[SW] Failed to cache POST request:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Try to find a cached response for a POST request
+ */
+async function getCachedPostResponse(request) {
+  try {
+    const body = await request.clone().json().catch(() => ({}));
+    const url = request.url;
+    const cacheKey = `${url}:${JSON.stringify(body)}`;
+    const cache = await caches.open(API_CACHE);
+    const cachedResponse = await cache.match(new Request(cacheKey));
+    if (cachedResponse) {
+      console.log('[SW] Found cached POST response:', cacheKey);
+      return cachedResponse;
+    }
+    return null;
+  } catch (error) {
+    console.log('[SW] Failed to retrieve cached POST response:', error);
+    return null;
+  }
 }
 
 /**
@@ -78,10 +110,7 @@ async function getCacheKey(url) {
  * This allows the service worker to activate quickly
  */
 self.addEventListener('install', event => {
-  // Skip waiting immediately to take control of clients
   self.skipWaiting();
-  
-  // Start caching assets but don't block activation
   event.waitUntil(
     Promise.all([
       // Cache core assets
@@ -95,14 +124,13 @@ self.addEventListener('install', event => {
                 return cache.put(cacheKey, response);
               }
             }).catch(error => {
+              console.log(`[SW] Failed to cache ${url}:`, error);
             });
           })
         );
       }),
-      
       // Cache audio assets
       caches.open(ASSETS_CACHE).then(cache => {
-        // Process audio assets in smaller batches
         return Promise.all(
           AUDIO_ASSETS.map(async url => {
             const cacheKey = await getCacheKey(url);
@@ -112,14 +140,13 @@ self.addEventListener('install', event => {
                 return cache.put(cacheKey, response);
               }
             }).catch(error => {
+              console.log(`[SW] Failed to cache ${url}:`, error);
             });
           })
         );
       }),
-      
-      // Start caching image assets (but don't wait for completion)
+      // Cache image assets (in batches)
       caches.open(ASSETS_CACHE).then(async cache => {
-        // Process images in small batches to avoid overwhelming the browser
         const batchSize = 5;
         for (let i = 0; i < IMAGE_ASSETS.length; i += batchSize) {
           const batch = IMAGE_ASSETS.slice(i, i + batchSize);
@@ -139,7 +166,6 @@ self.addEventListener('install', event => {
           );
         }
       }),
-      
       // Cache font assets
       caches.open(ASSETS_CACHE).then(cache => {
         return Promise.all(
@@ -155,7 +181,9 @@ self.addEventListener('install', event => {
             });
           })
         );
-      })
+      }),
+      // Create API cache (even if empty initially)
+      caches.open(API_CACHE)
     ])
   );
 });
@@ -166,58 +194,41 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
-      // Keep all current caches
-      const validCaches = [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE];
-      
-      // Delete any old caches not in our list
+      const validCaches = [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE, API_CACHE];
       return Promise.all(
         cacheNames
-          .filter(cacheName => cacheName.startsWith(CACHE_PREFIX) && !validCaches.includes(cacheName))
-          .map(cacheName => {
-            return caches.delete(cacheName);
+          .filter(name => name.startsWith(CACHE_PREFIX) && !validCaches.includes(name))
+          .map(name => {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
           })
       );
-    })
-    .then(() => {
-      // Claim all clients immediately so our service worker takes control
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 /**
  * Background update function
- * This updates a cached resource without affecting the current user experience
+ * We will only fetch from network if online, but otherwise skip
  */
 async function updateCacheInBackground(request) {
   try {
     const url = request.url;
-    
-    // Choose the appropriate cache based on the request URL
     let cacheName = DYNAMIC_CACHE;
     if (CORE_ASSETS.some(asset => url.includes(asset))) {
       cacheName = STATIC_CACHE;
     } else if ([...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS].some(asset => url.includes(asset))) {
       cacheName = ASSETS_CACHE;
+    } else if (API_ROUTES.some(route => url.includes(route))) {
+      cacheName = API_CACHE;
     }
-    
-    // Get a versioned cache key
+    // If offline, skip network fetch entirely
+    if (!self.navigator.onLine) return null;
     const cacheKey = await getCacheKey(url);
-    
-    // Fetch the latest version (bypass cache)
-    const fetchOptions = {
-      cache: 'no-cache',
-      credentials: 'same-origin',
-      headers: new Headers({ 'Cache-Control': 'no-cache' })
-    };
-    
-    const response = await fetch(request, fetchOptions);
+    const response = await fetch(request).catch(() => null);
     if (!response || !response.ok) return null;
-    
-    // Update the cache with the new version using the versioned key
     const cache = await caches.open(cacheName);
     await cache.put(cacheKey, response.clone());
-    
     return response;
   } catch (error) {
     console.log('[SW] Background update failed:', error);
@@ -226,94 +237,164 @@ async function updateCacheInBackground(request) {
 }
 
 /**
- * Main fetch handler - responds with cached content while updating in background
+ * Main fetch handler - never fetch from network if offline;
+ * always attempt cache-first, fallback to offline response.
  */
 self.addEventListener('fetch', event => {
   const request = event.request;
-  
-  // Skip non-GET requests and cross-origin requests
-  if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
+  const url = new URL(request.url);
+
+  // Skip non-GET/POST and cross-origin
+  if (!['GET', 'POST'].includes(request.method) || !request.url.startsWith(self.location.origin)) {
     return;
   }
-  
-  // Handle HTML document requests (like the main page)
-  if (request.mode === 'navigate' || request.headers.get('Accept')?.includes('text/html')) {
-    event.respondWith(
-      // First check the cache
-      caches.match(request).then(async cachedResponse => {
-        // Start a background fetch to update the cache regardless of cache hit
-        const fetchPromise = fetch(request).then(networkResponse => {
-          if (networkResponse && networkResponse.ok) {
-            // Clone the response before using it
-            const responseToCache = networkResponse.clone();
-            
-            // Update the cache with the new version
-            caches.open(STATIC_CACHE).then(async cache => {
-              const cacheKey = await getCacheKey(request.url);
-              cache.put(cacheKey, responseToCache);
+
+  // Handle API requests specially
+  const isApiRequest = API_ROUTES.some(route => request.url.includes(route));
+  if (isApiRequest) {
+    if (request.method === 'POST') {
+      event.respondWith(
+        (async () => {
+          if (!self.navigator.onLine) {
+            const cachedResponse = await getCachedPostResponse(request.clone());
+            if (cachedResponse) return cachedResponse;
+            // Tell app to use IndexedDB
+            return new Response(JSON.stringify({
+              success: false,
+              message: 'Offline - check IndexedDB',
+              _offline: true,
+              _useIndexedDB: true
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
             });
           }
-          return networkResponse;
-        }).catch(error => {
-          console.log('[SW] Navigation fetch failed:', error);
-          return null;
-        });
-        
-        // If we have a cached version, use it right away
+          try {
+            const response = await fetch(request.clone());
+            const responseToCache = response.clone();
+            cachePostRequest(request.clone(), responseToCache);
+            return response;
+          } catch {
+            const cachedResponse = await getCachedPostResponse(request.clone());
+            if (cachedResponse) return cachedResponse;
+            return new Response(JSON.stringify({
+              success: false,
+              message: 'You are offline. This feature requires an internet connection.',
+              _offline: true
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+        })()
+      );
+      return;
+    }
+
+    // GET API: cache-first, no network if offline
+    event.respondWith(
+      caches.match(request, { ignoreSearch: true }).then(async cachedResponse => {
         if (cachedResponse) {
-          // Trigger a background update but don't wait for it
           updateCacheInBackground(request);
           return cachedResponse;
         }
-        
-        // If no cached version, wait for the network response
-        const networkResponse = await fetchPromise;
-        return networkResponse || new Response('App is offline. Please try again when you have a network connection.', {
-          status: 503,
-          headers: { 'Content-Type': 'text/html' }
-        });
+        if (!self.navigator.onLine) {
+          return new Response(JSON.stringify({
+            success: false,
+            message: 'You are offline.',
+            _offline: true
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        try {
+          const response = await fetch(request);
+          if (response && response.ok) {
+            const responseToCache = response.clone();
+            const cache = await caches.open(API_CACHE);
+            cache.put(request, responseToCache);
+          }
+          return response;
+        } catch {
+          return new Response(JSON.stringify({
+            success: false,
+            message: 'You are offline.',
+            _offline: true
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       })
     );
     return;
   }
-  
-  // For all other assets (JS, CSS, images, etc.)
+
+  // Handle navigation requests (HTML pages)
+  if (request.mode === 'navigate' || request.headers.get('Accept')?.includes('text/html')) {
+    event.respondWith(
+      (async () => {
+        // Always serve cached root ("/") when offline
+        if (!self.navigator.onLine) {
+          const cachedShell = await caches.match('/', { ignoreSearch: true });
+          return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+        // If online, fetch and update cache
+        try {
+          const networkResponse = await fetch(request);
+          const cache = await caches.open(STATIC_CACHE);
+          cache.put('/', networkResponse.clone());
+          return networkResponse;
+        } catch {
+          const cachedShell = await caches.match('/', { ignoreSearch: true });
+          return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+      })()
+    );
+    return;
+  }
+
+  // All other assets (JS, CSS, images, etc.) – cache-first, never network-fetch if offline
   event.respondWith(
-    // Try to find a cached response that matches the request
-    caches.match(request).then(async cachedResponse => {
-      // Start updating the resource in the background
-      // regardless of whether we have it cached
-      updateCacheInBackground(request);
-      
-      // If we have a cached version, use it immediately
+    caches.match(request, { ignoreSearch: true }).then(async cachedResponse => {
       if (cachedResponse) {
+        updateCacheInBackground(request);
         return cachedResponse;
       }
-      
-      // If not cached, try the network
+      if (!self.navigator.onLine) {
+        // If offline and not in cache, respond with a generic offline placeholder
+        if (request.destination === 'image') {
+          return new Response('', { status: 404 });
+        }
+        return new Response('Resource currently unavailable offline', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
       try {
         const networkResponse = await fetch(request);
-        
-        // Clone the response before using it
         const responseToCache = networkResponse.clone();
-        
-        // Save the network response to cache for next time
-        const cacheName = AUDIO_ASSETS.some(asset => request.url.includes(asset)) || 
-                          IMAGE_ASSETS.some(asset => request.url.includes(asset)) || 
-                          FONT_ASSETS.some(asset => request.url.includes(asset)) 
-                        ? ASSETS_CACHE : DYNAMIC_CACHE;
-        
-        caches.open(cacheName).then(async cache => {
-          const cacheKey = await getCacheKey(request.url);
-          cache.put(cacheKey, responseToCache);
-        });
-        
+        const cacheName = AUDIO_ASSETS.some(asset => request.url.includes(asset)) ||
+                          IMAGE_ASSETS.some(asset => request.url.includes(asset)) ||
+                          FONT_ASSETS.some(asset => request.url.includes(asset))
+                        ? ASSETS_CACHE
+                        : DYNAMIC_CACHE;
+        const cache = await caches.open(cacheName);
+        const cacheKey = await getCacheKey(request.url);
+        cache.put(cacheKey, responseToCache);
         return networkResponse;
-      } catch (error) {
-        console.log('[SW] Fetch failed:', error);
-        
-        // If both cache and network fail, return a simple error response
-        return new Response('Resource currently unavailable offline', { 
+      } catch {
+        if (request.destination === 'image') {
+          return new Response('', { status: 404 });
+        }
+        return new Response('Resource currently unavailable offline', {
           status: 408,
           headers: { 'Content-Type': 'text/plain' }
         });
@@ -328,19 +409,20 @@ self.addEventListener('fetch', event => {
  */
 self.addEventListener('message', event => {
   const message = event.data;
-  
-  // Handle skipWaiting message (legacy support)
   if (message && message.action === 'skipWaiting') {
     self.skipWaiting();
   }
-  
-  // Handle refresh cache message (optional, for force refresh)
   if (message && message.action === 'refreshCache') {
     event.waitUntil(
       Promise.all(ALL_ASSETS.map(url => updateCacheInBackground(new Request(url))))
-        .then(() => {
-          // Complete
-        })
+        .then(() => console.log('[SW] Cache refreshed successfully'))
+    );
+  }
+  if (message && message.action === 'clearApiCache') {
+    event.waitUntil(
+      caches.open(API_CACHE).then(cache =>
+        cache.keys().then(keys => Promise.all(keys.map(key => cache.delete(key))))
+      ).then(() => console.log('[SW] API cache cleared successfully'))
     );
   }
 });

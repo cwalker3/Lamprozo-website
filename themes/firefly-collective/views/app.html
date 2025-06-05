@@ -1,20 +1,57 @@
-<!-- theme/views/app.html -->
-
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="theme-color" content="#333333">
         <title>FFC App</title>
+        <link rel="stylesheet" href="/wp-content/themes/firefly-collective/assets/css/custom-properties.css">
+        <link rel="stylesheet" href="/wp-content/themes/firefly-collective/assets/css/main.css">
+        <link rel="stylesheet" href="/wp-content/themes/firefly-collective/assets/css/animations.css">
+        <link rel="stylesheet" href="/wp-content/themes/firefly-collective/assets/css/nav.css">
         <link rel="stylesheet" href="/wp-content/themes/firefly-collective/assets/css/app.css">
+        <link rel="manifest" href="/wp-content/themes/firefly-collective/manifest.json">
     </head>
     <body>
-        
-        <h1>This is the App</h1>
+        <div id="backdrop"></div>
 
-        <button id="test-btn">Test</button>
+        <header>
+            <div id="nav-bar"></div>
+            <div id="logo-name">
+                <div id="site-logo"><img src="/wp-content/themes/firefly-collective/images/logo.webp" alt="Logo"></div>
+                <div id="site-name">Firefly Collective</div>
+            </div>
+        </header>  
+
+        <div>
+            <img id="hamburger" src="/wp-content/themes/firefly-collective/images/hamburger.webp" alt="Menu">
+        </div>
+        <div>
+            <img id="close-nav-btn" src="/wp-content/themes/firefly-collective/images/close-nav.webp" alt="Close Menu">
+        </div>
+
+        <!-- Nav container - menu will be inserted here by JavaScript -->
+        <nav>
+            <div class="menu-placeholder">
+                <p style="color: #666; text-align: center; padding: 2rem;">Loading menu...</p>
+            </div>
+        </nav>
+
+        <main>
+            <div class="content">
+                <h1>Welcome to FFC App</h1>
+                <p>This app works offline! Your menu and data are cached for offline use.</p>
+            </div>
+        </main>
+        
+        <!-- Offline indicator -->
+        <div class="offline-indicator">You are currently offline. Some features may be limited.</div>
+
+        <!-- Loading indicator -->
+        <div class="app-loading">Loading...</div>
 
         <script type="text/javascript" src="/wp-content/themes/firefly-collective/assets/js/app.js"></script>
-
     </body>
 </html>

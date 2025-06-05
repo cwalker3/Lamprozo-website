@@ -1,7 +1,77 @@
+/* theme/assets/css/app.css  */
+
 body {
     background-color: rgb(51, 51, 51);
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
 }
 
 h1 {
     color: yellow;
+    margin-top: 1rem;
+}
+
+main {
+    margin-top: 12vh; /* Adjust to account for fixed header */
+    padding: 1rem;
+}
+
+#test-btn {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 1rem 0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+/* PWA-specific adjustments to nav */
+.offline-indicator {
+    background-color: #ff4d4d;
+    color: white;
+    text-align: center;
+    padding: 8px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: none;
+    z-index: 1000;
+}
+
+body.is-offline .offline-indicator {
+    display: block;
+}
+
+/* Make sure URLs in the menu work properly in the PWA context */
+body > nav a {
+    text-decoration: none;
+}
+
+/* Ensure the site name is correct */
+#site-name {
+    color: white;
+    font-weight: bold;
+}
+
+/* PWA-specific overrides for nav.css */
+@media (max-width: 800px) {
+    main {
+        margin-top: 10vh;
+    }
+    
+    #logo-name {
+        font-size: 1.2rem;
+    }
+}
+
+/* If the menu uses WordPress admin URLs, transform them to app paths */
+body > nav a[href*="/wp-admin/"] {
+    display: none; /* Hide admin links in the PWA */
 }
