@@ -2,5 +2,5 @@
 
     // theme/views/order-history.php
 
-    require_once $plugin_path.'/views/orders.php';
+    require_once $backend_plugin_path.'/views/orders.php';
 ?>
