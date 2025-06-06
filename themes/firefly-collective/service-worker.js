@@ -15,7 +15,6 @@ const API_ROUTES = [
 
 // List of assets to cache on install
 const CORE_ASSETS = [
-  '/',
   theme_path + '/views/app.html',
   theme_path + '/assets/css/main.css',
   theme_path + '/assets/css/app.css',
@@ -337,7 +336,7 @@ self.addEventListener('fetch', event => {
       (async () => {
         // Always serve cached root ("/") when offline
         if (!self.navigator.onLine) {
-          const cachedShell = await caches.match('/', { ignoreSearch: true });
+          const cachedShell = await caches.match('/app.html', { ignoreSearch: true });
           return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
             status: 503,
             headers: { 'Content-Type': 'text/html' }
@@ -347,10 +346,10 @@ self.addEventListener('fetch', event => {
         try {
           const networkResponse = await fetch(request);
           const cache = await caches.open(STATIC_CACHE);
-          cache.put('/', networkResponse.clone());
+          cache.put('/app.html', networkResponse.clone());
           return networkResponse;
         } catch {
-          const cachedShell = await caches.match('/', { ignoreSearch: true });
+          const cachedShell = await caches.match('/app.html', { ignoreSearch: true });
           return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
             status: 503,
             headers: { 'Content-Type': 'text/html' }
