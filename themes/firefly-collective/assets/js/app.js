@@ -185,7 +185,7 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
           return {
             success: true,
             menu_html: `
-              <div class="website-menu offline-menu">
+              <div class="app-menu offline-menu">
                 <ul>
                   <li><a href="/">Home (Offline Mode)</a></li>
                   <li><a href="#" onclick="location.reload()">Retry Connection</a></li>
@@ -422,7 +422,7 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
     const navElement = document.querySelector('body > nav');
     if (navElement) {
       navElement.innerHTML = `
-        <div class="website-menu">
+        <div class="app-menu">
           <ul>
             <li><a href="/">Home</a></li>
             <li><a href="#" onclick="alert('Menu data unavailable offline. Please connect to the internet to refresh.')">Refresh Menu</a></li>
