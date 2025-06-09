@@ -10,7 +10,7 @@ const theme_path      = '/wp-content/themes/firefly-collective';
 
 // API endpoints to cache separately
 const API_ROUTES = [
-  '/wp-json/custom-api/v1/app-get-menu'
+  '/wp-json/custom-api/v1/app-init'
 ];
 
 // List of assets to cache on install

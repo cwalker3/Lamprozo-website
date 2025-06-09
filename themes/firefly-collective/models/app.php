@@ -33,11 +33,11 @@
     }
     add_action('after_switch_theme', 'app_setup_nav');
 
-    function app_get_menu( $request ) {
+    // App initialization - returns menu + front page
+    function app_init($request) {
         $params = $request->get_params();
-        $message = isset( $params['message'] ) ? $params['message'] : '';
         
-        // Capture the menu HTML output by using output buffering
+        // Get menu HTML
         ob_start();
         wp_nav_menu(array(
             'theme_location'  => 'app-menu',
@@ -46,14 +46,17 @@
         ));
         $menu_html = ob_get_clean();
         
-        // Get the outer nav element too (optional - if you want the complete nav)
-        $full_nav_html = '<nav style="display: grid;">' . $menu_html . '</nav>';
+        // Get front page content
+        ob_start();
         
-        // Return both the message and the menu HTML
+        // Get front page
+        $front_page_id = get_option( 'page_on_front' ); 
+        $front_page_html = get_post_field( 'post_content', $front_page_id );
+
         return rest_ensure_response([
-            'success' => true,
-            'message' => $message,
-            'menu_html' => $menu_html,
-            'full_nav_html' => $full_nav_html
+            'success'           => true,
+            'menu_html'         => $menu_html,
+            'front_page_html'   => $front_page_html,
+            'nonce'             => wp_create_nonce('wp_rest')
         ]);
     }

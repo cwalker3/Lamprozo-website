@@ -180,7 +180,7 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
       
       if (!serverReachable) {
         // Server not reachable, return offline response
-        if (endpoint === 'app-get-menu') {
+        if (endpoint === 'app-init') {
           // Return a basic menu structure for offline use
           return {
             success: true,
@@ -397,16 +397,12 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
   // Load menu function with robust error handling
   function loadMenu() {
     debugLog('Loading menu...');
-    return fetchWithOfflineSupport('app-get-menu', 'POST', { message: "Initializing app menu" })
+    return fetchWithOfflineSupport('app-init', 'POST')
       .then(data => {
-        if (data && data.success && data.menu_html) {
-          debugLog(`Menu data ${data._fromCache ? "loaded from cache" : "fetched from server"}`);
-          const inserted = insertMenuIntoDOM(data.menu_html);
-          if (!inserted) throw new Error('Failed to insert menu into DOM');
-          document.body.classList.remove('loading-menu');
-          if (data._fromCache) debugLog('Using cached menu data');
-        } else {
-          throw new Error('Invalid menu data received');
+        if (!data.success) throw new Error('App init failed');
+        if (isPWA) {
+          insertMenuIntoDOM(data.menu_html);
+          appRoot.innerHTML = data.front_page_html;
         }
       })
       .catch(error => {
@@ -487,7 +483,7 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
   // Preload menu data when online to ensure it's cached
   if (navigator.onLine) {
     setTimeout(() => {
-      fetchWithOfflineSupport('app-get-menu', 'POST', { message: "Preloading menu data" })
+      fetchWithOfflineSupport('app-init', 'POST', { message: "Preloading menu data" })
         .then(() => debugLog('Menu data preloaded'))
         .catch(() => debugLog('Menu preload failed'));
     }, 5000);

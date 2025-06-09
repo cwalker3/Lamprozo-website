@@ -69,9 +69,9 @@
             'permission_callback' => '__return_true',
         ));
 
-        register_rest_route('custom-api/v1', '/app-get-menu', array(
+        register_rest_route('custom-api/v1', '/app-init', array(
             'methods'             => 'POST',
-            'callback'            => 'app_get_menu',
+            'callback'            => 'app_init',
             'permission_callback' => '__return_true',
         ));
     }

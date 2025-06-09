@@ -1,7 +1,12 @@
 // theme/assets/js/main.js
 
+const appRoot = document.querySelector('#app-root');
+let isPWA = false;
+if (document.querySelector('#pwa-flag')) isPWA = true;
+
 const page = window.location.pathname.split('/')[1];
-const themePath = myApi.themePath;
+let themePath;
+if (!isPWA) themePath = myApi.themePath;
 const logoNameEle = document.querySelector('#logo-name');
 
 function isValidEmail(email) {
@@ -18,7 +23,7 @@ function isValidPhoneNumber(phoneNumber) {
 document.addEventListener('DOMContentLoaded', function () {
     logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
 
-    handleContactSticky();
+    if (!isPWA) handleContactSticky();
     function handleContactSticky() {
         if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard') return;
         const contactSticky = document.querySelector('#contact-sticky');

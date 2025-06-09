@@ -1,3 +1,7 @@
 <!-- theme/views/app.html -->
 
-<h1>This is the App</h1>
+<div id="app-root">
+
+    <h1>This is the App</h1>
+
+</div>
