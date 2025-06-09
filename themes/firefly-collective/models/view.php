@@ -1,5 +1,7 @@
 <?php
 
+    // theme/models/view.php
+
     // Parse Request URI Function
     function parse_request_uri() {
         $uri = $_SERVER['REQUEST_URI'];

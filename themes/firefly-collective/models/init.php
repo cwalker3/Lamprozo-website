@@ -49,6 +49,21 @@
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
 
+        // Blog
+        if (determine_view() === 'blog') {
+            wp_enqueue_script('blog-js', $theme_path . '/assets/js/blog.js', array(), $unique_id, true);
+        }
+
+        // Contact
+        if (determine_view() === 'contact') {
+            wp_enqueue_script('contact-js', $theme_path . '/assets/js/contact.js', array(), $unique_id, true);
+        }
+
+        // Signup
+        if (determine_view() === 'signup') {
+            wp_enqueue_script('signup-js', $theme_path . '/assets/js/signup.js', array(), $unique_id, true);
+        }
+
         // Frontend PWA
         if (determine_view() === 'app') {
 
@@ -65,6 +80,7 @@
         // Request an Appointment
         if (determine_view() === 'request-an-appointment') {
             wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
+            wp_enqueue_script('request-an-appointment-js', $theme_path . '/assets/js/request-an-appointment.js', array(), $unique_id, true);
             wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
             wp_localize_script('cal-js', 'calData', array(
                 'isAdmin'        => 'false',
