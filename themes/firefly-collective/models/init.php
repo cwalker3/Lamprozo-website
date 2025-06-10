@@ -22,6 +22,7 @@
         $unique_id = uniqid();
         $auth_id = isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : '';
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
+        $current_view = determine_view();
 
         // Enqueue Stylesheets
         wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
@@ -49,40 +50,31 @@
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
 
-        // Blog
-        if (determine_view() === 'blog') {
-            wp_enqueue_script('blog-js', $theme_path . '/assets/js/blog.js', array(), $unique_id, true);
-        }
+        $assets = get_view_assets( $current_view );
 
-        // Contact
-        if (determine_view() === 'contact') {
-            wp_enqueue_script('contact-js', $theme_path . '/assets/js/contact.js', array(), $unique_id, true);
-        }
+        // Enqueue CSS
+        enqueue_assets(
+            $assets['css'],
+            'css',
+            $assets['location_type'],
+            $theme_path,
+            $backend_plugin_path_web,
+            $unique_id
+        );
 
-        // Signup
-        if (determine_view() === 'signup') {
-            wp_enqueue_script('signup-js', $theme_path . '/assets/js/signup.js', array(), $unique_id, true);
-        }
-
-        // Frontend PWA
-        if (determine_view() === 'app') {
-
-            wp_enqueue_style('app-css', $theme_path . '/assets/css/app.css', array(), $unique_id);
-
-            wp_enqueue_script('app-js', $theme_path . '/assets/js/app.js', array(), $unique_id, true);
-            wp_localize_script('app-js', 'appData', array(
-                'nonce'         => $nonce,
-                'pluginWebPath' => $theme_path
-            ));
-
-        }
+        // Enqueue JS
+        enqueue_assets(
+            $assets['js'],
+            'js',
+            $assets['location_type'],
+            $theme_path,
+            $backend_plugin_path_web,
+            $unique_id
+        );
 
         // Request an Appointment
         if (determine_view() === 'request-an-appointment') {
-            wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
-            wp_enqueue_script('request-an-appointment-js', $theme_path . '/assets/js/request-an-appointment.js', array(), $unique_id, true);
-            wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
-            wp_localize_script('cal-js', 'calData', array(
+            wp_localize_script('calendar-js', 'calData', array(
                 'isAdmin'        => 'false',
                 'nonce'          => $nonce,
                 'calendar'       => get_firefly_collective_calendar(),
@@ -91,23 +83,11 @@
             ));
         }
 
-        // Signup
-        if (determine_view() === 'signup') {
-            wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $unique_id, true);
-        }
-
         // Dashboard
         if (determine_view() === 'dashboard') {
             global $features_options_addons;
             $features_options_addons = get_features_options_addons();
             $theme_path = get_template_directory_uri();
-            
-            wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $unique_id);
-            wp_enqueue_style('dashboard-css', $theme_path . '/assets/css/dashboard.css', array(), $unique_id);
-            
-            // Add Stripe.js
-            wp_enqueue_script('stripe-js', 'https://js.stripe.com/v3/', array(), null, true);
-            wp_enqueue_script('dashboard-js', $theme_path . '/assets/js/dashboard.js', array(), $unique_id, true);
             
             // Get Stripe configuration
             $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
@@ -124,14 +104,11 @@
         if (determine_view() === 'order-history') {
             global $currentUserIdAdmin;
             $currentUserIdAdmin = current_user_can('manage_options');
-            wp_enqueue_style('order-history-css', $backend_plugin_path_web . '/assets/css/orders.css', array(), $unique_id);
-            wp_enqueue_script('order-history-js', $backend_plugin_path_web . '/assets/js/orders.js', array(), $unique_id, true);
-            wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
 
             $obj = new stdClass();
 
             // Localize into JS
-            wp_localize_script('order-history-js', 'ordersData', array(
+            wp_localize_script('orders-js', 'ordersData', array(
                 'data'               => $obj,
                 'nonce'              => $nonce,
                 'theme_path'         => $theme_path,
@@ -153,6 +130,41 @@
     }
     // Hook into wp_head to print the manifest link in the <head> section
     add_action( 'wp_head', 'add_pwa_manifest' );
+
+    function enqueue_assets( array $files,
+                            string $type,
+                            string $location_type,
+                            string $theme_path,
+                            string $plugin_path_web,
+                            string $version ) {
+        $suffix = $type === 'css' ? '-css' : '-js';
+
+        foreach ( $files as $file ) {
+            // pick correct base URL
+            $base = $location_type === 'plugin'
+                ? $plugin_path_web
+                : $theme_path;
+
+            // remote?
+            if ( false !== strpos( $file, '://' ) ) {
+                $host  = parse_url( $file, PHP_URL_HOST );
+                $parts = explode( '.', $host );
+                $name  = $parts[ count( $parts ) - 2 ];
+                $src   = $file;
+            } else {
+                $name = pathinfo( $file, PATHINFO_FILENAME );
+                $src  = "{$base}/{$file}";
+            }
+
+            $handle = $name . $suffix;
+
+            if ( $type === 'css' ) {
+                wp_enqueue_style( $handle, $src, array(), $version );
+            } else {
+                wp_enqueue_script( $handle, $src, array(), $version, true );
+            }
+        }
+    }
 
     function disable_comments() {
         // Remove from admin menu
