@@ -1,6 +1,7 @@
 // theme/assets/js/app.js
 
 document.addEventListener('DOMContentLoaded', function () {
+  const devMode = true;
   const api_url = `${window.location.origin}/wp-json/custom-api/v1/`;
   const DB_NAME = 'ffc-app-db';
   const DB_VERSION = 1;
@@ -90,140 +91,73 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Fetch API with offline support and 1-hour cache strategy
-function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
-  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
-  
-  // Helper to check if server is actually reachable
-  function isServerReachable() {
-    if (!navigator.onLine) return Promise.resolve(false);
-    
-    // Try a lightweight ping to your API
-    return fetch(`${api_url}`, { method: 'HEAD', mode: 'no-cors' })
-      .then(() => true)
-      .catch(() => false);
-  }
-  
-  // First, always try to get from IndexedDB
-  return getFromIndexedDB(endpoint, params)
-    .then(cachedData => {
-      if (cachedData) {
-        // We have cached data, check if we should try to update it
-        return new Promise((resolve, reject) => {
-          if (!db) {
-            reject('Database not initialized');
-            return;
-          }
-          
-          const transaction = db.transaction([STORE_NAME], 'readonly');
-          const store = transaction.objectStore(STORE_NAME);
-          const id = `${endpoint}:${JSON.stringify(params)}`;
-          const request = store.get(id);
-          
-          request.onsuccess = async event => {
-            const result = event.target.result;
-            if (result) {
-              const age = Date.now() - result.timestamp;
-              
-              // Always return cached data immediately for better UX
-              debugLog(`Returning cached data (age: ${Math.round(age / 1000 / 60)} minutes)`);
-              resolve({ ...result.data, _fromCache: true });
-              
-              // If cache is fresh or we're offline, we're done
-              if (!navigator.onLine || age < CACHE_DURATION) {
-                return;
-              }
-              
-              // Cache is stale and we appear to be online
-              // Try to update in background without blocking
-              isServerReachable().then(reachable => {
-                if (reachable) {
-                  debugLog('Server reachable, updating cache in background');
-                  
-                  const fetchOptions = {
-                    method,
-                    headers: { 'Content-Type': 'application/json' }
-                  };
-                  if (method === 'POST') {
-                    fetchOptions.body = JSON.stringify(params);
-                  }
-                  
-                  fetch(`${api_url}${endpoint}`, fetchOptions)
-                    .then(response => response.json())
-                    .then(data => {
-                      saveToIndexedDB(endpoint, params, data).catch(err => {
-                        console.warn('Could not update cache:', err);
-                      });
-                    })
-                    .catch(err => {
-                      debugLog('Background update failed:', err);
-                    });
-                }
-              });
-            }
-          };
-          
-          request.onerror = event => {
-            reject(event.target.error);
-          };
-        });
-      } else {
-        // No cached data
-        throw new Error('No cached data available');
-      }
-    })
-    .catch(async err => {
-      // No cached data, check if we can fetch
-      debugLog('No cached data, checking server availability');
-      
-      const serverReachable = await isServerReachable();
-      
-      if (!serverReachable) {
-        // Server not reachable, return offline response
-        if (endpoint === 'app-init') {
-          // Return a basic menu structure for offline use
-          return {
-            success: true,
-            menu_html: `
-              <div class="app-menu offline-menu">
-                <ul>
-                  <li><a href="/">Home (Offline Mode)</a></li>
-                  <li><a href="#" onclick="location.reload()">Retry Connection</a></li>
-                </ul>
-              </div>
-            `,
-            _offline: true
-          };
+  // Fetch API with offline support and 1-hour cache strategy (not in dev mode)
+  async function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
+    const url = `${api_url}${endpoint}`;
+    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+    // ===== 1) DEV MODE: Network-only with no-store, then cache to IndexedDB =====
+    if (devMode) {
+      debugLog('DevMode: network-only fetch:', url);
+      try {
+        const options = {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store'                     // bypass HTTP + SW caches :contentReference[oaicite:3]{index=3}
+        };
+        if (method === 'POST') options.body = JSON.stringify(params);
+
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`Network error (${response.status})`);
         }
-        
-        throw new Error('Server not reachable and no cached data available');
+        const data = await response.json();
+
+        // Persist fresh data into IndexedDB for offline use :contentReference[oaicite:4]{index=4}
+        await saveToIndexedDB(endpoint, params, data);
+        return data;
+      } catch (err) {
+        console.warn('DevMode network failed, falling back to cache:', err);
+        return getFromIndexedDB(endpoint, params);
       }
-      
-      // Server is reachable, fetch normally
-      const fetchOptions = {
+    }
+
+    // ===== 2) PRODUCTION MODE: Cache-first via IndexedDB =====
+
+    // 2a) Attempt to read from IndexedDB
+    try {
+      const cachedData = await getFromIndexedDB(endpoint, params);
+      debugLog('ProdMode: returning cached data immediately:', cachedData);
+      return cachedData;                     // Return if cache hit :contentReference[oaicite:5]{index=5}
+    } catch (_) {
+      // No cached data—fall through to network
+    }
+
+    // 2b) Network fetch, then cache result
+    try {
+      debugLog('ProdMode: network fetch:', url);
+      const options = {
         method,
         headers: { 'Content-Type': 'application/json' }
       };
-      if (method === 'POST') {
-        fetchOptions.body = JSON.stringify(params);
+      if (method === 'POST') options.body = JSON.stringify(params);
+
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`API error (${response.status})`);
       }
-      
-      return fetch(`${api_url}${endpoint}`, fetchOptions)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('API request failed');
-          }
-          return response.json();
-        })
-        .then(data => {
-          // Save to IndexedDB
-          saveToIndexedDB(endpoint, params, data).catch(err => {
-            console.warn('Could not save to IndexedDB:', err);
-          });
-          return data;
-        });
-    });
-}
+      const data = await response.json();
+
+      // Save fresh data into IndexedDB for next time :contentReference[oaicite:6]{index=6}
+      saveToIndexedDB(endpoint, params, data).catch(e =>
+        console.warn('Could not save to IndexedDB:', e)
+      );
+      return data;
+    } catch (err) {
+      console.error('ProdMode network failed, falling back to cache:', err);
+      return getFromIndexedDB(endpoint, params); // final fallback
+    }
+  }
 
   // Insert menu HTML into the DOM
   function insertMenuIntoDOM(menuHTML) {
