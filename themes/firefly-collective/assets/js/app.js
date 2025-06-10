@@ -395,8 +395,8 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
   }
 
   // Load menu function with robust error handling
-  function loadMenu() {
-    debugLog('Loading menu...');
+  function appInit() {
+    debugLog('Initializing App...');
     return fetchWithOfflineSupport('app-init', 'POST')
       .then(data => {
         if (!data.success) throw new Error('App init failed');
@@ -506,7 +506,7 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
     } else {
       document.body.classList.remove('is-offline');
       if (db) {
-        loadMenu();
+        appInit();
       }
     }
   }
@@ -522,11 +522,11 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
   initIndexedDB()
     .then(() => {
       debugLog('IndexedDB initialized, loading menu');
-      return loadMenu();
+      return appInit();
     })
     .catch(error => {
       console.error('Failed to initialize IndexedDB:', error);
-      loadMenu();
+      appInit();
     });
 
   // Preload menu data when online to ensure it's cached
