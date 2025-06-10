@@ -60,3 +60,25 @@
             'nonce'             => wp_create_nonce('wp_rest')
         ]);
     }
+
+    add_action('init', function() {
+        // Check if this is a request for the service worker
+        $request_uri = $_SERVER['REQUEST_URI'];
+        $sw_path = '/wp-content/themes/firefly-collective/service-worker.js';
+        
+        // Only intercept exact service worker requests
+        if (parse_url($request_uri, PHP_URL_PATH) === $sw_path) {
+            // Set headers to prevent caching
+            header('Cache-Control: no-cache, no-store, must-revalidate');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('Content-Type: application/javascript');
+            
+            // Read and output the service worker file
+            $file_path = get_template_directory() . '/service-worker.js';
+            if (file_exists($file_path)) {
+                readfile($file_path);
+                exit;
+            }
+        }
+    });

@@ -438,14 +438,63 @@ function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
         )
         .then(function(registration) {
           console.log('Service worker registration succeeded:', registration);
+          
+          // Check for updates immediately
+          registration.update();
+          
+          // Listen for updates
           registration.addEventListener('updatefound', () => {
-            debugLog('Service worker update found');
+            console.log('Service worker update found');
+            const newWorker = registration.installing;
+            
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New service worker ready - but DON'T auto-reload
+                console.log('New service worker ready! Refresh to get updates.');
+                // Just skip waiting, don't reload
+                newWorker.postMessage({ action: 'skipWaiting' });
+              }
+            });
           });
+          
+          // DON'T auto-reload on controller change - let user control refreshes
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('Service worker updated. New version will be used on next refresh.');
+          });
+          
+          // Check service worker periodically (but don't auto-reload)
+          setInterval(() => {
+            registration.update();
+          }, 60000); // Check every minute
         })
         .catch(function(error) {
           console.log('Service worker registration failed:', error);
         });
     });
+    
+    // Add dev helper to check service worker status
+    window.checkSW = function() {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        console.log('Service Worker Registrations:', registrations);
+        registrations.forEach(reg => {
+          console.log('Scope:', reg.scope);
+          console.log('Active:', reg.active);
+          console.log('Waiting:', reg.waiting);
+          console.log('Installing:', reg.installing);
+        });
+      });
+    };
+    
+    // Helper to force clear all caches
+    window.clearAllCaches = function() {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          caches.delete(name);
+          console.log('Deleted cache:', name);
+        });
+        console.log('All caches cleared');
+      });
+    };
   }
 
   // Check for network connection status

@@ -1,12 +1,19 @@
 // theme/service-worker.js
 
-// Use content hashing to detect changes automatically
+// DEV MODE TOGGLE - Set to true to always fetch fresh content
+const devMode = true;
+
+// Cache configuration
 const CACHE_PREFIX    = 'ffc-';
 const STATIC_CACHE    = `${CACHE_PREFIX}static`;
 const ASSETS_CACHE    = `${CACHE_PREFIX}assets`;
 const DYNAMIC_CACHE   = `${CACHE_PREFIX}dynamic`;
 const API_CACHE       = `${CACHE_PREFIX}api`;
+const METADATA_CACHE  = `${CACHE_PREFIX}metadata`;
 const theme_path      = '/wp-content/themes/firefly-collective';
+
+// Cache duration (1 hour in milliseconds)
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // API endpoints to cache separately
 const API_ROUTES = [
@@ -50,54 +57,130 @@ const ALL_ASSETS = [
 ];
 
 /**
- * Get a cache key that includes the resource's version
- * We simply use the plain URL, so cache.match works regardless of queries
+ * Store cache metadata (timestamp) 
  */
-async function getCacheKey(url) {
-  return url;
+async function setCacheMetadata(url, timestamp) {
+  const cache = await caches.open(METADATA_CACHE);
+  const metadata = new Response(JSON.stringify({ timestamp }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+  await cache.put(new Request(`${url}:metadata`), metadata);
+}
+
+/**
+ * Get cache metadata (timestamp)
+ */
+async function getCacheMetadata(url) {
+  const cache = await caches.open(METADATA_CACHE);
+  const response = await cache.match(new Request(`${url}:metadata`));
+  if (!response) return null;
+  try {
+    const data = await response.json();
+    return data.timestamp;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if cached response is expired
+ */
+async function isCacheExpired(url) {
+  if (devMode) return true; // Always expired in dev mode
+  
+  const timestamp = await getCacheMetadata(url);
+  if (!timestamp) return true;
+  
+  const age = Date.now() - timestamp;
+  return age > CACHE_DURATION;
+}
+
+/**
+ * Get cache key - simple in production, timestamped in dev
+ */
+function getCacheKey(url) {
+  // Remove any existing query params for consistent cache keys
+  const cleanUrl = url.split('?')[0];
+  
+  // In dev mode, add timestamp to bypass cache
+  if (devMode) {
+    return `${cleanUrl}?_dev=${Date.now()}`;
+  }
+  
+  // In production, use clean URL for stable cache keys
+  return cleanUrl;
+}
+
+/**
+ * Store a response in cache with metadata
+ */
+async function cacheWithMetadata(cacheName, url, response) {
+  const cache = await caches.open(cacheName);
+  const cacheKey = getCacheKey(url);
+  await cache.put(cacheKey, response.clone());
+  await setCacheMetadata(url, Date.now());
+  console.log(`[SW] Cached: ${cacheKey}`);
+}
+
+/**
+ * Get from cache
+ */
+async function getFromCache(url) {
+  const cacheKey = getCacheKey(url);
+  
+  // Try all caches
+  for (const cacheName of [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE, API_CACHE]) {
+    const cache = await caches.open(cacheName);
+    const response = await cache.match(cacheKey);
+    if (response) {
+      console.log(`[SW] Found in ${cacheName}: ${cacheKey}`);
+      return response;
+    }
+  }
+  
+  return null;
 }
 
 /**
  * Store a POST request and its response in the cache
- * Uses a special key format to handle POST requests with bodies
  */
 async function cachePostRequest(request, response) {
-  if (!request.clone().bodyUsed) {
-    try {
-      const body = await request.clone().json().catch(() => ({}));
-      const url = request.url;
-      const cacheKey = `${url}:${JSON.stringify(body)}`;
-      const cache = await caches.open(API_CACHE);
-      const modifiedRequest = new Request(cacheKey, {
-        method: 'POST',
-        headers: request.headers,
-        body: JSON.stringify(body),
-        mode: 'cors'
-      });
-      await cache.put(modifiedRequest, response.clone());
-      console.log('[SW] POST request cached:', cacheKey);
-      return true;
-    } catch (error) {
-      console.log('[SW] Failed to cache POST request:', error);
-      return false;
-    }
+  if (devMode) return false; // No caching in dev mode
+  
+  try {
+    const body = await request.clone().json().catch(() => ({}));
+    const url = request.url;
+    const cacheKey = `${url}:${JSON.stringify(body)}`;
+    const cache = await caches.open(API_CACHE);
+    await cache.put(new Request(cacheKey), response.clone());
+    await setCacheMetadata(cacheKey, Date.now());
+    console.log('[SW] POST request cached:', cacheKey);
+    return true;
+  } catch (error) {
+    console.log('[SW] Failed to cache POST request:', error);
+    return false;
   }
-  return false;
 }
 
 /**
  * Try to find a cached response for a POST request
  */
 async function getCachedPostResponse(request) {
+  if (devMode) return null; // Never use cache in dev mode
+  
   try {
     const body = await request.clone().json().catch(() => ({}));
     const url = request.url;
     const cacheKey = `${url}:${JSON.stringify(body)}`;
+    
     const cache = await caches.open(API_CACHE);
     const cachedResponse = await cache.match(new Request(cacheKey));
     if (cachedResponse) {
-      console.log('[SW] Found cached POST response:', cacheKey);
-      return cachedResponse;
+      const expired = await isCacheExpired(cacheKey);
+      if (!expired) {
+        console.log('[SW] Found valid cached POST response');
+        return cachedResponse;
+      }
     }
     return null;
   } catch (error) {
@@ -107,95 +190,73 @@ async function getCachedPostResponse(request) {
 }
 
 /**
- * Install event - cache initial assets but don't block activation
- * This allows the service worker to activate quickly
+ * Install event - cache initial assets
  */
 self.addEventListener('install', event => {
+  console.log(`[SW] Installing service worker, devMode: ${devMode}`);
+  
+  // Always skip waiting to activate immediately
   self.skipWaiting();
+  
+  // Skip caching in dev mode
+  if (devMode) {
+    console.log('[SW] Dev mode enabled - skipping initial cache');
+    return;
+  }
+  
+  console.log('[SW] Production mode - caching assets');
+  
   event.waitUntil(
     Promise.all([
       // Cache core assets
-      caches.open(STATIC_CACHE).then(cache => {
+      caches.open(STATIC_CACHE).then(async cache => {
+        console.log('[SW] Caching core assets...');
         return Promise.all(
           CORE_ASSETS.map(async url => {
-            const cacheKey = await getCacheKey(url);
-            const request = new Request(url);
-            return fetch(request).then(response => {
+            try {
+              const response = await fetch(url);
               if (response.ok) {
-                return cache.put(cacheKey, response);
+                await cacheWithMetadata(STATIC_CACHE, url, response);
               }
-            }).catch(error => {
+            } catch (error) {
               console.log(`[SW] Failed to cache ${url}:`, error);
-            });
+            }
           })
         );
       }),
-      // Cache audio assets
-      caches.open(ASSETS_CACHE).then(cache => {
-        return Promise.all(
-          AUDIO_ASSETS.map(async url => {
-            const cacheKey = await getCacheKey(url);
-            const request = new Request(url);
-            return fetch(request).then(response => {
-              if (response.ok) {
-                return cache.put(cacheKey, response);
-              }
-            }).catch(error => {
-              console.log(`[SW] Failed to cache ${url}:`, error);
-            });
-          })
-        );
-      }),
-      // Cache image assets (in batches)
+      // Cache other assets
       caches.open(ASSETS_CACHE).then(async cache => {
-        const batchSize = 5;
-        for (let i = 0; i < IMAGE_ASSETS.length; i += batchSize) {
-          const batch = IMAGE_ASSETS.slice(i, i + batchSize);
-          await Promise.all(
-            batch.map(async url => {
-              const cacheKey = await getCacheKey(url);
-              const request = new Request(url);
-              try {
-                const response = await fetch(request);
-                if (response.ok) {
-                  return cache.put(cacheKey, response);
-                }
-              } catch (error) {
-                console.log(`[SW] Failed to cache ${url}:`, error);
-              }
-            })
-          );
+        console.log('[SW] Caching other assets...');
+        const allOtherAssets = [...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS];
+        for (const url of allOtherAssets) {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              await cacheWithMetadata(ASSETS_CACHE, url, response);
+            }
+          } catch (error) {
+            console.log(`[SW] Failed to cache ${url}:`, error);
+          }
         }
       }),
-      // Cache font assets
-      caches.open(ASSETS_CACHE).then(cache => {
-        return Promise.all(
-          FONT_ASSETS.map(async url => {
-            const cacheKey = await getCacheKey(url);
-            const request = new Request(url);
-            return fetch(request).then(response => {
-              if (response.ok) {
-                return cache.put(cacheKey, response);
-              }
-            }).catch(error => {
-              console.log(`[SW] Failed to cache ${url}:`, error);
-            });
-          })
-        );
-      }),
-      // Create API cache (even if empty initially)
-      caches.open(API_CACHE)
-    ])
+      // Create other caches
+      caches.open(DYNAMIC_CACHE),
+      caches.open(API_CACHE),
+      caches.open(METADATA_CACHE)
+    ]).then(() => {
+      console.log('[SW] Installation complete');
+    })
   );
 });
 
 /**
- * Activate event - clean up old caches and take control immediately
+ * Activate event - clean up old caches
  */
 self.addEventListener('activate', event => {
+  console.log('[SW] Activating service worker');
   event.waitUntil(
     caches.keys().then(cacheNames => {
-      const validCaches = [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE, API_CACHE];
+      const validCaches = [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE, API_CACHE, METADATA_CACHE];
       return Promise.all(
         cacheNames
           .filter(name => name.startsWith(CACHE_PREFIX) && !validCaches.includes(name))
@@ -209,37 +270,7 @@ self.addEventListener('activate', event => {
 });
 
 /**
- * Background update function
- * We will only fetch from network if online, but otherwise skip
- */
-async function updateCacheInBackground(request) {
-  try {
-    const url = request.url;
-    let cacheName = DYNAMIC_CACHE;
-    if (CORE_ASSETS.some(asset => url.includes(asset))) {
-      cacheName = STATIC_CACHE;
-    } else if ([...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS].some(asset => url.includes(asset))) {
-      cacheName = ASSETS_CACHE;
-    } else if (API_ROUTES.some(route => url.includes(route))) {
-      cacheName = API_CACHE;
-    }
-    // If offline, skip network fetch entirely
-    if (!self.navigator.onLine) return null;
-    const cacheKey = await getCacheKey(url);
-    const response = await fetch(request).catch(() => null);
-    if (!response || !response.ok) return null;
-    const cache = await caches.open(cacheName);
-    await cache.put(cacheKey, response.clone());
-    return response;
-  } catch (error) {
-    console.log('[SW] Background update failed:', error);
-    return null;
-  }
-}
-
-/**
- * Main fetch handler - never fetch from network if offline;
- * always attempt cache-first, fallback to offline response.
+ * Fetch event handler
  */
 self.addEventListener('fetch', event => {
   const request = event.request;
@@ -250,16 +281,37 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Handle API requests specially
+  // In dev mode, always fetch from network
+  if (devMode) {
+    console.log('[SW] Dev mode fetch:', request.url);
+    event.respondWith(
+      fetch(request.clone()).catch(() => {
+        return new Response('Dev mode: Network request failed', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      })
+    );
+    return;
+  }
+
+  // Production mode - cache first strategy
+
+  // Handle API requests
   const isApiRequest = API_ROUTES.some(route => request.url.includes(route));
   if (isApiRequest) {
     if (request.method === 'POST') {
       event.respondWith(
         (async () => {
+          // Check cache first
+          const cachedResponse = await getCachedPostResponse(request);
+          if (cachedResponse) {
+            console.log('[SW] Serving POST from cache');
+            return cachedResponse;
+          }
+          
+          // Not in cache or expired, fetch from network
           if (!self.navigator.onLine) {
-            const cachedResponse = await getCachedPostResponse(request.clone());
-            if (cachedResponse) return cachedResponse;
-            // Tell app to use IndexedDB
             return new Response(JSON.stringify({
               success: false,
               message: 'Offline - check IndexedDB',
@@ -270,17 +322,15 @@ self.addEventListener('fetch', event => {
               headers: { 'Content-Type': 'application/json' }
             });
           }
+          
           try {
             const response = await fetch(request.clone());
-            const responseToCache = response.clone();
-            cachePostRequest(request.clone(), responseToCache);
+            await cachePostRequest(request.clone(), response.clone());
             return response;
           } catch {
-            const cachedResponse = await getCachedPostResponse(request.clone());
-            if (cachedResponse) return cachedResponse;
             return new Response(JSON.stringify({
               success: false,
-              message: 'You are offline. This feature requires an internet connection.',
+              message: 'Network error',
               _offline: true
             }), {
               status: 200,
@@ -292,32 +342,32 @@ self.addEventListener('fetch', event => {
       return;
     }
 
-    // GET API: cache-first, no network if offline
+    // GET API requests
     event.respondWith(
-      caches.match(request, { ignoreSearch: true }).then(async cachedResponse => {
+      (async () => {
+        // Check if cached and not expired
+        const cachedResponse = await getFromCache(request.url);
         if (cachedResponse) {
-          updateCacheInBackground(request);
-          return cachedResponse;
+          const expired = await isCacheExpired(request.url);
+          if (!expired) {
+            console.log('[SW] Serving API from cache (still fresh)');
+            return cachedResponse;
+          }
         }
-        if (!self.navigator.onLine) {
-          return new Response(JSON.stringify({
-            success: false,
-            message: 'You are offline.',
-            _offline: true
-          }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
+        
+        // Expired or not cached, fetch from network
         try {
           const response = await fetch(request);
-          if (response && response.ok) {
-            const responseToCache = response.clone();
-            const cache = await caches.open(API_CACHE);
-            cache.put(request, responseToCache);
+          if (response.ok) {
+            await cacheWithMetadata(API_CACHE, request.url, response);
           }
           return response;
         } catch {
+          // Offline - return stale cache if available
+          if (cachedResponse) {
+            console.log('[SW] Offline - serving stale API cache');
+            return cachedResponse;
+          }
           return new Response(JSON.stringify({
             success: false,
             message: 'You are offline.',
@@ -327,7 +377,7 @@ self.addEventListener('fetch', event => {
             headers: { 'Content-Type': 'application/json' }
           });
         }
-      })
+      })()
     );
     return;
   }
@@ -336,23 +386,31 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate' || request.headers.get('Accept')?.includes('text/html')) {
     event.respondWith(
       (async () => {
-        // Always serve cached root ("/") when offline
-        if (!self.navigator.onLine) {
-          const cachedShell = await caches.match('/app.html', { ignoreSearch: true });
-          return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
-            status: 503,
-            headers: { 'Content-Type': 'text/html' }
-          });
+        // Check cache first
+        const cachedResponse = await getFromCache(request.url);
+        if (cachedResponse) {
+          const expired = await isCacheExpired(request.url);
+          if (!expired) {
+            console.log('[SW] Serving HTML from cache (still fresh)');
+            return cachedResponse;
+          }
+          console.log('[SW] HTML cache expired, fetching fresh');
         }
-        // If online, fetch and update cache
+        
+        // Not cached or expired, fetch from network
         try {
-          const networkResponse = await fetch(request);
-          const cache = await caches.open(STATIC_CACHE);
-          cache.put('/app.html', networkResponse.clone());
-          return networkResponse;
+          const response = await fetch(request);
+          if (response.ok) {
+            await cacheWithMetadata(STATIC_CACHE, request.url, response);
+          }
+          return response;
         } catch {
-          const cachedShell = await caches.match('/app.html', { ignoreSearch: true });
-          return cachedShell || new Response('App is offline. Please try again when you have a network connection.', {
+          // Offline - return stale cache if available
+          if (cachedResponse) {
+            console.log('[SW] Offline - serving stale HTML cache');
+            return cachedResponse;
+          }
+          return new Response('App is offline. Please try again when you have a network connection.', {
             status: 503,
             headers: { 'Content-Type': 'text/html' }
           });
@@ -362,68 +420,76 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // All other assets (JS, CSS, images, etc.) – cache-first, never network-fetch if offline
+  // All other assets (JS, CSS, images, etc.)
   event.respondWith(
-    caches.match(request, { ignoreSearch: true }).then(async cachedResponse => {
+    (async () => {
+      // Always check cache first in production
+      const cachedResponse = await getFromCache(request.url);
+      
       if (cachedResponse) {
-        updateCacheInBackground(request);
-        return cachedResponse;
-      }
-      if (!self.navigator.onLine) {
-        // If offline and not in cache, respond with a generic offline placeholder
-        if (request.destination === 'image') {
-          return new Response('', { status: 404 });
+        const expired = await isCacheExpired(request.url);
+        if (!expired) {
+          console.log('[SW] Serving from cache (still fresh):', request.url);
+          return cachedResponse;
         }
-        return new Response('Resource currently unavailable offline', {
-          status: 408,
-          headers: { 'Content-Type': 'text/plain' }
-        });
+        console.log('[SW] Cache expired for:', request.url);
       }
+      
+      // Not in cache or expired - fetch from network
       try {
-        const networkResponse = await fetch(request);
-        const responseToCache = networkResponse.clone();
-        const cacheName = AUDIO_ASSETS.some(asset => request.url.includes(asset)) ||
-                          IMAGE_ASSETS.some(asset => request.url.includes(asset)) ||
-                          FONT_ASSETS.some(asset => request.url.includes(asset))
-                        ? ASSETS_CACHE
-                        : DYNAMIC_CACHE;
-        const cache = await caches.open(cacheName);
-        const cacheKey = await getCacheKey(request.url);
-        cache.put(cacheKey, responseToCache);
-        return networkResponse;
-      } catch {
-        if (request.destination === 'image') {
-          return new Response('', { status: 404 });
+        console.log('[SW] Fetching from network:', request.url);
+        const response = await fetch(request);
+        
+        if (response.ok) {
+          // Determine cache name
+          let cacheName = DYNAMIC_CACHE;
+          if (CORE_ASSETS.some(asset => request.url.includes(asset))) {
+            cacheName = STATIC_CACHE;
+          } else if ([...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS].some(asset => request.url.includes(asset))) {
+            cacheName = ASSETS_CACHE;
+          }
+          
+          await cacheWithMetadata(cacheName, request.url, response);
         }
+        
+        return response;
+      } catch (error) {
+        console.log('[SW] Fetch failed:', error);
+        
+        // If offline and have stale cache, use it
+        if (cachedResponse) {
+          console.log('[SW] Offline - serving stale cache');
+          return cachedResponse;
+        }
+        
         return new Response('Resource currently unavailable offline', {
           status: 408,
           headers: { 'Content-Type': 'text/plain' }
         });
       }
-    })
+    })()
   );
 });
 
 /**
  * Listen for messages from the main thread
- * This is kept minimal since we want updates to happen automatically
  */
 self.addEventListener('message', event => {
   const message = event.data;
+  
   if (message && message.action === 'skipWaiting') {
     self.skipWaiting();
   }
+  
+  if (message && message.action === 'checkDevMode') {
+    console.log('[SW] Dev mode is:', devMode ? 'ENABLED' : 'DISABLED');
+  }
+  
   if (message && message.action === 'refreshCache') {
     event.waitUntil(
-      Promise.all(ALL_ASSETS.map(url => updateCacheInBackground(new Request(url))))
-        .then(() => console.log('[SW] Cache refreshed successfully'))
-    );
-  }
-  if (message && message.action === 'clearApiCache') {
-    event.waitUntil(
-      caches.open(API_CACHE).then(cache =>
-        cache.keys().then(keys => Promise.all(keys.map(key => cache.delete(key))))
-      ).then(() => console.log('[SW] API cache cleared successfully'))
+      caches.keys().then(cacheNames => 
+        Promise.all(cacheNames.map(name => caches.delete(name)))
+      ).then(() => console.log('[SW] All caches cleared'))
     );
   }
 });
