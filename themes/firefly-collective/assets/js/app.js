@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Debug logging function
   function debugLog(message, data = null) {
+    return;
     console.log(`[PWA Debug] ${message}`, data || '');
   }
 
@@ -165,11 +166,33 @@ document.addEventListener('DOMContentLoaded', function () {
     if (navElement) {
       navElement.innerHTML = menuHTML;
       debugLog('Menu HTML inserted into DOM');
+      
+      const navAnchors = document.querySelectorAll('body > nav a');
+      for (anchor of navAnchors) {
+        const anchorText = anchor.innerText;
+        const anchorSlug = anchorText.replace(/\s/, '-').toLowerCase();
+        anchor.parentElement.innerHTML = `<div class="app-nav" id="${anchorSlug}">${anchorText}</div>`;
+        
+        const appNavItem = document.querySelector(`#${anchorSlug}`);
+        appNavItem.addEventListener('pointerup', ()=>{
+          closeWebsiteMenu();
+          loadContent(anchorSlug);
+        });
+      }
+
       window.navData = { auth_id: '' }; // fake navData for nav.js
       setupNavigation();
       return true;
     }
     return false;
+  }
+
+  function loadContent(navSlug) {
+    switch (navSlug) {
+      case 'log-in':
+        loadLoginForm();
+        break;
+    }
   }
 
   // Setup navigation functionality directly
@@ -337,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (isPWA) {
           insertMenuIntoDOM(data.menu_html);
           appRoot.innerHTML = data.front_page_html;
+          window.gapiDomain = data.gapiDomain;
         }
       })
       .catch(error => {
@@ -481,4 +505,56 @@ document.addEventListener('DOMContentLoaded', function () {
       openWebsiteMenu();
     }
   });
+
+  // Login form
+  function loadLoginForm() {
+    const loginFormHTML = `
+      <div class="login-container">
+        <form class="login-form">
+          <h2 class="form-title">Log in</h2>
+
+          <div class="input-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter your username" required>
+          </div>
+
+          <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter your password" required>
+          </div>
+
+          <button type="submit" class="btn login-btn">Log In</button>
+
+          <div class="divider"><span>OR</span></div>
+
+          <button type="button" id="google-signin" class="btn google-btn">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
+            Sign in with Google
+          </button>
+        </form>
+      </div>
+    `;
+    appRoot.innerHTML = loginFormHTML;
+
+    handleGoogleAuth();
+  }
+
+  function loginUser(user_id) {
+    alert(user_id);
+    // Example implementation:
+    saveToIndexedDB('user-auth', {}, { auth_id: user_id })
+      .then(() => {
+        console.log('User authenticated:', user_id);
+        // Update navigation to show logged-in state
+        window.navData.auth_id = user_id;
+        setupNavigation();
+        // Optionally redirect or load dashboard
+        appRoot.innerHTML = '<h2>Welcome! You are now logged in.</h2>';
+      })
+      .catch(error => {
+        console.error('Failed to save auth:', error);
+      });
+  }
+  window.loginUser = loginUser;
+
 });

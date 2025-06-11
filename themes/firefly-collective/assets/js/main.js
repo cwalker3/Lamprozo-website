@@ -21,9 +21,9 @@ function isValidPhoneNumber(phoneNumber) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (isPWA) return;
     logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
-
-    if (!isPWA) handleContactSticky();
+    handleContactSticky();
     function handleContactSticky() {
         if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard') return;
         const contactSticky = document.querySelector('#contact-sticky');

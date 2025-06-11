@@ -230,13 +230,17 @@
             setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
         }
         
-        $html = '<script>
+        $html = '
+                <div style="width: 100%; height: 100%; display: grid; place-content: center;">
+                    <h2>Successfully authenticated!</h2>
+                    <button onpointerup="window.close();">Close this window</button>
+                </div>
+                <script>
                     var encryptedUserId = "' . esc_js($encrypted_user_id) . '";
                     window.opener.postMessage(
                         { type: "googleSignupSuccess", message: "Sign-in successful!", auth_id: encryptedUserId },
                         "*"
                     );
-                    window.opener.location.href = "/dashboard";
                     setTimeout(function(){ window.close(); }, 500);
                 </script>';
         

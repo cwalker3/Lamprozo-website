@@ -17,18 +17,11 @@ main {
     padding: 1rem;
 }
 
-#test-btn {
-    background-color: #4CAF50;
-    border: none;
+.app-nav {
     color: white;
-    padding: 10px 20px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 16px;
-    margin: 1rem 0;
-    cursor: pointer;
-    border-radius: 4px;
+    padding: 1rem;
+    text-align: right;
+    user-select: none;
 }
 
 /* PWA-specific adjustments to nav */
@@ -58,6 +51,122 @@ body > nav a {
 #site-name {
     color: white;
     font-weight: bold;
+}
+
+/* Container to center the form */
+.login-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* The card-like form */
+.login-form {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 320px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Form title */
+.form-title {
+  margin-bottom: 1.5rem;
+  color: #333333;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Input groups */
+.input-group {
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #555555;
+}
+.input-group input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.input-group input:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* Common button styles */
+.btn {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn:hover {
+  opacity: 0.9;
+}
+
+/* Primary login button */
+.login-btn {
+  background-color: #007bff;
+  color: #ffffff;
+  margin-bottom: 1rem;
+}
+
+/* Divider with “OR” text */
+.divider {
+  position: relative;
+  text-align: center;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  color: #888888;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: #dddddd;
+}
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+
+/* Google sign-in button */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid #dddddd;
+}
+.google-btn img {
+  width: 20px;
+  height: 20px;
+  margin-right: 0.5rem;
+}
+
+#loader {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 75px;
 }
 
 /* PWA-specific overrides for nav.css */

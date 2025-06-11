@@ -57,7 +57,8 @@
             'success'           => true,
             'menu_html'         => $menu_html,
             'front_page_html'   => $front_page_html,
-            'nonce'             => wp_create_nonce('wp_rest')
+            'nonce'             => wp_create_nonce('wp_rest'),
+            'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN
         ]);
     }
 
