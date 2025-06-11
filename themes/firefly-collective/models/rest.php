@@ -48,13 +48,13 @@
         register_rest_route('custom-api/v1', '/update-profile', array(
             'methods'             => 'POST',
             'callback'            => 'handle_profile_update',
-            'permission_callback' => 'verify_rest_nonce',
+            'permission_callback' => 'verify_auth_id',
         ));
         
         register_rest_route('custom-api/v1', '/reset-password', array(
             'methods'             => 'POST',
             'callback'            => 'handle_password_reset',
-            'permission_callback' => 'verify_rest_nonce',
+            'permission_callback' => 'verify_auth_id',
         ));
         
         register_rest_route('custom-api/v1', '/google-auth-init', array(
@@ -74,6 +74,12 @@
             'callback'            => 'app_init',
             'permission_callback' => '__return_true',
         ));
+
+        register_rest_route('custom-api/v1', '/app-get-view', array(
+            'methods'             => 'POST',
+            'callback'            => 'app_get_view',
+            'permission_callback' => '__return_true'
+        ));
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');
 
@@ -84,3 +90,24 @@
         }
         return true;
     }
+
+    function verify_auth_id( WP_REST_Request $request ) {
+        if ( empty( $_COOKIE['auth_id'] ) ) {
+            return false;
+        }
+
+        $raw_cookie = sanitize_text_field( $_COOKIE['auth_id'] );
+        $decrypted  = decrypt_with_auth_key( $raw_cookie );
+
+        $uid  = intval( $decrypted );
+        $user = get_user_by( 'id', $uid );
+
+        if ( $uid && $user ) {
+            wp_set_current_user( $uid );
+            wp_set_auth_cookie(  $uid, true, is_ssl() );
+            return true;
+        }
+
+        return false;
+    }
+

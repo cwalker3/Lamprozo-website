@@ -25,11 +25,13 @@ const CORE_ASSETS = [
   theme_path + '/views/app.html',
   theme_path + '/assets/css/main.css',
   theme_path + '/assets/css/app.css',
+  theme_path + '/assets/css/dashboard.css',
   theme_path + '/assets/css/animations.css',
   theme_path + '/assets/css/nav.css',
   theme_path + '/assets/js/app.js',
   theme_path + '/assets/js/nav.js',
   theme_path + '/assets/js/main.js',
+  theme_path + '/assets/js/dashboard.js',
   theme_path + '/assets/js/manifest.json',
 ];
 

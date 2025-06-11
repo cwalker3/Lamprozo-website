@@ -21,7 +21,7 @@ function isValidPhoneNumber(phoneNumber) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    if (isPWA) return;
+    if ( isPWA || window.location.href.includes('login.php') ) return;
     logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
     handleContactSticky();
     function handleContactSticky() {

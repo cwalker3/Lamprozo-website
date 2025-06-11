@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const STORE_NAME = 'api-responses';
   let db;
 
+  const loader = document.querySelector('#loader');
+
   // Debug logging function
   function debugLog(message, data = null) {
     return;
@@ -104,17 +106,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const options = {
           method,
           headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store'                     // bypass HTTP + SW caches :contentReference[oaicite:3]{index=3}
+          cache: 'no-store'                     // bypass HTTP + SW caches
         };
         if (method === 'POST') options.body = JSON.stringify(params);
 
-        const response = await fetch(url, options);
+        const response = await fetch(url, options);  // The actual fetch
         if (!response.ok) {
           throw new Error(`Network error (${response.status})`);
         }
         const data = await response.json();
+        setAuthId(data.auth_id);
+        setAppData({
+          api_url: data.api_url,
+          nonce: data.nonce
+        });
 
-        // Persist fresh data into IndexedDB for offline use :contentReference[oaicite:4]{index=4}
+        // Persist fresh data into IndexedDB for offline use
         await saveToIndexedDB(endpoint, params, data);
         return data;
       } catch (err) {
@@ -129,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
     try {
       const cachedData = await getFromIndexedDB(endpoint, params);
       debugLog('ProdMode: returning cached data immediately:', cachedData);
-      return cachedData;                     // Return if cache hit :contentReference[oaicite:5]{index=5}
+      return cachedData;                     // Return if cache hit
     } catch (_) {
       // No cached data—fall through to network
     }
@@ -143,13 +150,18 @@ document.addEventListener('DOMContentLoaded', function () {
       };
       if (method === 'POST') options.body = JSON.stringify(params);
 
-      const response = await fetch(url, options);
+      const response = await fetch(url, options); // The actual fetch
       if (!response.ok) {
         throw new Error(`API error (${response.status})`);
       }
       const data = await response.json();
+      setAuthId(data.auth_id);
+      setAppData({
+          api_url: data.api_url,
+          nonce: data.nonce
+        })
 
-      // Save fresh data into IndexedDB for next time :contentReference[oaicite:6]{index=6}
+      // Save fresh data into IndexedDB for next time
       saveToIndexedDB(endpoint, params, data).catch(e =>
         console.warn('Could not save to IndexedDB:', e)
       );
@@ -157,6 +169,50 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (err) {
       console.error('ProdMode network failed, falling back to cache:', err);
       return getFromIndexedDB(endpoint, params); // final fallback
+    }
+  }
+
+  function setAuthId(id) {
+    window.navData = { auth_id: id };
+    window.auth_id = id;
+  }
+
+  function setAppData(data) {
+    window.api_url  = data.api_url;
+    window.nonce    = data.nonce;
+  }
+
+  async function getView(view) {
+    loader.style.display = 'block';
+    try {
+      const url = `${window.api_url}app-get-view`;
+      const options = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+      };
+      options.body = JSON.stringify({ view });
+
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        throw new Error(`Network error (${response.status})`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        loader.style.display = 'none';
+        window.nonce       = data.nonce;
+        window.theme_path  = data.theme_path;
+        window.features    = data.features;
+        window.stripeKey   = data.stripeKey;
+
+        appRoot.innerHTML = data.response_html;
+      }
+    } catch (err) {
+      loader.style.display = 'none';
+      console.warn('the network failed:', err);
     }
   }
 
@@ -179,18 +235,25 @@ document.addEventListener('DOMContentLoaded', function () {
           loadContent(anchorSlug);
         });
       }
-
-      window.navData = { auth_id: '' }; // fake navData for nav.js
+      
       setupNavigation();
       return true;
     }
     return false;
   }
 
-  function loadContent(navSlug) {
+  async function loadContent(navSlug) {
     switch (navSlug) {
       case 'log-in':
         loadLoginForm();
+        break;
+
+      case 'dashboard':
+        await getView('dashboard');
+
+        if (document.getElementById('features-container')) {
+            window.initializeDashboard();
+        }
         break;
     }
   }
@@ -355,11 +418,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function appInit() {
     debugLog('Initializing App...');
     return fetchWithOfflineSupport('app-init', 'POST')
-      .then(data => {
+      .then(async data => {
         if (!data.success) throw new Error('App init failed');
         if (isPWA) {
           insertMenuIntoDOM(data.menu_html);
-          appRoot.innerHTML = data.front_page_html;
+          if (!window.auth_id) loadLoginForm();
+          if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
           window.gapiDomain = data.gapiDomain;
         }
       })
@@ -540,20 +604,34 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function loginUser(user_id) {
-    alert(user_id);
-    // Example implementation:
-    saveToIndexedDB('user-auth', {}, { auth_id: user_id })
-      .then(() => {
-        console.log('User authenticated:', user_id);
-        // Update navigation to show logged-in state
-        window.navData.auth_id = user_id;
-        setupNavigation();
-        // Optionally redirect or load dashboard
-        appRoot.innerHTML = '<h2>Welcome! You are now logged in.</h2>';
-      })
-      .catch(error => {
-        console.error('Failed to save auth:', error);
-      });
+      // Set auth_id
+      window.auth_id = user_id;
+      window.navData = { auth_id: user_id };
+      
+      // Save to IndexedDB
+      saveToIndexedDB('user-auth', {}, { auth_id: user_id })
+        .then(async () => {
+          console.log('User authenticated:', user_id);
+          
+          // Update navigation
+          setupNavigation();
+          
+          // Load dashboard view
+          await getView('dashboard');
+          
+          // Dashboard.js is already loaded, but its DOMContentLoaded won't fire again
+          // So we need to manually initialize it
+          setTimeout(() => {
+              if (window.initializeDashboard) {
+                  window.initializeDashboard();
+              } else {
+                  console.error('Dashboard initialization function not found');
+              }
+          }, 100);
+        })
+        .catch(error => {
+          console.error('Failed to save auth:', error);
+        });
   }
   window.loginUser = loginUser;
 

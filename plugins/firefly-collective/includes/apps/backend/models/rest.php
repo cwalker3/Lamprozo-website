@@ -82,7 +82,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_place_order',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_auth_id'
             )
         );
 
@@ -182,7 +182,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_create_payment_intent',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_auth_id'
             )
         );
 
@@ -202,7 +202,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_update_payment_status',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_auth_id'
             )
         );
 

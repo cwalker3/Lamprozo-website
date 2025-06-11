@@ -85,7 +85,6 @@
 
         // Dashboard
         if (determine_view() === 'dashboard') {
-            global $features_options_addons;
             $features_options_addons = get_features_options_addons();
             $theme_path = get_template_directory_uri();
             
@@ -186,8 +185,9 @@
         $theme_path = get_template_directory_uri();
         $nonce = wp_create_nonce('wp_rest');
         wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $nonce);
-        wp_enqueue_script('auth', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
-        wp_localize_script('auth', 'myApi', array(
+        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $nonce, true);
+        wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
+        wp_localize_script('auth-js', 'myApi', array(
             'nonce'     => $nonce,
             'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
         ));
