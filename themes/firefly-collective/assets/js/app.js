@@ -417,6 +417,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Load menu function with robust error handling
   function appInit() {
     debugLog('Initializing App...');
+    loader.style.display = 'block';
     return fetchWithOfflineSupport('app-init', 'POST')
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
@@ -425,6 +426,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!window.auth_id) loadLoginForm();
           if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
           window.gapiDomain = data.gapiDomain;
+          loader.style.display = 'none';
         }
       })
       .catch(error => {
