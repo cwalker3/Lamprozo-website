@@ -67,19 +67,19 @@
         $theme_path_web = get_template_directory_uri();
         $nonce = wp_create_nonce('wp_rest');
 
+        // Set up the context that your view expects
+        global $current_user;
+        $decrypted = decrypt_with_auth_key( sanitize_text_field( $_COOKIE['auth_id'] ) );
+        $uid = intval( $decrypted );
+        if ( $uid && get_user_by('id', $uid) ) {
+            wp_set_current_user($uid);
+            wp_set_auth_cookie($uid, true, is_ssl());
+        }
+        wp_get_current_user(); // Ensure current user is populated
+
         switch ($view) {
             case 'dashboard':
                 $features_options_addons = get_features_options_addons();
-                
-                // Set up the context that your view expects
-                global $current_user;
-                $decrypted = decrypt_with_auth_key( sanitize_text_field( $_COOKIE['auth_id'] ) );
-                $uid = intval( $decrypted );
-                if ( $uid && get_user_by('id', $uid) ) {
-                    wp_set_current_user($uid);
-                    wp_set_auth_cookie($uid, true, is_ssl());
-                }
-                wp_get_current_user(); // Ensure current user is populated
                 
                 // Get the dashboard page from WordPress
                 $dashboard_page = get_page_by_path('dashboard');
