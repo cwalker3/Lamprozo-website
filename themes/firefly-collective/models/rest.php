@@ -48,13 +48,13 @@
         register_rest_route('custom-api/v1', '/update-profile', array(
             'methods'             => 'POST',
             'callback'            => 'handle_profile_update',
-            'permission_callback' => 'verify_auth_id',
+            'permission_callback' => 'verify_rest_request',
         ));
         
         register_rest_route('custom-api/v1', '/reset-password', array(
             'methods'             => 'POST',
             'callback'            => 'handle_password_reset',
-            'permission_callback' => 'verify_auth_id',
+            'permission_callback' => 'verify_rest_request',
         ));
         
         register_rest_route('custom-api/v1', '/google-auth-init', array(
@@ -91,23 +91,41 @@
         return true;
     }
 
-    function verify_auth_id( WP_REST_Request $request ) {
+    function verify_rest_request( WP_REST_Request $request ) {
+        // 1. Use WordPress’s logged-in cookie authentication
+        if ( ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
+            $cookie_value = sanitize_text_field( $_COOKIE[ LOGGED_IN_COOKIE ] );
+            $user_id      = wp_validate_auth_cookie( $cookie_value, 'logged_in' );
+
+            if ( $user_id ) {
+                wp_set_current_user( $user_id );
+                // Reset auth cookies for consistency
+                wp_set_auth_cookie( $user_id, true, is_ssl() );
+
+                // 2. Grant admin users immediately
+                if ( user_can( $user_id, 'manage_options' ) ) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Fallback: validate your custom auth_id cookie
         if ( empty( $_COOKIE['auth_id'] ) ) {
             return false;
         }
-
-        $raw_cookie = sanitize_text_field( $_COOKIE['auth_id'] );
-        $decrypted  = decrypt_with_auth_key( $raw_cookie );
-
-        $uid  = intval( $decrypted );
-        $user = get_user_by( 'id', $uid );
+        $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
+        $decrypted = decrypt_with_auth_key( $raw );
+        $uid       = intval( $decrypted );
+        $user      = get_user_by( 'id', $uid );
 
         if ( $uid && $user ) {
             wp_set_current_user( $uid );
-            wp_set_auth_cookie(  $uid, true, is_ssl() );
+            wp_set_auth_cookie( $uid, true, is_ssl() );
             return true;
         }
 
         return false;
     }
+
+
 

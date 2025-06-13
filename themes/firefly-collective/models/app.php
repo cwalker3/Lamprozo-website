@@ -18,7 +18,8 @@
         set_theme_mod('nav_menu_locations', $locations);
 
         $custom_links = array(
-            array('title' => 'Dashboard',         'url' => '/app.html'),
+            array('title' => 'Order History',     'url' => '#'),
+            array('title' => 'Dashboard',         'url' => '#'),
             array('title' => 'Log Out',           'url' => '#'),
             array('title' => 'Log In',            'url' => '#'),
         );
@@ -65,7 +66,9 @@
         $view = $params['view'];
         $theme_path = get_template_directory();
         $theme_path_web = get_template_directory_uri();
+        $plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $nonce = wp_create_nonce('wp_rest');
+        $api_url = esc_url_raw(rest_url('custom-api/v1/'));
 
         // Set up the context that your view expects
         global $current_user;
@@ -122,6 +125,27 @@
                     'stripeKey'         => $publishable_key
                 ]);
             break;
+
+            case 'order-history':
+                global $currentUserIdAdmin;
+                $currentUserIdAdmin = current_user_can('manage_options');
+
+                // Get orders view
+                ob_start();
+                include $plugin_path . '/views/orders.php';
+                $response_html = ob_get_clean();
+
+                $obj = new stdClass();
+
+                return rest_ensure_response([
+                    'success'           => true,
+                    'response_html'     => $response_html,
+                    'data'              => $obj,
+                    'apiUrl'            => $api_url,
+                    'nonce'             => $nonce,
+                    'view_path'         => $plugin_path . '/views/orders.php'
+                ]);
+                break;
         }
     }
 

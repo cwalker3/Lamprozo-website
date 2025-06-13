@@ -1,19 +1,6 @@
 <?php
 
     // theme/models/rest.php
-    
-    function verify_rest_nonce_and_login( WP_REST_Request $request ) {
-        if ( ! function_exists( 'verify_rest_nonce' ) ) {
-            return false;
-        }
-        if ( ! verify_rest_nonce( $request ) ) {
-            return false;
-        }
-        if ( ! is_user_logged_in() ) {
-            return false;
-        }
-        return true;
-    }
 
     function register_plugin_custom_api_endpoints() {
         register_rest_route(
@@ -82,7 +69,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_place_order',
-                'permission_callback' => 'verify_auth_id'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -92,7 +79,7 @@
             array(
                 'methods'             => 'GET',
                 'callback'            => 'firefly_collective_get_orders',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -102,7 +89,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_delete_order',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -112,7 +99,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_update_order_status',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -122,7 +109,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_delete_orders_bulk',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -132,7 +119,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_update_orders_status_bulk',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -142,7 +129,7 @@
             array(
                 'methods'             => 'GET',
                 'callback'            => 'firefly_collective_get_features',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -152,7 +139,7 @@
             array(
                 'methods'             => 'GET',
                 'callback'            => 'firefly_collective_get_options',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -162,7 +149,7 @@
             array(
                 'methods'             => 'GET',
                 'callback'            => 'firefly_collective_get_addons',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -172,7 +159,7 @@
             array(
                 'methods'             => 'GET',
                 'callback'            => 'firefly_collective_get_users',
-                'permission_callback' => 'verify_rest_nonce_and_login'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -182,7 +169,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_create_payment_intent',
-                'permission_callback' => 'verify_auth_id'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -202,7 +189,7 @@
             array(
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_update_payment_status',
-                'permission_callback' => 'verify_auth_id'
+                'permission_callback' => 'verify_rest_request'
             )
         );
 
@@ -212,7 +199,7 @@
             [
                 'methods'             => 'POST',
                 'callback'            => 'firefly_collective_refund_payment',
-                'permission_callback' => 'verify_rest_nonce_and_login',
+                'permission_callback' => 'verify_rest_request',
             ]
         );
     }

@@ -3,16 +3,28 @@
 /**
  * Orders Management JavaScript
  */
+
+// Progressive web app check
+if (typeof isPWA === undefined) isPWA = ordersData.isPWA;
+isPWA = Boolean(Number(isPWA));
+
 document.addEventListener('DOMContentLoaded', function() {
     // Check if Vue is loaded and we're on the orders page
-    if (typeof Vue !== 'undefined' && document.getElementById('ffc-orders-app')) {
+    if (typeof Vue !== 'undefined' && document.getElementById('ffc-orders-app') && !isPWA) {
         initOrdersApp();
     }
 });
 
 function initOrdersApp() {
     const { createApp, ref, computed, onMounted, watch } = Vue;
-    
+
+    if (isPWA) {
+        ordersData = { 
+            nonce: window.nonce,
+            apiUrl: window.api_url
+        }
+    }
+
     createApp({
         setup() {
             // State management
@@ -92,7 +104,7 @@ function initOrdersApp() {
             });
             
             // Methods
-            function fetchOrders() {
+            async function fetchOrders() {
                 loading.value = true;
                 
                 const queryParams = new URLSearchParams({
@@ -108,67 +120,85 @@ function initOrdersApp() {
                 if (filters.value.dateTo) queryParams.append('date_to', filters.value.dateTo);
                 if (filters.value.search) queryParams.append('search', filters.value.search);
                 if (filters.value.orderID) queryParams.append('order_id', filters.value.orderID);
-                
-                fetch(`${ordersData.apiUrl}get-orders?${queryParams.toString()}`, {
-                    method: 'GET',
+
+                // Prepare request
+                const url = `${ordersData.apiUrl}get-orders?${queryParams.toString()}&auth_id=${window.auth_id}`;
+                const options = {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-WP-Nonce': ordersData.nonce
                     }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        orders.value = data.orders;
-                        pagination.value.totalItems = data.total;
-                        pagination.value.totalPages = Math.ceil(data.total / pagination.value.perPage);
-                        
-                        // If current page is greater than total pages, go to last page
-                        if (pagination.value.currentPage > pagination.value.totalPages && pagination.value.totalPages > 0) {
-                            changePage(pagination.value.totalPages);
-                            return;
-                        }
-                    } else {
-                        console.error('Error fetching orders:', data.message);
+                };
+
+                try {
+                    const response = await fetch(url, options);
+
+                    // If we got a 403 specifically, handle it first
+                    if (response.status === 403) {
+                        console.error('You\'re not authorized.');
+                        return;
+                    }
+
+                    // For any non-2xx status, attempt to pull an error message from JSON
+                    if (!response.ok) {
+                        let errMsg = response.statusText; // fallback
+                    try {
+                        const errJson = await response.json();
+                        // adjust these keys to whatever your API returns
+                        errMsg = errJson.error || errJson.message || errMsg;
+                    } catch (e) {
+                        // non-JSON body or parse failed; keep statusText
+                    }
+                        console.error(`Error (${response.status}): ${errMsg}`);
+                        return;
+                    }
+
+                    // Success path
+                    const data = await response.json();
+
+                    orders.value = data.orders;
+                    pagination.value.totalItems = data.total;
+                    pagination.value.totalPages = Math.ceil(data.total / pagination.value.perPage);
+                    
+                    // If current page is greater than total pages, go to last page
+                    if (pagination.value.currentPage > pagination.value.totalPages && pagination.value.totalPages > 0) {
+                        changePage(pagination.value.totalPages);
+                        return;
                     }
                     loading.value = false;
-                })
-                .catch(error => {
+                }
+                catch (error) {
                     console.error('Error fetching orders:', error);
                     loading.value = false;
-                });
+                }
             }
             
             function fetchLookupData() {
                 // Fetch features, options, addons, and users in parallel
                 Promise.all([
-                    fetch(`${ordersData.apiUrl}get-features`, {
+                    fetch(`${ordersData.apiUrl}get-features/?auth_id=${window.auth_id}`, {
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-WP-Nonce': ordersData.nonce
+                            'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-options`, {
+                    fetch(`${ordersData.apiUrl}get-options/?auth_id=${window.auth_id}`, {
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-WP-Nonce': ordersData.nonce
+                            'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-addons`, {
+                    fetch(`${ordersData.apiUrl}get-addons/?auth_id=${window.auth_id}`, {
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-WP-Nonce': ordersData.nonce
+                            'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-users`, {
+                    fetch(`${ordersData.apiUrl}get-users/?auth_id=${window.auth_id}`, {
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-WP-Nonce': ordersData.nonce
+                            'Content-Type': 'application/json'
                         }
                     }).then(response => response.json())
+                    
                 ])
                 .then(([featuresData, optionsData, addonsData, usersData]) => {
                     if (featuresData.success) features.value = featuresData.features;
@@ -477,11 +507,11 @@ function initOrdersApp() {
                 fetch(`${ordersData.apiUrl}refund-payment`, {
                     method: 'POST',
                     headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': ordersData.nonce
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                    orderID: currentOrderId.value
+                        orderID: currentOrderId.value,
+                        auth_id: window.auth_id
                     })
                 })
                 .then(res => res.json())

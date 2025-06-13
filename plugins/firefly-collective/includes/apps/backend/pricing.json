@@ -35,7 +35,7 @@
                     },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 750,
+                    "staticPrice": 1050,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",

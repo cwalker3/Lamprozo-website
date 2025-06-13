@@ -200,15 +200,22 @@ document.addEventListener('DOMContentLoaded', function () {
         throw new Error(`Network error (${response.status})`);
       }
 
-      const data = await response.json();
-      if (data.success) {
+      const dataResponse = await response.json();
+      if (dataResponse.success) {
         loader.style.display = 'none';
-        window.nonce       = data.nonce;
-        window.theme_path  = data.theme_path;
-        window.features    = data.features;
-        window.stripeKey   = data.stripeKey;
+        switch (view) {
+          case 'dashboard':
+            window.theme_path  = dataResponse.theme_path;
+            window.features    = dataResponse.features;
+            window.stripeKey   = dataResponse.stripeKey;
+          break;
 
-        appRoot.innerHTML = data.response_html;
+          case 'order-history':
+            window.apiUrl      = dataResponse.apiUrl;
+            window.data        = dataResponse.data;
+          break;
+        }
+        appRoot.innerHTML = dataResponse.response_html;
       }
     } catch (err) {
       loader.style.display = 'none';
@@ -246,14 +253,22 @@ document.addEventListener('DOMContentLoaded', function () {
     switch (navSlug) {
       case 'log-in':
         loadLoginForm();
+        scrollToTop();
         break;
 
       case 'dashboard':
+        window.resetDashboard();
         await getView('dashboard');
-
         if (document.getElementById('features-container')) {
             window.initializeDashboard();
+            scrollToTop();
         }
+        break;
+
+      case 'order-history':
+        await getView('order-history');
+        initOrdersApp();
+        scrollToTop();
         break;
     }
   }
@@ -636,5 +651,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
   }
   window.loginUser = loginUser;
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
 });

@@ -27,6 +27,7 @@
         $hookName = '';
         $nonce   = wp_create_nonce('wp_rest');
         $api_url = get_rest_url(null, 'custom-api/v1/');
+        $theme_path = get_template_directory_uri();
         
         switch ($hook) {
 
@@ -71,6 +72,7 @@
 
                 // Enqueue CSS & JS
                 wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
+                wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
                 wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
                 wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
 
@@ -79,12 +81,16 @@
                 // Localize into JS
                 $nonce   = wp_create_nonce('wp_rest');
                 $api_url = get_rest_url(null, 'custom-api/v1/');
+                wp_localize_script('main-js', 'myApi', array(
+                    'themePath' => $theme_path
+                ));
                 wp_localize_script('orders-js', 'ordersData', array(
                     'data'   => $obj,
                     'nonce'  => $nonce,
                     'apiUrl' => $api_url,
                     'currentUserIsAdmin' => $currentUserIdAdmin,
-                    'currentUserId'      => get_current_user_id()
+                    'currentUserId'      => get_current_user_id(),
+                    'isPWA' => 0
                 ));
                 break;
 

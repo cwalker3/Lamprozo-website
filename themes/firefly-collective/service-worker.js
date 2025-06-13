@@ -11,6 +11,7 @@ const DYNAMIC_CACHE   = `${CACHE_PREFIX}dynamic`;
 const API_CACHE       = `${CACHE_PREFIX}api`;
 const METADATA_CACHE  = `${CACHE_PREFIX}metadata`;
 const theme_path      = '/wp-content/themes/firefly-collective';
+const plugin_path     = '/wp-content/plugins/firefly-collective/includes/apps/backend';
 
 // Cache duration (1 hour in milliseconds)
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -28,10 +29,12 @@ const CORE_ASSETS = [
   theme_path + '/assets/css/dashboard.css',
   theme_path + '/assets/css/animations.css',
   theme_path + '/assets/css/nav.css',
+  plugin_path + '/assets/css/orders.css',
   theme_path + '/assets/js/app.js',
   theme_path + '/assets/js/nav.js',
   theme_path + '/assets/js/main.js',
   theme_path + '/assets/js/dashboard.js',
+  plugin_path + '/assets/js/orders.js',
   theme_path + '/assets/js/manifest.json',
 ];
 
