@@ -256,6 +256,26 @@ document.addEventListener('DOMContentLoaded', function () {
         scrollToTop();
         break;
 
+      case 'log-out':
+        loader.style.display = 'block';
+        fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
+          headers: {
+              'Content-Type': 'application/json'
+          }
+        }).then(response => response.json())
+        .then(data => {
+          if (data.logout) {
+            loadLoginForm();
+            loader.style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('Error logging out:', error);
+          loader.style.display = 'none';
+        });
+        scrollToTop();
+        break;
+
       case 'dashboard':
         window.resetDashboard();
         await getView('dashboard');

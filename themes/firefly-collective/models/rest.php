@@ -80,6 +80,12 @@
             'callback'            => 'app_get_view',
             'permission_callback' => '__return_true'
         ));
+
+        register_rest_route('custom-api/v1', '/app-logout', array(
+            'methods'             => 'GET',
+            'callback'            => 'app_logout',
+            'permission_callback' => 'verify_rest_request'
+        ));
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');
 

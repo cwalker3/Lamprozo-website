@@ -149,6 +149,19 @@
         }
     }
 
+    function app_logout($request) {
+        wp_logout();
+
+        if ( isset( $_COOKIE['auth_id'] ) ) {
+            setcookie( 'auth_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+            unset( $_COOKIE['auth_id'] );
+        }
+
+        return rest_ensure_response([
+            'logout' => true
+        ]);
+    }
+
     add_action('init', function() {
         // Check if this is a request for the service worker
         $request_uri = $_SERVER['REQUEST_URI'];

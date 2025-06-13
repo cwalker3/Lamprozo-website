@@ -7,6 +7,10 @@ body {
     font-family: Arial, sans-serif;
 }
 
+main {
+  margin: 0 auto;
+}
+
 h1 {
     color: yellow;
     margin-top: 1rem;
