@@ -119,11 +119,13 @@
         if ( empty( $_COOKIE['auth_id'] ) ) {
             return false;
         }
+
         $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
         $decrypted = decrypt_with_auth_key( $raw );
         $uid       = intval( $decrypted );
         $user      = get_user_by( 'id', $uid );
 
+        // decrypt_with_auth_key() returns false on any tampering
         if ( $uid && $user ) {
             wp_set_current_user( $uid );
             wp_set_auth_cookie( $uid, true, is_ssl() );
