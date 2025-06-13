@@ -116,10 +116,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const data = await response.json();
         setAuthId(data.auth_id);
-        setAppData({
-          api_url: data.api_url,
-          nonce: data.nonce
-        });
+        setAppData(data);
 
         // Persist fresh data into IndexedDB for offline use
         await saveToIndexedDB(endpoint, params, data);
@@ -156,10 +153,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       const data = await response.json();
       setAuthId(data.auth_id);
-      setAppData({
-          api_url: data.api_url,
-          nonce: data.nonce
-        })
+      setAppData(data);
 
       // Save fresh data into IndexedDB for next time
       saveToIndexedDB(endpoint, params, data).catch(e =>
@@ -180,6 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function setAppData(data) {
     window.api_url  = data.api_url;
     window.nonce    = data.nonce;
+    window.http_host = data.http_host;
   }
 
   async function getView(view) {
@@ -233,14 +228,16 @@ document.addEventListener('DOMContentLoaded', function () {
       const navAnchors = document.querySelectorAll('body > nav a');
       for (anchor of navAnchors) {
         const anchorText = anchor.innerText;
-        const anchorSlug = anchorText.replace(/\s/, '-').toLowerCase();
+        const anchorSlug = anchorText.replace(/\s/g, '-').toLowerCase();
         anchor.parentElement.innerHTML = `<div class="app-nav" id="${anchorSlug}">${anchorText}</div>`;
         
         const appNavItem = document.querySelector(`#${anchorSlug}`);
-        appNavItem.addEventListener('pointerup', ()=>{
-          closeWebsiteMenu();
-          loadContent(anchorSlug);
-        });
+        if (appNavItem) {
+          appNavItem.addEventListener('pointerup', ()=>{
+            closeWebsiteMenu();
+            loadContent(anchorSlug);
+          });
+        }
       }
       
       setupNavigation();
@@ -251,6 +248,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function loadContent(navSlug) {
     switch (navSlug) {
+      case 'back-to-website':
+        window.location = `https://${window.http_host}`;
+        break;
+
       case 'log-in':
         loadLoginForm();
         scrollToTop();
@@ -381,15 +382,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Show/hide based on auth (if needed)
     if (window.navData && window.navData.auth_id) {
-      const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
-      const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
-      const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+      const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
+      const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
+      const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
+      const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
       const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
       const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
       if (signupBtn) signupBtn.style.display = 'none';
       if (loginBtn) loginBtn.style.display = 'none';
       if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
       if (dashboardBtn) dashboardBtn.style.display = 'block';
+      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
       if (logoutBtn) logoutBtn.style.display = 'block';
     }
     debugLog('Navigation setup complete');

@@ -20,6 +20,7 @@
         $custom_links = array(
             array('title' => 'Order History',     'url' => '#'),
             array('title' => 'Dashboard',         'url' => '#'),
+            array('title' => 'Back to Website',   'url' => '#'),
             array('title' => 'Log Out',           'url' => '#'),
             array('title' => 'Log In',            'url' => '#'),
         );
@@ -39,6 +40,7 @@
         $params = $request->get_params();
         $theme_path = get_template_directory_uri();
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
+        $http_host = $_SERVER['HTTP_HOST'];
 
         // Get menu HTML
         ob_start();
@@ -56,7 +58,8 @@
             'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
             'theme_path'        => $theme_path,
             'api_url'           => $api_url,
-            'auth_id'           => $_COOKIE['auth_id']
+            'auth_id'           => $_COOKIE['auth_id'],
+            'http_host'         => $http_host
         ]);
     }
 
@@ -122,7 +125,7 @@
                     'nonce'             => $nonce,
                     'features'          => $features_options_addons,
                     'theme_path'        => $theme_path_web,
-                    'stripeKey'         => $publishable_key
+                    'stripeKey'         => $publishable_key,
                 ]);
             break;
 
