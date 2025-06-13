@@ -19,6 +19,10 @@
     box-sizing: border-box;
 }
 
+h1 {
+    text-align: center;
+}
+
 /* Profile Section */
 #profile-container {
     width: 100%;
@@ -28,18 +32,34 @@
     border-radius: 5px;
     background: #1c1c1c;
     padding: 20px;
+    box-sizing: border-box;
 }
-#profile-container form {
-    display: flex;
-    flex-direction: column;
+
+#profile-container form,
+#profile-form {
+    display: grid;
+    grid-template-columns: 1fr; /* Force single column layout */
+    width: 70% !important; /* Use !important to override any conflicting styles */
+    margin: 0 auto;
+    box-sizing: border-box;
 }
+
+/* Remove place-content which can cause width issues */
+#profile-form > div {
+    width: 100%;
+    margin-block: .4rem;
+    box-sizing: border-box;
+}
+
 #profile-container input {
     width: 100%;
     padding: 8px;
     margin-bottom: 15px;
     border: 1px solid #ccc;
     border-radius: 3px;
+    box-sizing: border-box;
 }
+
 #profile-container button {
     width: 100%;
     padding: 8px;
@@ -49,13 +69,18 @@
     background: var(--primaryColor);
     color: #fff;
     cursor: pointer;
+    box-sizing: border-box;
 }
+
 #profile-container button:hover {
     background: var(--secondaryColor);
 }
+
 #profile-message {
     color: green;
     margin-bottom: 15px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Price Calculator Container */
@@ -810,13 +835,40 @@ td .feature-fields-list {
 }
 
 /* Responsive adjustments */
+@media (min-width: 800px) {
+    #profile-container,
+    #price-calculator,
+    #invoice-container {
+        width: 790px;
+    }
+
+    #price-calculator,
+    #invoice-container {
+        margin-top: 1rem;
+    }
+}
+
+@media (min-width: 1000px) {
+    #profile-container,
+    #price-calculator,
+    #invoice-container {
+        width: 900px;
+        margin: 0 auto;
+    }
+
+    #price-calculator,
+    #invoice-container {
+        margin-top: 1rem;
+    }
+}
+
 @media (max-width: 800px) {
     :root {
-        --profileMaxWidth: 300px;
+        --profileMaxWidth: 90vw;
     }
     #price-calculator,
     #invoice-container {
-        max-width: 95%;
+        width: 90vw;
     }
 }
 

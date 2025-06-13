@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
     logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
     handleContactSticky();
     function handleContactSticky() {
-        if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard') return;
+        if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard' || page === 'app') return;
         const contactSticky = document.querySelector('#contact-sticky');
         contactSticky.addEventListener('pointerup', ()=>{window.location='/request-a-quote';});
         let isVisible = false;
