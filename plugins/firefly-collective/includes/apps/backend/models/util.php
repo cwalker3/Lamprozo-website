@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/util.php
+
     function generateToken($length = 21) {
         $bytes = random_bytes($length);
         $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';

@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/db.php
+
     function firefly_collective_create_tables() {
         global $wpdb;
 

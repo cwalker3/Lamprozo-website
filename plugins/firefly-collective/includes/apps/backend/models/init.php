@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/init.php
+
     function enqueue_general_styles_and_scripts($hook) {
         $theme_path = get_template_directory_uri();
         $unique_id = uniqid();

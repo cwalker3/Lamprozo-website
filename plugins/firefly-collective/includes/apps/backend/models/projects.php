@@ -1,5 +1,5 @@
 <?php
-defined('ABSPATH') || exit; // Prevent direct access
+// plugin/models/projects.php
 
 /**
  * Add the Projects page to the WordPress admin menu.

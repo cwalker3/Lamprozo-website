@@ -1,5 +1,7 @@
 <?php
 
+    // plugin/models/bookings.php
+
     function enqueue_bookings_styles_and_scripts($hook) {
         // Check if we're on the 'My Bookings' admin page
         if ($hook !== 'toplevel_page_my-bookings') {

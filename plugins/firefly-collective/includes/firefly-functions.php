@@ -1,4 +1,6 @@
 <?php
+    
+    // plugin/functions.php
 
     // Ensure no direct access to the file
     if ( ! defined( 'ABSPATH' ) ) {
