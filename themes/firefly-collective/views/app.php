@@ -1,7 +1,6 @@
 <!-- theme/views/app.html -->
 
-<div id="app-root">
+<div id="app-root"></div>
 
-    <h1>This is the App</h1>
-
-</div>
+<div id="website-app"></div>
+<img src="/wp-content/themes/firefly-collective/images/loading.gif" id="loader">

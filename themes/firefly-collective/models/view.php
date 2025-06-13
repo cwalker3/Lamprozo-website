@@ -11,48 +11,55 @@
     }
 
     // Get assets for specific views
-    function get_view_assets($view) {
+    function get_view_assets($view, $theme_path, $plugin_path) {
         $assets = array();
         $assets['js'] = array();
         $assets['css'] = array();
-        $assets['location_type'] = 'theme';
 
         switch($view) {
             case 'blog':
-                $assets['js'][]     = 'assets/js/blog.js';
+                $assets['js'][]     = $theme_path . '/assets/js/blog.js';
                 break;
             
             case 'app':
-                $assets['css'][]    = 'assets/css/app.css';
-                $assets['js'][]     = 'assets/js/app.js';
+                $assets['css'][]    = $theme_path . '/assets/css/app.css';
+                $assets['css'][]    = $theme_path . '/assets/css/auth.css';
+                $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
+                $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
+                $assets['js'][]     = $theme_path . '/assets/js/main.js';
+                $assets['js'][]     = $theme_path . '/assets/js/auth.js';
+                $assets['js'][]     = $theme_path . '/assets/js/app.js';
+                $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';
+                $assets['js'][]     = $plugin_path . '/assets/js/orders.js';
+                $assets['js'][]     = 'https://js.stripe.com/v3/';
+                $assets['js'][]     = VUE_REMOTE_CORE;
                 break;
 
             case 'contact':
-                $assets['js'][]     = 'assets/js/contact.js';
+                $assets['js'][]     = $theme_path . '/assets/js/contact.js';
                 break;
 
             case 'signup':
-                $assets['js'][]     = 'assets/js/auth.js';
-                $assets['js'][]     = 'assets/js/signup.js';
+                $assets['js'][]     = $theme_path . '/assets/js/auth.js';
+                $assets['js'][]     = $theme_path . '/assets/js/signup.js';
                 break;
 
             case 'request-an-appointment':
-                $assets['css'][]    = 'assets/css/calendar.css';
-                $assets['js'][]     = 'assets/js/calendar.js';
-                $assets['js'][]     = 'assets/js/request-an-appointment.js';
+                $assets['css'][]    = $theme_path . '/assets/css/calendar.css';
+                $assets['js'][]     = $theme_path . '/assets/js/calendar.js';
+                $assets['js'][]     = $theme_path . '/assets/js/request-an-appointment.js';
                 break;
 
             case 'dashboard':
-                $assets['css'][]    = 'assets/css/auth.css';
-                $assets['css'][]    = 'assets/css/dashboard.css';
-                $assets['js'][]     = 'assets/js/dashboard.js';
+                $assets['css'][]    = $theme_path . '/assets/css/auth.css';
+                $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
+                $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';
                 $assets['js'][]     = 'https://js.stripe.com/v3/';
                 break;
             
             case 'order-history':
-                $assets['location_type'] = 'plugin';
-                $assets['css'][]    = 'assets/css/orders.css';
-                $assets['js'][]     = 'assets/js/orders.js';
+                $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
+                $assets['js'][]     = $plugin_path . '/assets/js/orders.js';
                 $assets['js'][]     = VUE_REMOTE_CORE;
                 break;
         }

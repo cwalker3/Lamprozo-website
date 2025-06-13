@@ -19,8 +19,10 @@ function handleGoogleAuth () {
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'googleSignupSuccess') {
 
+            const websiteApp = document.querySelector('#website-app'); 
+
             // App login
-            if (isPWA) {
+            if (isPWA || websiteApp) {
                 // From app.js
                 loginUser(event.data.auth_id);
                 return;

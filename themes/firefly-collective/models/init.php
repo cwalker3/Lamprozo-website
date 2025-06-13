@@ -50,27 +50,14 @@
             'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
         ));
 
-        $assets = get_view_assets( $current_view );
+        // Get dynamic asset paths
+        $assets = get_view_assets($current_view, $theme_path, $backend_plugin_path_web);
 
         // Enqueue CSS
-        enqueue_assets(
-            $assets['css'],
-            'css',
-            $assets['location_type'],
-            $theme_path,
-            $backend_plugin_path_web,
-            $unique_id
-        );
+        enqueue_assets($assets['css'], 'css', $unique_id);
 
         // Enqueue JS
-        enqueue_assets(
-            $assets['js'],
-            'js',
-            $assets['location_type'],
-            $theme_path,
-            $backend_plugin_path_web,
-            $unique_id
-        );
+        enqueue_assets($assets['js'], 'js', $unique_id);
 
         // Request an Appointment
         if (determine_view() === 'request-an-appointment') {
@@ -130,19 +117,10 @@
     // Hook into wp_head to print the manifest link in the <head> section
     add_action( 'wp_head', 'add_pwa_manifest' );
 
-    function enqueue_assets( array $files,
-                            string $type,
-                            string $location_type,
-                            string $theme_path,
-                            string $plugin_path_web,
-                            string $version ) {
+    function enqueue_assets( array $files, string $type, string $version ) {
         $suffix = $type === 'css' ? '-css' : '-js';
 
-        foreach ( $files as $file ) {
-            // pick correct base URL
-            $base = $location_type === 'plugin'
-                ? $plugin_path_web
-                : $theme_path;
+        foreach ( $files as $path ) {
 
             // remote?
             if ( false !== strpos( $file, '://' ) ) {
@@ -151,8 +129,8 @@
                 $name  = $parts[ count( $parts ) - 2 ];
                 $src   = $file;
             } else {
-                $name = pathinfo( $file, PATHINFO_FILENAME );
-                $src  = "{$base}/{$file}";
+                $name = pathinfo( $path, PATHINFO_FILENAME );
+                $src  = "{$path}";
             }
 
             $handle = $name . $suffix;

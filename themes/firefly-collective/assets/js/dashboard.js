@@ -15,9 +15,10 @@
             console.log('Dashboard elements not found, skipping initialization');
             return;
         }
-        
+
         isInitialized = true;
-        if (isPWA) {
+        const websiteApp = document.querySelector('#website-app');
+        if (isPWA || websiteApp) {
             myApi = {
                 nonce: window.nonce,
                 api_url: window.api_url
@@ -30,6 +31,7 @@
                 stripeKey: window.stripeKey
             }
         }
+
         // Global state: keys are feature type indexes; each value is an array of instance objects.
         // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
         let selections = {};

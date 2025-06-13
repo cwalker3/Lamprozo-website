@@ -36,6 +36,10 @@ body > nav ul > li:nth-last-of-type(2) {
     display: none;
 }
 
+body > nav ul > li:nth-last-of-type(3) {
+  display: block !important;
+}
+
 /* PWA-specific adjustments to nav */
 .offline-indicator {
     background-color: #ff4d4d;

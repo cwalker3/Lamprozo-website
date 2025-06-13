@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let db;
 
   const loader = document.querySelector('#loader');
+  const websiteApp = document.querySelector('#website-app');
 
   // Debug logging function
   function debugLog(message, data = null) {
@@ -459,13 +460,11 @@ document.addEventListener('DOMContentLoaded', function () {
     return fetchWithOfflineSupport('app-init', 'POST')
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
-        if (isPWA) {
-          insertMenuIntoDOM(data.menu_html);
-          if (!window.auth_id) loadLoginForm();
-          if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
-          window.gapiDomain = data.gapiDomain;
-          loader.style.display = 'none';
-        }
+        insertMenuIntoDOM(data.menu_html);
+        if (!window.auth_id) loadLoginForm();
+        if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
+        window.gapiDomain = data.gapiDomain;
+        loader.style.display = 'none';
       })
       .catch(error => {
         console.error('Failed to load menu:', error);
