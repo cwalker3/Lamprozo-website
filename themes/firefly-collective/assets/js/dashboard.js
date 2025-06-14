@@ -17,7 +17,6 @@
         }
 
         isInitialized = true;
-        const websiteApp = document.querySelector('#website-app');
         if (isPWA || websiteApp) {
             myApi = {
                 nonce: window.nonce,

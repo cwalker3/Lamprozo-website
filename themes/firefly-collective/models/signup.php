@@ -95,5 +95,8 @@
         wp_set_current_user($user_id);
         wp_set_auth_cookie($user_id, true, is_ssl());
 
-        return rest_ensure_response(array('redirect' => '/dashboard'));
+        return rest_ensure_response(array(
+                                    'redirect' => '/dashboard',
+                                    'auth_id'  => $encrypted_user_id
+                                ));
     }

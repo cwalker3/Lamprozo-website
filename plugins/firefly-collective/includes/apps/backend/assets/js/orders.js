@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function initOrdersApp() {
     const { createApp, ref, computed, onMounted, watch } = Vue;
 
-    const websiteApp = document.querySelector('#website-app');
     if (isPWA || websiteApp) {
         ordersData = { 
             nonce: window.nonce,

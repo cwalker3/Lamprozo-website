@@ -27,6 +27,7 @@
                 $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
                 $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
                 $assets['js'][]     = $theme_path . '/assets/js/main.js';
+                $assets['js'][]     = $theme_path . '/assets/js/signup.js';
                 $assets['js'][]     = $theme_path . '/assets/js/auth.js';
                 $assets['js'][]     = $theme_path . '/assets/js/app.js';
                 $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';

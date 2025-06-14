@@ -145,11 +145,77 @@
                     'response_html'     => $response_html,
                     'data'              => $obj,
                     'apiUrl'            => $api_url,
-                    'nonce'             => $nonce,
-                    'view_path'         => $plugin_path . '/views/orders.php'
+                    'nonce'             => $nonce
+                ]);
+                break;
+            
+            case 'signup':
+
+                // Get the dashboard page from WordPress
+                $signup_page = get_page_by_path('signup');
+                
+                if ($signup_page) {
+                    // Set up variables that the view expects
+                    $pageTitle = get_the_title($signup_page->ID);
+                    $postContent = apply_filters('the_content', $signup_page->post_content);
+                    $postID = $signup_page->ID;
+                } else {
+                    // Fallback if no dashboard page exists
+                    $pageTitle = 'Signup';
+                    $postContent = '';
+                    $postID = 0;
+                }
+
+                // Get orders view
+                ob_start();
+                include $theme_path . '/views/signup.php';
+                $response_html = ob_get_clean();
+
+                $obj = new stdClass();
+
+                return rest_ensure_response([
+                    'success'           => true,
+                    'response_html'     => $response_html,
+                    'apiUrl'            => $api_url,
+                    'nonce'             => $nonce
                 ]);
                 break;
         }
+    }
+
+    function app_login($request) {
+        $params = $request->get_params();
+        
+        // Validate required fields
+        if (empty($params['username']) || empty($params['password'])) {
+            return rest_ensure_response([
+                'success' => false,
+                'message' => 'Username and password are required'
+            ]);
+        }
+        
+        // Authenticate user
+        $user = wp_authenticate($params['username'], $params['password']);
+        
+        if (is_wp_error($user)) {
+            return rest_ensure_response([
+                'success' => false,
+                'message' => 'Invalid credentials'
+            ]);
+        }
+        
+        // Set auth cookies
+        $user_id = $user->ID;
+        $encrypted_user_id = encrypt_with_auth_key($user_id);
+        setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+        
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id, true, is_ssl());
+        
+        return rest_ensure_response([
+            'success' => true,
+            'auth_id' => $encrypted_user_id
+        ]);
     }
 
     function app_logout($request) {

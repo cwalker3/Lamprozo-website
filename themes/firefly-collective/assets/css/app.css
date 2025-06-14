@@ -88,6 +88,10 @@ body > nav a {
   text-align: center;
 }
 
+#login-error-msg {
+  color: rgb(143, 21, 21);
+}
+
 /* Form title */
 .form-title {
   margin-bottom: 1.5rem;
@@ -174,6 +178,11 @@ body > nav a {
   width: 20px;
   height: 20px;
   margin-right: 0.5rem;
+}
+
+#start-signup {
+  color: white;
+  background-color: rgb(58, 128, 58);
 }
 
 #loader {

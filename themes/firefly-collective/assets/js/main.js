@@ -1,6 +1,7 @@
 // theme/assets/js/main.js
 
 const appRoot = document.querySelector('#app-root');
+const websiteApp = document.querySelector('#website-app');
 let isPWA = false;
 if (document.querySelector('#pwa-flag')) isPWA = true;
 

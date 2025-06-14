@@ -176,6 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.api_url  = data.api_url;
     window.nonce    = data.nonce;
     window.http_host = data.http_host;
+    window.theme_path = data.theme_path;
   }
 
   async function getView(view) {
@@ -613,20 +614,24 @@ document.addEventListener('DOMContentLoaded', function () {
   function loadLoginForm() {
     const loginFormHTML = `
       <div class="login-container">
-        <form class="login-form">
+        <div class="login-form">
           <h2 class="form-title">Log in</h2>
+
+          <div id="login-error-msg"></div>
 
           <div class="input-group">
             <label for="username">Username</label>
-            <input type="text" id="username" placeholder="Enter your username" required>
+            <input id="app-username" type="text" placeholder="Enter your username" required>
           </div>
 
           <div class="input-group">
             <label for="password">Password</label>
-            <input type="password" id="password" placeholder="Enter your password" required>
+            <input id="app-password" type="password" placeholder="Enter your password" required>
           </div>
 
-          <button type="submit" class="btn login-btn">Log In</button>
+          <button type="submit" class="btn login-btn" id="app-login">Log In</button>
+
+          <button type="submit" class="btn" id="start-signup">Sign Up</button>
 
           <div class="divider"><span>OR</span></div>
 
@@ -634,10 +639,58 @@ document.addEventListener('DOMContentLoaded', function () {
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
             Sign in with Google
           </button>
-        </form>
+        </div>
       </div>
     `;
     appRoot.innerHTML = loginFormHTML;
+
+    const appLogin = document.querySelector('#app-login');
+    const appUsernameInput = document.querySelector('#app-username');
+    const appPasswordInput = document.querySelector('#app-password');
+    const loginErrorMsg = document.querySelector('#login-error-msg');
+    appLogin.addEventListener('pointerup', async () =>{
+      loader.style.display = 'block';
+      try {
+        const url = `${window.api_url}app-login`;
+        const options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username: appUsernameInput.value,
+            password: appPasswordInput.value
+          })
+        };
+
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`Network error (${response.status})`);
+        }
+
+        const dataResponse = await response.json();
+        if (dataResponse.success) {
+          loader.style.display = 'none';
+          loginUser(dataResponse.auth_id);
+          scrollToTop();
+        }
+        else {
+          loginErrorMsg.innerText = dataResponse.message;
+          loader.style.display = 'none';
+        }
+      } 
+      catch (err) {
+        loader.style.display = 'none';
+        console.warn('the network failed:', err);
+      }
+    });
+
+    const startSignup = document.querySelector('#start-signup');
+    startSignup.addEventListener('pointerup', async ()=>{
+      await getView('signup');
+      window.initializeSignup();
+      scrollToTop();
+    });
 
     handleGoogleAuth();
   }
@@ -646,7 +699,7 @@ document.addEventListener('DOMContentLoaded', function () {
       // Set auth_id
       window.auth_id = user_id;
       window.navData = { auth_id: user_id };
-      
+
       // Save to IndexedDB
       saveToIndexedDB('user-auth', {}, { auth_id: user_id })
         .then(async () => {
@@ -654,10 +707,11 @@ document.addEventListener('DOMContentLoaded', function () {
           
           // Update navigation
           setupNavigation();
-          
+
           // Load dashboard view
           await getView('dashboard');
-          
+          scrollToTop();
+          window.resetDashboard();
           // Dashboard.js is already loaded, but its DOMContentLoaded won't fire again
           // So we need to manually initialize it
           setTimeout(() => {

@@ -6,11 +6,11 @@
     <div class="signup-method">
         <label>
             <input type="radio" name="signup-method" value="direct" checked>
-            <?php esc_html_e('Direct Signup', 'alex-strait'); ?>
+            <?php esc_html_e('Direct Signup'); ?>
         </label>
         <label>
             <input type="radio" name="signup-method" value="third">
-            <?php esc_html_e('Sign in with Third Party', 'alex-strait'); ?>
+            <?php esc_html_e('Sign in with Third Party'); ?>
         </label>
     </div>
     <div id="direct-signup-fields">
@@ -20,12 +20,12 @@
         <input type="tel" placeholder="<?php esc_attr_e('Optional Phone'); ?>" id="signup-form-phone">
         <label>
             <input type="checkbox" id="enable-username-password">
-            <?php esc_html_e('Create a username and password', 'alex-strait'); ?>
+            <?php esc_html_e('Create a username and password'); ?>
         </label>
         <div id="username-password-fields" style="display:none;">
-            <input type="text" placeholder="<?php esc_attr_e('Username', 'alex-strait'); ?>" id="signup-form-username">
+            <input type="text" placeholder="<?php esc_attr_e('Username'); ?>" id="signup-form-username">
             <div class="password-field">
-                <input type="password" placeholder="<?php esc_attr_e('Password', 'alex-strait'); ?>" id="signup-form-password">
+                <input type="password" placeholder="<?php esc_attr_e('Password'); ?>" id="signup-form-password">
                 <span id="toggle-password" class="toggle-password">&#128065;</span>
             </div>
         </div>
@@ -41,7 +41,7 @@
             <label class="party-disabled"><input type="radio" name="third-party-provider" value="microsoft"> Microsoft</label>
         </div>
         <div id="google-signin-btn">
-            <button id="google-signin"><?php esc_html_e('Sign in with Google', 'alex-strait'); ?></button>
+            <button id="google-signin"><?php esc_html_e('Sign in with Google'); ?></button>
         </div>
     </div>
 </div>

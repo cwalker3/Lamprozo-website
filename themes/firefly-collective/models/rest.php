@@ -81,6 +81,12 @@
             'permission_callback' => '__return_true'
         ));
 
+        register_rest_route('custom-api/v1', '/app-login', array(
+            'methods'             => 'POST',
+            'callback'            => 'app_login',
+            'permission_callback' => '__return_true'
+        ));
+
         register_rest_route('custom-api/v1', '/app-logout', array(
             'methods'             => 'GET',
             'callback'            => 'app_logout',
