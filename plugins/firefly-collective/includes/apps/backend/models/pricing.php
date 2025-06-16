@@ -1,6 +1,6 @@
 <?php
 
-    // plugin/models/orders.php
+    // plugin/models/pricing.php
 
     /* ------------------------------ *
     * Admin Menu & Assets
