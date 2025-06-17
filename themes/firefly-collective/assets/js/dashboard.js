@@ -2930,10 +2930,11 @@
                 if (!response.ok) throw new Error('Failed to load subscriptions');
                 
                 const data = await response.json();
-                
+
+                smoothScrollToElement(subsManagementEl);
+
                 if (data.success && data.subscriptions.length > 0) {
                     renderSubscriptions(data.subscriptions);
-                    smoothScrollToElement(subsManagementEl);
                     container.style.display = 'block';
                 } else {
                     noSubs.style.display = 'block';
