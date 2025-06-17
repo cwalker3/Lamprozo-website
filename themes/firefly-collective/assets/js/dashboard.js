@@ -3169,6 +3169,10 @@
             document.addEventListener('DOMContentLoaded', addSubscriptionsTab);
         } else {
             addSubscriptionsTab();
+            if (isPWA) {
+                const manageSubsLoader = document.querySelector('#subs-loader');
+                manageSubsLoader.src = `${window.theme_path}/images/loading.gif`;
+            }
         }
 
         // Override the existing updateOrderButton function
