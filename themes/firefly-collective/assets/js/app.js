@@ -403,21 +403,14 @@ document.addEventListener('DOMContentLoaded', function () {
   function openWebsiteMenu() {
     debugLog('Opening menu');
     const nav = document.querySelector('body > nav');
-    const backdrop = document.getElementById('backdrop');
-    const hamburger = document.getElementById('hamburger');
     const closeNavBtn = document.getElementById('close-nav-btn');
-    if (!nav || !backdrop || !hamburger || !closeNavBtn) {
-      console.error('Elements missing for openWebsiteMenu');
-      return;
-    }
     nav.style.display = 'grid';
-    backdrop.style.display = 'block';
-    backdrop.style.pointerEvents = 'auto';
-    hamburger.style.display = 'none';
-    closeNavBtn.style.display = 'block';
     nav.classList.remove('slide-out');
-    backdrop.classList.remove('fade');
-    debugLog('Menu opened');
+    nav.classList.add('slide-in');
+    nav.addEventListener('transitionend', () => {
+      closeNavBtn.style.display = 'block';
+      debugLog('Menu opened and close button revealed');
+    }, { once: true });
   }
 
   function closeWebsiteMenu() {
@@ -430,18 +423,28 @@ document.addEventListener('DOMContentLoaded', function () {
       console.error('Elements missing for closeWebsiteMenu');
       return;
     }
+
+    // Update ARIA for screen readers
+    hamburger.setAttribute('aria-expanded', 'false');
+    nav.setAttribute('aria-hidden', 'true');
+
+    // Begin transition
     nav.classList.add('slide-out');
     backdrop.classList.add('fade');
     backdrop.style.pointerEvents = 'none';
-    hamburger.style.display = 'block';
     closeNavBtn.style.display = 'none';
-    setTimeout(() => {
-      if (nav.classList.contains('slide-out')) {
-        nav.style.display = 'none';
-        backdrop.style.display = 'none';
-      }
-    }, 500);
-    debugLog('Menu closed');
+    hamburger.style.display = 'block';
+
+    // Wait for the CSS transition to finish
+    const onTransitionEnd = (event) => {
+      // Only run once, and only on the property we care about
+      if (event.propertyName !== 'transform') return;
+      nav.style.display = 'none';
+      backdrop.style.display = 'none';
+      nav.removeEventListener('transitionend', onTransitionEnd);
+      debugLog('Menu fully closed');
+    };
+    nav.addEventListener('transitionend', onTransitionEnd, { once: true });
   }
 
   function expandMenu(menuItemEle, expandIcon) {
