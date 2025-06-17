@@ -30,7 +30,8 @@ h1 {
     margin: 0 auto;
     margin-top: 1rem;
     border-radius: 5px;
-    background: #1c1c1c;
+    background: #ffffff;
+    color: black;
     padding: 20px;
     box-sizing: border-box;
     text-align: center;
