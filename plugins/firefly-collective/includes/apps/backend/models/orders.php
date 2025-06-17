@@ -45,18 +45,30 @@
             status VARCHAR(50) NOT NULL DEFAULT 'pending',
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            
+            subscription_id VARCHAR(255) NULL,
+            subscription_status VARCHAR(50) NULL,
+            subscription_renewal TINYINT(1) DEFAULT 0,
+            subscription_period_start DATETIME NULL,
+            subscription_period_end DATETIME NULL,
+            subscription_current_period_start DATETIME NULL,
+            subscription_current_period_end DATETIME NULL,
+            subscription_cancelled_at DATETIME NULL,
+
             PRIMARY KEY(id),
             INDEX idx_order (orderID),
             INDEX idx_user (userId),
             INDEX idx_feature (featureId),
             INDEX idx_option (optionId),
             INDEX idx_status (status),
-            INDEX idx_created (createdAt)
+            INDEX idx_created (createdAt),
+            INDEX idx_subscription_id (subscription_id)
         ) {$collate};";
         
-        require_once(ABSPATH.'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
     }
+
 
     function firefly_collective_place_order($request) {
         global $wpdb;

@@ -389,18 +389,39 @@
                 // Success path
                 const data = await response.json();
 
-                sessionStorage.setItem('placedOrder', JSON.stringify({
-                    recordId:   data.records[0].recordId,
-                    orderID:    data.orderID,
-                    status:     'pending',
-                    itemCount:  orderItems.length,
-                    totalValue: data.totalOrderValue
-                }));
-                
-                updateOrderButton();
-                disableFormInteraction();
-                
-                initializeStripePayment();
+                if (data.type === 'subscription') {
+                    // Handle subscription response
+                    sessionStorage.setItem('placedOrder', JSON.stringify({
+                        recordId: data.records ? data.records[0].recordId : null,
+                        orderID: data.orderID,
+                        status: 'pending',
+                        itemCount: orderItems.length,
+                        totalValue: data.totalOrderValue,
+                        type: 'subscription',
+                        subscriptionId: data.subscriptionId
+                    }));
+                    
+                    updateOrderButton();
+                    disableFormInteraction();
+                    
+                    // Initialize Stripe payment for subscription
+                    handleSubscriptionPayment(data.clientSecret, data.subscriptionId);
+                } else {
+                    // Handle one-time payment as before
+                    sessionStorage.setItem('placedOrder', JSON.stringify({
+                        recordId: data.records[0].recordId,
+                        orderID: data.orderID,
+                        status: 'pending',
+                        itemCount: orderItems.length,
+                        totalValue: data.totalOrderValue,
+                        type: 'one_time'
+                    }));
+                    
+                    updateOrderButton();
+                    disableFormInteraction();
+                    
+                    initializeStripePayment();
+                }
 
                 hideLoadingOverlay(overlay);
             }
@@ -726,6 +747,8 @@
             let totalLower = 0;
             let totalUpper = 0;
             let totalFinal = 0;
+            let recurringTotal = 0;
+            let oneTimeTotal = 0;
             estimateMode = false;
 
             let tableHTML = `
@@ -739,251 +762,190 @@
                     <tbody>
             `;
 
+            // Separate recurring and one-time items
+            let recurringItems = [];
+            let oneTimeItems = [];
+
             dashboardData.features.forEach((feature, fIndex) => {
                 const instances = selections[fIndex] || [];
                 instances.forEach(instance => {
                     if (instance.optionIndex === undefined) return;
                     const option = feature.options[instance.optionIndex];
                     if (!option) return;
-
-                    // Build the combined item description
-                    let itemDescription = `<div class="item-main">
-                        <div class="feature-name">${feature.featureName}</div>
-                        <div class="option-details">`;
-
-                    // Add option name with price option if selected
-                    let selectedOptionText = '';
-                    let priceOptionsArray = [];
                     
-                    if (option.priceOptions) {
-                        try {
-                            if (typeof option.priceOptions === 'string') {
-                                priceOptionsArray = JSON.parse(option.priceOptions).types || [];
-                            } else if (option.priceOptions.types) {
-                                priceOptionsArray = option.priceOptions.types;
-                            }
-                            
-                            // If we have a valid selection, add the name to the display
-                            if (priceOptionsArray.length > 0 && 
-                                instance.priceOptionIndex !== undefined &&
-                                priceOptionsArray[instance.priceOptionIndex]) {
-                                selectedOptionText = ` (${priceOptionsArray[instance.priceOptionIndex].label})`;
-                            }
-                        } catch(e) {
-                            console.error("Error parsing price options:", e);
-                        }
-                    }
-
-                    itemDescription += `<div class="option-name">${option.optionName}${selectedOptionText}</div>`;
-
-                    // Create array for additional details
-                    let additionalDetails = [];
-
-                    // Add quantity if not recurring
-                    if (!feature.recurring) {
-                        const qty = parseInt(instance.quantity) || 1;
-                        additionalDetails.push(`Qty: ${qty}`);
-                    }
-
-                    // Add interval if recurring
-                    if (feature.recurring && option.interval) {
-                        additionalDetails.push(`${option.interval}`);
-                    }
-
-                    // Include existing option-level user fields
-                    if (instance.userFields) {
-                        for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
-                            // Try to get the user field data
-                            const userField = option[`${fieldName}_user`];
-                            if (userField) {
-                                try {
-                                    let fieldData;
-                                    if (typeof userField === 'string') {
-                                        fieldData = JSON.parse(userField);
-                                    } else {
-                                        fieldData = userField;
-                                    }
-                                    
-                                    if (fieldData && fieldData.types && Array.isArray(fieldData.types) && 
-                                        fieldData.types[selectedIndex]) {
-                                        // Format field name nicely
-                                        const formattedFieldName = fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, function(str) { return str.toUpperCase(); }).trim();
-                                        additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
-                                    }
-                                } catch(e) {
-                                    console.error(`Error processing user field ${fieldName}:`, e);
-                                }
-                            }
-                        }
-                    }
-
-                    // Add additional details as separate lines
-                    if (additionalDetails.length > 0) {
-                        additionalDetails.forEach(detail => {
-                            itemDescription += `<div class="option-detail-line">• ${detail}</div>`;
-                        });
-                    }
-
-                    itemDescription += `</div></div>`;
-
-                    // Calculate base price (option only, no addons)
-                    let basePrice = parseSafe(option.staticPrice, 0);
+                    const itemData = {
+                        feature: feature,
+                        option: option,
+                        instance: instance,
+                        fIndex: fIndex
+                    };
                     
-                    // Handle price options for base price
-                    if (priceOptionsArray.length > 0 && 
-                        instance.priceOptionIndex !== undefined &&
-                        priceOptionsArray[instance.priceOptionIndex]) {
-                        basePrice = parseSafe(priceOptionsArray[instance.priceOptionIndex].price, basePrice);
-                    }
-                    
-                    // Get quantity
-                    const qty = parseInt(instance.quantity) || 1;
-                    
-                    // Check if we have a range for the base option
-                    if (instanceHasRange(feature, instance)) {
-                        estimateMode = true;
-                        const lower = calculateInstancePriceLower(feature, instance);
-                        const upper = calculateInstancePriceUpper(feature, instance);
-                        totalLower += lower;
-                        totalUpper += upper;
-                        
-                        // For ranges, show the base price range
-                        const baseLower = parseSafe(option.priceFloor, basePrice) * qty;
-                        const baseUpper = parseSafe(option.priceCeiling, basePrice) * qty;
-                        
-                        tableHTML += `
-                            <tr>
-                                <td>${itemDescription}</td>
-                                <td>$${baseLower.toFixed(2)} - $${baseUpper.toFixed(2)}</td>
-                            </tr>
-                        `;
+                    if (feature.recurring) {
+                        recurringItems.push(itemData);
                     } else {
-                        // Calculate full price for discount calculations
-                        const fullPrice = calculateInstancePrice(feature, instance);
-                        totalLower += fullPrice;
-                        totalUpper += fullPrice;
-                        
-                        // Calculate base price with quantity
-                        let totalBasePrice = basePrice * qty;
-                        let displayPrice = totalBasePrice;
-                        
-                        // Check if a discount is applied to the full order
-                        if (instance.appliedDiscount) {
-                            // Show original base price crossed out and discounted price
-                            const originalFullPrice = instance.appliedDiscount.originalPrice;
-                            const discountedFullPrice = fullPrice;
-                            
-                            // Calculate what portion of the discount applies to the base
-                            const basePortionOfOriginal = totalBasePrice / originalFullPrice;
-                            const baseDiscountAmount = (originalFullPrice - discountedFullPrice) * basePortionOfOriginal;
-                            displayPrice = totalBasePrice - baseDiscountAmount;
-                            
-                            totalFinal += displayPrice;
-                            tableHTML += `
-                                <tr>
-                                    <td>${itemDescription}</td>
-                                    <td>
-                                        <div class="price-with-discount">
-                                            <span class="original-price">$${totalBasePrice.toFixed(2)}</span>
-                                            <span class="discounted-price">$${displayPrice.toFixed(2)}</span>
-                                            <div class="discount-note">
-                                                ${instance.appliedDiscount.percentage}% discount applied
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                        } else {
-                            // No discount on base, show regular price
-                            totalFinal += displayPrice;
-                            tableHTML += `
-                                <tr>
-                                    <td>${itemDescription}</td>
-                                    <td>$${displayPrice.toFixed(2)}</td>
-                                </tr>
-                            `;
-                        }
-                    }
-
-                    // If the instance has addons, show them as sub-rows with their total price
-                    if (instance.addons && instance.addons.length > 0) {
-                        instance.addons.forEach(addonId => {
-                            const addon = option.addons.find(a => a.id === addonId);
-                            if (addon) {
-                                const symbol = isMultiply(addon) ? 'x' : '+';
-                                
-                                if (instanceHasRange(feature, instance)) {
-                                    // For ranges, show addon price ranges
-                                    const floorVal = parseSafe(addon.floorPriceMod, parseSafe(addon.staticPriceMod, 0));
-                                    const ceilVal = parseSafe(addon.ceilingPriceMod, parseSafe(addon.staticPriceMod, 0));
-                                    
-                                    const addonFloorTotal = floorVal * qty;
-                                    const addonCeilTotal = ceilVal * qty;
-                                    
-                                    if (floorVal !== 0 || ceilVal !== 0) {
-                                        tableHTML += `
-                                            <tr class="addon-row">
-                                                <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                                <td>${symbol} $${addonFloorTotal.toFixed(2)} - $${addonCeilTotal.toFixed(2)}</td>
-                                            </tr>
-                                        `;
-                                    } else {
-                                        const addonStaticTotal = parseSafe(addon.staticPriceMod, 0) * qty;
-                                        tableHTML += `
-                                            <tr class="addon-row">
-                                                <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                                <td>${symbol} $${addonStaticTotal.toFixed(2)}</td>
-                                            </tr>
-                                        `;
-                                    }
-                                } else {
-                                    // For fixed prices, show total addon price (addon price × quantity)
-                                    const addonPricePerUnit = parseSafe(addon.staticPriceMod, 0);
-                                    const addonTotalPrice = addonPricePerUnit * qty;
-                                    totalFinal += addonTotalPrice;
-
-                                    tableHTML += `
-                                        <tr class="addon-row">
-                                            <td><div class="addon-item-name">${addon.addonName}</div></td>
-                                            <td>${symbol} $${addonTotalPrice.toFixed(2)}</td>
-                                        </tr>
-                                    `;
-                                }
-                            }
-                        });
-                        
-                        // Add group discount rows if applicable
-                        if (instance.groupDiscounts) {
-                            Object.entries(instance.groupDiscounts).forEach(([groupName, discount]) => {
-                                totalFinal -= discount.amount;
-                                tableHTML += `
-                                    <tr class="discount-row">
-                                        <td><div class="discount-item-name">Group Discount: ${groupName} (${discount.percentage}% off for ${discount.count} items)</div></td>
-                                        <td>-$${discount.amount.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            });
-                        }
+                        oneTimeItems.push(itemData);
                     }
                 });
             });
 
+            // Function to render item rows
+            const renderItemRow = (itemData) => {
+                const { feature, option, instance, fIndex } = itemData;
+                
+                // Build the combined item description
+                let itemDescription = `<div class="item-main">
+                    <div class="feature-name">${feature.featureName}</div>
+                    <div class="option-details">`;
+
+                // Add option name with price option if selected
+                let selectedOptionText = '';
+                let priceOptionsArray = [];
+                
+                if (option.priceOptions) {
+                    try {
+                        if (typeof option.priceOptions === 'string') {
+                            priceOptionsArray = JSON.parse(option.priceOptions).types || [];
+                        } else if (option.priceOptions.types) {
+                            priceOptionsArray = option.priceOptions.types;
+                        }
+                        
+                        if (priceOptionsArray.length > 0 && 
+                            instance.priceOptionIndex !== undefined &&
+                            priceOptionsArray[instance.priceOptionIndex]) {
+                            selectedOptionText = ` (${priceOptionsArray[instance.priceOptionIndex].label})`;
+                        }
+                    } catch(e) {
+                        console.error("Error parsing price options:", e);
+                    }
+                }
+
+                itemDescription += `<div class="option-name">${option.optionName}${selectedOptionText}</div>`;
+
+                // Add interval for recurring items
+                if (feature.recurring && option.interval) {
+                    itemDescription += `<div class="recurring-interval">Billed ${option.interval}ly</div>`;
+                }
+
+                // Additional details handling (same as before)
+                let additionalDetails = [];
+                if (!feature.recurring) {
+                    const qty = parseInt(instance.quantity) || 1;
+                    additionalDetails.push(`Qty: ${qty}`);
+                }
+
+                // Include user fields
+                if (instance.userFields) {
+                    for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
+                        const userField = option[`${fieldName}_user`];
+                        if (userField) {
+                            try {
+                                let fieldData;
+                                if (typeof userField === 'string') {
+                                    fieldData = JSON.parse(userField);
+                                } else {
+                                    fieldData = userField;
+                                }
+                                
+                                if (fieldData && fieldData.types && Array.isArray(fieldData.types) && 
+                                    fieldData.types[selectedIndex]) {
+                                    const formattedFieldName = fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, function(str) { return str.toUpperCase(); }).trim();
+                                    additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
+                                }
+                            } catch(e) {
+                                console.error(`Error processing user field ${fieldName}:`, e);
+                            }
+                        }
+                    }
+                }
+
+                if (additionalDetails.length > 0) {
+                    additionalDetails.forEach(detail => {
+                        itemDescription += `<div class="option-detail-line">• ${detail}</div>`;
+                    });
+                }
+
+                itemDescription += `</div></div>`;
+
+                // Calculate price
+                const fullPrice = calculateInstancePrice(feature, instance);
+                
+                return {
+                    html: `<tr>
+                        <td>${itemDescription}</td>
+                        <td>${feature.recurring ? 
+                            `$${fullPrice.toFixed(2)}/${option.interval || 'month'}` : 
+                            `$${fullPrice.toFixed(2)}`}</td>
+                    </tr>`,
+                    price: fullPrice,
+                    isRecurring: feature.recurring
+                };
+            };
+
+            // Render one-time items first
+            if (oneTimeItems.length > 0) {
+                tableHTML += `<tr class="section-header"><td colspan="2"><strong>One-Time Charges</strong></td></tr>`;
+                oneTimeItems.forEach(itemData => {
+                    const rendered = renderItemRow(itemData);
+                    tableHTML += rendered.html;
+                    oneTimeTotal += rendered.price;
+                    totalFinal += rendered.price;
+                });
+            }
+
+            // Render recurring items
+            if (recurringItems.length > 0) {
+                if (oneTimeItems.length > 0) {
+                    tableHTML += `<tr class="section-spacer"><td colspan="2">&nbsp;</td></tr>`;
+                }
+                tableHTML += `<tr class="section-header"><td colspan="2"><strong>Recurring Charges</strong></td></tr>`;
+                recurringItems.forEach(itemData => {
+                    const rendered = renderItemRow(itemData);
+                    tableHTML += rendered.html;
+                    recurringTotal += rendered.price;
+                });
+            }
+
+            // Show totals
             tableHTML += `
                     </tbody>
-                    <tfoot>
-                        <tr>
-                            <td style="text-align: right; font-weight: bold;">Total:</td>
-                            <td id="invoice-total">`;
-            if (estimateMode) {
-                tableHTML += `$${totalLower.toFixed(2)} - $${totalUpper.toFixed(2)}`;
+                    <tfoot>`;
+            
+            if (oneTimeItems.length > 0 && recurringItems.length > 0) {
+                // Show both totals
+                tableHTML += `
+                    <tr class="subtotal-row">
+                        <td style="text-align: right;">One-Time Total:</td>
+                        <td>$${oneTimeTotal.toFixed(2)}</td>
+                    </tr>
+                    <tr class="subtotal-row">
+                        <td style="text-align: right;">Recurring Total:</td>
+                        <td>$${recurringTotal.toFixed(2)}/month</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td style="text-align: right; font-weight: bold;">Due Today:</td>
+                        <td id="invoice-total">$${totalFinal.toFixed(2)}</td>
+                    </tr>`;
+            } else if (recurringItems.length > 0) {
+                // Only recurring
+                tableHTML += `
+                    <tr class="total-row">
+                        <td style="text-align: right; font-weight: bold;">Recurring Total:</td>
+                        <td id="invoice-total">$${recurringTotal.toFixed(2)}/month</td>
+                    </tr>`;
             } else {
-                tableHTML += `$${totalFinal.toFixed(2)}`;
+                // Only one-time
+                tableHTML += `
+                    <tr class="total-row">
+                        <td style="text-align: right; font-weight: bold;">Total:</td>
+                        <td id="invoice-total">$${totalFinal.toFixed(2)}</td>
+                    </tr>`;
             }
-            tableHTML += `</td>
-                        </tr>
+            
+            tableHTML += `
                     </tfoot>
                 </table>
             `;
+            
             if (invoiceDetails) invoiceDetails.innerHTML = tableHTML;
 
             updateOrderButton();
@@ -2944,6 +2906,271 @@
             }
         }
         
+        // Subscription management functions
+        let updatePaymentElements, updatePaymentElement;
+
+        async function loadSubscriptions() {
+            const container = document.getElementById('subscriptions-container');
+            const loading = document.getElementById('subscriptions-loading');
+            const noSubs = document.getElementById('no-subscriptions');
+            const subsManagementEl = document.querySelector('#subscriptions-management');
+            const manageSubsBtn = document.querySelector('#manage-subs-btn');
+            
+            loading.style.display = 'block';
+            container.style.display = 'none';
+            noSubs.style.display = 'none';
+            manageSubsBtn.style.opacity = '0.1';
+            manageSubsBtn.style.pointerEvents = 'none';
+            
+            try {
+                const response = await fetch(`${myApi.api_url}get-subscriptions`, {
+                    method: 'GET'
+                });
+                
+                if (!response.ok) throw new Error('Failed to load subscriptions');
+                
+                const data = await response.json();
+                
+                if (data.success && data.subscriptions.length > 0) {
+                    renderSubscriptions(data.subscriptions);
+                    smoothScrollToElement(subsManagementEl);
+                    container.style.display = 'block';
+                } else {
+                    noSubs.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading subscriptions:', error);
+                container.innerHTML = '<p style="color: red;">Error loading subscriptions. Please try again.</p>';
+                container.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function renderSubscriptions(subscriptions) {
+            const container = document.getElementById('subscriptions-container');
+            container.innerHTML = '';
+            
+            subscriptions.forEach(sub => {
+                const card = document.createElement('div');
+                card.className = 'subscription-card';
+                
+                const nextBilling = new Date(sub.subscription_current_period_end);
+                const formattedDate = nextBilling.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                card.innerHTML = `
+                    <div class="subscription-header">
+                        <div class="subscription-title">${sub.features}</div>
+                        <div class="subscription-status ${sub.subscription_status}">${formatStatus(sub.subscription_status)}</div>
+                    </div>
+                    
+                    <div class="subscription-details">
+                        <div class="subscription-detail">
+                            <div class="subscription-detail-label">Plan</div>
+                            <div class="subscription-detail-value">${sub.options}</div>
+                        </div>
+                        <div class="subscription-detail">
+                            <div class="subscription-detail-label">Billing</div>
+                            <div class="subscription-detail-value">$${sub.total_amount} / ${sub.intervals}</div>
+                        </div>
+                        <div class="subscription-detail">
+                            <div class="subscription-detail-label">Next Payment</div>
+                            <div class="subscription-detail-value">${formattedDate}</div>
+                        </div>
+                        <div class="subscription-detail">
+                            <div class="subscription-detail-label">Started</div>
+                            <div class="subscription-detail-value">${new Date(sub.started_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    
+                    ${sub.payment_method ? `
+                        <div class="payment-method">
+                            <div class="payment-method-icon ${sub.payment_method.brand}"></div>
+                            <div class="payment-method-details">
+                                <div class="payment-method-last4">•••• ${sub.payment_method.last4}</div>
+                                <div class="payment-method-expiry">Expires ${sub.payment_method.exp_month}/${sub.payment_method.exp_year}</div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="subscription-actions">
+                        <button class="btn-primary" id="update-payment-btn">Update Payment</button>
+                        ${sub.subscription_status === 'active' ? 
+                            `<button class="btn-danger" id="cancel-sub-btn">Cancel Subscription</button>` 
+                            : ''}
+                    </div>
+                `;
+                
+                container.appendChild(card);
+                const cancelSubBtn = document.querySelector('#cancel-sub-btn');
+                cancelSubBtn.addEventListener('pointerup', ()=>{
+                    cancelSubscription(sub.subscription_id)
+                });
+                const updatePaymentBtn = document.querySelector('#update-payment-btn');
+                updatePaymentBtn.addEventListener('pointerup', ()=>{
+                    const cancelUpdatePaymentBtn = document.querySelector('#cancel-update-payment');
+                    cancelUpdatePaymentBtn.addEventListener('pointerup', closeUpdatePaymentModal);
+                    updatePaymentMethod();
+                });
+
+            });
+        }
+
+        function formatStatus(status) {
+            const statusMap = {
+                'active': 'Active',
+                'past_due': 'Past Due',
+                'cancelled': 'Cancelled',
+                'trialing': 'Trial'
+            };
+            return statusMap[status] || status;
+        }
+
+        async function cancelSubscription(subscriptionId) {
+            if (!confirm('Are you sure you want to cancel this subscription? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${myApi.api_url}cancel-subscription`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subscriptionId: subscriptionId
+                    })
+                });
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Subscription cancelled successfully.');
+                    loadSubscriptions(); // Reload the list
+                } else {
+                    throw new Error(data.message || 'Failed to cancel subscription');
+                }
+            } catch (error) {
+                console.error('Error cancelling subscription:', error);
+                alert('Error cancelling subscription: ' + error.message);
+            }
+        }
+
+        async function updatePaymentMethod() {
+            const modal = document.getElementById('update-payment-modal');
+            modal.style.display = 'flex';
+            
+            try {
+                const response = await fetch(`${myApi.api_url}update-payment-method`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && stripe) {
+                    // Create elements for updating payment method
+                    updatePaymentElements = stripe.elements({
+                        clientSecret: data.clientSecret,
+                        appearance: {
+                            theme: 'stripe'
+                        }
+                    });
+                    
+                    updatePaymentElement = updatePaymentElements.create('payment');
+                    updatePaymentElement.mount('#update-payment-element');
+                    
+                    // Handle form submission
+                    document.getElementById('update-payment-submit').onclick = async () => {
+                        const submitBtn = document.getElementById('update-payment-submit');
+                        const errorDiv = document.getElementById('update-payment-error');
+                        
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Updating...';
+                        errorDiv.style.display = 'none';
+                        
+                        const {error} = await stripe.confirmSetup({
+                            elements: updatePaymentElements,
+                            confirmParams: {
+                                return_url: window.location.href,
+                            },
+                            redirect: 'if_required'
+                        });
+                        
+                        if (error) {
+                            errorDiv.textContent = error.message;
+                            errorDiv.style.display = 'block';
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Update';
+                        } else {
+                            alert('Payment method updated successfully!');
+                            closeUpdatePaymentModal();
+                            loadSubscriptions();
+                        }
+                    };
+                }
+            } catch (error) {
+                console.error('Error setting up payment update:', error);
+                alert('Error setting up payment update. Please try again.');
+                closeUpdatePaymentModal();
+            }
+        }
+
+        function closeUpdatePaymentModal() {
+            const modal = document.getElementById('update-payment-modal');
+            modal.style.display = 'none';
+            
+            if (updatePaymentElement) {
+                updatePaymentElement.unmount();
+                updatePaymentElement = null;
+                updatePaymentElements = null;
+            }
+        }
+
+        // Handle subscription response
+        function handleSubscriptionPayment(clientSecret, subscriptionId) {
+            // Create payment form as before
+            createPaymentForm(clientSecret);
+            
+            // Store subscription ID for later use
+            const orderData = sessionStorage.getItem('placedOrder');
+            if (orderData) {
+                const orderInfo = JSON.parse(orderData);
+                orderInfo.subscriptionId = subscriptionId;
+                sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
+            }
+        }
+        
+        // Add a button to show subscriptions section
+        function addSubscriptionsTab() {
+            const profileContainer = document.getElementById('profile-container');
+            if (profileContainer) {
+                const subscriptionsBtn = document.createElement('button');
+                subscriptionsBtn.type = 'button';
+                subscriptionsBtn.id = "manage-subs-btn";
+                subscriptionsBtn.textContent = 'Manage Subscriptions';
+                subscriptionsBtn.style.marginTop = '20px';
+                subscriptionsBtn.onclick = () => {
+                    document.getElementById('subscriptions-management').style.display = 'block';
+                    loadSubscriptions();
+                };
+                profileContainer.appendChild(subscriptionsBtn);
+            }
+        }
+
+        // Initialize on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', addSubscriptionsTab);
+        } else {
+            addSubscriptionsTab();
+        }
+
         // Override the existing updateOrderButton function
         window.updateOrderButton = updateOrderButton;
 

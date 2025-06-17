@@ -202,5 +202,35 @@
                 'permission_callback' => 'verify_rest_request',
             ]
         );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/get-subscriptions',
+            array(
+                'methods'             => 'GET',
+                'callback'            => 'firefly_collective_get_subscriptions',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/cancel-subscription',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_cancel_subscription',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/update-payment-method',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_update_payment_method',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
     }
     add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

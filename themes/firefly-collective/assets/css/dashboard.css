@@ -33,6 +33,7 @@ h1 {
     background: #1c1c1c;
     padding: 20px;
     box-sizing: border-box;
+    text-align: center;
 }
 
 #profile-container form,
@@ -49,6 +50,7 @@ h1 {
     width: 100%;
     margin-block: .4rem;
     box-sizing: border-box;
+    text-align: left;
 }
 
 #profile-container input {
@@ -116,6 +118,7 @@ h1 {
 
 /* Instance Block (each duplicate instance) */
 .instances-container {
+    color: black;
     margin-left: 10px;
 }
 .feature {
@@ -678,6 +681,11 @@ td .feature-fields-list {
     height: 50px;
 }
 
+#subs-loader {
+    width: 30px;
+    height: auto;
+}
+
 .order-confirm-modal button {
     padding: 10px 20px;
     border: none;
@@ -752,6 +760,251 @@ td .feature-fields-list {
 }
 #pay-now:hover {
     background: var(--secondaryColor);
+}
+
+/* Invoice table sections */
+.invoice-table .section-header td {
+    background-color: #f5f5f5;
+    padding: 10px;
+    font-size: 1.1em;
+    border-top: 2px solid #ddd;
+}
+
+.invoice-table .section-spacer td {
+    height: 20px;
+    border: none;
+}
+
+.invoice-table .subtotal-row td {
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+}
+
+.invoice-table .total-row td {
+    border-top: 2px solid #333;
+    padding-top: 12px;
+    font-size: 1.1em;
+}
+
+/* Recurring indicator */
+.recurring-interval {
+    color: #666;
+    font-size: 0.9em;
+    font-style: italic;
+    margin-top: 4px;
+}
+
+/* Subscription management */
+
+#subscriptions-management {
+    margin: 0 auto;
+    width: 900px;
+    max-width: 90vw;
+    margin-bottom: 5vh;
+}
+
+.subscriptions-container {
+    color: black;
+    margin: 20px 0;
+}
+
+#manage-subs-btn {
+    margin: 0 auto;
+    width: 70% !important;
+    user-select: none;
+}
+
+.subscription-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.subscription-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.subscription-title {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.subscription-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.subscription-status.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.subscription-status.past_due {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.subscription-status.cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.subscription-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.subscription-detail {
+    display: flex;
+    flex-direction: column;
+}
+
+.subscription-detail-label {
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.subscription-detail-value {
+    font-weight: 500;
+}
+
+.subscription-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.subscription-actions button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+.subscription-actions .btn-primary {
+    background: #0073aa;
+    color: white;
+}
+
+.subscription-actions .btn-primary:hover {
+    background: #005a87;
+}
+
+.subscription-actions .btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.subscription-actions .btn-danger:hover {
+    background: #c82333;
+}
+
+/* Payment method display */
+.payment-method {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.payment-method-icon {
+    width: 40px;
+    height: 25px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.payment-method-icon.visa {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwNTFBNSIvPgo8cGF0aCBkPSJNMTYuNSA5TDEzLjUgMTVIMTEuNUwxMy4yIC45QzEzLjMgOC41IDEzLjcgOCAxNC4yIDhIMTUuNUwxOCAxNUgxNkwxNS42IDEzLjVIMTMuOUwxMy41IDEzLjVIMTYuNVpNMTkgOEgyMUwyMiAxNUgyMEwxOSA4WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+');
+}
+
+.payment-method-icon.mastercard {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwMCIvPgo8Y2lyY2xlIGN4PSIxNiIgY3k9IjEyIiByPSI3IiBmaWxsPSIjRUIwMDFCIi8+CjxjaXJjbGUgY3g9IjI0IiBjeT0iMTIiIHI9IjciIGZpbGw9IiNGNzkzMDAiLz4KPC9zdmc+');
+}
+
+.payment-method-details {
+    flex: 1;
+}
+
+.payment-method-last4 {
+    font-weight: 500;
+}
+
+.payment-method-expiry {
+    font-size: 0.85em;
+    color: #666;
+}
+
+/* Update payment modal */
+.update-payment-modal {
+    color: black;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.update-payment-content {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.update-payment-content h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+#update-payment-element {
+    margin-bottom: 20px;
+}
+
+.update-payment-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* Mixed order warning */
+.mixed-order-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.mixed-order-warning strong {
+    display: block;
+    margin-bottom: 5px;
 }
 
 /* Tooltip styles */

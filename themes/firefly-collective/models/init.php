@@ -73,6 +73,7 @@
         // Dashboard
         if (determine_view() === 'dashboard') {
             $features_options_addons = get_features_options_addons();
+            global $theme_path;
             $theme_path = get_template_directory_uri();
             
             // Get Stripe configuration

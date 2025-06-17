@@ -1,5 +1,6 @@
 <?php
     global $current_user;
+    global $theme_path;
 ?>
 <h1><?php echo esc_html($pageTitle); ?></h1>
 <p><?php echo apply_filters('the_content', $postContent); ?></p>
@@ -33,6 +34,39 @@
                 <button type="button" id="reset-password-btn">Send Password Reset</button>
             </div>
         </form>
+    </div>
+
+    <!-- Subscription Management -->
+    <div id="subscriptions-management" style="display: none;">
+        <h2>Manage Subscriptions</h2>
+        
+        <div id="subscriptions-loading" class="loading-spinner">
+            <img src="<?=$theme_path?>/images/loading.gif" alt="Loading..." id="subs-loader">
+            <p>Loading your subscriptions...</p>
+        </div>
+        
+        <div id="subscriptions-container" class="subscriptions-container" style="display: none;">
+            <!-- Subscriptions will be dynamically loaded here -->
+        </div>
+        
+        <div id="no-subscriptions" style="display: none;">
+            <p>You don't have any active subscriptions.</p>
+        </div>
+    </div>
+
+    <!-- Update Payment Method Modal -->
+    <div id="update-payment-modal" class="update-payment-modal" style="display: none;">
+        <div class="update-payment-content">
+            <h3>Update Payment Method</h3>
+            <div id="update-payment-element">
+                <!-- Stripe Elements will mount here -->
+            </div>
+            <div id="update-payment-error" style="color: red; margin-top: 10px; display: none;"></div>
+            <div class="update-payment-actions">
+                <button class="button" id="cancel-update-payment">Cancel</button>
+                <button class="button button-primary" id="update-payment-submit">Update</button>
+            </div>
+        </div>
     </div>
 
     <!-- Price Calculator Interface -->
