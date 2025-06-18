@@ -800,7 +800,6 @@
                 // Add option name with price option if selected
                 let selectedOptionText = '';
                 let priceOptionsArray = [];
-                
                 if (option.priceOptions) {
                     try {
                         if (typeof option.priceOptions === 'string') {
@@ -808,59 +807,83 @@
                         } else if (option.priceOptions.types) {
                             priceOptionsArray = option.priceOptions.types;
                         }
-                        
-                        if (priceOptionsArray.length > 0 && 
+                        if (
+                            priceOptionsArray.length > 0 &&
                             instance.priceOptionIndex !== undefined &&
-                            priceOptionsArray[instance.priceOptionIndex]) {
+                            priceOptionsArray[instance.priceOptionIndex]
+                        ) {
                             selectedOptionText = ` (${priceOptionsArray[instance.priceOptionIndex].label})`;
                         }
-                    } catch(e) {
+                    } catch (e) {
                         console.error("Error parsing price options:", e);
                     }
                 }
 
-                itemDescription += `<div class="option-name">${option.optionName}${selectedOptionText}</div>`;
+                // Move Qty into the option-name parentheses
+                let qtyLabel = '';
+                if (!feature.recurring) {
+                    const qty = parseInt(instance.quantity) || 1;
+                    qtyLabel = ` (Qty: ${qty})`;
+                }
+
+                itemDescription += `<div class="option-name">
+                    ${option.optionName}${selectedOptionText}${qtyLabel}
+                </div>`;
 
                 // Add interval for recurring items
                 if (feature.recurring && option.interval) {
                     itemDescription += `<div class="recurring-interval">Billed ${option.interval}ly</div>`;
                 }
 
-                // Additional details handling (same as before)
+                // Collect any extra lines (user fields & addons)
                 let additionalDetails = [];
-                if (!feature.recurring) {
-                    const qty = parseInt(instance.quantity) || 1;
-                    additionalDetails.push(`Qty: ${qty}`);
-                }
 
                 // Include user fields
                 if (instance.userFields) {
                     for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
                         const userField = option[`${fieldName}_user`];
-                        if (userField) {
-                            try {
-                                let fieldData;
-                                if (typeof userField === 'string') {
-                                    fieldData = JSON.parse(userField);
-                                } else {
-                                    fieldData = userField;
-                                }
-                                
-                                if (fieldData && fieldData.types && Array.isArray(fieldData.types) && 
-                                    fieldData.types[selectedIndex]) {
-                                    const formattedFieldName = fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, function(str) { return str.toUpperCase(); }).trim();
-                                    additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
-                                }
-                            } catch(e) {
-                                console.error(`Error processing user field ${fieldName}:`, e);
+                        if (!userField) continue;
+                        try {
+                            const fieldData = typeof userField === 'string'
+                                ? JSON.parse(userField)
+                                : userField;
+                            if (
+                                fieldData &&
+                                Array.isArray(fieldData.types) &&
+                                fieldData.types[selectedIndex]
+                            ) {
+                                const formattedFieldName = fieldName
+                                    .replace(/([A-Z])/g, ' $1')
+                                    .replace(/^./, str => str.toUpperCase())
+                                    .trim();
+                                additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
                             }
+                        } catch (e) {
+                            console.error(`Error processing user field ${fieldName}:`, e);
                         }
                     }
                 }
 
+                // Include selected addons
+                let isAddon = false;
+                let dot = '• ';
+                if (Array.isArray(instance.addons) && instance.addons.length) {
+                    instance.addons.forEach(addonId => {
+                        const addonObj = option.addons.find(a => a.id === addonId);
+                        if (addonObj) {
+                            additionalDetails.push(`
+                                <span class="addon-item-name">${addonObj.addonName}</span>
+                            `);
+                            isAddon = true;
+                        }
+                    });
+                }
+                if (isAddon) dot = '';
+
+                // Render any additional lines
                 if (additionalDetails.length > 0) {
                     additionalDetails.forEach(detail => {
-                        itemDescription += `<div class="option-detail-line">• ${detail}</div>`;
+                        itemDescription += `<div class="option-detail-line">${dot}${detail}</div>`;
                     });
                 }
 
@@ -872,14 +895,18 @@
                 return {
                     html: `<tr>
                         <td>${itemDescription}</td>
-                        <td>${feature.recurring ? 
-                            `$${fullPrice.toFixed(2)}/${option.interval || 'month'}` : 
-                            `$${fullPrice.toFixed(2)}`}</td>
+                        <td>${
+                            feature.recurring
+                                ? `${fullPrice.toFixed(2)}/${option.interval || 'month'}`
+                                : fullPrice.toFixed(2)
+                        }</td>
                     </tr>`,
                     price: fullPrice,
                     isRecurring: feature.recurring
                 };
             };
+
+
 
             // Render one-time items first
             if (oneTimeItems.length > 0) {
@@ -1251,9 +1278,7 @@
             const headerDiv = document.createElement('div');
             headerDiv.classList.add('instance-header');
             const headerTitle = document.createElement('span');
-            headerTitle.textContent = (instance.optionIndex === undefined)
-                ? `New ${feature.featureName}`
-                : feature.featureName;
+            headerTitle.textContent = 'Options:';
             headerDiv.appendChild(headerTitle);
 
             // Show delete button if there's more than one instance
