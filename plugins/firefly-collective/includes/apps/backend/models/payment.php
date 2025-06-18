@@ -767,7 +767,7 @@
     }
 
     /**
-     * Cancel a subscription
+     * Cancel a subscription (with refund if <= 3 days old)
      */
     function firefly_collective_cancel_subscription($request) {
 
@@ -780,6 +780,20 @@
         
         global $wpdb;
         
+        // Get order details to check if refund eligible
+        $order = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE subscription_id = %s",
+            $subscription_id
+        ));
+        
+        if (!$order) {
+            return new WP_Error('order_not_found', 'Order not found', array('status' => 404));
+        }
+        
+        // Check if order is 3 days old or less
+        $order_age_days = (time() - strtotime($order->createdAt)) / (60 * 60 * 24);
+        $should_refund = $order_age_days <= 3;
+        
         // Cancel in Stripe
         firefly_collective_stripe_init();
         
@@ -787,22 +801,42 @@
             $subscription = \Stripe\Subscription::retrieve($subscription_id);
             $subscription->cancel();
             
+            // Process refund if eligible
+            if ($should_refund && !empty($order->payment_intent_id)) {
+                $refund = \Stripe\Refund::create([
+                    'payment_intent' => $order->payment_intent_id,
+                    'amount' => $order->totalPrice * 100 // Convert to cents
+                ]);
+            }
+            
             // Update database
+            $update_data = array(
+                'subscription_status' => 'cancelled',
+                'subscription_cancelled_at' => current_time('mysql')
+            );
+            
+            if ($should_refund) {
+                $update_data['status'] = 'refunded';
+            }
+            
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
-                array(
-                    'subscription_status' => 'cancelled',
-                    'subscription_cancelled_at' => current_time('mysql')
-                ),
+                $update_data,
                 array('subscription_id' => $subscription_id),
-                array('%s', '%s'),
+                array('%s', '%s', '%s'),
                 array('%s')
             );
             
+            $message = $should_refund 
+                ? 'Subscription cancelled and refunded successfully' 
+                : 'Subscription cancelled successfully';
+            
             return array(
                 'success' => true,
-                'message' => 'Subscription cancelled successfully'
+                'message' => $message,
+                'refunded' => $should_refund
             );
+            
         } catch (Exception $e) {
             return new WP_Error('stripe_error', $e->getMessage(), array('status' => 500));
         }
