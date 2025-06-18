@@ -163,33 +163,49 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="(item, itemIndex) in group.items" :key="'item-' + itemIndex">
+                                        <tr v-for="(item, itemIndex) in group.items" 
+                                            :key="'item-' + itemIndex"
+                                            :class="{'refunded-item': item.status === 'refunded'}">
                                             <td>{{ getFeatureName(item.featureId) }}</td>
                                             <td>
                                                 {{ getOptionName(item.optionId) }}
-
-                                                <!-- If this option got a discount, show it right below -->
+                                                <!-- Option discount if present -->
                                                 <div v-if="hasOptionDiscount(item)" class="ffc-discount-inline">
                                                     - {{ getOptionDiscountText(item) }}
                                                 </div>
                                             </td>
                                             <td>
-                                                <!-- First: show all addons as a comma-separated list (or “No addons”). -->
+                                                <!-- Addons list -->
                                                 <span v-if="getAddonNames(item.addonIds).length">
                                                     {{ getAddonNames(item.addonIds).join(', ') }}
                                                 </span>
                                                 <span v-else>No addons</span>
-
-                                                <!-- Then: if there are one or more addon-discount messages, show them all on one line. -->
+                                                <!-- Addon discounts if present -->
                                                 <div v-if="getAllAddonDiscounts(item).length" class="ffc-discount-inline">
                                                     - {{ getAllAddonDiscounts(item).join(', ') }}
                                                 </div>
                                             </td>
                                             <td>{{ item.quantity }}</td>
-                                            <td>
-                                                ${{ formatPrice(item.totalPrice) }}
-
-                                                <!-- If this item had a “totalPriceDiscount” > 0, show it immediately below -->
+                                            <td class="ffc-total-price">
+                                                <span>${{ formatPrice(item.totalPrice) }}</span>
+                                                
+                                                <!-- Individual refund button - ONLY FOR ADMINS -->
+                                                <button 
+                                                    v-if="currentUserIdAdmin"
+                                                    class="button button-small item-refund-btn"
+                                                    @click="confirmItemRefund(group.orderID, item.id)"
+                                                    :disabled="item.status === 'refunded'"
+                                                    :title="item.status === 'refunded' ? 'Already refunded' : 'Refund this item'"
+                                                >
+                                                    {{ item.status === 'refunded' ? 'Refunded' : 'Refund' }}
+                                                </button>
+                                                
+                                                <!-- For non-admins, just show refunded status -->
+                                                <span v-else-if="item.status === 'refunded'" class="ffc-status-badge ffc-status-refunded">
+                                                    Refunded
+                                                </span>
+                                                
+                                                <!-- Item discount if present -->
                                                 <div v-if="parseFloat(item.totalPriceDiscount) > 0" class="ffc-discount-inline">
                                                     - ${{ formatPrice(item.totalPriceDiscount) }}
                                                 </div>
@@ -276,7 +292,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(item, itemIndex) in currentOrder.items" :key="'modal-item-' + itemIndex">
+                        <tr v-for="(item, itemIndex) in currentOrder.items" 
+                            :key="'modal-item-' + itemIndex"
+                            :class="{'refunded-item': item.status === 'refunded'}">
                             <td>{{ getFeatureName(item.featureId) }}</td>
                             <td>
                                 {{ getOptionName(item.optionId) }}
@@ -403,6 +421,23 @@
             <div class="ffc-modal-footer">
                 <button class="button" @click="showRefundModal = false">Cancel</button>
                 <button class="button button-link-delete" @click="refundOrder()">Refund</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Item Refund Confirmation Modal -->
+    <div class="ffc-modal" v-if="showItemRefundModal" v-cloak>
+        <div class="ffc-modal-content ffc-small-modal">
+            <div class="ffc-modal-header">
+                <h2>Confirm Item Refund</h2>
+                <button class="ffc-modal-close" @click="showItemRefundModal = false">×</button>
+            </div>
+            <div class="ffc-modal-body">
+                <p>Are you sure you want to refund this individual item? This action cannot be undone.</p>
+            </div>
+            <div class="ffc-modal-footer">
+                <button class="button" @click="showItemRefundModal = false">Cancel</button>
+                <button class="button button-link-delete" @click="refundItem()">Refund Item</button>
             </div>
         </div>
     </div>

@@ -21,6 +21,7 @@
             
             $params = $request->get_json_params();
             $order_id = isset($params['orderID']) ? sanitize_text_field($params['orderID']) : '';
+            $item_id = isset($params['itemId']) ? intval($params['itemId']) : null;
             
             if (empty($order_id)) {
                 return new WP_Error('missing_order_id', 'Order ID is required', array('status' => 400));
@@ -737,7 +738,7 @@
      * Issue a refund for a given orderID.
      */
     function firefly_collective_refund_payment($request) {
-        // 1. Verify user is logged in
+        // Verify user is logged in
         if (!is_user_logged_in()) {
             return new WP_Error(
                 'not_logged_in', 
@@ -746,9 +747,10 @@
             );
         }
 
-        // 2. Get orderID from the request body
+        // Get orderID and itemId from the request body
         $params = $request->get_json_params();
         $order_id = isset($params['orderID']) ? sanitize_text_field($params['orderID']) : '';
+        $item_id = isset($params['itemId']) ? intval($params['itemId']) : null; // Add this line to get itemId
 
         if (empty($order_id)) {
             return new WP_Error(
@@ -761,7 +763,7 @@
         global $wpdb;
         $table = $wpdb->prefix . 'ffc_orders';
 
-        // 3. Get all items in this order
+        // Get all items in this order
         $order_items = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table WHERE orderID = %s",
             $order_id
@@ -775,10 +777,26 @@
             );
         }
 
-        // 4. Calculate what needs to be refunded
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            // Verify the order belongs to the current user
+            if (!empty($order_items)) {
+                $order_user_id = intval($order_items[0]['userId']);
+                if ($order_user_id !== get_current_user_id()) {
+                    return new WP_Error(
+                        'unauthorized', 
+                        'You can only refund your own orders.', 
+                        ['status' => 403]
+                    );
+                }
+            }
+        }
+
+        // Calculate what needs to be refunded
         $items_to_refund = [];
         $total_to_refund = 0;
         $payment_intent_id = null;
+        $refunded_item_ids = []; // Track refunded item IDs
 
         foreach ($order_items as $item) {
             // Skip already refunded items
@@ -786,9 +804,15 @@
                 continue;
             }
             
+            // If item_id is specified, only refund that specific item
+            if ($item_id !== null && intval($item['id']) !== $item_id) {
+                continue; // Skip items that don't match the specified item_id
+            }
+            
             // Collect items that need refunding
             $items_to_refund[] = $item;
             $total_to_refund += floatval($item['totalPrice']);
+            $refunded_item_ids[] = intval($item['id']); // Track which items are being refunded
             
             // Get payment intent ID from any non-refunded item
             if (!$payment_intent_id && !empty($item['payment_intent_id'])) {
@@ -800,7 +824,7 @@
         if (empty($items_to_refund)) {
             return new WP_Error(
                 'already_refunded', 
-                'This order has already been fully refunded.', 
+                'This item has already been fully refunded.', 
                 ['status' => 400]
             );
         }
@@ -813,11 +837,11 @@
             );
         }
 
-        // 5. Initialize Stripe
+        // Initialize Stripe
         firefly_collective_stripe_init();
 
         try {
-            // 6. Create a partial refund for the remaining amount
+            // Create a partial refund for the remaining amount
             $refund = \Stripe\Refund::create([
                 'payment_intent' => sanitize_text_field($payment_intent_id),
                 'amount' => round($total_to_refund * 100), // Convert to cents
@@ -825,7 +849,8 @@
                 'metadata' => [
                     'order_id' => $order_id,
                     'refunded_items' => count($items_to_refund),
-                    'partial_refund' => count($items_to_refund) < count($order_items) ? 'true' : 'false'
+                    'partial_refund' => count($items_to_refund) < count($order_items) ? 'true' : 'false',
+                    'item_id' => $item_id // Include the specific item ID if set
                 ]
             ]);
 
@@ -837,7 +862,7 @@
                 );
             }
 
-            // 7. Update only the non-refunded items to 'refunded' status
+            // Update only the specified items to 'refunded' status
             $updated = 0;
             foreach ($items_to_refund as $item) {
                 $result = $wpdb->update(
@@ -860,17 +885,18 @@
                 );
             }
 
-            // 8. Send confirmation email
+            // Send confirmation email
             firefly_collective_orders_email($order_id, 'refunded');
 
             return [
                 'success' => true,
                 'message' => count($items_to_refund) < count($order_items) 
-                    ? 'Partial refund processed successfully.' 
+                    ? 'Item refunded successfully.' 
                     : 'Order refunded successfully.',
                 'refund_id' => $refund->id,
                 'amount_refunded' => $total_to_refund,
-                'items_refunded' => count($items_to_refund)
+                'items_refunded' => count($items_to_refund),
+                'refunded_item_ids' => $refunded_item_ids // Return the IDs of refunded items
             ];
 
         } catch (\Stripe\Exception\ApiErrorException $e) {

@@ -231,6 +231,21 @@
     text-align: right;
 }
 
+td.ffc-total-price {
+    position: relative;
+}
+
+td.ffc-total-price > button {
+    position: absolute;
+    right: .5rem;
+    bottom: .3rem;
+}
+
+.ffc-total-price > span {
+    display: inline-block;
+    margin-right: 1rem ;
+}
+
 .ffc-user-data {
     background-color: #fff;
     padding: 10px 15px;

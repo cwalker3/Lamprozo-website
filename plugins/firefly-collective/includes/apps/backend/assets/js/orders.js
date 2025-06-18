@@ -57,6 +57,13 @@ function initOrdersApp() {
             // Bulk actions
             const bulkAction = ref('');
             const bulkStatus = ref('pending');
+
+            // Admin check
+            const currentUserIdAdmin = ref(ordersData.currentUserIsAdmin || false);
+
+            // State for tracking item refunds
+            const itemToRefund = ref(null);
+            const showItemRefundModal = ref(false);
             
             // Filters
             const filters = ref({
@@ -77,54 +84,54 @@ function initOrdersApp() {
             
             // Computed properties
             const groupedOrders = computed(() => {
-            const groups = {};
-            
-            orders.value.forEach(order => {
-                if (!groups[order.orderID]) {
-                    groups[order.orderID] = {
-                        orderID: order.orderID,
-                        userId: order.userId,
-                        status: order.status,
-                        createdAt: order.createdAt,
-                        totalValue: 0,
-                        items: [],
-                        userData: order.userData ? JSON.parse(order.userData) : {},
-                        // Add tracking for mixed status
-                        hasPartialRefund: false,
-                        refundedAmount: 0
-                    };
-                }
+                const groups = {};
                 
-                groups[order.orderID].items.push(order);
-                groups[order.orderID].totalValue += parseFloat(order.totalPrice);
+                orders.value.forEach(order => {
+                    if (!groups[order.orderID]) {
+                        groups[order.orderID] = {
+                            orderID: order.orderID,
+                            userId: order.userId,
+                            status: order.status,
+                            createdAt: order.createdAt,
+                            totalValue: 0,
+                            items: [],
+                            userData: order.userData ? JSON.parse(order.userData) : {},
+                            // Add tracking for mixed status
+                            hasPartialRefund: false,
+                            refundedAmount: 0
+                        };
+                    }
+                    
+                    groups[order.orderID].items.push(order);
+                    groups[order.orderID].totalValue += parseFloat(order.totalPrice);
+                    
+                    // Track refunded items
+                    if (order.status === 'refunded') {
+                        groups[order.orderID].hasPartialRefund = true;
+                        groups[order.orderID].refundedAmount += parseFloat(order.totalPrice) || 0;
+                    }
+                });
                 
-                // Track refunded items
-                if (order.status === 'refunded') {
-                    groups[order.orderID].hasPartialRefund = true;
-                    groups[order.orderID].refundedAmount += parseFloat(order.totalPrice) || 0;
-                }
+                // Determine overall status for each group
+                Object.values(groups).forEach(group => {
+                    const statuses = group.items.map(item => item.status);
+                    const uniqueStatuses = [...new Set(statuses)];
+                    
+                    if (uniqueStatuses.length === 1) {
+                        // All items have the same status
+                        group.status = uniqueStatuses[0];
+                    } else if (statuses.includes('refunded') && statuses.some(s => s !== 'refunded')) {
+                        // Mixed: some refunded, some not
+                        group.status = 'partial';
+                        group.hasPartialRefund = true;
+                    } else {
+                        // Use the most recent status
+                        group.status = group.items[group.items.length - 1].status;
+                    }
+                });
+                
+                return Object.values(groups);
             });
-            
-            // Determine overall status for each group
-            Object.values(groups).forEach(group => {
-                const statuses = group.items.map(item => item.status);
-                const uniqueStatuses = [...new Set(statuses)];
-                
-                if (uniqueStatuses.length === 1) {
-                    // All items have the same status
-                    group.status = uniqueStatuses[0];
-                } else if (statuses.includes('refunded') && statuses.some(s => s !== 'refunded')) {
-                    // Mixed: some refunded, some not
-                    group.status = 'partial';
-                    group.hasPartialRefund = true;
-                } else {
-                    // Use the most recent status
-                    group.status = group.items[group.items.length - 1].status;
-                }
-            });
-            
-            return Object.values(groups);
-        });
             
             const allSelected = computed(() => {
                 return groupedOrders.value.length > 0 && selectedOrders.value.length === groupedOrders.value.length;
@@ -247,6 +254,76 @@ function initOrdersApp() {
                     }
                 });
                 return total;
+            }
+
+            // Calculate actual order value
+            function getActualOrderValue(group) {
+                let total = 0;
+                group.items.forEach(item => {
+                    // Only add to total if item is not already refunded
+                    if (item.status !== 'refunded') {
+                        total += parseFloat(item.totalPrice) || 0;
+                    }
+                });
+                return total;
+            }
+
+            // Confirm refunding a single item
+            function confirmItemRefund(orderID, itemId) {
+                currentOrderId.value = orderID;
+                itemToRefund.value = itemId;
+                showItemRefundModal.value = true;
+            }
+
+            // Refund a single item
+            async function refundItem() {
+                showItemRefundModal.value = false;
+                
+                try {
+                    loading.value = true;
+                    
+                    const response = await fetch(`${ordersData.apiUrl}refund-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderID: currentOrderId.value,
+                            itemId: itemToRefund.value,  // Send specific item ID
+                            auth_id: window.auth_id
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Update the local state without full reload
+                        updateRefundedItems(currentOrderId.value, data.refunded_item_ids);
+                        
+                        alert(data.message || 'Item refunded successfully');
+                    } else {
+                        alert(data.message || 'Failed to refund item');
+                    }
+                } catch (error) {
+                    console.error('Refund error:', error);
+                    alert('An error occurred while refunding the item');
+                } finally {
+                    loading.value = false;
+                    itemToRefund.value = null;
+                }
+            }
+
+            // Update UI after successful refund
+            function updateRefundedItems(orderID, refundedItemIds) {
+                // Update the orders array
+                orders.value.forEach(order => {
+                    if (order.orderID === orderID && refundedItemIds.includes(order.id)) {
+                        order.status = 'refunded';
+                    }
+                });
+                
+                // Force Vue to re-compute groupedOrders
+                orders.value = [...orders.value];
             }
 
             function toggleExpand(orderID) {
@@ -534,6 +611,64 @@ function initOrdersApp() {
                 });
             }
 
+            // Confirm refunding a single item
+            function confirmItemRefund(orderID, itemId) {
+                currentOrderId.value = orderID;
+                itemToRefund.value = itemId;
+                showItemRefundModal.value = true;
+            }
+
+            // Refund a single item
+            async function refundItem() {
+                showItemRefundModal.value = false;
+                
+                try {
+                    loading.value = true;
+                    
+                    const response = await fetch(`${ordersData.apiUrl}refund-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderID: currentOrderId.value,
+                            itemId: itemToRefund.value,  // Send specific item ID
+                            auth_id: window.auth_id
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Update the local state without full reload
+                        updateRefundedItems(currentOrderId.value, data.refunded_item_ids);
+                        
+                        alert(data.message || 'Item refunded successfully');
+                    } else {
+                        alert(data.message || 'Failed to refund item');
+                    }
+                } catch (error) {
+                    console.error('Refund error:', error);
+                    alert('An error occurred while refunding the item');
+                } finally {
+                    loading.value = false;
+                    itemToRefund.value = null;
+                }
+            }
+
+            // Update UI after successful refund
+            function updateRefundedItems(orderID, refundedItemIds) {
+                // Update the orders array
+                orders.value.forEach(order => {
+                    if (order.orderID === orderID && refundedItemIds.includes(parseInt(order.id))) {
+                        order.status = 'refunded';
+                    }
+                });
+                
+                // Force Vue to re-compute groupedOrders
+                orders.value = [...orders.value];
+            }
+
             function confirmRefund(orderID) {
                 currentOrderId.value = orderID;
                 showRefundModal.value = true;
@@ -786,6 +921,9 @@ function initOrdersApp() {
                 bulkAction,
                 bulkStatus,
                 allSelected,
+                currentUserIdAdmin,
+                itemToRefund,
+                showItemRefundModal,
                 
                 // Methods
                 fetchOrders,
@@ -807,6 +945,9 @@ function initOrdersApp() {
                 applyBulkAction,
                 printOrder,
                 getActualOrderValue,
+                confirmItemRefund,
+                refundItem,
+                updateRefundedItems,
                 
                 // Helper functions
                 formatOrderID,
