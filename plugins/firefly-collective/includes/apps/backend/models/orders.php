@@ -14,6 +14,18 @@
     }
     add_action('admin_menu', 'firefly_collective_add_orders_link');
 
+    function firefly_collective_add_subscriptions_link() {
+        add_menu_page(
+            'Subscriptions',
+            'Subscriptions',
+            'manage_options',
+            'subscriptions',
+            'firefly_collective_subscriptions_dashboard',
+            'dashicons-tickets-alt'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_subscriptions_link');
+
     function firefly_collective_orders_dashboard() {
         $plugin_root = dirname(plugin_dir_path(__FILE__));
         $view_path   = $plugin_root . '/views/orders.php';
@@ -23,6 +35,95 @@
             wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
         }
     }
+
+    function firefly_collective_subscriptions_dashboard() {
+        $plugin_root = dirname(plugin_dir_path(__FILE__));
+        $view_path   = $plugin_root . '/views/subscriptions.php';
+        if (file_exists($view_path)) {
+            require_once $view_path;
+        } else {
+            wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
+        }
+    }
+
+    function enqueue_orders_styles_and_scripts($hook) {
+        if ($hook !== 'toplevel_page_orders' && $hook !== 'toplevel_page_subscriptions') {
+            return;
+        }
+
+        $plugin_root_url = dirname(plugin_dir_url(__FILE__)) . '/';
+        $unique_id       = uniqid();
+        $hookName = '';
+        $nonce   = wp_create_nonce('wp_rest');
+        $api_url = get_rest_url(null, 'custom-api/v1/');
+        $theme_path = get_template_directory_uri();
+
+        // Admin only
+        global $currentUserIdAdmin;
+        $currentUserIdAdmin = current_user_can('manage_options');
+
+        // Main JS
+        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
+        wp_localize_script('main-js', 'myApi', array(
+            'themePath' => $theme_path
+        ));
+
+        // Enqueue Vue
+        wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
+
+        switch ($hook) {
+            // Orders admin
+            case "toplevel_page_orders":
+
+                // Enqueue CSS & JS
+                wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
+                wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
+
+                $obj = new stdClass();
+
+                // Localize into JS
+                $nonce   = wp_create_nonce('wp_rest');
+                $api_url = get_rest_url(null, 'custom-api/v1/');
+                
+                wp_localize_script('orders-js', 'ordersData', array(
+                    'data'   => $obj,
+                    'nonce'  => $nonce,
+                    'apiUrl' => $api_url,
+                    'currentUserIsAdmin' => $currentUserIdAdmin,
+                    'currentUserId'      => get_current_user_id(),
+                    'isPWA' => 0
+                ));
+                break;
+
+        // Subscriptions admin
+        case "toplevel_page_subscriptions":
+
+            // Enqueue CSS & JS
+            wp_enqueue_style('subscriptions-css', $plugin_root_url . 'assets/css/subscriptions.css', array(), $unique_id);
+            wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
+            wp_enqueue_script('subscriptions-js', $plugin_root_url . 'assets/js/subscriptions.js', array(), $unique_id, true);
+
+            // Get Stripe configuration
+            $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
+
+            // Enqueue Stripe
+            wp_enqueue_script('stripe-js', STRIPE_REMOTE_JS, array(), null, true);
+
+            // Localize into JS
+            $nonce   = wp_create_nonce('wp_rest');
+            $api_url = get_rest_url(null, 'custom-api/v1/');
+            wp_localize_script('subscriptions-js', 'subscriptionsData', array(
+                'nonce'              => $nonce,
+                'apiUrl'             => $api_url,
+                'currentUserIsAdmin' => $currentUserIdAdmin,
+                'currentUserId'      => get_current_user_id(),
+                'isPWA'              => 0,
+                'stripeKey'          => $publishable_key
+            ));
+            break;
+        }
+    }
+    add_action('admin_enqueue_scripts', 'enqueue_orders_styles_and_scripts');
 
     function create_ffc_orders_table_if_not_exist() {
         global $wpdb;

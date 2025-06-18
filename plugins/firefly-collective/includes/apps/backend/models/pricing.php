@@ -18,7 +18,7 @@
     add_action('admin_menu', 'firefly_collective_add_pricing_link');
 
     function enqueue_pricing_styles_and_scripts($hook) {
-        if ($hook !== 'toplevel_page_pricing' && $hook !== 'toplevel_page_orders') {
+        if ($hook !== 'toplevel_page_pricing') {
             return;
         }
 
@@ -61,36 +61,6 @@
                 wp_localize_script('pricing-js', 'pricingDataSettings', array(
                     'nonce'  => $nonce,
                     'apiUrl' => $api_url
-                ));
-                break;
-
-            // Orders admin
-            case "toplevel_page_orders":
-
-                global $currentUserIdAdmin;
-                $currentUserIdAdmin = current_user_can('manage_options');
-
-                // Enqueue CSS & JS
-                wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
-                wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-                wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
-                wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
-
-                $obj = new stdClass();
-
-                // Localize into JS
-                $nonce   = wp_create_nonce('wp_rest');
-                $api_url = get_rest_url(null, 'custom-api/v1/');
-                wp_localize_script('main-js', 'myApi', array(
-                    'themePath' => $theme_path
-                ));
-                wp_localize_script('orders-js', 'ordersData', array(
-                    'data'   => $obj,
-                    'nonce'  => $nonce,
-                    'apiUrl' => $api_url,
-                    'currentUserIsAdmin' => $currentUserIdAdmin,
-                    'currentUserId'      => get_current_user_id(),
-                    'isPWA' => 0
                 ));
                 break;
 

@@ -705,27 +705,27 @@
         if (!$user_id) {
             return new WP_Error('not_logged_in', 'You must be logged in to view subscriptions.', array('status' => 401));
         }
-        
+
         // Get active subscriptions from database
         $subscriptions = $wpdb->get_results($wpdb->prepare(
-            "SELECT DISTINCT 
-                o.subscription_id, 
-                o.subscription_status,
-                o.subscription_current_period_end,
-                MIN(o.createdAt) as started_at,
-                SUM(o.totalPrice) as total_amount,
-                GROUP_CONCAT(DISTINCT f.featureName) as features,
-                GROUP_CONCAT(DISTINCT opt.optionName) as options,
-                GROUP_CONCAT(DISTINCT opt.interval) as intervals
-            FROM {$wpdb->prefix}ffc_orders o
-            JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
-            JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
-            WHERE o.userId = %d 
-            AND o.subscription_id IS NOT NULL 
-            AND o.subscription_status IN ('active', 'trialing', 'past_due')
-            GROUP BY o.subscription_id, o.subscription_status, o.subscription_current_period_end",
-            $user_id
-        ), ARRAY_A);
+        "SELECT DISTINCT 
+            o.subscription_id, 
+            o.subscription_status,
+            o.subscription_current_period_end,
+            o.userId,  -- ADD THIS LINE
+            MIN(o.createdAt) as started_at,
+            SUM(o.totalPrice) as total_amount,
+            GROUP_CONCAT(DISTINCT f.featureName) as features,
+            GROUP_CONCAT(DISTINCT opt.optionName) as options,
+            GROUP_CONCAT(DISTINCT opt.interval) as intervals
+        FROM {$wpdb->prefix}ffc_orders o
+        JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+        JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
+        WHERE o.subscription_id IS NOT NULL 
+        AND o.subscription_status IN ('active', 'trialing', 'past_due')
+        GROUP BY o.subscription_id, o.subscription_status, o.subscription_current_period_end, o.userId",
+        $user_id
+    ), ARRAY_A);
         
         // Get payment method info from Stripe
         firefly_collective_stripe_init();
@@ -778,22 +778,7 @@
             return new WP_Error('missing_subscription_id', 'Subscription ID is required', array('status' => 400));
         }
         
-        // Verify user owns this subscription
         global $wpdb;
-        
-        $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
-        $decrypted = decrypt_with_auth_key( $raw );
-        $user_id   = intval( $decrypted );
-
-        $owns_subscription = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders 
-            WHERE userId = %d AND subscription_id = %s",
-            $user_id, $subscription_id
-        ));
-        
-        if (!$owns_subscription) {
-            return new WP_Error('unauthorized', 'You do not have permission to cancel this subscription', array('status' => 403));
-        }
         
         // Cancel in Stripe
         firefly_collective_stripe_init();
