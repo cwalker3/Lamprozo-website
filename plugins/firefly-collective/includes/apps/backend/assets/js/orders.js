@@ -77,27 +77,54 @@ function initOrdersApp() {
             
             // Computed properties
             const groupedOrders = computed(() => {
-                const groups = {};
+            const groups = {};
+            
+            orders.value.forEach(order => {
+                if (!groups[order.orderID]) {
+                    groups[order.orderID] = {
+                        orderID: order.orderID,
+                        userId: order.userId,
+                        status: order.status,
+                        createdAt: order.createdAt,
+                        totalValue: 0,
+                        items: [],
+                        userData: order.userData ? JSON.parse(order.userData) : {},
+                        // Add tracking for mixed status
+                        hasPartialRefund: false,
+                        refundedAmount: 0
+                    };
+                }
                 
-                orders.value.forEach(order => {
-                    if (!groups[order.orderID]) {
-                        groups[order.orderID] = {
-                            orderID: order.orderID,
-                            userId: order.userId,
-                            status: order.status,
-                            createdAt: order.createdAt,
-                            totalValue: 0,
-                            items: [],
-                            userData: order.userData ? JSON.parse(order.userData) : {}
-                        };
-                    }
-                    
-                    groups[order.orderID].items.push(order);
-                    groups[order.orderID].totalValue += parseFloat(order.totalPrice);
-                });
+                groups[order.orderID].items.push(order);
+                groups[order.orderID].totalValue += parseFloat(order.totalPrice);
                 
-                return Object.values(groups);
+                // Track refunded items
+                if (order.status === 'refunded') {
+                    groups[order.orderID].hasPartialRefund = true;
+                    groups[order.orderID].refundedAmount += parseFloat(order.totalPrice) || 0;
+                }
             });
+            
+            // Determine overall status for each group
+            Object.values(groups).forEach(group => {
+                const statuses = group.items.map(item => item.status);
+                const uniqueStatuses = [...new Set(statuses)];
+                
+                if (uniqueStatuses.length === 1) {
+                    // All items have the same status
+                    group.status = uniqueStatuses[0];
+                } else if (statuses.includes('refunded') && statuses.some(s => s !== 'refunded')) {
+                    // Mixed: some refunded, some not
+                    group.status = 'partial';
+                    group.hasPartialRefund = true;
+                } else {
+                    // Use the most recent status
+                    group.status = group.items[group.items.length - 1].status;
+                }
+            });
+            
+            return Object.values(groups);
+        });
             
             const allSelected = computed(() => {
                 return groupedOrders.value.length > 0 && selectedOrders.value.length === groupedOrders.value.length;
@@ -211,6 +238,17 @@ function initOrdersApp() {
                 });
             }
             
+            function getActualOrderValue(group) {
+                let total = 0;
+                group.items.forEach(item => {
+                    // Only add to total if item is not already refunded
+                    if (item.status !== 'refunded') {
+                        total += parseFloat(item.totalPrice) || 0;
+                    }
+                });
+                return total;
+            }
+
             function toggleExpand(orderID) {
                 const index = expandedOrders.value.indexOf(orderID);
                 if (index === -1) {
@@ -501,38 +539,62 @@ function initOrdersApp() {
                 showRefundModal.value = true;
             }
             
-            function refundOrder() {
-                loading.value = true;
-
-                fetch(`${ordersData.apiUrl}refund-payment`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        orderID: currentOrderId.value,
-                        auth_id: window.auth_id
-                    })
-                })
-                .then(res => res.json())
-                .then(data => {
+            async function refundOrder() {
+                showRefundModal.value = false;
+                
+                try {
+                    // First, check what's actually left to refund
+                    const orderGroup = groupedOrders.value.find(g => g.orderID === currentOrderId.value);
+                    if (!orderGroup) {
+                        alert('Order not found');
+                        return;
+                    }
+                    
+                    // Calculate what's already been refunded
+                    const alreadyRefunded = orderGroup.items
+                        .filter(item => item.status === 'refunded')
+                        .reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
+                    
+                    const remainingToRefund = orderGroup.totalValue - alreadyRefunded;
+                    
+                    if (remainingToRefund <= 0) {
+                        alert('This order has already been fully refunded.');
+                        return;
+                    }
+                    
+                    // Confirm the partial refund amount if needed
+                    if (alreadyRefunded > 0) {
+                        const confirmPartial = confirm(`This order has already been partially refunded ($${alreadyRefunded.toFixed(2)}). Do you want to refund the remaining $${remainingToRefund.toFixed(2)}?`);
+                        if (!confirmPartial) return;
+                    }
+                    
+                    loading.value = true;
+                    
+                    const response = await fetch(`${ordersData.apiUrl}refund-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderID: currentOrderId.value,
+                            auth_id: window.auth_id
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
                     if (data.success) {
-                    showRefundModal.value = false;
-                    // Update the local UI status immediately:
-                    const idx = groupedOrders.value.findIndex(g => g.orderID === currentOrderId.value);
-                    if (idx !== -1) {
-                        groupedOrders.value[idx].status = 'refunded';
-                    }
-                    selectedOrders.value = selectedOrders.value.filter(id => id !== currentOrderId.value);
+                        alert(data.message || 'Order refunded successfully');
+                        fetchOrders();
                     } else {
-                    console.error('Error refunding order:', data.message || data);
+                        alert(data.message || 'Failed to refund order');
                     }
+                } catch (error) {
+                    console.error('Refund error:', error);
+                    alert('An error occurred while refunding the order');
+                } finally {
                     loading.value = false;
-                })
-                .catch(err => {
-                    console.error('Error refunding order:', err);
-                    loading.value = false;
-                });
+                }
             }
         
             function applyBulkAction() {
@@ -744,6 +806,7 @@ function initOrdersApp() {
                 refundOrder,
                 applyBulkAction,
                 printOrder,
+                getActualOrderValue,
                 
                 // Helper functions
                 formatOrderID,

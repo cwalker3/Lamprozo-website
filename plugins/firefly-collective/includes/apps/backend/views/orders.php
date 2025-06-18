@@ -107,10 +107,25 @@
                                 {{ expandedOrders.includes(group.orderID) ? '▼' : '►' }}
                             </button>
                         </td>
-                        <td>${{ formatPrice(group.totalValue) }}</td>
+                        <td>
+                            <span v-if="!group.hasPartialRefund">
+                                ${{ formatPrice(group.totalValue) }}
+                            </span>
+                            <span v-else>
+                                ${{ formatPrice(getActualOrderValue(group)) }}
+                                <span class="ffc-original-price">
+                                    (was ${{ formatPrice(group.totalValue) }})
+                                </span>
+                            </span>
+                        </td>
                         <td>
                             <span class="ffc-status-badge" :class="'ffc-status-' + group.status">
-                                {{ capitalizeFirst(group.status) }}
+                                <template v-if="group.status === 'partial'">
+                                    Mixed
+                                </template>
+                                <template v-else>
+                                    {{ capitalizeFirst(group.status) }}
+                                </template>
                             </span>
                         </td>
                         <td>{{ formatDate(group.createdAt) }}</td>
@@ -125,9 +140,10 @@
                                 <button
                                     class="button button-small button-link-delete"
                                     @click="confirmRefund(group.orderID)"
-                                    :disabled="group.status === 'refunded'"
-                                    >
-                                    Refund
+                                    :disabled="group.status === 'refunded' || (group.totalValue - group.refundedAmount) <= 0"
+                                    :title="group.hasPartialRefund ? `Refund remaining $${formatPrice(group.totalValue - group.refundedAmount)}` : 'Refund order'"
+                                >
+                                    {{ group.hasPartialRefund ? 'Refund Rest' : 'Refund' }}
                                 </button>
                             </div>
                         </td>
@@ -140,7 +156,7 @@
                                     <thead>
                                         <tr>
                                             <th>Item</th>
-                                            <th>Options</th>
+                                            <th>Option</th>
                                             <th>Addons</th>
                                             <th>Quantity</th>
                                             <th>Price</th>
@@ -253,7 +269,7 @@
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th>Options</th>
+                            <th>Option</th>
                             <th>Addons</th>
                             <th>Quantity</th>
                             <th>Price</th>
@@ -295,13 +311,25 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="4" class="ffc-total-label">Total</td>
+                            <td colspan="4" class="ffc-total-label">Subtotal</td>
                             <td>${{ formatPrice(currentOrder.totalValue) }}</td>
+                        </tr>
+                        <tr v-if="currentOrder.refundedAmount > 0">
+                            <td colspan="4" class="ffc-total-label">Already Refunded</td>
+                            <td style="color: #dc3545;">-${{ formatPrice(currentOrder.refundedAmount) }}</td>
+                        </tr>
+                        <tr v-if="currentOrder.refundedAmount > 0">
+                            <td colspan="4" class="ffc-total-label"><strong>Current Total</strong></td>
+                            <td><strong>${{ formatPrice(currentOrder.totalValue - currentOrder.refundedAmount) }}</strong></td>
+                        </tr>
+                        <tr v-else>
+                            <td colspan="4" class="ffc-total-label"><strong>Total</strong></td>
+                            <td><strong>${{ formatPrice(currentOrder.totalValue) }}</strong></td>
                         </tr>
                         <tr v-if="parseFloat(getTotalDiscount(currentOrder)) > 0">
                             <td colspan="4"></td>
                             <td class="ffc-discount-inline" style="text-align: right;">
-                            - ${{ formatPrice(getTotalDiscount(currentOrder)) }} discount
+                                - ${{ formatPrice(getTotalDiscount(currentOrder)) }} discount
                             </td>
                         </tr>
                     </tfoot>

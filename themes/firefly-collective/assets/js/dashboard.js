@@ -903,6 +903,9 @@
                     tableHTML += rendered.html;
                     recurringTotal += rendered.price;
                 });
+
+                // When we have both one-time and recurring, add recurring to the total
+                if (oneTimeItems.length > 0) totalFinal += recurringTotal;
             }
 
             // Show totals

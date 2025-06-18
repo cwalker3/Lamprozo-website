@@ -14,10 +14,7 @@
         \Stripe\Stripe::setApiVersion('2023-10-16');
     }
 
-    // Create a payment intent
-    /**
-     * Modified create payment intent function to support customers and subscriptions
-     */
+    // Create a payment intent (for orders and subscriptions)
     function firefly_collective_create_payment_intent($request) {
         try {
             firefly_collective_stripe_init();
@@ -33,7 +30,7 @@
             global $wpdb;
             $table_name = $wpdb->prefix . 'ffc_orders';
             
-            // Get all items in this order
+            // Get all items in this order - INCLUDE THE ID FIELD
             $order_items = $wpdb->get_results($wpdb->prepare(
                 "SELECT o.*, f.featureName, f.recurring, opt.optionName, opt.interval 
                 FROM $table_name o
@@ -68,10 +65,12 @@
                 }
             }
             
-            // If we have both recurring and one-time items, we need to handle them separately
+            // Handle different payment scenarios
             if ($has_recurring && $has_one_time) {
+                // Mixed payment - use the new implementation
                 return firefly_collective_create_mixed_payment($customer, $order_id, $recurring_items, $one_time_items);
             } elseif ($has_recurring) {
+                // Subscription only
                 return firefly_collective_create_subscription($customer, $order_id, $recurring_items);
             } else {
                 // One-time payment only
@@ -242,20 +241,159 @@
     }
 
     /**
-     * Handle mixed payment (one-time + subscription)
+     * Handle mixed payment (one-time + subscription) using Stripe Invoice Items
+     * This replaces the existing firefly_collective_create_mixed_payment function
      */
     function firefly_collective_create_mixed_payment($customer, $order_id, $recurring_items, $one_time_items) {
-        // This is complex - you'd typically:
-        // 1. Create the subscription with setup intent
-        // 2. Create a separate payment intent for one-time items
-        // 3. Use Stripe Checkout or handle them sequentially
+        global $wpdb;
         
-        // For now, return an error suggesting to split the order
-        return new WP_Error(
-            'mixed_payment_types', 
-            'Please place recurring and one-time items in separate orders for now.', 
-            array('status' => 400)
-        );
+        try {
+            // Step 1: Add one-time items as invoice items to the customer
+            // These will be automatically included in the subscription's first invoice
+            foreach ($one_time_items as $item) {
+                \Stripe\InvoiceItem::create([
+                    'customer' => $customer->id,
+                    'amount' => round(floatval($item['totalPrice']) * 100), // Convert to cents
+                    'currency' => 'usd',
+                    'description' => $item['featureName'] . ' - ' . $item['optionName'] . ' (One-time)',
+                    'metadata' => [
+                        'order_id' => $order_id,
+                        'feature_id' => $item['featureId'],
+                        'option_id' => $item['optionId'],
+                        'type' => 'one_time'
+                    ]
+                ]);
+            }
+            
+            // Step 2: Create subscription items for recurring items
+            $stripe_items = [];
+            foreach ($recurring_items as $item) {
+                // Create or retrieve a product and price
+                $product = \Stripe\Product::create([
+                    'name' => $item['featureName'] . ' - ' . $item['optionName'],
+                    'metadata' => [
+                        'feature_id' => $item['featureId'],
+                        'option_id' => $item['optionId'],
+                        'order_id' => $order_id
+                    ]
+                ]);
+                
+                // Determine interval (default to monthly if not specified)
+                $interval = $item['interval'] ?: 'monthly';
+                
+                // Create a price for this product
+                $price = \Stripe\Price::create([
+                    'product' => $product->id,
+                    'unit_amount' => round(floatval($item['totalPrice']) * 100),
+                    'currency' => 'usd',
+                    'recurring' => [
+                        'interval' => $interval,
+                        'interval_count' => 1
+                    ]
+                ]);
+                
+                $stripe_items[] = [
+                    'price' => $price->id,
+                    'quantity' => 1
+                ];
+            }
+            
+            // Step 3: Create subscription (which will include the invoice items in the first invoice)
+            $subscription = \Stripe\Subscription::create([
+                'customer' => $customer->id,
+                'items' => $stripe_items,
+                'payment_behavior' => 'default_incomplete',
+                'payment_settings' => ['save_default_payment_method' => 'on_subscription'],
+                'expand' => ['latest_invoice.payment_intent'],
+                'metadata' => [
+                    'order_id' => $order_id,
+                    'wordpress_user_id' => get_current_user_id(),
+                    'has_one_time_items' => 'true'
+                ]
+            ]);
+            
+            // Step 4: Calculate total for the first invoice (subscription + one-time items)
+            $total_one_time = 0;
+            foreach ($one_time_items as $item) {
+                $total_one_time += floatval($item['totalPrice']);
+            }
+            
+            $total_recurring = 0;
+            foreach ($recurring_items as $item) {
+                $total_recurring += floatval($item['totalPrice']);
+            }
+            
+            // Step 5: Update database records
+            // Update recurring items with subscription info
+            foreach ($recurring_items as $item) {
+                $wpdb->update(
+                    $wpdb->prefix . 'ffc_orders',
+                    array(
+                        'payment_intent_id' => $subscription->latest_invoice->payment_intent->id,
+                        'subscription_id' => $subscription->id,
+                        'subscription_status' => 'active',
+                        'subscription_renewal' => date('Y-m-d H:i:s', $subscription->current_period_end),
+                        'subscription_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
+                        'subscription_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
+                        'subscription_current_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
+                        'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
+                    ),
+                    array(
+                        'orderID' => $order_id,
+                        'id' => $item['id']
+                    ),
+                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'),
+                    array('%s', '%d')
+                );
+            }
+            
+            // Update one-time items with payment intent info
+            foreach ($one_time_items as $item) {
+                $wpdb->update(
+                    $wpdb->prefix . 'ffc_orders',
+                    array(
+                        'payment_intent_id' => $subscription->latest_invoice->payment_intent->id,
+                    ),
+                    array(
+                        'orderID' => $order_id,
+                        'id' => $item['id']
+                    ),
+                    array('%s'),
+                    array('%s', '%d')
+                );
+            }
+            
+            return array(
+                'success' => true,
+                'clientSecret' => $subscription->latest_invoice->payment_intent->client_secret,
+                'type' => 'mixed',
+                'subscriptionId' => $subscription->id,
+                'totalFirstPayment' => $total_one_time + $total_recurring,
+                'recurringAmount' => $total_recurring,
+                'oneTimeAmount' => $total_one_time
+            );
+            
+        } catch (Exception $e) {
+            // If something goes wrong, clean up any created invoice items
+            try {
+                $invoice_items = \Stripe\InvoiceItem::all([
+                    'customer' => $customer->id,
+                    'pending' => true,
+                    'limit' => 100
+                ]);
+                
+                foreach ($invoice_items->data as $item) {
+                    if (isset($item->metadata->order_id) && $item->metadata->order_id === $order_id) {
+                        $item->delete();
+                    }
+                }
+            } catch (Exception $cleanup_error) {
+                // Log cleanup error but don't throw
+                error_log('Failed to cleanup invoice items: ' . $cleanup_error->getMessage());
+            }
+            
+            throw new Exception('Failed to create mixed payment: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -322,7 +460,50 @@
                     // This handles recurring subscription payments
                     $invoice = $event->data->object;
                     if ($invoice->subscription) {
-                        firefly_collective_handle_subscription_invoice_paid($invoice);
+                        // Check if this is the first invoice with one-time items
+                        $subscription = \Stripe\Subscription::retrieve($invoice->subscription);
+                        
+                        // If this is the first invoice and has one-time items, update their status
+                        if ($invoice->billing_reason === 'subscription_create' && 
+                            isset($subscription->metadata->has_one_time_items) && 
+                            $subscription->metadata->has_one_time_items === 'true') {
+                            
+                            // Update one-time items to 'paid' status
+                            global $wpdb;
+                            $order_id = $subscription->metadata->order_id;
+                            
+                            if ($order_id) {
+                                // Update all one-time items in this order to 'paid'
+                                $wpdb->update(
+                                    $wpdb->prefix . 'ffc_orders',
+                                    array('status' => 'paid'),
+                                    array(
+                                        'orderID' => $order_id,
+                                        'subscription_id' => null  // One-time items don't have subscription_id
+                                    ),
+                                    array('%s'),
+                                    array('%s', '%s')
+                                );
+                                
+                                // Also update subscription items to 'paid'
+                                $wpdb->update(
+                                    $wpdb->prefix . 'ffc_orders',
+                                    array('status' => 'paid'),
+                                    array(
+                                        'orderID' => $order_id,
+                                        'subscription_id' => $invoice->subscription
+                                    ),
+                                    array('%s'),
+                                    array('%s', '%s')
+                                );
+                                
+                                // Send confirmation email for the complete order
+                                firefly_collective_orders_email($order_id, 'paid');
+                            }
+                        } else {
+                            // Regular subscription renewal
+                            firefly_collective_handle_subscription_invoice_paid($invoice);
+                        }
                     }
                     break;
                     
@@ -557,7 +738,7 @@
      */
     function firefly_collective_refund_payment($request) {
         // 1. Verify user is logged in
-        if ( ! is_user_logged_in() ) {
+        if (!is_user_logged_in()) {
             return new WP_Error(
                 'not_logged_in', 
                 'You must be logged in to refund an order.', 
@@ -566,10 +747,10 @@
         }
 
         // 2. Get orderID from the request body
-        $params   = $request->get_json_params();
-        $order_id = isset( $params['orderID'] ) ? sanitize_text_field( $params['orderID'] ) : '';
+        $params = $request->get_json_params();
+        $order_id = isset($params['orderID']) ? sanitize_text_field($params['orderID']) : '';
 
-        if ( empty( $order_id ) ) {
+        if (empty($order_id)) {
             return new WP_Error(
                 'missing_order_id', 
                 'Order ID is required.', 
@@ -580,31 +761,75 @@
         global $wpdb;
         $table = $wpdb->prefix . 'ffc_orders';
 
-        // 3. Fetch the stored payment_intent_id (and ensure the order exists)
-        $pi_id = $wpdb->get_var( $wpdb->prepare(
-            "SELECT payment_intent_id FROM $table WHERE orderID = %s",
+        // 3. Get all items in this order
+        $order_items = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table WHERE orderID = %s",
             $order_id
-        ) );
+        ), ARRAY_A);
 
-        if ( ! $pi_id ) {
+        if (empty($order_items)) {
             return new WP_Error(
-                'no_payment_intent', 
-                'No payment intent found for this order or order not found.', 
+                'order_not_found', 
+                'Order not found.', 
                 ['status' => 404]
             );
         }
 
-        // 4. Initialize Stripe
+        // 4. Calculate what needs to be refunded
+        $items_to_refund = [];
+        $total_to_refund = 0;
+        $payment_intent_id = null;
+
+        foreach ($order_items as $item) {
+            // Skip already refunded items
+            if ($item['status'] === 'refunded') {
+                continue;
+            }
+            
+            // Collect items that need refunding
+            $items_to_refund[] = $item;
+            $total_to_refund += floatval($item['totalPrice']);
+            
+            // Get payment intent ID from any non-refunded item
+            if (!$payment_intent_id && !empty($item['payment_intent_id'])) {
+                $payment_intent_id = $item['payment_intent_id'];
+            }
+        }
+
+        // Check if there's anything to refund
+        if (empty($items_to_refund)) {
+            return new WP_Error(
+                'already_refunded', 
+                'This order has already been fully refunded.', 
+                ['status' => 400]
+            );
+        }
+
+        if (!$payment_intent_id) {
+            return new WP_Error(
+                'no_payment_intent', 
+                'No payment intent found for this order.', 
+                ['status' => 404]
+            );
+        }
+
+        // 5. Initialize Stripe
         firefly_collective_stripe_init();
 
         try {
-            // 5. Create a full refund via Stripe
+            // 6. Create a partial refund for the remaining amount
             $refund = \Stripe\Refund::create([
-                'payment_intent' => sanitize_text_field( $pi_id ),
+                'payment_intent' => sanitize_text_field($payment_intent_id),
+                'amount' => round($total_to_refund * 100), // Convert to cents
+                'reason' => 'requested_by_customer',
+                'metadata' => [
+                    'order_id' => $order_id,
+                    'refunded_items' => count($items_to_refund),
+                    'partial_refund' => count($items_to_refund) < count($order_items) ? 'true' : 'false'
+                ]
             ]);
 
-            if ( $refund->status !== 'succeeded' ) {
-                // If Stripe didn’t return `succeeded`, treat as failure
+            if ($refund->status !== 'succeeded') {
                 return new WP_Error(
                     'refund_failed', 
                     'Stripe refund status: ' . $refund->status, 
@@ -612,34 +837,43 @@
                 );
             }
 
-            // 6. Update our DB: set status = 'refunded'
-            $updated = $wpdb->update(
-                $table,
-                ['status' => 'refunded'],
-                ['orderID' => $order_id],
-                ['%s'],
-                ['%s']
-            );
+            // 7. Update only the non-refunded items to 'refunded' status
+            $updated = 0;
+            foreach ($items_to_refund as $item) {
+                $result = $wpdb->update(
+                    $table,
+                    ['status' => 'refunded'],
+                    ['id' => $item['id']], // Use the specific item ID
+                    ['%s'],
+                    ['%d']
+                );
+                if ($result !== false) {
+                    $updated += $result;
+                }
+            }
 
-            if ( $updated === false ) {
+            if ($updated === 0) {
                 return new WP_Error(
                     'db_error', 
-                    'Failed to update order status: ' . $wpdb->last_error, 
+                    'Failed to update order status in database.', 
                     ['status' => 500]
                 );
             }
 
-            // 7. Optionally, send confirmation emails (reuse your existing function)
-            firefly_collective_orders_email( $order_id, 'refunded' );
+            // 8. Send confirmation email
+            firefly_collective_orders_email($order_id, 'refunded');
 
             return [
                 'success' => true,
-                'message' => 'Order refunded successfully.',
+                'message' => count($items_to_refund) < count($order_items) 
+                    ? 'Partial refund processed successfully.' 
+                    : 'Order refunded successfully.',
                 'refund_id' => $refund->id,
+                'amount_refunded' => $total_to_refund,
+                'items_refunded' => count($items_to_refund)
             ];
 
-        } catch ( \Stripe\Exception\ApiErrorException $e ) {
-            // Catch any Stripe API error (e.g. insufficient funds, invalid PI ID, etc.)
+        } catch (\Stripe\Exception\ApiErrorException $e) {
             return new WP_Error(
                 'stripe_refund_error',
                 'Stripe error: ' . $e->getMessage(),

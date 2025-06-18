@@ -170,6 +170,28 @@
   cursor: not-allowed;
 }
 
+.ffc-original-price {
+    color: #999;
+    font-size: 0.9em;
+    text-decoration: line-through;
+    margin-left: 5px;
+}
+
+/* Visual indicator for partially refunded orders */
+.ffc-order-row.has-partial-refund {
+    background-color: #fffbf0;
+}
+
+/* Add a mixed status badge for partially refunded orders */
+.ffc-status-badge.ffc-status-partial {
+    background-color: #ff9800;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
 /* Order Details Row */
 .ffc-order-details-row {
     background-color: #f9f9f9;
