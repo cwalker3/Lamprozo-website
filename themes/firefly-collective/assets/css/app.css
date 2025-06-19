@@ -16,6 +16,10 @@ h1 {
     margin-top: 1rem;
 }
 
+h1, p, .app-nav {
+  user-select: none;
+}
+
 main {
     margin-top: 12vh; /* Adjust to account for fixed header */
     padding: 1rem;
@@ -25,7 +29,6 @@ main {
     color: white;
     padding: 1rem;
     text-align: right;
-    user-select: none;
     cursor: pointer;
 }
 
@@ -38,6 +41,16 @@ body > nav ul > li:nth-last-of-type(2) {
 
 body > nav ul > li:nth-last-of-type(3) {
   display: block !important;
+}
+
+#app-page-html {
+  margin-bottom: 2rem;
+}
+
+#app-page-html,
+.login-container {
+  display: grid;
+  justify-content: center;
 }
 
 /* PWA-specific adjustments to nav */
@@ -67,14 +80,6 @@ body > nav a {
 #site-name {
     color: white;
     font-weight: bold;
-}
-
-/* Container to center the form */
-.login-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
 }
 
 /* The card-like form */

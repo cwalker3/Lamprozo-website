@@ -177,6 +177,8 @@ document.addEventListener('DOMContentLoaded', function () {
     window.nonce    = data.nonce;
     window.http_host = data.http_host;
     window.theme_path = data.theme_path;
+    window.app_page_title = data.app_page_title;
+    window.app_page_html = data.app_page_html;
   }
 
   async function getView(view) {
@@ -212,6 +214,8 @@ document.addEventListener('DOMContentLoaded', function () {
             window.data        = dataResponse.data;
           break;
         }
+        // Clear appRoot before inserting new content
+        appRoot.innerHTML = '';
         appRoot.innerHTML = dataResponse.response_html;
       }
     } catch (err) {
@@ -255,6 +259,8 @@ document.addEventListener('DOMContentLoaded', function () {
         break;
 
       case 'log-in':
+        appRoot.innerHTML = '';
+        loadAppTitleAndAppHTML();
         loadLoginForm();
         scrollToTop();
         break;
@@ -268,6 +274,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(response => response.json())
         .then(data => {
           if (data.logout) {
+            appRoot.innerHTML = '';
+            loadAppTitleAndAppHTML();
             loadLoginForm();
             loader.style.display = 'none';
           }
@@ -459,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // Load menu function with robust error handling
+  // Initialize the app
   function appInit() {
     debugLog('Initializing App...');
     loader.style.display = 'block';
@@ -467,6 +475,16 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
         insertMenuIntoDOM(data.menu_html);
+
+        // Save app page data to IndexedDB
+        await saveToIndexedDB('app-page-data', {}, {
+          app_page_title: data.app_page_title,
+          app_page_html: data.app_page_html
+        });
+
+        loadAppTitleAndAppHTML();
+
+        // Dashboard (or log in form if not logged in)
         if (!window.auth_id) loadLoginForm();
         if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
         window.gapiDomain = data.gapiDomain;
@@ -478,6 +496,17 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.add('menu-load-failed');
         insertFallbackMenu();
       });
+  }
+
+  // App page title and HTML
+  function loadAppTitleAndAppHTML() {
+    const titleEl = document.createElement('h1');
+      titleEl.innerText = window.app_page_title;
+      const contentEl = document.createElement('div');
+      contentEl.id = 'app-page-html';
+      contentEl.innerHTML = window.app_page_html;
+      appRoot.appendChild(titleEl);
+      appRoot.appendChild(contentEl);
   }
 
   // Fallback menu for when everything fails
@@ -647,7 +676,13 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
       </div>
     `;
-    appRoot.innerHTML = loginFormHTML;
+    
+    // Create a container for the login form
+    const loginContainer = document.createElement('div');
+    loginContainer.innerHTML = loginFormHTML;
+    
+    // Append to appRoot instead of replacing
+    appRoot.appendChild(loginContainer);
 
     const appLogin = document.querySelector('#app-login');
     const appUsernameInput = document.querySelector('#app-username');
@@ -692,6 +727,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const startSignup = document.querySelector('#start-signup');
     startSignup.addEventListener('pointerup', async ()=>{
+      appRoot.innerHTML = '';
       await getView('signup');
       window.initializeSignup();
       scrollToTop();
@@ -712,6 +748,8 @@ document.addEventListener('DOMContentLoaded', function () {
           
           // Update navigation
           setupNavigation();
+
+          appRoot.innerHTML = '';
 
           // Load dashboard view
           await getView('dashboard');

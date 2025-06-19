@@ -18,9 +18,20 @@
         ));
         $menu_html = ob_get_clean();
 
+        // Get app page title and html
+        $app_page_title = '';
+        $app_page_html = '';
+        $page = get_page_by_path( 'app' );
+        $app_page_title = get_the_title( $page->ID );
+        ob_start();
+        echo apply_filters( 'the_content', $page->post_content );
+        $app_page_html = ob_get_clean();
+
         return rest_ensure_response([
             'success'           => true,
             'menu_html'         => $menu_html,
+            'app_page_html'     => $app_page_html,
+            'app_page_title'    => $app_page_title,
             'nonce'             => wp_create_nonce('wp_rest'),
             'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
             'theme_path'        => $theme_path,
