@@ -2,6 +2,34 @@
 
     // theme/models/app.php
 
+    // App initialization - returns menu + front page
+    function app_init($request) {
+        $params = $request->get_params();
+        $theme_path = get_template_directory_uri();
+        $api_url = esc_url_raw(rest_url('custom-api/v1/'));
+        $http_host = $_SERVER['HTTP_HOST'];
+
+        // Get menu HTML
+        ob_start();
+        wp_nav_menu(array(
+            'theme_location'  => 'app-menu',
+            'container_class' => 'app-menu',
+            'fallback_cb'     => false,
+        ));
+        $menu_html = ob_get_clean();
+
+        return rest_ensure_response([
+            'success'           => true,
+            'menu_html'         => $menu_html,
+            'nonce'             => wp_create_nonce('wp_rest'),
+            'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
+            'theme_path'        => $theme_path,
+            'api_url'           => $api_url,
+            'auth_id'           => $_COOKIE['auth_id'],
+            'http_host'         => $http_host
+        ]);
+    }
+
     function app_setup_nav() {
         $app_menu_name = 'App Menu';
         $menu_obj  = wp_get_nav_menu_object($app_menu_name);
@@ -34,35 +62,6 @@
         }
     }
     add_action('after_switch_theme', 'app_setup_nav');
-
-    // App initialization - returns menu + front page
-    function app_init($request) {
-        $params = $request->get_params();
-        $theme_path = get_template_directory_uri();
-        $api_url = esc_url_raw(rest_url('custom-api/v1/'));
-        $http_host = $_SERVER['HTTP_HOST'];
-
-        // Get menu HTML
-        ob_start();
-        wp_nav_menu(array(
-            'theme_location'  => 'app-menu',
-            'container_class' => 'app-menu',
-            'fallback_cb'     => false,
-        ));
-        $menu_html = ob_get_clean();
-
-        return rest_ensure_response([
-            'success'           => true,
-            'menu_html'         => $menu_html,
-            'nonce'             => wp_create_nonce('wp_rest'),
-            'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
-            'theme_path'        => $theme_path,
-            'api_url'           => $api_url,
-            'auth_id'           => $_COOKIE['auth_id'],
-            'http_host'         => $http_host
-        ]);
-    }
-
 
     function app_get_view($request) {
         $params = $request->get_params();
