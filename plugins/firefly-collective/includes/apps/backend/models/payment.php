@@ -572,6 +572,15 @@
                         firefly_collective_update_order_payment_status($order_id, 'failed');
                     }
                     break;
+                
+                case 'payment_intent.processing':
+                    // The ACH debit is pending settlement
+                    $pi = $event->data->object;
+                    firefly_collective_update_order_payment_status(
+                        $pi->metadata->order_id,
+                        'processing'
+                    );
+                    break;
                     
                 // Subscription events
                 case 'customer.subscription.created':
