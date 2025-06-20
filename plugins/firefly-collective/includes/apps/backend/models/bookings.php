@@ -467,7 +467,7 @@
         // Top-level menu
         add_menu_page(
             'My Bookings', // Title of the page
-            'My Bookings', // Text to show on the menu link
+            'Bookings', // Text to show on the menu link
             'manage_options', // Capability requirement to see the link
             'my-bookings', // The 'slug' - file to display when clicking the link
             'firefly_collective_bookings_dashboard', // Function to call when admin link is clicked
