@@ -4,6 +4,7 @@
 # Don't ignore specific files
 !/.htaccess
 !.gitignore
+!LICENSE.md
 
 # Don't ignore specific directories and their contents
 !plugins/
