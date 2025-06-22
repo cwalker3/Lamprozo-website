@@ -194,7 +194,6 @@
         $auth_id = '';
         
         if ($existing_user = get_user_by('email', $email)) {
-            update_user_meta($existing_user->ID, 'third_party', 'google');
             $auth_id = $existing_user->ID;
             $user_id = $existing_user->ID;
         } else {
@@ -215,6 +214,8 @@
                 return $response;
             }
             update_user_meta($user_id, 'third_party', 'google');
+            update_user_meta($user_id, 'custom_user', true);
+
             $auth_id = $user_id;
         }
         
@@ -227,7 +228,7 @@
         // Set auth_id cookie if the user is a subscriber
         $current_user = get_user_by('id', $auth_id);
         if ($current_user && in_array('subscriber', (array)$current_user->roles)) {
-            setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+            set_custom_user($encrypted_user_id);
         }
         
         $html = '
@@ -249,11 +250,27 @@
         return $response;
     }
 
+   add_action('template_redirect', function() {
+        if (determine_view() === 'dashboard' && empty($_COOKIE['auth_id'])) {
+            // Log the user out of WordPress
+            wp_logout();
+            
+            // Clear any additional session data if needed
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_destroy();
+            }
+            
+            // Redirect to admin login
+            wp_redirect(home_url('/admin'));
+            exit();
+        }
+    }, 1);
+
     // Hook into regular login to set the auth_id cookie for subscribers.
     function set_auth_cookie_on_wp_login($user_login, $user) {
         if (in_array('subscriber', (array)$user->roles)) {
             $encrypted_user_id = encrypt_with_auth_key($user->ID);
-            setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+            set_custom_user($encrypted_user_id);
         }
     }
     add_action('wp_login', 'set_auth_cookie_on_wp_login', 10, 2);

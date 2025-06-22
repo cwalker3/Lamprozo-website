@@ -7,14 +7,14 @@
 
     // Load models
     $models = array(
-                'init',     'rest',     
-                'meta',     'contact',
-                'signup',   'signin',   
-                'blogs',    'bookings',
-                'mail',     'view',
-                'pages',    'util',
-                'encrypt',  'profile',
-                'app');
+                'init',     'rest',
+                'user',     'meta',
+                'contact',  'signup',
+                'signin',   'blogs',
+                'bookings', 'mail',
+                'view',     'pages',
+                'util',     'encrypt',  
+                'profile',  'app');
     foreach($models as $model) {
         require_once(get_template_directory()."/models/$model.php");
     }

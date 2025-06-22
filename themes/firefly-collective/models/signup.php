@@ -41,6 +41,7 @@
         );
 
         $user_id = wp_insert_user($userdata);
+        update_user_meta($user_id, 'custom_user', true);
 
         if (is_wp_error($user_id)) {
             return new WP_Error('user_creation_failed', $user_id->get_error_message(), array('status' => 500));
@@ -90,7 +91,7 @@
         send_html_mail(NULL, $subject, $html, true);
 
         $encrypted_user_id = encrypt_with_auth_key($user_id);
-        setcookie('auth_id', $encrypted_user_id, time() + 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+        set_custom_user($encrypted_user_id);
 
         wp_set_current_user($user_id);
         wp_set_auth_cookie($user_id, true, is_ssl());
