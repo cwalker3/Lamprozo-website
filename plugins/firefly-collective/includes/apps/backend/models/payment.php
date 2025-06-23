@@ -306,29 +306,26 @@
             );
         }
         
-        // Save subscription details to orders
-        $wpdb->update(
-            $wpdb->prefix . 'ffc_orders',
-            array(
-                'payment_intent_id'               => $subscription->latest_invoice->payment_intent->id,
-                'subscription_id'                 => $subscription->id,
-                'subscription_status'             => 'active',
-                'subscription_renewal'            => date('Y-m-d H:i:s', $subscription->current_period_end),
-                'subscription_period_start'       => date('Y-m-d H:i:s', $subscription->current_period_start),
-                'subscription_period_end'         => date('Y-m-d H:i:s', $subscription->current_period_end),
-                'subscription_current_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
-                'subscription_current_period_end'   => date('Y-m-d H:i:s', $subscription->current_period_end),
-            ),
-            array(
-                'orderID' => $order_id
-            ),
-            array(
-                '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'
-            ),
-            array(
-                '%s'
-            )
-        );
+        // Save subscription details to orders (only the subscription item row)
+        foreach ( $subscription_items as $item ) {
+            $wpdb->update(
+                $wpdb->prefix . 'ffc_orders',
+                array(
+                    'payment_intent_id'               => $subscription->latest_invoice->payment_intent->id,
+                    'subscription_id'                 => $subscription->id,
+                    'subscription_status'             => 'active',
+                    'subscription_renewal'            => 0,
+                    'subscription_period_start'       => date('Y-m-d H:i:s', $subscription->current_period_start),
+                    'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
+                ),
+                array(
+                    'orderID' => $order_id,
+                    'id'      => $item['id']
+                ),
+                array('%s','%s','%s','%d','%s','%s'),
+                array('%s','%d')
+            );
+        }
 
         return array(
             'success'        => true,
@@ -354,9 +351,8 @@
                 return format_item_description($item, $wpdb);
             }, $recurring_items);
             
-            // Combine all descriptions
-            $all_descriptions = array_merge($one_time_descriptions, $recurring_descriptions);
-            $order_description = implode(" | ", $all_descriptions);
+            // Only describe the subscription line
+            $order_description = implode(" | ", $recurring_descriptions);
             
             // Calculate totals for reporting
             $total_one_time = 0;
@@ -369,7 +365,7 @@
                 $total_recurring += floatval($item['totalPrice']);
             }
             
-            // Build metadata
+            // Build metadata with clear subscription amount
             $metadata = [
                 'order_id' => $order_id,
                 'wordpress_user_id' => get_current_user_id(),
@@ -377,6 +373,7 @@
                 'has_one_time_items' => 'true',
                 'total_items' => count($one_time_items) + count($recurring_items),
                 'subscription_interval' => isset($recurring_items[0]['interval']) ? $recurring_items[0]['interval'] : 'monthly',
+                'subscription_amount_monthly' => number_format($total_recurring, 2), // Clear monthly amount
             ];
             
             // Step 1: Add one-time items as invoice items to the customer
@@ -405,13 +402,14 @@
             foreach ($recurring_items as $item) {
                 $item_desc = format_item_description($item, $wpdb);
                 
-                // Create or retrieve a product and price
+                // Create or retrieve a product with clear recurring amount in name
                 $product = \Stripe\Product::create([
-                    'name' => $item_desc,
+                    'name' => sprintf('%s ($%.2f/%s)', $item_desc, floatval($item['totalPrice']), $item['interval'] ?: 'month'),
                     'metadata' => [
                         'feature_id' => $item['featureId'],
                         'option_id' => $item['optionId'],
-                        'order_id' => $order_id
+                        'order_id' => $order_id,
+                        'recurring_amount' => floatval($item['totalPrice'])
                     ]
                 ]);
                 
@@ -443,15 +441,16 @@
                 'payment_settings' => ['save_default_payment_method' => 'on_subscription'],
                 'expand' => ['latest_invoice.payment_intent'],
                 'metadata' => $metadata,
-                'description' => $order_description
+                'description' => sprintf('%s - $%.2f/%s', $order_description, $total_recurring, $interval)
             ]);
             
-            // Step 4: Update the Payment Intent with the same description
+            // Step 4: Update the Payment Intent with a clear description
             if ($subscription && $subscription->latest_invoice && $subscription->latest_invoice->payment_intent) {
                 \Stripe\PaymentIntent::update(
                     $subscription->latest_invoice->payment_intent->id,
                     [
-                        'description' => $order_description
+                        'description' => $order_description,
+                        'statement_descriptor_suffix' => 'SUB+SETUP' // Shows on bank statement
                     ]
                 );
             }
@@ -465,17 +464,15 @@
                         'payment_intent_id' => $subscription->latest_invoice->payment_intent->id,
                         'subscription_id' => $subscription->id,
                         'subscription_status' => 'active',
-                        'subscription_renewal' => date('Y-m-d H:i:s', $subscription->current_period_end),
+                        'subscription_renewal' => 0,  // Set to 0 for initial subscription
                         'subscription_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
-                        'subscription_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
-                        'subscription_current_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
                         'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
                     ),
                     array(
                         'orderID' => $order_id,
                         'id' => $item['id']
                     ),
-                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'),
+                    array('%s', '%s', '%s', '%d', '%s', '%s'),
                     array('%s', '%d')
                 );
             }
@@ -602,48 +599,50 @@
                     // This handles recurring subscription payments
                     $invoice = $event->data->object;
                     if ($invoice->subscription) {
-                        // Check if this is the first invoice with one-time items
+                        // Check if this is the first invoice with mixed payment
                         $subscription = \Stripe\Subscription::retrieve($invoice->subscription);
                         
-                        // If this is the first invoice and has one-time items, update their status
-                        if ($invoice->billing_reason === 'subscription_create' && 
-                            isset($subscription->metadata->has_one_time_items) && 
-                            $subscription->metadata->has_one_time_items === 'true') {
-                            
-                            // Update one-time items to 'paid' status
-                            global $wpdb;
-                            $order_id = $subscription->metadata->order_id;
-                            
-                            if ($order_id) {
-                                // Update all one-time items in this order to 'paid'
-                                $wpdb->update(
-                                    $wpdb->prefix . 'ffc_orders',
-                                    array('status' => 'paid'),
-                                    array(
-                                        'orderID' => $order_id,
-                                        'subscription_id' => null  // One-time items don't have subscription_id
-                                    ),
-                                    array('%s'),
-                                    array('%s', '%s')
-                                );
+                        if ($invoice->billing_reason === 'subscription_create') {
+                            // First invoice - check if it has one-time items
+                            if (isset($subscription->metadata->has_one_time_items) && 
+                                $subscription->metadata->has_one_time_items === 'true') {
                                 
-                                // Also update subscription items to 'paid'
-                                $wpdb->update(
-                                    $wpdb->prefix . 'ffc_orders',
-                                    array('status' => 'paid'),
-                                    array(
-                                        'orderID' => $order_id,
-                                        'subscription_id' => $invoice->subscription
-                                    ),
-                                    array('%s'),
-                                    array('%s', '%s')
-                                );
+                                // Update one-time and subscription items to 'paid' status
+                                global $wpdb;
+                                $order_id = $subscription->metadata->order_id;
                                 
-                                // Send confirmation email for the complete order
-                                firefly_collective_orders_email($order_id, 'paid');
+                                if ($order_id) {
+                                    // Update all items in this order to 'paid'
+                                    $wpdb->update(
+                                        $wpdb->prefix . 'ffc_orders',
+                                        array('status' => 'paid'),
+                                        array('orderID' => $order_id),
+                                        array('%s'),
+                                        array('%s')
+                                    );
+                                    
+                                    // Send confirmation email for the complete order
+                                    firefly_collective_orders_email($order_id, 'paid');
+                                }
+                            } else {
+                                // Regular subscription creation without one-time items
+                                global $wpdb;
+                                $order_id = $subscription->metadata->order_id;
+                                
+                                if ($order_id) {
+                                    $wpdb->update(
+                                        $wpdb->prefix . 'ffc_orders',
+                                        array('status' => 'paid'),
+                                        array('orderID' => $order_id),
+                                        array('%s'),
+                                        array('%s')
+                                    );
+                                    
+                                    firefly_collective_orders_email($order_id, 'paid');
+                                }
                             }
                         } else {
-                            // Regular subscription renewal
+                            // Recurring payment - create new order
                             firefly_collective_handle_subscription_invoice_paid($invoice);
                         }
                     }
@@ -682,24 +681,39 @@
     /**
      * Handle subscription creation
      */
-    function firefly_collective_handle_subscription_created($subscription) {
+    function firefly_collective_handle_subscription_created( $subscription ) {
         global $wpdb;
-        
-        // Update the original order
-        if (isset($subscription->metadata->order_id)) {
-            $wpdb->update(
-                $wpdb->prefix . 'ffc_orders',
-                array(
-                    'subscription_id' => $subscription->id,
-                    'subscription_status' => $subscription->status,
-                    'subscription_current_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
-                    'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end)
-                ),
-                array('orderID' => $subscription->metadata->order_id),
-                array('%s', '%s', '%s', '%s'),
-                array('%s')
-            );
+
+        if ( empty( $subscription->metadata->order_id ) ) {
+            return;
         }
+
+        // 1. Find the 1 row we already stamped with subscription_id in create_subscription()
+        $original = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id
+            FROM {$wpdb->prefix}ffc_orders
+            WHERE orderID = %s
+                AND subscription_id = %s
+            LIMIT 1",
+            $subscription->metadata->order_id,
+            $subscription->id
+        ), ARRAY_A );
+
+        if ( ! $original ) {
+            return; // nothing to do
+        }
+
+        // 2. Update only that single row’s status & period_end
+        $wpdb->update(
+            "{$wpdb->prefix}ffc_orders",
+            [
+                'subscription_status'             => $subscription->status,
+                'subscription_current_period_end' => date( 'Y-m-d H:i:s', $subscription->current_period_end ),
+            ],
+            [ 'id' => $original['id'] ],
+            [ '%s', '%s' ],
+            [ '%d' ]
+        );
     }
 
     /**
@@ -713,7 +727,6 @@
             $wpdb->prefix . 'ffc_orders',
             array(
                 'subscription_status' => $subscription->status,
-                'subscription_current_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
                 'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end)
             ),
             array('subscription_id' => $subscription->id),
@@ -753,51 +766,135 @@
 
     /**
      * Handle successful subscription renewal payment
+     * Inserts any one-time invoice items, then creates a renewal order
+     * and updates the original subscription's end date.
      */
-    function firefly_collective_handle_subscription_invoice_paid($invoice) {
+    function firefly_collective_handle_subscription_invoice_paid( $invoice ) {
         global $wpdb;
         
-        // Get the original order data to clone for the renewal
-        $original_orders = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE subscription_id = %s",
-            $invoice->subscription
-        ), ARRAY_A);
+        // Fix: Use object notation instead of array notation
+        $subscriptionId = $invoice->subscription;
         
-        if (empty($original_orders)) {
+        // Add debug logging
+        error_log("Processing subscription invoice for subscription: " . $subscriptionId);
+        
+        if (!$subscriptionId) {
+            error_log("No subscription ID found in invoice");
             return;
         }
+
+        // 1. Find the very first subscription-setup order
+        $original = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_orders
+                WHERE subscription_id = %s
+                ORDER BY createdAt ASC
+                LIMIT 1",
+                $subscriptionId
+            ),
+            ARRAY_A
+        );
         
-        // Create a new order for this renewal
-        $renewal_order_id = wp_generate_uuid4();
-        
-        foreach ($original_orders as $order) {
-            $wpdb->insert(
-                $wpdb->prefix . 'ffc_orders',
-                array(
-                    'orderID' => $renewal_order_id,
-                    'payment_intent_id' => $invoice->payment_intent,
-                    'subscription_id' => $invoice->subscription,
-                    'userId' => $order['userId'],
-                    'featureId' => $order['featureId'],
-                    'optionId' => $order['optionId'],
-                    'addonIds' => $order['addonIds'],
-                    'priceSelected' => $order['priceSelected'],
-                    'quantity' => $order['quantity'],
-                    'totalPrice' => $order['totalPrice'],
-                    'totalPriceDiscount' => $order['totalPriceDiscount'],
-                    'priceDiscountsInfo' => $order['priceDiscountsInfo'],
-                    'userData' => $order['userData'],
-                    'status' => 'paid',
-                    'subscription_renewal' => 1,
-                    'subscription_period_start' => date('Y-m-d H:i:s', $invoice->period_start),
-                    'subscription_period_end' => date('Y-m-d H:i:s', $invoice->period_end),
-                    'createdAt' => current_time('mysql')
-                )
+        if ( ! $original ) {
+            error_log( "No subscription order found for {$subscriptionId}" );
+            return;
+        }
+
+        // 2. Insert any one-time invoice items as standalone orders
+        foreach ( $invoice->lines->data as $line ) {
+            // Stripe sometimes labels non-subscription lines as 'invoiceitem'
+            if ( isset($line->type) && $line->type === 'invoiceitem' ) {
+                $amount   = $line->amount / 100;
+                $quantity = ! empty( $line->quantity ) ? $line->quantity : 1;
+
+                $wpdb->insert(
+                    "{$wpdb->prefix}ffc_orders",
+                    [
+                        'orderID'                          => $original['orderID'],
+                        'payment_intent_id'                => $invoice->payment_intent,
+                        'userId'                           => $original['userId'],
+                        'featureId'                        => $original['featureId'],
+                        'optionId'                         => $original['optionId'],
+                        'addonIds'                         => $original['addonIds'],
+                        'priceSelected'                    => $original['priceSelected'],
+                        'quantity'                         => $quantity,
+                        'totalPrice'                       => $amount,
+                        'status'                           => 'paid',
+                        'createdAt'                        => current_time( 'mysql' ),
+                        'updatedAt'                        => current_time( 'mysql' ),
+                        'subscription_id'                  => null,
+                        'subscription_status'              => null,
+                        'subscription_period_start'        => null,
+                        'subscription_current_period_end'  => null,
+                        'subscription_cancelled_at'        => null,
+                    ]
+                );
+            }
+        }
+
+        // 3. Handle the recurring subscription line
+        foreach ( $invoice->lines->data as $line ) {
+            if ( $line->type !== 'subscription' ) {
+                continue;
+            }
+
+            $periodStart = date( 'Y-m-d H:i:s', $line->period->start );
+            $periodEnd   = date( 'Y-m-d H:i:s', $line->period->end );
+            $amount      = $line->amount / 100;
+            $quantity    = $line->quantity;
+
+            // Skip the first invoice (subscription creation)
+            if ($invoice->billing_reason === 'subscription_create') {
+                error_log("Skipping renewal order creation for initial subscription invoice");
+                
+                // Just update the original order's period end
+                $wpdb->update(
+                    "{$wpdb->prefix}ffc_orders",
+                    [ 'subscription_current_period_end' => $periodEnd ],
+                    [ 'id' => $original['id'] ]
+                );
+                continue;
+            }
+
+            // 3a. Insert a renewal order for actual renewals
+            error_log("Creating renewal order for subscription {$subscriptionId}");
+            
+            $result = $wpdb->insert(
+                "{$wpdb->prefix}ffc_orders",
+                [
+                    'orderID'                          => wp_generate_uuid4(), // Generate new order ID for renewal
+                    'payment_intent_id'                => $invoice->payment_intent,
+                    'userId'                           => $original['userId'],
+                    'featureId'                        => $original['featureId'],
+                    'optionId'                         => $original['optionId'],
+                    'addonIds'                         => $original['addonIds'],
+                    'priceSelected'                    => $original['priceSelected'],
+                    'quantity'                         => $quantity,
+                    'totalPrice'                       => $amount,
+                    'status'                           => 'paid',
+                    'createdAt'                        => current_time( 'mysql' ),
+                    'updatedAt'                        => current_time( 'mysql' ),
+                    'subscription_id'                  => null, // Renewal orders don't need subscription info
+                    'subscription_status'              => null,
+                    'subscription_renewal'             => 1, // Mark as renewal
+                    'subscription_period_start'        => $periodStart,
+                    'subscription_current_period_end'  => $periodEnd,
+                ]
+            );
+            
+            if ($result === false) {
+                error_log("Failed to insert renewal order: " . $wpdb->last_error);
+            } else {
+                error_log("Successfully created renewal order");
+            }
+
+            // 3b. Update the original subscription row's period end
+            $wpdb->update(
+                "{$wpdb->prefix}ffc_orders",
+                [ 'subscription_current_period_end' => $periodEnd ],
+                [ 'id' => $original['id'] ]
             );
         }
-        
-        // Send renewal confirmation email
-        firefly_collective_orders_email($renewal_order_id, 'subscription_renewed');
     }
 
     /**

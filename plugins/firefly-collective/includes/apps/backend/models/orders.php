@@ -151,8 +151,6 @@
             subscription_status VARCHAR(50) NULL,
             subscription_renewal TINYINT(1) DEFAULT 0,
             subscription_period_start DATETIME NULL,
-            subscription_period_end DATETIME NULL,
-            subscription_current_period_start DATETIME NULL,
             subscription_current_period_end DATETIME NULL,
             subscription_cancelled_at DATETIME NULL,
 
