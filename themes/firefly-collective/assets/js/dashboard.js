@@ -788,6 +788,11 @@
                 });
             });
 
+            // Determine the interval label for recurring totals
+            const recurringInterval = recurringItems.length > 0
+                ? recurringItems[0].option.interval
+                : '';
+
             // Function to render item rows
             const renderItemRow = (itemData) => {
                 const { feature, option, instance, fIndex } = itemData;
@@ -897,7 +902,8 @@
                         <td>${itemDescription}</td>
                         <td>${
                             feature.recurring
-                                ? `${fullPrice.toFixed(2)}/${option.interval || 'month'}`
+                                // Use the option.interval here
+                                ? `${fullPrice.toFixed(2)}/${option.interval}`
                                 : fullPrice.toFixed(2)
                         }</td>
                     </tr>`,
@@ -905,8 +911,6 @@
                     isRecurring: feature.recurring
                 };
             };
-
-
 
             // Render one-time items first
             if (oneTimeItems.length > 0) {
@@ -949,7 +953,7 @@
                     </tr>
                     <tr class="subtotal-row">
                         <td style="text-align: right;">Recurring Total:</td>
-                        <td>$${recurringTotal.toFixed(2)}/month</td>
+                        <td>$${recurringTotal.toFixed(2)}/${recurringInterval}</td>
                     </tr>
                     <tr class="total-row">
                         <td style="text-align: right; font-weight: bold;">Due Today:</td>
@@ -960,7 +964,7 @@
                 tableHTML += `
                     <tr class="total-row">
                         <td style="text-align: right; font-weight: bold;">Recurring Total:</td>
-                        <td id="invoice-total">$${recurringTotal.toFixed(2)}/month</td>
+                        <td id="invoice-total">$${recurringTotal.toFixed(2)}/${recurringInterval}</td>
                     </tr>`;
             } else {
                 // Only one-time

@@ -2495,8 +2495,8 @@ function showNewOptionForm(fIdx) {
   const defaultIntervalSchema = {
     level:'admin', ui_type:'array',
     value:{
-      types:['daily','bi-weekly','weekly','monthly','bi-annually','annually','none'],
-      selected:0
+      types:['day','week','month','year','none'],
+      selected:4
     }
   };
 
