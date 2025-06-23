@@ -1,4 +1,4 @@
-<!-- theme/views/app.html -->
+<!-- theme/views/app.php -->
 
 <div id="app-root"></div>
 
