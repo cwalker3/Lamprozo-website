@@ -6,7 +6,7 @@ function handleGoogleAuth () {
         googleSigninBtn.addEventListener('click', function(e) {
             let gapiEndPoint 
             if (!isPWA) gapiEndPoint  = myApi.gapiDomain  + '/wp-json/custom-api/v1/google-auth-init';
-            if (isPWA)  gapiEndPoint  = window.gapiDomain + '/wp-json/custom-api/v1/google-auth-init';
+            if (isPWA || websiteApp)  gapiEndPoint  = window.gapiDomain + '/wp-json/custom-api/v1/google-auth-init';
             let googleAuthUrl = gapiEndPoint;
             let width  = Math.min(1024, screen.width * 0.95);
             let height = Math.min(1024, screen.height * 0.95);
@@ -18,8 +18,6 @@ function handleGoogleAuth () {
 
     window.addEventListener('message', function(event) {
         if (event.data && event.data.type === 'googleSignupSuccess') {
-
-            const websiteApp = document.querySelector('#website-app'); 
 
             // App login
             if (isPWA || websiteApp) {
