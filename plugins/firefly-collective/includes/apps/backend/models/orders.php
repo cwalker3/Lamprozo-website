@@ -776,7 +776,7 @@
             }
         }
         
-        // rRebuild $items_html so that prices/right‐align, item column is first and wide,
+        // Rebuild $items_html so that prices/right‐align, item column is first and wide,
         // “Addons:” appears under that same first column, not in its own column. ──
         $items_html = '';
         foreach ($order_items as $item) {
@@ -944,9 +944,6 @@
             // for cancelled / refunded / deleted, no “thank you,” just “please contact us.”
             $closing_paragraph = "<p>If you have any questions, please contact us.</p>";
         }
-        //
-        // ── end CHANGED ──
-        //
         
         // Update the <table> so that prices are right‐aligned, item column is wide,
         // and print the single “order‐level” discount under “Order Total.” ──
@@ -1022,7 +1019,21 @@
             </body>
             </html>
         ";
-        $user_sent = send_html_mail($user->user_email, $user_subject, $user_html);
+        
+        // Set headers for HTML mail
+        $headers = array(
+            'From: Firefly Collective <donotreply@fireflycollective.org>',
+            'Reply-To: donotreply@fireflycollective.org',
+            'Content-Type: text/html; charset=UTF-8',
+        );
+
+        // Send user email
+        $user_sent = wp_mail(
+            $user->user_email,
+            $user_subject,
+            $user_html,
+            $headers
+        );
         
         $admin_subject = "Order #{$invoice_number} from {$user->display_name} is now {$status_formatted}";
         $admin_html = "
@@ -1102,7 +1113,14 @@
             </body>
             </html>
         ";
-        $admin_sent = send_html_mail(NULL, $admin_subject, $admin_html, true);
+        // Send admin notification
+        $admin_email = get_option('admin_email');
+        $admin_sent = wp_mail(
+            $admin_email, 
+            $admin_subject,
+            $admin_html,
+            $headers
+        );
 
         return ($user_sent && $admin_sent);
     }

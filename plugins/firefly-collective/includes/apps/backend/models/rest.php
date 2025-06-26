@@ -232,5 +232,15 @@
                 'permission_callback' => 'verify_rest_request'
             )
         );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/make-log',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_make_log',
+                'permission_callback' => '__return_true'
+            )
+        );
     }
     add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

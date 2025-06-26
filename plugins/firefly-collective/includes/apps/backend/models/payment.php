@@ -859,10 +859,13 @@
             // 3a. Insert a renewal order for actual renewals
             error_log("Creating renewal order for subscription {$subscriptionId}");
             
+            // Generate new order ID for renewal
+            $new_order_id = wp_generate_uuid4();
+
             $result = $wpdb->insert(
                 "{$wpdb->prefix}ffc_orders",
                 [
-                    'orderID'                          => wp_generate_uuid4(), // Generate new order ID for renewal
+                    'orderID'                          => $new_order_id, 
                     'payment_intent_id'                => $invoice->payment_intent,
                     'userId'                           => $original['userId'],
                     'featureId'                        => $original['featureId'],
@@ -885,7 +888,7 @@
             if ($result === false) {
                 error_log("Failed to insert renewal order: " . $wpdb->last_error);
             } else {
-                error_log("Successfully created renewal order");
+                firefly_collective_orders_email($new_order_id, 'paid');
             }
 
             // 3b. Update the original subscription row's period end
