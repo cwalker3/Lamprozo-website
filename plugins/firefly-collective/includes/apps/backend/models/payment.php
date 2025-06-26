@@ -113,79 +113,54 @@
     }
 
     /**
-     * Create a one-time payment using Stripe Invoice with proper line items
+     * Create a one-time payment using Stripe Payment Intent
      */
     function firefly_collective_create_one_time_payment($customer, $order_id, $items) {
         global $wpdb;
 
         try {
-            // Build deferred invoice items and collect descriptions
-            $line_items = [];
+            // Calculate total amount and build description
+            $total_amount = 0;
             $item_descriptions = [];
 
             foreach ($items as $item) {
                 $item_desc = format_item_description($item, $wpdb);
                 $item_descriptions[] = $item_desc;
-
-                $line_items[] = [
-                    'customer'    => $customer->id,
-                    'description' => $item_desc,
-                    'quantity'    => 1,
-                    'unit_amount' => round(floatval($item['totalPrice']) * 100), // cents
-                    'currency'    => 'usd',
-                    'metadata'    => [
-                        'order_id'          => $order_id,
-                        'wordpress_user_id' => get_current_user_id(),
-                        'feature_id'        => $item['featureId'],
-                        'option_id'         => $item['optionId'],
-                        'type'              => 'one_time',
-                    ],
-                ];
+                $total_amount += floatval($item['totalPrice']);
             }
 
-            // Summarize order for invoice-level description & metadata
+            // Create description
             $order_description = implode(" | ", $item_descriptions);
+            
+            // Build metadata
             $metadata = [
-                'order_id'         => $order_id,
-                'wordpress_user_id'=> get_current_user_id(),
-                'payment_type'     => 'one_time',
-                'total_items'      => count($items),
-                'features'         => implode(', ', array_unique(array_map(function($i){return $i['featureName'];}, $items))),
+                'order_id'          => $order_id,
+                'wordpress_user_id' => get_current_user_id(),
+                'payment_type'      => 'one_time',
+                'total_items'       => count($items),
+                'features'          => implode(', ', array_unique(array_map(function($i){return $i['featureName'];}, $items))),
             ];
 
-            // 1) Create a draft Invoice
-            $invoice = \Stripe\Invoice::create([
-                'customer'          => $customer->id,
-                'collection_method' => 'charge_automatically',
-                'description'       => $order_description,
-                'metadata'          => $metadata,
-                'auto_advance'      => false,  // leave as draft so we can attach items
+            // Create a Payment Intent directly
+            $payment_intent = \Stripe\PaymentIntent::create([
+                'amount'                    => round($total_amount * 100), // Convert to cents
+                'currency'                  => 'usd',
+                'customer'                  => $customer->id,
+                'description'               => $order_description,
+                'metadata'                  => $metadata,
+                'automatic_payment_methods' => [
+                    'enabled' => true,
+                ],
             ]);
 
-            // 2) Attach each prepared InvoiceItem to that draft
-            foreach ($line_items as $li) {
-                $li['invoice'] = $invoice->id;
-                \Stripe\InvoiceItem::create($li);
-            }
-
-            // 3) Finalize & immediately pay the invoice
-            $invoice      = $invoice->finalizeInvoice();
-            $paid_invoice = $invoice->pay();
-
-            // Grab the resulting PaymentIntent
-            $payment_intent_id = $paid_invoice->payment_intent;
-
-            // Update your orders table with the PaymentIntent ID
+            // Update orders table with the Payment Intent ID
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
-                ['payment_intent_id' => $payment_intent_id],
+                ['payment_intent_id' => $payment_intent->id],
                 ['orderID'          => $order_id],
                 ['%s'],
                 ['%s']
             );
-
-            // Retrieve the client secret for front-end confirmation
-            $payment_intent = \Stripe\PaymentIntent::retrieve($payment_intent_id);
 
             return [
                 'success'      => true,
@@ -194,22 +169,6 @@
             ];
 
         } catch (Exception $e) {
-            // Cleanup on failure
-            try {
-                $pending = \Stripe\InvoiceItem::all([
-                    'customer' => $customer->id,
-                    'pending'  => true,
-                    'limit'    => 100,
-                ]);
-                foreach ($pending->data as $pi) {
-                    if (isset($pi->metadata->order_id) && $pi->metadata->order_id === $order_id) {
-                        $pi->delete();
-                    }
-                }
-            } catch (Exception $cleanup) {
-                error_log('Failed cleanup of invoice items: ' . $cleanup->getMessage());
-            }
-
             throw new Exception('Failed to create one-time payment: ' . $e->getMessage());
         }
     }
