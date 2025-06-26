@@ -168,7 +168,6 @@
         dbDelta( $sql );
     }
 
-
     function firefly_collective_place_order($request) {
         global $wpdb;
         if ( ! is_user_logged_in() ) {

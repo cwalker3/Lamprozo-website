@@ -921,10 +921,23 @@
             return new WP_Error('missing_params', 'Order ID and status are required', array('status' => 400));
         }
         
+        // Check if this order has a subscription_id (meaning it's already handled by webhook)
+        global $wpdb;
+        $has_subscription = $wpdb->get_var($wpdb->prepare(
+            "SELECT subscription_id FROM {$wpdb->prefix}ffc_orders 
+            WHERE orderID = %s AND subscription_id IS NOT NULL 
+            LIMIT 1",
+            $order_id
+        ));
+        
         $updated = firefly_collective_update_order_payment_status($order_id, $status);
         
         if ($updated) {
-            firefly_collective_orders_email($order_id, $status);
+            // Only send email if it's NOT a subscription order (webhooks handle those)
+            if (!$has_subscription) {
+                firefly_collective_orders_email($order_id, $status);
+            }
+            
             return array(
                 'success' => true,
                 'message' => 'Order status updated'
