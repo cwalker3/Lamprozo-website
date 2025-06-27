@@ -232,19 +232,24 @@ document.addEventListener('DOMContentLoaded', function () {
       debugLog('Menu HTML inserted into DOM');
       
       const navAnchors = document.querySelectorAll('body > nav a');
-      for (anchor of navAnchors) {
+      navAnchors.forEach(anchor => {  // Use forEach to avoid closure issues
         const anchorText = anchor.innerText;
         const anchorSlug = anchorText.replace(/\s/g, '-').toLowerCase();
         anchor.parentElement.innerHTML = `<div class="app-nav" id="${anchorSlug}">${anchorText}</div>`;
-        
-        const appNavItem = document.querySelector(`#${anchorSlug}`);
-        if (appNavItem) {
-          appNavItem.addEventListener('pointerup', ()=>{
-            closeWebsiteMenu();
-            loadContent(anchorSlug);
-          });
-        }
-      }
+      });
+      
+      // Setup click handlers after all nav items are created
+      const appNavItems = document.querySelectorAll('.app-nav');
+      appNavItems.forEach(navItem => {
+        const navSlug = navItem.id;
+        navItem.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log(`Nav item clicked: ${navSlug}`);
+          closeWebsiteMenu(true);  // Use force parameter
+          loadContent(navSlug);
+        });
+      });
       
       setupNavigation();
       return true;
@@ -274,6 +279,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(response => response.json())
         .then(data => {
           if (data.logout) {
+            window.auth_id = null;
+            window.navData = null;
+            updateNavVisibility();
             appRoot.innerHTML = '';
             loadAppTitleAndAppHTML();
             loadLoginForm();
@@ -388,20 +396,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Show/hide based on auth (if needed)
-    if (window.navData && window.navData.auth_id) {
-      const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
-      const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
-      const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
-      const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
-      const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
-      const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
-      if (signupBtn) signupBtn.style.display = 'none';
-      if (loginBtn) loginBtn.style.display = 'none';
-      if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
-      if (dashboardBtn) dashboardBtn.style.display = 'block';
-      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
-      if (logoutBtn) logoutBtn.style.display = 'block';
-    }
+    updateNavVisibility();
     debugLog('Navigation setup complete');
   }
 
@@ -440,8 +435,8 @@ document.addEventListener('DOMContentLoaded', function () {
     debugLog('Menu opened');
   }
 
-  function closeWebsiteMenu() {
-    if (menuState.isAnimating || !menuState.isOpen) return;
+  function closeWebsiteMenu(force = false) {
+    if (!force && (menuState.isAnimating || !menuState.isOpen)) return;
     
     debugLog('Closing menu');
     menuState.isAnimating = true;
@@ -483,6 +478,33 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       menuItemEle.style.maxHeight = menuItemEle.scrollHeight + 'px';
       expandIcon.textContent = '-';
+    }
+  }
+
+  function updateNavVisibility() {
+    const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
+    const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
+    const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
+    const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+    const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+    const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
+    
+    if (window.navData && window.navData.auth_id) {
+      // User is logged in
+      if (signupBtn) signupBtn.style.display = 'none';
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
+      if (dashboardBtn) dashboardBtn.style.display = 'block';
+      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'block';
+    } else {
+      // User is logged out
+      if (signupBtn) signupBtn.style.display = 'block';
+      if (loginBtn) loginBtn.style.display = 'block';
+      if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
+      if (dashboardBtn) dashboardBtn.style.display = 'none';
+      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
+      if (logoutBtn) logoutBtn.style.display = 'none';
     }
   }
 
