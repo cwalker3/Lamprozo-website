@@ -304,6 +304,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  // Add menu state management
+  let menuState = {
+    isAnimating: false,
+    isOpen: false
+  };
+
   // Setup navigation functionality directly
   function setupNavigation() {
     debugLog('Setting up navigation');
@@ -311,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeNavBtn = document.getElementById('close-nav-btn');
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
+    
     if (!hamburger || !closeNavBtn || !nav || !backdrop) {
       console.error('Navigation elements not found', {
         hamburger: !!hamburger,
@@ -350,45 +357,35 @@ document.addEventListener('DOMContentLoaded', function () {
     nav.style.display = 'none';
     backdrop.style.display = 'none';
 
-    // Event handlers
+    // Single event handler for hamburger (use click only)
     hamburger.addEventListener('click', e => {
       debugLog('Hamburger clicked');
       e.preventDefault();
       e.stopPropagation();
-      openWebsiteMenu();
+      if (!menuState.isAnimating && !menuState.isOpen) {
+        openWebsiteMenu();
+      }
     });
-    hamburger.addEventListener('touchstart', e => {
-      debugLog('Hamburger touched');
-      e.preventDefault();
-      e.stopPropagation();
-      openWebsiteMenu();
-    }, { passive: false });
 
+    // Single event handler for close button
     closeNavBtn.addEventListener('click', e => {
       debugLog('Close button clicked');
       e.preventDefault();
       e.stopPropagation();
-      closeWebsiteMenu();
+      if (!menuState.isAnimating && menuState.isOpen) {
+        closeWebsiteMenu();
+      }
     });
-    closeNavBtn.addEventListener('touchstart', e => {
-      debugLog('Close button touched');
-      e.preventDefault();
-      e.stopPropagation();
-      closeWebsiteMenu();
-    }, { passive: false });
 
+    // Single event handler for backdrop
     backdrop.addEventListener('click', e => {
       debugLog('Backdrop clicked');
       e.preventDefault();
       e.stopPropagation();
-      closeWebsiteMenu();
+      if (!menuState.isAnimating && menuState.isOpen) {
+        closeWebsiteMenu();
+      }
     });
-    backdrop.addEventListener('touchstart', e => {
-      debugLog('Backdrop touched');
-      e.preventDefault();
-      e.stopPropagation();
-      closeWebsiteMenu();
-    }, { passive: false });
 
     // Show/hide based on auth (if needed)
     if (window.navData && window.navData.auth_id) {
@@ -409,51 +406,73 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function openWebsiteMenu() {
+    if (menuState.isAnimating || menuState.isOpen) return;
+    
     debugLog('Opening menu');
+    menuState.isAnimating = true;
+    menuState.isOpen = true;
+    
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
     const hamburger = document.getElementById('hamburger');
     const closeNavBtn = document.getElementById('close-nav-btn');
+    
     if (!nav || !backdrop || !hamburger || !closeNavBtn) {
       console.error('Elements missing for openWebsiteMenu');
+      menuState.isAnimating = false;
+      menuState.isOpen = false;
       return;
     }
+    
     nav.style.display = 'grid';
     backdrop.style.display = 'block';
-    backdrop.style.pointerEvents = 'auto';
     hamburger.style.display = 'none';
     nav.classList.remove('slide-out');
     backdrop.classList.remove('fade');
-
-    closeNavBtn.style.pointerEvents = 'none';
     closeNavBtn.style.display = 'block';
+    
+    // Allow animation to complete before accepting new inputs
     setTimeout(() => {
-      closeNavBtn.style.pointerEvents = 'auto';
-    }, 500);
+      menuState.isAnimating = false;
+      debugLog('Menu open animation complete');
+    }, 600);
+    
     debugLog('Menu opened');
   }
 
   function closeWebsiteMenu() {
+    if (menuState.isAnimating || !menuState.isOpen) return;
+    
     debugLog('Closing menu');
+    menuState.isAnimating = true;
+    menuState.isOpen = false;
+    
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
     const hamburger = document.getElementById('hamburger');
     const closeNavBtn = document.getElementById('close-nav-btn');
+    
     if (!nav || !backdrop || !hamburger || !closeNavBtn) {
       console.error('Elements missing for closeWebsiteMenu');
+      menuState.isAnimating = false;
+      menuState.isOpen = true;
       return;
     }
+    
     nav.classList.add('slide-out');
     backdrop.classList.add('fade');
-    backdrop.style.pointerEvents = 'none';
     hamburger.style.display = 'block';
     closeNavBtn.style.display = 'none';
+    
     setTimeout(() => {
       if (nav.classList.contains('slide-out')) {
         nav.style.display = 'none';
         backdrop.style.display = 'none';
       }
-    }, 500);
+      menuState.isAnimating = false;
+      debugLog('Menu close animation complete');
+    }, 600);
+    
     debugLog('Menu closed');
   }
 
