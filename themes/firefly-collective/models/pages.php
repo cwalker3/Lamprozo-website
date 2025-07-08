@@ -74,7 +74,7 @@
         // 7. Append custom links in the exact order
         $custom_links = array(
             array('title' => 'Log Out',         'url' => '/logout'),
-            array('title' => 'Log In',          'url' => '/admin'),
+            array('title' => 'Log In',          'url' => '/ffc-login'),
         );
         foreach ($custom_links as $link) {
             if (! in_array($link['title'], $existing_titles, true)) {

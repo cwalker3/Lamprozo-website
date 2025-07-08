@@ -1,5 +1,137 @@
 <?php
 
+    // Define the custom login slug using theme mod with default value
+    define('CUSTOM_LOGIN_SLUG', get_theme_mod('custom_login_slug', 'ffc-login'));
+
+    /**
+     * Register Theme Customizer settings for custom login URL
+     */
+    add_action('customize_register', 'firefly_customize_register_login_settings');
+    function firefly_customize_register_login_settings($wp_customize) {
+        // Add a new section for Security Settings
+        $wp_customize->add_section('firefly_security_settings', array(
+            'title'       => __('Security Settings', 'firefly-collective'),
+            'priority'    => 160,
+            'description' => __('Configure security-related settings for your site.', 'firefly-collective'),
+        ));
+        
+        // Add setting for custom login slug
+        $wp_customize->add_setting('custom_login_slug', array(
+            'default'           => 'ffc-login',
+            'sanitize_callback' => 'firefly_sanitize_login_slug',
+            'transport'         => 'postMessage', // Requires JS to preview, but we'll just refresh
+        ));
+        
+        // Add control for custom login slug
+        $wp_customize->add_control('custom_login_slug', array(
+            'label'       => __('Custom Login URL', 'firefly-collective'),
+            'description' => __('Enter a custom slug for your login page. Default is "ffc-login". Only lowercase letters, numbers, and hyphens allowed.', 'firefly-collective'),
+            'section'     => 'firefly_security_settings',
+            'type'        => 'text',
+            'input_attrs' => array(
+                'placeholder' => 'ffc-login',
+                'pattern'     => '[a-z0-9\-]+',
+            ),
+        ));
+        
+        // Add a notice about saving permalinks
+        $wp_customize->add_control('login_slug_notice', array(
+            'label'       => '',
+            'description' => sprintf(
+                '<strong>%s</strong> %s',
+                __('Important:', 'firefly-collective'),
+                __('After changing this setting, you may need to refresh permalinks by visiting Settings → Permalinks and clicking "Save Changes".', 'firefly-collective')
+            ),
+            'section'     => 'firefly_security_settings',
+            'type'        => 'hidden',
+            'priority'    => 11,
+        ));
+    }
+
+    /**
+     * Sanitize the login slug input
+     */
+    function firefly_sanitize_login_slug($input) {
+        // Remove any whitespace
+        $input = trim($input);
+        
+        // Convert to lowercase
+        $input = strtolower($input);
+        
+        // Remove any characters that aren't lowercase letters, numbers, or hyphens
+        $input = preg_replace('/[^a-z0-9\-]/', '', $input);
+        
+        // Remove multiple consecutive hyphens
+        $input = preg_replace('/-+/', '-', $input);
+        
+        // Remove leading/trailing hyphens
+        $input = trim($input, '-');
+        
+        // If empty after sanitization, return default
+        if (empty($input)) {
+            return 'ffc-login';
+        }
+        
+        // Ensure it's not a WordPress reserved slug
+        $reserved_slugs = array(
+            'wp-admin', 'wp-login', 'admin', 'login', 'wp-content', 
+            'wp-includes', 'wp-json', 'feed', 'rss', 'sitemap',
+            'robots', 'xmlrpc', 'trackback'
+        );
+        
+        if (in_array($input, $reserved_slugs)) {
+            return 'ffc-login';
+        }
+        
+        return $input;
+    }
+
+    /**
+     * Add JavaScript to show live preview of the login URL
+     */
+    add_action('customize_preview_init', 'firefly_customizer_live_preview');
+    function firefly_customizer_live_preview() {
+        wp_enqueue_script(
+            'firefly-customizer-preview',
+            get_template_directory_uri() . '/assets/js/customizer-preview.js',
+            array('customize-preview'),
+            wp_get_theme()->get('Version'),
+            true
+        );
+    }
+
+    /**
+     * Add admin notice after login slug is changed
+     */
+    add_action('customize_save_after', 'firefly_after_customize_save');
+    function firefly_after_customize_save($wp_customize) {
+        $old_slug = get_theme_mod('custom_login_slug', 'ffc-login');
+        $new_slug = $wp_customize->get_setting('custom_login_slug')->post_value();
+        
+        if ($old_slug !== $new_slug) {
+            // Set a transient to show admin notice
+            set_transient('firefly_login_slug_changed', true, 60);
+        }
+    }
+
+    /**
+     * Show admin notice after login slug change
+     */
+    add_action('admin_notices', 'firefly_login_slug_change_notice');
+    function firefly_login_slug_change_notice() {
+        if (get_transient('firefly_login_slug_changed')) {
+            $login_url = home_url(CUSTOM_LOGIN_SLUG);
+            ?>
+            <div class="notice notice-warning is-dismissible">
+                <p><strong><?php _e('Login URL Changed!', 'firefly-collective'); ?></strong></p>
+                <p><?php printf(__('Your new login URL is: <a href="%s">%s</a>', 'firefly-collective'), esc_url($login_url), esc_html($login_url)); ?></p>
+                <p><?php _e('Please bookmark this URL as the old login URLs will now return 404 errors.', 'firefly-collective'); ?></p>
+            </div>
+            <?php
+            delete_transient('firefly_login_slug_changed');
+        }
+    }
+
     function change_login_logo() {
         echo '<style type="text/css">
         .login h1 a { 
@@ -260,8 +392,8 @@
                 session_destroy();
             }
             
-            // Redirect to admin login
-            wp_redirect(home_url('/admin'));
+            // Redirect to custom login URL instead of /admin
+            wp_redirect(home_url(CUSTOM_LOGIN_SLUG));
             exit();
         }
     }, 1);
@@ -277,8 +409,16 @@
 
     // Redirect subscribers to /dashboard after login.
     function custom_login_redirect($redirect_to, $request, $user) {
-        if (isset($user->roles) && is_array($user->roles) && in_array('subscriber', $user->roles)) {
-            return home_url('/dashboard');
+        // Only redirect subscribers to dashboard
+        if (isset($user->roles) && is_array($user->roles)) {
+            if (in_array('subscriber', $user->roles)) {
+                return home_url('/dashboard');
+            }
+            // For admins and other roles, let them go to wp-admin
+            if (!empty($redirect_to) && $redirect_to !== admin_url()) {
+                return $redirect_to;
+            }
+            return admin_url();
         }
         return $redirect_to;
     }
@@ -294,14 +434,6 @@
         return $served;
     }, 10, 4);
 
-    // Redirect on login pages.
-    add_action('login_init', function() {
-        if (isset($_COOKIE['auth_id'])) {
-            wp_safe_redirect(home_url('/dashboard'));
-            exit;
-        }
-    });
-
     function custom_google_signin_button() {
         ?>
         <div class="google-signin-container">
@@ -315,31 +447,372 @@
 
     // Redirect on admin pages.
     add_action('admin_init', function() {
-        // Avoid interfering with AJAX requests.
-        if (isset($_COOKIE['auth_id']) && !(defined('DOING_AJAX') && DOING_AJAX)) {
-            wp_safe_redirect(home_url('/dashboard'));
-            exit;
+        // Avoid interfering with AJAX requests
+        if (defined('DOING_AJAX') && DOING_AJAX) {
+            return;
+        }
+        
+        // Only redirect subscribers with auth_id cookie
+        if (isset($_COOKIE['auth_id'])) {
+            $current_user = wp_get_current_user();
+            if ($current_user && $current_user->ID > 0) {
+                // Only redirect subscribers, let other roles access wp-admin
+                if (in_array('subscriber', (array)$current_user->roles)) {
+                    wp_safe_redirect(home_url('/dashboard'));
+                    exit;
+                }
+            }
         }
     });
 
     function custom_logout_redirect() {
         // Only intercept the exact /logout URI
         if ( untrailingslashit( $_SERVER['REQUEST_URI'] ) === '/logout' ) {
-            // 1. Log the user out of WP (clears WP’s own cookies/auth)
+            // 1. Log the user out of WP (clears WP's own cookies/auth)
             wp_logout();
-    
+
             // 2. Remove custom auth_id cookie
             if ( isset( $_COOKIE['auth_id'] ) ) {
                 setcookie( 'auth_id', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
                 unset( $_COOKIE['auth_id'] );
             }
-    
-            // 3. Redirect to WP login page
-            wp_redirect( wp_login_url() );
+
+            // 3. Redirect to custom login page
+            wp_redirect( home_url(CUSTOM_LOGIN_SLUG) );
             exit;
         }
     }
-    add_action( 'init', 'custom_logout_redirect' );    
+    add_action( 'init', 'custom_logout_redirect' ); 
+
+    /**
+     * Initialize custom login URL handling
+     */
+    add_action('init', 'custom_login_url_init', 1);
+    function custom_login_url_init() {
+        // Only proceed if we're not in admin or doing AJAX
+        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+            return;
+        }
+        
+        $request_uri = $_SERVER['REQUEST_URI'];
+        $request_path = parse_url($request_uri, PHP_URL_PATH);
+        $request = trim($request_path, '/');
+        
+        // Handle custom login URL (including with query strings)
+        if ($request === CUSTOM_LOGIN_SLUG || 
+            strpos($request, CUSTOM_LOGIN_SLUG . '/') === 0 || 
+            (strpos($request_uri, '/' . CUSTOM_LOGIN_SLUG . '?') !== false)) {
+            // Prevent redirect loops
+            if (!defined('CUSTOM_LOGIN_LOADING')) {
+                define('CUSTOM_LOGIN_LOADING', true);
+                
+                // Set global to indicate we're on the login page
+                $GLOBALS['pagenow'] = 'wp-login.php';
+                
+                // Load wp-login.php
+                require_once(ABSPATH . 'wp-login.php');
+                exit;
+            }
+        }
+        
+        // For wp-login.php, allow it if:
+        // 1. User is logged in
+        // 2. It's a login/logout action
+        // 3. There's a redirect_to parameter (post-login redirect)
+        // 4. It's coming from our custom login page
+        if (strpos($request, 'wp-login.php') !== false) {
+            if (is_user_logged_in() || 
+                isset($_GET['action']) || 
+                isset($_POST['log']) || 
+                isset($_GET['redirect_to']) || 
+                isset($_POST['redirect_to']) ||
+                isset($_GET['loggedout']) ||
+                isset($_POST['wp-submit']) ||
+                isset($_GET['reauth']) ||
+                (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], CUSTOM_LOGIN_SLUG) !== false)) {
+                return; // Allow access
+            }
+            // Otherwise, block it
+            custom_return_404();
+        }
+        
+        // Block other default login URLs for non-logged-in users
+        $blocked_paths = [
+            'wp-admin' => ['wp-admin', 'wp-admin/'],
+            'admin' => ['admin']
+        ];
+        
+        foreach ($blocked_paths as $type => $paths) {
+            foreach ($paths as $blocked) {
+                if ($request === $blocked || 
+                    strpos($request, $blocked . '/') === 0 || 
+                    strpos($request_uri, '/' . $blocked . '?') !== false) {
+                    
+                    // Allow wp-admin for logged-in users
+                    if ($type === 'wp-admin' && is_user_logged_in()) {
+                        return;
+                    }
+                    
+                    // Block everything else
+                    custom_return_404();
+                }
+            }
+        }
+    }
+
+    /**
+     * Return a proper 404 response
+     */
+    function custom_return_404() {
+        global $wp_query;
+        $wp_query->set_404();
+        status_header(404);
+        
+        // Use theme's 404 template if available
+        if ($template = locate_template('404.php')) {
+            load_template($template);
+        } else {
+            // Basic 404 response
+            header('HTTP/1.0 404 Not Found');
+            echo '<h1>404 Not Found</h1>';
+            echo '<p>The page you are looking for does not exist.</p>';
+        }
+        exit;
+    }
+
+    /**
+     * Filter login URL to use custom slug
+     */
+    add_filter('site_url', 'custom_login_url', 10, 4);
+    function custom_login_url($url, $path, $scheme, $blog_id) {
+        if (strpos($path, 'wp-login.php') !== false && !defined('CUSTOM_LOGIN_LOADING')) {
+            $args = '';
+            if (strpos($url, '?') !== false) {
+                list($base, $args) = explode('?', $url, 2);
+                $args = '?' . $args;
+            }
+            return home_url(CUSTOM_LOGIN_SLUG . '/' . $args, $scheme);
+        }
+        return $url;
+    }
+
+    /**
+     * Filter login URL
+     */
+    add_filter('login_url', 'custom_filter_login_url', 10, 3);
+    function custom_filter_login_url($login_url, $redirect, $force_reauth) {
+        if (!defined('CUSTOM_LOGIN_LOADING')) {
+            $login_url = home_url(CUSTOM_LOGIN_SLUG . '/');
+            
+            if (!empty($redirect)) {
+                $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);
+            }
+            
+            if ($force_reauth) {
+                $login_url = add_query_arg('reauth', '1', $login_url);
+            }
+        }
+        return $login_url;
+    }
+
+    /**
+     * Filter logout URL
+     */
+    add_filter('logout_url', 'custom_filter_logout_url', 10, 2);
+    function custom_filter_logout_url($logout_url, $redirect) {
+        if (!defined('CUSTOM_LOGIN_LOADING')) {
+            $args = array('action' => 'logout');
+            if (!empty($redirect)) {
+                $args['redirect_to'] = urlencode($redirect);
+            }
+            
+            $logout_url = add_query_arg($args, home_url(CUSTOM_LOGIN_SLUG . '/'));
+            $logout_url = wp_nonce_url($logout_url, 'log-out');
+        }
+        return $logout_url;
+    }
+
+    /**
+     * Filter password reset URL
+     */
+    add_filter('lostpassword_url', 'custom_filter_lostpassword_url', 10, 2);
+    function custom_filter_lostpassword_url($lostpassword_url, $redirect) {
+        if (!defined('CUSTOM_LOGIN_LOADING')) {
+            $args = array('action' => 'lostpassword');
+            if (!empty($redirect)) {
+                $args['redirect_to'] = urlencode($redirect);
+            }
+            $lostpassword_url = add_query_arg($args, home_url(CUSTOM_LOGIN_SLUG . '/'));
+        }
+        return $lostpassword_url;
+    }
+
+    /**
+     * Redirect wp-login.php form actions to custom URL
+     */
+    add_filter('login_form_action', 'custom_login_form_action', 10, 1);
+    function custom_login_form_action($action) {
+        if (!defined('CUSTOM_LOGIN_LOADING')) {
+            return home_url(CUSTOM_LOGIN_SLUG . '/');
+        }
+        return $action;
+    }
+
+    /**
+     * Update custom Google signin button script
+     */
+    add_action('login_footer', 'custom_login_google_script');
+    function custom_login_google_script() {
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const googleButton = document.getElementById('google-signin');
+            if (googleButton) {
+                googleButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const width = 500;
+                    const height = 600;
+                    const left = (screen.width - width) / 2;
+                    const top = (screen.height - height) / 2;
+                    
+                    window.open(
+                        '<?php echo esc_url(home_url('/wp-json/custom-api/v1/google-auth-init')); ?>',
+                        'google-signin',
+                        `width=${width},height=${height},left=${left},top=${top}`
+                    );
+                    
+                    // Listen for success message
+                    window.addEventListener('message', function(event) {
+                        if (event.data && event.data.type === 'googleSignupSuccess') {
+                            window.location.href = '<?php echo esc_url(home_url('/dashboard')); ?>';
+                        }
+                    });
+                });
+            }
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Disable XML-RPC for additional security
+     */
+    add_filter('xmlrpc_enabled', '__return_false');
+
+    /**
+     * Remove WordPress version from various places
+     */
+    remove_action('wp_head', 'wp_generator');
+    add_filter('the_generator', '__return_empty_string');
+
+    /**
+     * Disable login hints in error messages
+     */
+    add_filter('login_errors', 'custom_login_errors');
+    function custom_login_errors($error) {
+        // Return generic error message
+        return __('Login failed. Please check your credentials.', 'alex-strait');
+    }
+
+    /**
+     * Prevent user enumeration via author archives
+     */
+    add_action('template_redirect', 'custom_prevent_user_enumeration');
+    function custom_prevent_user_enumeration() {
+        if (is_author()) {
+            custom_return_404();
+        }
+    }
+
+    /**
+     * Block user enumeration via REST API
+     */
+    add_filter('rest_endpoints', 'custom_disable_user_endpoints');
+    function custom_disable_user_endpoints($endpoints) {
+        if (isset($endpoints['/wp/v2/users'])) {
+            unset($endpoints['/wp/v2/users']);
+        }
+        if (isset($endpoints['/wp/v2/users/(?P<id>[\d]+)'])) {
+            unset($endpoints['/wp/v2/users/(?P<id>[\d]+)']);
+        }
+        return $endpoints;
+    }
+
+    add_action('login_init', 'custom_unified_login_init', 5);
+    function custom_unified_login_init() {
+        // Add security headers
+        header('X-Frame-Options: DENY');
+        header('X-Content-Type-Options: nosniff');
+        header('X-XSS-Protection: 1; mode=block');
+        header('Referrer-Policy: no-referrer-when-downgrade');
+        
+        // Check if user has auth_id cookie or is logged in
+        if (!empty($_COOKIE['auth_id']) || is_user_logged_in()) {
+            // Don't redirect if it's a logout action
+            if (!isset($_REQUEST['action']) || $_REQUEST['action'] !== 'logout') {
+                wp_safe_redirect(home_url('/dashboard'));
+                exit;
+            }
+        }
+    }
+
+    /**
+     * Clean up and secure the custom login implementation
+     */
+    add_action('init', 'custom_login_cleanup', 99);
+    function custom_login_cleanup() {
+        // Remove hints from login page that could help attackers
+        add_filter('login_message', '__return_empty_string');
+        
+        // Disable login shake effect on error
+        add_action('login_footer', function() {
+            ?><script>
+            if (document.getElementById('login_error')) {
+                document.body.classList.remove('login-action-login');
+                document.getElementById('login').classList.remove('shake');
+            }
+            </script><?php
+        });
+    }
+
+    /**
+     * Prevent WordPress from redirecting wp-admin to login
+     * This runs before WordPress can process the request
+     */
+    add_action('parse_request', 'custom_block_wp_admin_early', 1);
+    function custom_block_wp_admin_early($wp) {
+        // Skip if in actual admin or doing AJAX
+        if (is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+            return;
+        }
+        
+        $request_uri = $_SERVER['REQUEST_URI'];
+        $request_path = parse_url($request_uri, PHP_URL_PATH);
+        $request = trim($request_path, '/');
+        
+        // Check if this is a wp-admin request
+        if ($request === 'wp-admin' || 
+            strpos($request, 'wp-admin/') === 0 || 
+            strpos($request_uri, '/wp-admin?') !== false) {
+            
+            // If user is not logged in, return 404 immediately
+            if (!is_user_logged_in()) {
+                custom_return_404();
+            }
+        }
+    }
+
+    /**
+     * Additional filter to prevent auth_redirect on wp-admin
+     */
+    add_filter('auth_redirect_scheme', 'custom_prevent_auth_redirect', 1);
+    function custom_prevent_auth_redirect($scheme) {
+        // Check if trying to access wp-admin and not logged in
+        if (strpos($_SERVER['REQUEST_URI'], '/wp-admin') !== false && !is_user_logged_in()) {
+            custom_return_404();
+        }
+        return $scheme;
+    }
 
     add_filter('determine_current_user', function( $user_id ) {
         if ( empty( $_COOKIE['auth_id'] ) ) {
