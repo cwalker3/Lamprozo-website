@@ -199,6 +199,25 @@ body > nav a {
     max-width: 75px;
 }
 
+.offline-indicator {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #333;
+  color: white;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  z-index: 9999;
+  display: none;
+  pointer-events: none;
+}
+
+body.is-offline .offline-indicator {
+  display: block;
+}
+
 /* PWA-specific overrides for nav.css */
 @media (max-width: 800px) {
     main {

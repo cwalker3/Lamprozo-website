@@ -203,52 +203,65 @@ self.addEventListener('install', event => {
   // Always skip waiting to activate immediately
   self.skipWaiting();
   
-  // Skip caching in dev mode
-  if (devMode) {
-    console.log('[SW] Dev mode enabled - skipping initial cache');
-    return;
-  }
-  
-  console.log('[SW] Production mode - caching assets');
+  // Critical files that should be cached even in dev mode for offline support
+  const criticalFiles = [
+    theme_path + '/views/app.html',
+    theme_path + '/assets/css/main.css',
+    theme_path + '/assets/css/app.css',
+    theme_path + '/assets/css/dashboard.css',
+    theme_path + '/assets/css/animations.css',
+    theme_path + '/assets/css/nav.css',
+    theme_path + '/assets/css/custom-properties.css',
+    plugin_path + '/assets/css/orders.css',
+    theme_path + '/assets/js/app.js',
+    theme_path + '/assets/js/nav.js',
+    theme_path + '/assets/js/main.js',
+    theme_path + '/assets/js/dashboard.js',
+    theme_path + '/assets/js/auth.js',
+    theme_path + '/assets/js/signup.js',
+    plugin_path + '/assets/js/orders.js',
+    theme_path + '/images/ffc-logo.webp',
+    theme_path + '/images/ffc-logo-192.webp',
+    theme_path + '/images/logo.webp',
+    theme_path + '/images/hamburger.webp',
+    theme_path + '/images/close-nav.webp',
+    theme_path + '/images/loading.gif',
+    theme_path + '/manifest.json',
+    // External libraries
+    'https://js.stripe.com/v3/',
+    'https://unpkg.com/vue@3/dist/vue.global.js',
+    'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg'
+  ];
   
   event.waitUntil(
-    Promise.all([
-      // Cache core assets
-      caches.open(STATIC_CACHE).then(async cache => {
-        console.log('[SW] Caching core assets...');
-        return Promise.all(
-          CORE_ASSETS.map(async url => {
-            try {
-              const response = await fetch(url);
-              if (response.ok) {
-                await cacheWithMetadata(STATIC_CACHE, url, response);
-              }
-            } catch (error) {
-              console.log(`[SW] Failed to cache ${url}:`, error);
-            }
-          })
-        );
-      }),
-      // Cache other assets
-      caches.open(ASSETS_CACHE).then(async cache => {
-        console.log('[SW] Caching other assets...');
-        const allOtherAssets = [...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS];
-        for (const url of allOtherAssets) {
-          try {
-            const response = await fetch(url);
-            if (response.ok) {
-              await cacheWithMetadata(ASSETS_CACHE, url, response);
-            }
-          } catch (error) {
-            console.log(`[SW] Failed to cache ${url}:`, error);
+    (async () => {
+      // Always cache critical files for offline support
+      const cache = await caches.open(STATIC_CACHE);
+      for (const file of criticalFiles) {
+        try {
+          const response = await fetch(file);
+          if (response.ok) {
+            await cache.put(file, response);
+            console.log(`[SW] Cached critical file: ${file}`);
           }
+        } catch (error) {
+          console.log(`[SW] Failed to cache critical file ${file}:`, error);
         }
-      }),
-      // Create other caches
-      caches.open(DYNAMIC_CACHE),
-      caches.open(API_CACHE),
-      caches.open(METADATA_CACHE)
-    ]).then(() => {
+      }
+      
+      // Skip the rest if in dev mode
+      if (devMode) {
+        console.log('[SW] Dev mode enabled - skipping full asset cache');
+        return;
+      }
+      
+      // Production mode - cache all assets
+      console.log('[SW] Production mode - caching all assets');
+      
+      return Promise.all([
+        // ... rest of production caching code (leave as is)
+      ]);
+    })().then(() => {
       console.log('[SW] Installation complete');
     })
   );
@@ -281,21 +294,131 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Skip non-GET/POST and cross-origin
-  if (!['GET', 'POST'].includes(request.method) || !request.url.startsWith(self.location.origin)) {
+  // Skip non-GET/POST
+  if (!['GET', 'POST'].includes(request.method)) {
     return;
   }
 
-  // In dev mode, always fetch from network
+  // Handle external resources
+  const isExternal = !request.url.startsWith(self.location.origin);
+  if (isExternal) {
+    // Cache important external resources
+    const allowedExternals = [
+      'js.stripe.com',
+      'unpkg.com',
+      'www.gstatic.com',
+      'cdnjs.cloudflare.com',
+      'm.stripe.com' // Add mobile stripe
+    ];
+
+    const shouldCache = allowedExternals.some(domain => request.url.includes(domain));
+    if (!shouldCache) {
+      return; // Let browser handle other external requests
+    }
+
+    // Handle external resources with cache-first strategy
+    event.respondWith(
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(request).then(response => {
+          // Cache the external resource
+          if (response.ok) {
+            const responseToCache = response.clone();
+            caches.open(ASSETS_CACHE).then(cache => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return response;
+        }).catch(() => {
+          // Return a fake response for Stripe to prevent errors
+          if (request.url.includes('stripe')) {
+            return new Response('', { status: 200 });
+          }
+          return new Response('External resource unavailable offline', { status: 503 });
+        });
+      })
+    );
+    return;
+  }
+
+  // Allow specific same-origin or whitelisted external domains (fallback check removed)
+
+  // Development mode - check offline status first
   if (devMode) {
     console.log('[SW] Dev mode fetch:', request.url);
     event.respondWith(
-      fetch(request.clone()).catch(() => {
-        return new Response('Dev mode: Network request failed', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      })
+      (async () => {
+        if (!navigator.onLine) {
+          console.log('[SW] Offline - going straight to cache');
+          if (request.url.includes('/wp-json/')) {
+            return new Response(JSON.stringify({
+              success: false,
+              message: 'Offline - check your connection',
+              _offline: true
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          if (request.mode === 'navigate' || request.headers.get('Accept')?.includes('text/html')) {
+            const appShellUrl = theme_path + '/views/app.html';
+            for (const cacheName of [STATIC_CACHE, DYNAMIC_CACHE]) {
+              const cache = await caches.open(cacheName);
+              const cachedResponse = await cache.match(appShellUrl);
+              if (cachedResponse) {
+                console.log('[SW] Returning cached app shell (offline)');
+                return cachedResponse;
+              }
+            }
+          }
+          for (const cacheName of [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE]) {
+            const cache = await caches.open(cacheName);
+            const cachedResponse = await cache.match(request.url);
+            if (cachedResponse) {
+              console.log('[SW] Serving from cache (offline):', request.url);
+              return cachedResponse;
+            }
+          }
+          return new Response('Resource not available offline', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        try {
+          const response = await fetch(request.clone(), { signal: controller.signal });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          console.log('[SW] Network failed or timed out, checking cache');
+          if (request.url.includes('/wp-json/')) {
+            return new Response(JSON.stringify({
+              success: false,
+              message: 'Network timeout',
+              _offline: true
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          for (const cacheName of [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE]) {
+            const cache = await caches.open(cacheName);
+            const cachedResponse = await cache.match(request.url);
+            if (cachedResponse) {
+              console.log('[SW] Serving from cache after timeout:', request.url);
+              return cachedResponse;
+            }
+          }
+          return new Response('Resource unavailable', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        }
+      })()
     );
     return;
   }

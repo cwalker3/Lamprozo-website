@@ -2521,7 +2521,14 @@
         
         // Initialize Stripe if the library is loaded
         if (typeof Stripe !== 'undefined' && dashboardData.stripeKey) {
-            stripe = Stripe(dashboardData.stripeKey);
+            
+            if (window.Stripe && navigator.onLine) {
+                // Initialize Stripe only when online
+                stripe = Stripe(dashboardData.stripeKey);
+            } else {
+                console.log('Stripe not available offline');
+                // Disable payment features or show offline message
+            }
             
             // Check URL parameters for payment status
             checkPaymentStatus();

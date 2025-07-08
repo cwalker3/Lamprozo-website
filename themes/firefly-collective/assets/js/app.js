@@ -1,6 +1,7 @@
 // theme/assets/js/app.js
 
 document.addEventListener('DOMContentLoaded', function () {
+
   const devMode = true;
   const api_url = `${window.location.origin}/wp-json/custom-api/v1/`;
   const DB_NAME = 'ffc-app-db';
@@ -98,28 +99,33 @@ document.addEventListener('DOMContentLoaded', function () {
   // Fetch API with offline support and 1-hour cache strategy (not in dev mode)
   async function fetchWithOfflineSupport(endpoint, method = 'GET', params = {}) {
     const url = `${api_url}${endpoint}`;
-    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
-
-    // ===== 1) DEV MODE: Network-only with no-store, then cache to IndexedDB =====
+    
     if (devMode) {
       debugLog('DevMode: network-only fetch:', url);
       try {
         const options = {
           method,
           headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store'                     // bypass HTTP + SW caches
+          cache: 'no-store'
         };
         if (method === 'POST') options.body = JSON.stringify(params);
 
-        const response = await fetch(url, options);  // The actual fetch
+        const response = await fetch(url, options);
         if (!response.ok) {
           throw new Error(`Network error (${response.status})`);
         }
+        
         const data = await response.json();
+        
+        // Check for offline response
+        if (data._offline) {
+          throw new Error('Offline response detected');
+        }
+        
         setAuthId(data.auth_id);
         setAppData(data);
-
-        // Persist fresh data into IndexedDB for offline use
+        
+        // Save to IndexedDB
         await saveToIndexedDB(endpoint, params, data);
         return data;
       } catch (err) {
@@ -183,44 +189,115 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function getView(view) {
     loader.style.display = 'block';
+    
     try {
-      const url = `${window.api_url}app-get-view`;
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-
-      };
-      options.body = JSON.stringify({ view });
-
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        throw new Error(`Network error (${response.status})`);
+      const endpoint = 'app-get-view';
+      const params = { view };
+      let dataResponse;
+      let isOffline = false;
+      
+      // First, try network
+      try {
+        const url = `${window.api_url}${endpoint}`;
+        const options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(params)
+        };
+        
+        if (devMode) {
+          options.cache = 'no-store';
+        }
+        
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`Network error (${response.status})`);
+        }
+        
+        dataResponse = await response.json();
+        
+        // Check if this is an offline response from service worker
+        if (dataResponse._offline || !dataResponse.success) {
+          console.log('Got offline response from service worker, trying IndexedDB');
+          throw new Error('Offline response - fallback to IndexedDB');
+        }
+        
+        // Save successful response to IndexedDB
+        if (dataResponse.success) {
+          await saveToIndexedDB(`view:${view}`, {}, {
+            ...dataResponse,
+            timestamp: Date.now()
+          });
+        }
+      } catch (networkError) {
+        console.warn('Network failed or offline, trying IndexedDB:', networkError);
+        isOffline = true;
+        
+        // Try IndexedDB
+        try {
+          const cachedData = await getFromIndexedDB(`view:${view}`, {});
+          dataResponse = cachedData;
+          console.log('Loaded view from IndexedDB:', view);
+        } catch (cacheError) {
+          console.error('View not available in IndexedDB:', cacheError);
+          loader.style.display = 'none';
+          
+          // Show offline message
+          appRoot.innerHTML = `
+            <div class="offline-message" style="text-align: center; padding: 40px 20px;">
+              <h2>This view is not available offline</h2>
+              <p>The "${view}" page hasn't been loaded yet while online.</p>
+              <p>Please connect to the internet and try again.</p>
+              <button onclick="window.location.reload()" class="btn" style="margin-top: 20px;">
+                Try Again
+              </button>
+            </div>
+          `;
+          return;
+        }
       }
-
-      const dataResponse = await response.json();
-      if (dataResponse.success) {
+      
+      // Process the response
+      if (dataResponse && dataResponse.success) {
         loader.style.display = 'none';
+        
+        // Update window variables
         switch (view) {
           case 'dashboard':
-            window.theme_path  = dataResponse.theme_path;
-            window.features    = dataResponse.features;
-            window.stripeKey   = dataResponse.stripeKey;
-          break;
-
+            window.theme_path = dataResponse.theme_path;
+            window.features = dataResponse.features;
+            window.stripeKey = dataResponse.stripeKey;
+            break;
+            
           case 'order-history':
-            window.apiUrl      = dataResponse.apiUrl;
-            window.data        = dataResponse.data;
-          break;
+            window.apiUrl = dataResponse.apiUrl;
+            window.data = dataResponse.data;
+            break;
         }
-        // Clear appRoot before inserting new content
+        
+        // Insert HTML
         appRoot.innerHTML = '';
         appRoot.innerHTML = dataResponse.response_html;
+      } else {
+        throw new Error('Invalid response data');
       }
+      
     } catch (err) {
       loader.style.display = 'none';
-      console.warn('the network failed:', err);
+      console.error('Failed to load view:', err);
+      
+      // Show error message
+      appRoot.innerHTML = `
+        <div class="error-message" style="text-align: center; padding: 40px 20px;">
+          <h2>Unable to load this view</h2>
+          <p>There was an error loading the "${view}" page.</p>
+          <button onclick="window.location.reload()" class="btn" style="margin-top: 20px;">
+            Refresh Page
+          </button>
+        </div>
+      `;
     }
   }
 
@@ -252,6 +329,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       
       setupNavigation();
+      updateNavVisibility();
       return true;
     }
     return false;
@@ -272,35 +350,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
       case 'log-out':
         loader.style.display = 'block';
-        fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
-          headers: {
-              'Content-Type': 'application/json'
-          }
-        }).then(response => response.json())
-        .then(data => {
-          if (data.logout) {
-            window.auth_id = null;
-            window.navData = null;
-            updateNavVisibility();
-            appRoot.innerHTML = '';
-            loadAppTitleAndAppHTML();
-            loadLoginForm();
-            loader.style.display = 'none';
-          }
-        })
-        .catch(error => {
-          console.error('Error logging out:', error);
+        
+        // If offline, just clear local data
+        if (!navigator.onLine) {
+          window.auth_id = null;
+          window.navData = null;
+          
+          // Clear auth from IndexedDB
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          store.delete('user-auth:{}');
+          
+          updateNavVisibility();
+          appRoot.innerHTML = '';
+          loadAppTitleAndAppHTML();
+          loadLoginForm();
           loader.style.display = 'none';
-        });
-        scrollToTop();
-        break;
+          scrollToTop();
+          break;
+        }
 
       case 'dashboard':
-        window.resetDashboard();
+        // Only call resetDashboard if it exists
+        if (window.resetDashboard && typeof window.resetDashboard === 'function') {
+          window.resetDashboard();
+        }
         await getView('dashboard');
         if (document.getElementById('features-container')) {
+          if (window.initializeDashboard && typeof window.initializeDashboard === 'function') {
             window.initializeDashboard();
-            scrollToTop();
+          }
+          scrollToTop();
         }
         break;
 
@@ -512,10 +592,75 @@ document.addEventListener('DOMContentLoaded', function () {
   function appInit() {
     debugLog('Initializing App...');
     loader.style.display = 'block';
-    return fetchWithOfflineSupport('app-init', 'POST')
+    
+    // First, try to restore auth from IndexedDB - with better error handling
+    return getFromIndexedDB('user-auth', {})
+      .then(authData => {
+        if (authData && authData.auth_id) {
+          console.log('Restored auth from IndexedDB:', authData.auth_id);
+          window.auth_id = authData.auth_id;
+          window.navData = { auth_id: authData.auth_id };
+          return true; // Auth restored successfully
+        }
+        return false; // No auth found
+      })
+      .catch(() => {
+        console.log('No saved auth found');
+        return false; // No auth found
+      })
+      .then((authRestored) => {
+        // If offline and no cached app-init data, use what we have
+        if (!navigator.onLine) {
+          return getFromIndexedDB('app-init', {})
+            .then(cachedData => {
+              console.log('Using cached app-init data');
+              // Set the app data from cache
+              if (cachedData) {
+                setAuthId(cachedData.auth_id || window.auth_id);
+                setAppData(cachedData);
+              }
+              return cachedData;
+            })
+            .catch(() => {
+              console.log('No cached app-init, creating minimal data');
+              // Return minimal data structure
+              return {
+                success: true,
+                menu_html: null,
+                app_page_title: 'App',
+                app_page_html: 'Welcome to the app'
+              };
+            });
+        }
+        
+        // Online - fetch normally
+        return fetchWithOfflineSupport('app-init', 'POST');
+      })
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
-        insertMenuIntoDOM(data.menu_html);
+        
+        // Insert menu into DOM
+        const menuInserted = insertMenuIntoDOM(data.menu_html);
+        
+        // If menu wasn't inserted but we have cached menu, try that
+        if (!menuInserted && !navigator.onLine) {
+          try {
+            const cachedMenu = await getFromIndexedDB('menu-html', {});
+            if (cachedMenu && cachedMenu.menu_html) {
+              insertMenuIntoDOM(cachedMenu.menu_html);
+            }
+          } catch (e) {
+            console.log('No cached menu available');
+          }
+        }
+        
+        // Always save menu HTML separately for offline use
+        if (data.menu_html) {
+          await saveToIndexedDB('menu-html', {}, {
+            menu_html: data.menu_html,
+            timestamp: Date.now()
+          });
+        }
 
         // Save app page data to IndexedDB
         await saveToIndexedDB('app-page-data', {}, {
@@ -526,28 +671,68 @@ document.addEventListener('DOMContentLoaded', function () {
         loadAppTitleAndAppHTML();
 
         // Dashboard (or log in form if not logged in)
-        if (!window.auth_id) loadLoginForm();
-        if (window.auth_id) await getView('dashboard'), window.initializeDashboard();
+        if (!window.auth_id) {
+          loadLoginForm();
+        } else {
+          await getView('dashboard');
+          if (window.initializeDashboard) {
+            window.initializeDashboard();
+          }
+        }
+        
         window.gapiDomain = data.gapiDomain;
         loader.style.display = 'none';
       })
-      .catch(error => {
-        console.error('Failed to load menu:', error);
-        document.body.classList.remove('loading-menu');
-        document.body.classList.add('menu-load-failed');
-        insertFallbackMenu();
+      .catch(async error => {
+        console.error('Failed to load app:', error);
+        loader.style.display = 'none';
+        
+        // Try to load cached data if available
+        try {
+          const cachedMenu = await getFromIndexedDB('menu-html', {});
+          const cachedAppData = await getFromIndexedDB('app-page-data', {});
+          
+          if (cachedMenu && cachedMenu.menu_html) {
+            insertMenuIntoDOM(cachedMenu.menu_html);
+          }
+          
+          if (cachedAppData) {
+            window.app_page_title = cachedAppData.app_page_title;
+            window.app_page_html = cachedAppData.app_page_html;
+          }
+          
+          loadAppTitleAndAppHTML();
+          
+          if (!window.auth_id) {
+            loadLoginForm();
+          } else {
+            // Try to load cached dashboard
+            await getView('dashboard');
+            if (window.initializeDashboard) {
+              window.initializeDashboard();
+            }
+          }
+        } catch (e) {
+          console.error('No cached data available:', e);
+          insertFallbackMenu();
+        }
       });
   }
 
   // App page title and HTML
   function loadAppTitleAndAppHTML() {
+    if (!window.app_page_title || !window.app_page_html) {
+      console.log('App page data not available');
+      return;
+    }
+    
     const titleEl = document.createElement('h1');
-      titleEl.innerText = window.app_page_title;
-      const contentEl = document.createElement('div');
-      contentEl.id = 'app-page-html';
-      contentEl.innerHTML = window.app_page_html;
-      appRoot.appendChild(titleEl);
-      appRoot.appendChild(contentEl);
+    titleEl.innerText = window.app_page_title;
+    const contentEl = document.createElement('div');
+    contentEl.id = 'app-page-html';
+    contentEl.innerHTML = window.app_page_html;
+    appRoot.appendChild(titleEl);
+    appRoot.appendChild(contentEl);
   }
 
   // Fallback menu for when everything fails
@@ -638,12 +823,19 @@ document.addEventListener('DOMContentLoaded', function () {
   function updateOnlineStatus() {
     const condition = navigator.onLine ? "online" : "offline";
     console.log(`Connection status: ${condition}`);
+    
+    // Control the offline indicator that's already in the HTML
+    const offlineIndicator = document.querySelector('.offline-indicator');
+    
     if (condition === "offline") {
       document.body.classList.add('is-offline');
+      if (offlineIndicator) {
+        offlineIndicator.style.display = 'block';
+      }
     } else {
       document.body.classList.remove('is-offline');
-      if (db) {
-        appInit();
+      if (offlineIndicator) {
+        offlineIndicator.style.display = 'none';
       }
     }
   }
@@ -673,6 +865,41 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(() => debugLog('Menu data preloaded'))
         .catch(() => debugLog('Menu preload failed'));
     }, 5000);
+  }
+
+  // Preload views when online to ensure offline availability
+  if (navigator.onLine) {
+    setTimeout(() => {
+      const viewsToPreload = ['dashboard', 'order-history', 'signup'];
+      
+      viewsToPreload.forEach((view, index) => {
+        // Stagger the preloading to avoid overwhelming the server
+        setTimeout(() => {
+          // Only preload if user is authenticated (for protected views)
+          if (view === 'signup' || window.auth_id) {
+            console.log(`Preloading view: ${view}`);
+            
+            // Use a hidden fetch to cache the view
+            fetch(`${window.api_url}app-get-view`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ view })
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                saveToIndexedDB(`view:${view}`, {}, {
+                  ...data,
+                  timestamp: Date.now()
+                });
+                console.log(`View preloaded: ${view}`);
+              }
+            })
+            .catch(() => console.log(`Failed to preload view: ${view}`));
+          }
+        }, index * 2000); // 2 second delay between each preload
+      });
+    }, 10000); // Start preloading 10 seconds after app init
   }
 
   // Safety measure for hamburger menu delegation
