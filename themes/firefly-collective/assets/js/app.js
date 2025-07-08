@@ -353,22 +353,36 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // If offline, just clear local data
         if (!navigator.onLine) {
-          window.auth_id = null;
-          window.navData = null;
-          
-          // Clear auth from IndexedDB
-          const transaction = db.transaction([STORE_NAME], 'readwrite');
-          const store = transaction.objectStore(STORE_NAME);
-          store.delete('user-auth:{}');
-          
-          updateNavVisibility();
-          appRoot.innerHTML = '';
-          loadAppTitleAndAppHTML();
-          loadLoginForm();
           loader.style.display = 'none';
-          scrollToTop();
-          break;
+          clearUser();
         }
+
+        else {
+          // Logout endpoint
+          fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+          }).then(response => response.json())
+          .then(data => {
+            if (data.logout) {
+              
+              // Also reset dashboard if it has a similar pattern
+              if (window.resetDashboard) {
+                window.resetDashboard();
+              }
+
+              clearUser();
+              loader.style.display = 'none';
+            }
+          })
+          .catch(error => {
+            console.error('Error logging out:', error);
+            loader.style.display = 'none';
+          });
+        }
+        scrollToTop();
+        break;
 
       case 'dashboard':
         // Only call resetDashboard if it exists
@@ -390,6 +404,21 @@ document.addEventListener('DOMContentLoaded', function () {
         scrollToTop();
         break;
     }
+  }
+
+  // Clear user from system and load form
+  function clearUser() {
+    window.auth_id = null;
+    window.navData = null;
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete('user-auth:{}');
+    
+    updateNavVisibility();
+    appRoot.innerHTML = '';
+    loadAppTitleAndAppHTML();
+    loadLoginForm();
+    scrollToTop();
   }
 
   // Add menu state management
