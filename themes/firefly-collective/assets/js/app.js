@@ -703,6 +703,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!window.auth_id) {
           loadLoginForm();
         } else {
+          setSubscriptionStatus();
           await getView('dashboard');
           if (window.initializeDashboard) {
             window.initializeDashboard();
@@ -929,6 +930,51 @@ document.addEventListener('DOMContentLoaded', function () {
         }, index * 2000); // 2 second delay between each preload
       });
     }, 10000); // Start preloading 10 seconds after app init
+  }
+
+  // Subscription status check function
+  async function setSubscriptionStatus(forceRefresh = false) {
+    const cacheKey = 'subscription-status';
+    
+    // If offline and not forcing refresh, return cached status
+    if (!navigator.onLine && !forceRefresh) {
+      try {
+        const cached = await getFromIndexedDB(cacheKey, {});
+        return cached;
+      } catch (e) {
+        return { has_active_subscription: false, status: 'not_paid' };
+      }
+    }
+    
+    try {
+      // Check subscription status via API
+      const response = await fetchWithOfflineSupport('check-subscription-status', 'GET');
+      
+      if (response.success) {
+        // Cache the result
+        await saveToIndexedDB(cacheKey, {}, {
+          ...response,
+          timestamp: Date.now()
+        });
+        
+        // Store in window for quick access
+        window.subscriptionStatus = response;
+        
+        return response;
+      }
+    } catch (error) {
+      console.error('Failed to check subscription status:', error);
+      
+      // Try to get cached status
+      try {
+        const cached = await getFromIndexedDB(cacheKey, {});
+        return cached;
+      } catch (e) {
+        return { has_active_subscription: false, status: 'not_paid' };
+      }
+    }
+    
+    return { has_active_subscription: false, status: 'not_paid' };
   }
 
   // Safety measure for hamburger menu delegation

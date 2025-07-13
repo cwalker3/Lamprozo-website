@@ -623,6 +623,126 @@
         );
     }
 
+    /**
+     * Check if a user has an active subscription based on database data
+     */
+    function firefly_collective_check_subscription_status($request) {
+        global $wpdb;
+        
+        // Get user ID from request or current user
+        $user_id = $request->get_param('user_id');
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return new WP_Error('not_logged_in', 'User not found', array('status' => 401));
+        }
+        
+        // Check permissions - users can only check their own status unless admin
+        if (!current_user_can('manage_options') && $user_id != get_current_user_id()) {
+            return new WP_Error('unauthorized', 'You can only check your own subscription status', array('status' => 403));
+        }
+        
+        // Query for active subscriptions
+        $active_subscription = $wpdb->get_row($wpdb->prepare("
+            SELECT 
+                o.*,
+                f.featureName,
+                opt.optionName,
+                opt.interval
+            FROM {$wpdb->prefix}ffc_orders o
+            JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+            JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
+            WHERE o.userId = %d
+                AND o.subscription_id IS NOT NULL
+                AND o.subscription_status IN ('active', 'trialing', 'past_due')
+                AND o.subscription_current_period_end > NOW()
+                AND o.subscription_cancelled_at IS NULL
+                AND f.recurring = 1
+            ORDER BY o.subscription_current_period_end DESC
+            LIMIT 1
+        ", $user_id), ARRAY_A);
+        
+        if ($active_subscription) {
+            // Calculate days remaining
+            $end_date = new DateTime($active_subscription['subscription_current_period_end']);
+            $now = new DateTime();
+            $days_remaining = $now->diff($end_date)->days;
+            
+            return array(
+                'success' => true,
+                'has_active_subscription' => true,
+                'status' => 'paid',
+                'subscription_details' => array(
+                    'subscription_id' => $active_subscription['subscription_id'],
+                    'status' => $active_subscription['subscription_status'],
+                    'feature' => $active_subscription['featureName'],
+                    'plan' => $active_subscription['optionName'],
+                    'interval' => $active_subscription['interval'],
+                    'current_period_end' => $active_subscription['subscription_current_period_end'],
+                    'days_remaining' => $days_remaining,
+                    'amount' => floatval($active_subscription['totalPrice'])
+                )
+            );
+        }
+        
+        // Check if user had a subscription that expired or was cancelled
+        $past_subscription = $wpdb->get_row($wpdb->prepare("
+            SELECT 
+                subscription_cancelled_at,
+                subscription_current_period_end,
+                subscription_status
+            FROM {$wpdb->prefix}ffc_orders
+            WHERE userId = %d
+                AND subscription_id IS NOT NULL
+            ORDER BY createdAt DESC
+            LIMIT 1
+        ", $user_id), ARRAY_A);
+        
+        $message = 'No active subscription found';
+        if ($past_subscription) {
+            if ($past_subscription['subscription_cancelled_at']) {
+                $message = 'Subscription was cancelled on ' . date('F j, Y', strtotime($past_subscription['subscription_cancelled_at']));
+            } elseif ($past_subscription['subscription_current_period_end'] < current_time('mysql')) {
+                $message = 'Subscription expired on ' . date('F j, Y', strtotime($past_subscription['subscription_current_period_end']));
+            }
+        }
+        
+        return array(
+            'success' => true,
+            'has_active_subscription' => false,
+            'status' => 'not_paid',
+            'message' => $message
+        );
+    }
+
+    /**
+     * Helper function to check subscription status for internal use
+     * Returns boolean true if user has active subscription, false otherwise
+     */
+    function firefly_check_subscription_status($user_id) {
+        global $wpdb;
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        $active_subscription = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(*)
+            FROM {$wpdb->prefix}ffc_orders o
+            JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+            WHERE o.userId = %d
+                AND o.subscription_id IS NOT NULL
+                AND o.subscription_status IN ('active', 'trialing', 'past_due')
+                AND o.subscription_current_period_end > NOW()
+                AND o.subscription_cancelled_at IS NULL
+                AND f.recurring = 1
+        ", $user_id));
+        
+        return $active_subscription > 0;
+    }
+
     function firefly_collective_get_features() {
         global $wpdb;
         if ( ! is_user_logged_in() ) {

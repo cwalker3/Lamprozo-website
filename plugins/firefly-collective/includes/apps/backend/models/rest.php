@@ -225,6 +225,16 @@
 
         register_rest_route(
             'custom-api/v1',
+            '/check-subscription-status',
+            array(
+                'methods'             => 'GET',
+                'callback'            => 'firefly_collective_check_subscription_status',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
             '/update-payment-method',
             array(
                 'methods'             => 'POST',
