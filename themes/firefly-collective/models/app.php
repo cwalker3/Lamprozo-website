@@ -75,6 +75,7 @@
     add_action('after_switch_theme', 'app_setup_nav');
 
     function app_get_view($request) {
+        global $theme_path_web;
         $params = $request->get_params();
         $view = $params['view'];
         $theme_path = get_template_directory();

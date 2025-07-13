@@ -1,6 +1,6 @@
 <?php
     global $current_user;
-    global $theme_path;
+    global $theme_path_web;
 ?>
 <h1><?php echo esc_html($pageTitle); ?></h1>
 <p><?php echo apply_filters('the_content', $postContent); ?></p>
@@ -41,7 +41,7 @@
         <h2>Manage Subscriptions</h2>
         
         <div id="subscriptions-loading" class="loading-spinner">
-            <img src="<?=$theme_path?>/images/loading.gif" alt="Loading..." id="subs-loader">
+            <img src="<?=$theme_path_web?>/images/loading.gif" alt="Loading..." id="subs-loader">
             <p>Loading your subscriptions...</p>
         </div>
         

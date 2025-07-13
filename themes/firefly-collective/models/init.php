@@ -14,10 +14,11 @@
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
-        global $backend_plugin_path, $backend_plugin_path_web;
+        global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web;
         $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
+        $theme_path_web = get_template_directory_uri();
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
         $auth_id = isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : '';
