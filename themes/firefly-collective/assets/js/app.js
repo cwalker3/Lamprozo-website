@@ -185,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.theme_path = data.theme_path;
     window.app_page_title = data.app_page_title;
     window.app_page_html = data.app_page_html;
+    window.subscription_status = data.subscription_status;
   }
 
   async function getView(view) {
@@ -269,6 +270,7 @@ document.addEventListener('DOMContentLoaded', function () {
             window.theme_path = dataResponse.theme_path;
             window.features = dataResponse.features;
             window.stripeKey = dataResponse.stripeKey;
+            window.subscription_status = dataResponse.subscription_status;
             break;
             
           case 'order-history':
@@ -703,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!window.auth_id) {
           loadLoginForm();
         } else {
-          setSubscriptionStatus();
           await getView('dashboard');
           if (window.initializeDashboard) {
             window.initializeDashboard();

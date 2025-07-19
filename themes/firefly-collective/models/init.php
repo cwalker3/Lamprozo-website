@@ -80,11 +80,18 @@
             // Get Stripe configuration
             $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
 
+            // Get subscription status
+            $request = new WP_REST_Request();
+            $request->set_param('user_id', $user_id);
+            
+            $subscription_status = firefly_collective_check_subscription_status($request);
+
             wp_localize_script('dashboard-js', 'dashboardData', array(
-                'nonce'          => $nonce,
-                'features'       => $features_options_addons,
-                'theme_path'     => $theme_path,
-                'stripeKey'      => $publishable_key
+                'nonce'                 => $nonce,
+                'features'              => $features_options_addons,
+                'theme_path'            => $theme_path,
+                'stripeKey'             => $publishable_key,
+                'subscription_status'   => $subscription_status
             ));
         }
 

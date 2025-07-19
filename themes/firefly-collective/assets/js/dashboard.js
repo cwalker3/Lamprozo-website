@@ -6,6 +6,7 @@
     
     // Main initialization function
     window.initializeDashboard = function() {
+        
         // Prevent multiple initializations
         if (isInitialized) return;
         
@@ -27,7 +28,8 @@
                 nonce: window.nonce,
                 theme_path: window.theme_path,
                 features: window.features,
-                stripeKey: window.stripeKey
+                stripeKey: window.stripeKey,
+                subscription_status: window.subscription_status
             }
         }
 
