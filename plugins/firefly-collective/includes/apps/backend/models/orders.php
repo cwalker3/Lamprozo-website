@@ -679,6 +679,7 @@
                     'status' => $active_subscription['subscription_status'],
                     'feature' => $active_subscription['featureName'],
                     'plan' => $active_subscription['optionName'],
+                    'option_id' => intval($active_subscription['optionId']),
                     'interval' => $active_subscription['interval'],
                     'current_period_end' => $active_subscription['subscription_current_period_end'],
                     'days_remaining' => $days_remaining,

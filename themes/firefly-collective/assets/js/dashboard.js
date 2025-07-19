@@ -1317,6 +1317,20 @@
                 const opt = document.createElement('option');
                 opt.value = oIndex;
                 opt.textContent = option.optionName;
+                
+                console.log(dashboardData.subscription_status);
+                console.log(option.id);
+
+                // Check if this is a recurring feature and if user has active subscription for this option
+                if (feature.recurring && 
+                    dashboardData.subscription_status && 
+                    dashboardData.subscription_status.has_active_subscription &&
+                    dashboardData.subscription_status.subscription_details &&
+                    parseInt( dashboardData.subscription_status.subscription_details.option_id) === parseInt(option.id) ) {
+                    opt.disabled = true;
+                    opt.textContent += ' (Already Subscribed)';
+                }
+                
                 select.appendChild(opt);
             });
 
