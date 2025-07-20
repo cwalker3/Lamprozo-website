@@ -123,7 +123,7 @@ function initSubscriptionsApp() {
             async function fetchSubscriptions() {
                 loading.value = true;
                 // Prepare request
-                const url = `${subscriptionsData.apiUrl}get-subscriptions/?auth_id=${subscriptionsData.auth_id}`;
+                const url = `${subscriptionsData.apiUrl}get-subscriptions`;
                 const options = {
                     headers: {
                         'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ function initSubscriptionsApp() {
             
             function fetchUsers() {
                 // Fetch users for display names
-                fetch(`${subscriptionsData.apiUrl}get-users/?auth_id=${subscriptionsData.auth_id}`, {
+                fetch(`${subscriptionsData.apiUrl}get-users`, {
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -240,8 +240,7 @@ function initSubscriptionsApp() {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            subscriptionId: cancelSubscriptionId.value,
-                            auth_id: subscriptionsData.auth_id
+                            subscriptionId: cancelSubscriptionId.value
                         })
                     });
                     
