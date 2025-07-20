@@ -807,9 +807,11 @@
      */
     add_filter('auth_redirect_scheme', 'custom_prevent_auth_redirect', 1);
     function custom_prevent_auth_redirect($scheme) {
-        // Check if trying to access wp-admin and not logged in
-        if (strpos($_SERVER['REQUEST_URI'], '/wp-admin') !== false && !is_user_logged_in()) {
-            custom_return_404();
+        if (strpos($_SERVER['REQUEST_URI'], '/wp-admin') !== false) {
+            // Check for WordPress auth cookies or your custom auth_id cookie
+            if ( !isset($_COOKIE[LOGGED_IN_COOKIE]) ) {
+                custom_return_404();
+            }
         }
         return $scheme;
     }
