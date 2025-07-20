@@ -3118,6 +3118,8 @@
 
         async function updatePaymentMethod() {
             const modal = document.getElementById('update-payment-modal');
+            const cancelBtn = document.querySelector('#cancel-update-payment');
+            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
             modal.style.display = 'flex';
             
             try {
