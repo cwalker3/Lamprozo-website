@@ -57,6 +57,7 @@
         $nonce   = wp_create_nonce('wp_rest');
         $api_url = get_rest_url(null, 'custom-api/v1/');
         $theme_path = get_template_directory_uri();
+        $auth_id = $_COOKIE['auth_id'];
 
         // Admin only
         global $currentUserIdAdmin;
@@ -89,6 +90,7 @@
                     'data'   => $obj,
                     'nonce'  => $nonce,
                     'apiUrl' => $api_url,
+                    'auth_id'=> $auth_id,
                     'currentUserIsAdmin' => $currentUserIdAdmin,
                     'currentUserId'      => get_current_user_id(),
                     'isPWA' => 0
@@ -115,6 +117,7 @@
             wp_localize_script('subscriptions-js', 'subscriptionsData', array(
                 'nonce'              => $nonce,
                 'apiUrl'             => $api_url,
+                'auth_id'            => $auth_id,
                 'currentUserIsAdmin' => $currentUserIdAdmin,
                 'currentUserId'      => get_current_user_id(),
                 'isPWA'              => 0,

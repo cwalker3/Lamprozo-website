@@ -156,7 +156,7 @@ function initOrdersApp() {
                 if (filters.value.orderID) queryParams.append('order_id', filters.value.orderID);
 
                 // Prepare request
-                const url = `${ordersData.apiUrl}get-orders?${queryParams.toString()}&auth_id=${window.auth_id}`;
+                const url = `${ordersData.apiUrl}get-orders?${queryParams.toString()}&auth_id=${ordersData.auth_id}`;
                 const options = {
                     headers: {
                         'Content-Type': 'application/json',
@@ -209,25 +209,25 @@ function initOrdersApp() {
             function fetchLookupData() {
                 // Fetch features, options, addons, and users in parallel
                 Promise.all([
-                    fetch(`${ordersData.apiUrl}get-features/?auth_id=${window.auth_id}`, {
+                    fetch(`${ordersData.apiUrl}get-features/?auth_id=${ordersData.auth_id}`, {
                         headers: {
                             'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-options/?auth_id=${window.auth_id}`, {
+                    fetch(`${ordersData.apiUrl}get-options/?auth_id=${ordersData.auth_id}`, {
                         headers: {
                             'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-addons/?auth_id=${window.auth_id}`, {
+                    fetch(`${ordersData.apiUrl}get-addons/?auth_id=${ordersData.auth_id}`, {
                         headers: {
                             'Content-Type': 'application/json'
                         }
                     }).then(response => response.json()),
                     
-                    fetch(`${ordersData.apiUrl}get-users/?auth_id=${window.auth_id}`, {
+                    fetch(`${ordersData.apiUrl}get-users/?auth_id=${ordersData.auth_id}`, {
                         headers: {
                             'Content-Type': 'application/json'
                         }
@@ -290,7 +290,7 @@ function initOrdersApp() {
                         body: JSON.stringify({
                             orderID: currentOrderId.value,
                             itemId: itemToRefund.value,  // Send specific item ID
-                            auth_id: window.auth_id
+                            auth_id: ordersData.auth_id
                         })
                     });
                     
@@ -552,8 +552,7 @@ function initOrdersApp() {
                 fetch(`${ordersData.apiUrl}update-order-status`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': ordersData.nonce
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         orderID: currentOrderId.value,
@@ -587,8 +586,7 @@ function initOrdersApp() {
                 fetch(`${ordersData.apiUrl}delete-order`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': ordersData.nonce
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         orderID: currentOrderId.value
@@ -633,7 +631,7 @@ function initOrdersApp() {
                         body: JSON.stringify({
                             orderID: currentOrderId.value,
                             itemId: itemToRefund.value,  // Send specific item ID
-                            auth_id: window.auth_id
+                            auth_id: ordersData.auth_id
                         })
                     });
                     
@@ -712,7 +710,7 @@ function initOrdersApp() {
                         },
                         body: JSON.stringify({
                             orderID: currentOrderId.value,
-                            auth_id: window.auth_id
+                            auth_id: ordersData.auth_id
                         })
                     });
                     
@@ -750,8 +748,7 @@ function initOrdersApp() {
                 fetch(`${ordersData.apiUrl}${endpoint}`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': ordersData.nonce
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(bodyData)
                 })
