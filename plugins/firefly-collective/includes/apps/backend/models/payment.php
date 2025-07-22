@@ -617,36 +617,25 @@
                     break;
                     
                 case 'invoice.paid':
-                    reliable_log('=== INVOICE.PAID WEBHOOK START ===', 'WEBHOOK');
                     
                     $invoice = $event->data->object;
-                    reliable_log('Original invoice ID: ' . $invoice->id, 'WEBHOOK');
-                    reliable_log('Original billing_reason: ' . ($invoice->billing_reason ?? 'null'), 'WEBHOOK');
                     
                     // Re-retrieve with a shallow expand (≤ 4 levels)
                     $invoice = \Stripe\Invoice::retrieve($invoice->id, [
                         'expand' => ['payments.data.payment', 'lines.data.price.product']
                     ]);
-                    
-                    reliable_log('Expanded invoice retrieved', 'WEBHOOK');
 
                     // USE THE NEW FUNCTION instead of hardcoded logic
                     $subscriptionId = ff_invoice_subscription_id($invoice);
-                    reliable_log('Subscription ID found: ' . ($subscriptionId ?? 'null'), 'WEBHOOK');
 
                     if ($subscriptionId) {
-                        reliable_log('Processing subscription: ' . $subscriptionId, 'WEBHOOK');
                         
                         $subscription = \Stripe\Subscription::retrieve($subscriptionId);
-                        reliable_log('Subscription retrieved, status: ' . $subscription->status, 'WEBHOOK');
 
                         $is_create = (isset($invoice->billing_reason) && $invoice->billing_reason === 'subscription_create');
-                        reliable_log('Is subscription create: ' . ($is_create ? 'true' : 'false'), 'WEBHOOK');
 
                         if ($is_create) {
-                            reliable_log('Handling subscription creation...', 'WEBHOOK');
                             $order_id = isset($subscription->metadata->order_id) ? $subscription->metadata->order_id : null;
-                            reliable_log('Order ID from metadata: ' . ($order_id ?? 'null'), 'WEBHOOK');
                             
                             if ($order_id) {
                                 global $wpdb;
@@ -658,18 +647,12 @@
                                     ['%s']
                                 );
                                 firefly_collective_orders_email($order_id, 'paid');
-                                reliable_log('Subscription creation handled for order: ' . $order_id, 'WEBHOOK');
                             }
                         } else {
-                            reliable_log('Handling subscription renewal...', 'WEBHOOK');
                             firefly_collective_handle_subscription_invoice_paid($invoice);
-                            reliable_log('Subscription renewal handled', 'WEBHOOK');
                         }
-                    } else {
-                        reliable_log('ERROR: No subscription ID found in invoice!', 'WEBHOOK');
                     }
                     
-                    reliable_log('=== INVOICE.PAID WEBHOOK END ===', 'WEBHOOK');
                     break;
                     
                 case 'invoice.payment_failed':
@@ -814,10 +797,6 @@
      */
     function firefly_collective_handle_subscription_invoice_paid( $invoice ) {
         global $wpdb;
-        
-        reliable_log('=== RENEWAL FUNCTION START ===', 'RENEWAL');
-        reliable_log('Invoice ID: ' . $invoice->id, 'RENEWAL');
-        reliable_log('Billing reason: ' . ($invoice->billing_reason ?? 'null'), 'RENEWAL');
 
         // Ensure expanded invoice
         $invoice = \Stripe\Invoice::retrieve($invoice->id, [
@@ -826,10 +805,8 @@
 
         // USE THE NEW FUNCTION instead of old hardcoded logic
         $subscriptionId = ff_invoice_subscription_id($invoice);
-        reliable_log('Subscription ID from invoice: ' . ($subscriptionId ?? 'null'), 'RENEWAL');
 
         if (!$subscriptionId) {
-            reliable_log("ERROR: No subscription ID found in invoice", 'RENEWAL');
             return;
         }
 
@@ -845,14 +822,10 @@
         );
 
         if (!$original) {
-            reliable_log("ERROR: No subscription order found for {$subscriptionId}", 'RENEWAL');
             return;
         }
-        
-        reliable_log("Found original order: " . $original['orderID'], 'RENEWAL');
 
         $piId = ff_invoice_pi_id($invoice);
-        reliable_log("Payment Intent ID: " . ($piId ?? 'null'), 'RENEWAL');
 
         // 2. Insert any one-time invoice items
         foreach ($invoice->lines->data as $line) {
@@ -885,36 +858,20 @@
             }
         }
 
-        // Log all invoice lines to see structure
-        reliable_log("Invoice has " . count($invoice->lines->data) . " lines", 'RENEWAL');
-        foreach ($invoice->lines->data as $i => $line) {
-            reliable_log("Line $i: type=" . ($line->type ?? 'null') . 
-                        ", amount=" . ($line->amount ?? 'null') . 
-                        ", period_start=" . ($line->period->start ?? 'null') . 
-                        ", period_end=" . ($line->period->end ?? 'null'), 'RENEWAL');
-        }
-
         // 3. Handle the recurring line
         foreach ($invoice->lines->data as $line) {
-            reliable_log("Checking line for recurring: type=" . ($line->type ?? 'null'), 'RENEWAL');
             
             // USE THE NEW FUNCTION instead of old hardcoded logic
             if (!ff_is_recurring_line($line)) {
-                reliable_log("Line is not recurring, skipping", 'RENEWAL');
                 continue;
             }
-            
-            reliable_log("Processing recurring line", 'RENEWAL');
 
             $periodStart = date('Y-m-d H:i:s', $line->period->start);
             $periodEnd   = date('Y-m-d H:i:s', $line->period->end);
             $amount      = $line->amount / 100;
             $quantity    = $line->quantity;
-            
-            reliable_log("Period: $periodStart to $periodEnd, Amount: $amount", 'RENEWAL');
 
             if ($invoice->billing_reason === 'subscription_create') {
-                reliable_log("Skipping renewal order creation for initial subscription invoice", 'RENEWAL');
                 $wpdb->update(
                     "{$wpdb->prefix}ffc_orders",
                     [ 'subscription_current_period_end' => $periodEnd ],
@@ -924,10 +881,7 @@
             }
 
             // Renewal order
-            reliable_log("Creating renewal order for subscription {$subscriptionId}", 'RENEWAL');
-
             $new_order_id = wp_generate_uuid4();
-            reliable_log("New order ID: " . $new_order_id, 'RENEWAL');
 
             $result = $wpdb->insert(
                 "{$wpdb->prefix}ffc_orders",
@@ -953,9 +907,7 @@
             );
 
             if ($result === false) {
-                reliable_log("ERROR: Failed to insert renewal order: " . $wpdb->last_error, 'RENEWAL');
             } else {
-                reliable_log("SUCCESS: Inserted renewal order", 'RENEWAL');
                 firefly_collective_orders_email($new_order_id, 'paid');
             }
 
@@ -965,10 +917,7 @@
                 [ 'subscription_current_period_end' => $periodEnd ],
                 [ 'id' => $original['id'] ]
             );
-            reliable_log("Updated original order period end", 'RENEWAL');
         }
-        
-        reliable_log('=== RENEWAL FUNCTION END ===', 'RENEWAL');
     }
 
     /**
