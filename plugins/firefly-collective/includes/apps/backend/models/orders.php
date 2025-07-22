@@ -147,6 +147,7 @@
             priceDiscountsInfo JSON DEFAULT NULL,
             userData JSON NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'pending',
+            transaction_type VARCHAR(50) NULL DEFAULT 'initial',
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             

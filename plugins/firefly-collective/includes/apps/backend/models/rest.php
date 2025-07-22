@@ -215,6 +215,26 @@
 
         register_rest_route(
             'custom-api/v1',
+            '/change-subscription-plan',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_change_subscription_plan',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/complete-plan-change',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_complete_plan_change',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
             '/cancel-subscription',
             array(
                 'methods'             => 'POST',

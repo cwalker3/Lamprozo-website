@@ -1317,9 +1317,6 @@
                 const opt = document.createElement('option');
                 opt.value = oIndex;
                 opt.textContent = option.optionName;
-                
-                console.log(dashboardData.subscription_status);
-                console.log(option.id);
 
                 // Check if this is a recurring feature and if user has active subscription for this option
                 if (feature.recurring && 
@@ -2985,7 +2982,6 @@
                 if (!response.ok) throw new Error('Failed to load subscriptions');
                 
                 const data = await response.json();
-
                 smoothScrollToElement(subsManagementEl);
 
                 if (data.success && data.subscriptions.length > 0) {
@@ -3018,6 +3014,23 @@
                     day: 'numeric'
                 });
                 
+                // Get feature and option IDs directly from the subscription data
+                const featureId = parseInt(sub.featureId);
+                const currentOptionId = parseInt(sub.optionId);
+                
+                // Check if this recurring feature has other options
+                let availablePlans = [];
+                
+                if (featureId && dashboardData.features) {
+                    const feature = dashboardData.features.find(f => parseInt(f.id) === featureId);
+                    if (feature && feature.recurring && feature.options) {
+                        // Filter out the current option
+                        availablePlans = feature.options.filter(opt => parseInt(opt.id) !== currentOptionId);
+                    }
+                }
+
+                const isPastDue = sub.subscription_status === 'past_due';
+                
                 card.innerHTML = `
                     <div class="subscription-header">
                         <div class="subscription-title">${sub.features}</div>
@@ -3043,36 +3056,86 @@
                         </div>
                     </div>
                     
-                    ${sub.payment_method ? `
-                        <div class="payment-method">
-                            <div class="payment-method-icon ${sub.payment_method.brand}"></div>
-                            <div class="payment-method-details">
-                                <div class="payment-method-last4">•••• ${sub.payment_method.last4}</div>
-                                <div class="payment-method-expiry">Expires ${sub.payment_method.exp_month}/${sub.payment_method.exp_year}</div>
-                            </div>
+                    ${(availablePlans.length > 0 || isPastDue) ? `
+                        <div class="plan-change-section" style="margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
+                            ${isPastDue ? 
+                                `<div style="color: #d83838; margin-bottom: 10px; font-weight: bold;">
+                                    Your subscription is past due. Please renew to continue service.
+                                </div>` : ''
+                            }
+                            
+                            ${availablePlans.length > 0 ? `
+                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                    ${isPastDue ? 'Renew with a different plan:' : 'Change Plan:'}
+                                </label>
+                                <select class="plan-select" data-subscription-id="${sub.subscription_id}" 
+                                        data-current-option="${currentOptionId}"
+                                        style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                                    <option value="">Select a plan...</option>
+                                    ${availablePlans.map(plan => `
+                                        <option value="${plan.id}">
+                                            ${plan.optionName} - $${plan.staticPrice}/${plan.interval || 'month'}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            ` : ''}
+                            
+                            <button class="btn-primary ${isPastDue ? 'renew-subscription' : 'change-plan'}" 
+                                    data-subscription-id="${sub.subscription_id}"
+                                    ${availablePlans.length > 0 ? 'disabled' : ''}>
+                                ${isPastDue ? 'Renew Subscription' : 'Change Plan'}
+                            </button>
                         </div>
                     ` : ''}
                     
                     <div class="subscription-actions">
-                        <button class="btn-primary" id="update-payment-btn">Update Payment</button>
-                        ${sub.subscription_status === 'active' ? 
-                            `<button class="btn-danger" id="cancel-sub-btn">Cancel Subscription</button>` 
+                        <button class="btn-primary update-payment-btn" data-subscription-id="${sub.subscription_id}">
+                            Update Payment Method
+                        </button>
+                        ${sub.subscription_status === 'active' && !isPastDue ? 
+                            `<button class="btn-danger cancel-sub-btn" data-subscription-id="${sub.subscription_id}">
+                                Cancel Subscription
+                            </button>` 
                             : ''}
                     </div>
                 `;
                 
                 container.appendChild(card);
-                const cancelSubBtn = document.querySelector('#cancel-sub-btn');
-                cancelSubBtn.addEventListener('pointerup', ()=>{
-                    cancelSubscription(sub.subscription_id)
+            });
+            
+            // Add event listeners
+            container.querySelectorAll('.cancel-sub-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    cancelSubscription(e.target.dataset.subscriptionId);
                 });
-                const updatePaymentBtn = document.querySelector('#update-payment-btn');
-                updatePaymentBtn.addEventListener('pointerup', ()=>{
-                    const cancelUpdatePaymentBtn = document.querySelector('#cancel-update-payment');
-                    cancelUpdatePaymentBtn.addEventListener('pointerup', closeUpdatePaymentModal);
-                    updatePaymentMethod();
+            });
+            
+            container.querySelectorAll('.update-payment-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    updatePaymentMethod(e.target.dataset.subscriptionId);
                 });
-
+            });
+            
+            // Plan change dropdown listeners
+            container.querySelectorAll('.plan-select').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const btn = e.target.parentElement.querySelector('.change-plan, .renew-subscription');
+                    btn.disabled = !e.target.value;
+                });
+            });
+            
+            // Change plan / Renew button listeners
+            container.querySelectorAll('.change-plan, .renew-subscription').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const subscriptionId = e.target.dataset.subscriptionId;
+                    const planSelect = e.target.parentElement.querySelector('.plan-select');
+                    const newOptionId = planSelect ? planSelect.value : null;
+                    const isRenewal = e.target.classList.contains('renew-subscription');
+                    
+                    if (newOptionId) {
+                        initiatePlanChange(subscriptionId, newOptionId, isRenewal);
+                    }
+                });
             });
         }
 
@@ -3184,10 +3247,189 @@
             const modal = document.getElementById('update-payment-modal');
             modal.style.display = 'none';
             
+            // Clean up any plan change details
+            const detailsDiv = modal.querySelector('div[style*="marginBottom: 15px"]');
+            if (detailsDiv) {
+                detailsDiv.remove();
+            }
+            
+            // Reset modal title
+            const modalTitle = modal.querySelector('h3');
+            if (modalTitle) {
+                modalTitle.textContent = 'Update Payment Method';
+            }
+            
+            // Reset error display
+            const errorDiv = document.getElementById('update-payment-error');
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+            
             if (updatePaymentElement) {
                 updatePaymentElement.unmount();
                 updatePaymentElement = null;
                 updatePaymentElements = null;
+            }
+        }
+
+        // Plan change functions
+        async function initiatePlanChange(subscriptionId, newOptionId, isRenewal = false) {
+            const modal = document.getElementById('update-payment-modal');
+            const modalTitle = modal.querySelector('h3');
+            const submitBtn = document.getElementById('update-payment-submit');
+            const errorDiv = document.getElementById('update-payment-error');
+            const cancelBtn = document.querySelector('#cancel-update-payment');
+            const updatePaymentSubmit = document.querySelector('#update-payment-submit');
+            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
+
+            // Update modal for plan change context
+            modalTitle.textContent = isRenewal ? 'Renew Subscription' : 'Change Subscription Plan';
+            modal.style.display = 'flex';
+
+            try {
+                const response = await fetch(`${myApi.api_url}change-subscription-plan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subscriptionId: subscriptionId,
+                        newOptionId: parseInt(newOptionId),
+                        isRenewal: isRenewal,
+                        auth_id: window.auth_id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to initialize plan change');
+                }
+                
+                if (data.success && stripe) {
+                    // Show plan change details
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.style.marginBottom = '15px';
+                    detailsDiv.innerHTML = `
+                        <p><strong>Current Plan:</strong> ${data.currentPlan} ($${data.currentPrice.toFixed(2)})</p>
+                        <p><strong>New Plan:</strong> ${data.newPlan} ($${data.newPrice.toFixed(2)})</p>
+                        ${data.immediateCharge > 0 ? 
+                            `<p style="font-size: 1.1em; color: #333;"><strong>Due Today: $${data.immediateCharge.toFixed(2)}</strong></p>` :
+                            data.immediateCharge < 0 ?
+                            `<p style="font-size: 1.1em; color: #28a745;"><strong>Credit Applied: $${Math.abs(data.immediateCharge).toFixed(2)}</strong></p>` :
+                            '<p style="font-size: 0.9em; color: #666;">No additional charge today</p>'
+                        }
+                    `;
+                    
+                    const paymentElement = document.getElementById('update-payment-element');
+                    paymentElement.parentNode.insertBefore(detailsDiv, paymentElement);
+                    
+                    // Create elements for plan change
+                    updatePaymentElements = stripe.elements({
+                        clientSecret: data.clientSecret,
+                        appearance: {
+                            theme: 'stripe'
+                        }
+                    });
+                    
+                    updatePaymentElement = updatePaymentElements.create('payment');
+                    updatePaymentElement.mount('#update-payment-element');
+                    
+                    // Update button text based on context
+                    submitBtn.textContent = isRenewal ? 'Renew Plan' : 'Change Plan';
+                    
+                    // Handle form submission
+                    submitBtn.onclick = async () => {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = isRenewal ? 'Renewing...' : 'Changing Plan...';
+                        errorDiv.style.display = 'none';
+                        
+                        const {error, setupIntent} = await stripe.confirmSetup({
+                            elements: updatePaymentElements,
+                            confirmParams: {
+                                return_url: window.location.href,
+                            },
+                            redirect: 'if_required'
+                        });
+                        
+                        if (error) {
+                            errorDiv.textContent = error.message;
+                            errorDiv.style.display = 'block';
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = isRenewal ? 'Renew Plan' : 'Change Plan';
+                        } else {
+                            // Complete the plan change
+                            await completePlanChange(setupIntent.id);
+                        }
+                    };
+                } else {
+                    throw new Error(data.message || 'Failed to initialize plan change');
+                }
+            } catch (error) {
+                console.error('Error setting up plan change:', error);
+                alert('Error: ' + error.message);
+                closeUpdatePaymentModal();
+            }
+        }
+
+        async function completePlanChange(setupIntentId) {
+            try {
+                const response = await fetch(`${myApi.api_url}complete-plan-change`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        setupIntentId: setupIntentId,
+                        auth_id: window.auth_id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Close the modal first
+                    closeUpdatePaymentModal();
+                    
+                    // Show success message
+                    const successMessage = document.createElement('div');
+                    successMessage.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: #4CAF50;
+                        color: white;
+                        padding: 15px 20px;
+                        border-radius: 4px;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        z-index: 10000;
+                    `;
+                    successMessage.textContent = data.message || 'Plan changed successfully!';
+                    document.body.appendChild(successMessage);
+                    
+                    // Remove success message after 3 seconds
+                    setTimeout(() => {
+                        successMessage.remove();
+                    }, 3000);
+                    
+                    // Reload subscriptions to show updated plan
+                    setTimeout(() => {
+                        loadSubscriptions();
+                    }, 500);
+                    
+                } else {
+                    throw new Error(data.message || 'Failed to complete plan change');
+                }
+            } catch (error) {
+                console.error('Error completing plan change:', error);
+                const errorDiv = document.getElementById('update-payment-error');
+                errorDiv.textContent = 'Error: ' + error.message;
+                errorDiv.style.display = 'block';
+                
+                const submitBtn = document.getElementById('update-payment-submit');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update';
             }
         }
 

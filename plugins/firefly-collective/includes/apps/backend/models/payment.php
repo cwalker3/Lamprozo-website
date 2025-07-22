@@ -486,7 +486,7 @@
     }
 
     /**
-     * Enhanced webhook handler to support subscription events
+     * Webhook handler to support subscription events
      */
     function firefly_collective_handle_stripe_webhook($request) {
         try {
@@ -558,6 +558,21 @@
                     // This handles recurring subscription payments
                     $invoice = $event->data->object;
                     if ($invoice->subscription) {
+                        // Check if this is a plan change invoice by looking for proration items
+                        $has_proration = false;
+                        foreach ($invoice->lines->data as $line) {
+                            if ($line->proration) {
+                                $has_proration = true;
+                                break;
+                            }
+                        }
+                        
+                        // If it's a plan change invoice, skip creating new orders
+                        if ($has_proration) {
+                            error_log('Plan change invoice detected, skipping order creation');
+                            break;
+                        }
+                        
                         // Check if this is the first invoice with mixed payment
                         $subscription = \Stripe\Subscription::retrieve($invoice->subscription);
                         
@@ -896,6 +911,344 @@
         }
     }
 
+    /**
+     * Handle change plan for subscriptions
+     */
+    function firefly_collective_change_subscription_plan($request) {
+        try {
+            firefly_collective_stripe_init();
+
+            $params          = $request->get_json_params();
+            $subscription_id = sanitize_text_field($params['subscriptionId'] ?? '');
+            $new_option_id   = intval($params['newOptionId'] ?? 0);
+            $is_renewal      = !empty($params['isRenewal']);
+
+            global $wpdb;
+
+            // Get current subscription details
+            $current_sub = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT o.*, opt.optionName, opt.staticPrice, opt.interval, o.subscription_current_period_end
+                    FROM {$wpdb->prefix}ffc_orders o
+                    JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
+                    WHERE o.subscription_id = %s
+                    ORDER BY o.createdAt ASC
+                    LIMIT 1",
+                    $subscription_id
+                ),
+                ARRAY_A
+            );
+
+            if (!$current_sub) {
+                return new WP_Error('subscription_not_found', 'Subscription not found', array('status' => 404));
+            }
+
+            // Get new option details
+            $new_option = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
+                    $new_option_id
+                ),
+                ARRAY_A
+            );
+
+            if (!$new_option) {
+                return new WP_Error('option_not_found', 'New plan not found', array('status' => 404));
+            }
+
+            $user_id  = get_current_user_id();
+            $customer = firefly_collective_get_or_create_stripe_customer($user_id);
+
+            // Stripe client
+            $stripe     = new \Stripe\StripeClient(\Stripe\Stripe::$apiKey);
+            $stripe_sub = $stripe->subscriptions->retrieve($subscription_id);
+
+            // Create a new Price for the plan
+            $new_price = $stripe->prices->create([
+                'product'     => $stripe_sub->items->data[0]->price->product,
+                'unit_amount' => round((float)$new_option['staticPrice'] * 100),
+                'currency'    => 'usd',
+                'recurring'   => [
+                    'interval' => $new_option['interval'] ?: 'month',
+                ],
+            ]);
+
+            // Calculate proration using preview
+            $immediate_charge = 0;
+
+            try {
+                // Create preview with proper parameters
+                $preview_params = [
+                    'customer'     => $customer->id,
+                    'subscription' => $subscription_id,
+                    'subscription_details' => [
+                        'items' => [
+                            [
+                                'id'    => $stripe_sub->items->data[0]->id,
+                                'price' => $new_price->id,
+                            ],
+                        ],
+                        'proration_behavior' => 'create_prorations',
+                    ],
+                ];
+
+                $proration_preview = $stripe->invoices->createPreview($preview_params);
+                
+                // The amount_due is the actual amount that will be charged
+                $immediate_charge = $proration_preview->amount_due / 100;
+                
+                // Log for debugging
+                error_log('Proration preview amount_due: ' . $proration_preview->amount_due);
+                error_log('Proration preview total: ' . $proration_preview->total);
+                error_log('Immediate charge calculated: ' . $immediate_charge);
+
+            } catch (Exception $e) {
+                // Fallback: manual proration
+                error_log('Failed to preview invoice: ' . $e->getMessage());
+
+                // Calculate days remaining in period
+                $current_time   = time();
+                $period_end     = strtotime($current_sub['subscription_current_period_end']);
+                $period_start   = strtotime($stripe_sub->current_period_start);
+                $total_days     = ($period_end - $period_start) / 86400;
+                $days_remaining = max(0, ($period_end - $current_time) / 86400);
+
+                if ($days_remaining > 0 && $total_days > 0) {
+                    // Calculate the prorated amounts
+                    $old_price = (float)$current_sub['staticPrice'];
+                    $new_price_amount = (float)$new_option['staticPrice'];
+                    
+                    // Credit for unused time on old plan
+                    $credit = ($old_price / $total_days) * $days_remaining;
+                    
+                    // Charge for remaining time on new plan
+                    $charge = ($new_price_amount / $total_days) * $days_remaining;
+                    
+                    // Net charge
+                    $immediate_charge = round($charge - $credit, 2);
+                    
+                    error_log("Manual proration: credit=$credit, charge=$charge, net=$immediate_charge");
+                }
+            }
+
+            // Create a SetupIntent for payment method collection
+            $setup_intent = $stripe->setupIntents->create([
+                'customer'             => $customer->id,
+                'payment_method_types' => ['card'],
+                'usage'                => 'off_session',
+                'metadata'             => [
+                    'subscription_id'   => $subscription_id,
+                    'new_option_id'     => $new_option_id,
+                    'old_option_id'     => $current_sub['optionId'],
+                    'is_renewal'        => $is_renewal ? 'true' : 'false',
+                    'wordpress_user_id' => $user_id,
+                    'immediate_charge'  => (string)$immediate_charge,
+                    'new_price_id'      => $new_price->id,
+                ],
+            ]);
+
+            return [
+                'success'         => true,
+                'clientSecret'    => $setup_intent->client_secret,
+                'currentPlan'     => $current_sub['optionName'],
+                'currentPrice'    => (float)$current_sub['staticPrice'],
+                'newPlan'         => $new_option['optionName'],
+                'newPrice'        => (float)$new_option['staticPrice'],
+                'immediateCharge' => $immediate_charge,
+                'isUpgrade'       => (float)$new_option['staticPrice'] > (float)$current_sub['staticPrice'],
+                'setupIntentId'   => $setup_intent->id,
+            ];
+
+        } catch (Exception $e) {
+            error_log('Plan change error: ' . $e->getMessage());
+            return new WP_Error('stripe_error', $e->getMessage(), ['status' => 500]);
+        }
+    }
+
+    /**
+     * Complete the plan change after payment method confirmation
+     */
+    function firefly_collective_complete_plan_change($request) {
+        try {
+            firefly_collective_stripe_init();
+            
+            $params = $request->get_json_params();
+            $setup_intent_id = sanitize_text_field($params['setupIntentId']);
+            
+            // Create a StripeClient instance
+            $stripe = new \Stripe\StripeClient(\Stripe\Stripe::$apiKey);
+            
+            // Retrieve the SetupIntent to get metadata
+            $setup_intent = $stripe->setupIntents->retrieve($setup_intent_id);
+            
+            if ($setup_intent->status !== 'succeeded') {
+                return new WP_Error('payment_not_confirmed', 'Payment method not confirmed', array('status' => 400));
+            }
+            
+            $subscription_id = $setup_intent->metadata->subscription_id;
+            $new_option_id = intval($setup_intent->metadata->new_option_id);
+            $immediate_charge = floatval($setup_intent->metadata->immediate_charge);
+            $is_renewal = $setup_intent->metadata->is_renewal === 'true';
+            $new_price_id = $setup_intent->metadata->new_price_id;
+            
+            global $wpdb;
+            
+            // Get new option details
+            $new_option = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
+                $new_option_id
+            ), ARRAY_A);
+            
+            // Retrieve the subscription
+            $stripe_sub = $stripe->subscriptions->retrieve($subscription_id);
+            
+            // Update the subscription with the new price
+            $update_params = [
+                'items' => [
+                    [
+                        'id' => $stripe_sub->items->data[0]->id,
+                        'price' => $new_price_id
+                    ]
+                ],
+                'proration_behavior' => 'always_invoice',
+                'payment_behavior' => 'default_incomplete',
+                'default_payment_method' => $setup_intent->payment_method,
+                'metadata' => [
+                    'plan_change_in_progress' => 'true' // Mark this as a plan change
+                ]
+            ];
+            
+            $updated_sub = $stripe->subscriptions->update($subscription_id, $update_params);
+            
+            // Update the existing subscription record in database
+            $wpdb->update(
+                $wpdb->prefix . 'ffc_orders',
+                array(
+                    'optionId' => $new_option_id,
+                    'totalPrice' => floatval($new_option['staticPrice']),
+                    'subscription_status' => $updated_sub->status,
+                    'subscription_current_period_end' => date('Y-m-d H:i:s', $updated_sub->current_period_end),
+                    'updatedAt' => current_time('mysql')
+                ),
+                array(
+                    'subscription_id' => $subscription_id,
+                    'subscription_renewal' => 0
+                ),
+                array('%d', '%s', '%s', '%s', '%s'),
+                array('%s', '%d')
+            );
+            
+            // Try to find and pay the prorated invoice
+            $payment_intent_id = null;
+            $actual_charge = $immediate_charge; // Default to calculated charge
+            
+            try {
+                // Wait a moment for Stripe to create the invoice
+                sleep(1);
+                
+                // Look for the proration invoice
+                $invoices = $stripe->invoices->all([
+                    'subscription' => $subscription_id,
+                    'limit' => 5,
+                    'created' => [
+                        'gte' => time() - 10 // Last 10 seconds
+                    ]
+                ]);
+                
+                foreach ($invoices->data as $invoice) {
+                    // Check if this invoice has proration items
+                    $has_proration = false;
+                    foreach ($invoice->lines->data as $line) {
+                        if ($line->proration) {
+                            $has_proration = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($has_proration && ($invoice->status === 'open' || $invoice->status === 'draft')) {
+                        error_log('Found proration invoice ' . $invoice->id . ' with amount ' . $invoice->amount_due);
+                        
+                        // Use the actual invoice amount
+                        $actual_charge = $invoice->amount_due / 100;
+                        
+                        // Finalize if draft
+                        if ($invoice->status === 'draft') {
+                            $invoice = $stripe->invoices->finalizeInvoice($invoice->id);
+                        }
+                        
+                        // Pay the invoice
+                        $paid_invoice = $stripe->invoices->pay($invoice->id);
+                        $payment_intent_id = $paid_invoice->payment_intent;
+                        
+                        error_log('Paid proration invoice ' . $invoice->id . ' for $' . $actual_charge);
+                        break;
+                    }
+                }
+            } catch (\Stripe\Exception\ApiErrorException $e) {
+                error_log('Error processing proration invoice: ' . $e->getMessage());
+            }
+            
+            // Create a transaction record for the plan change
+            if ($actual_charge != 0) { // Only create if there's a charge or credit
+                $new_order_id = wp_generate_uuid4();
+                
+                $original_order = $wpdb->get_row($wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders 
+                    WHERE subscription_id = %s 
+                    ORDER BY createdAt ASC LIMIT 1",
+                    $subscription_id
+                ), ARRAY_A);
+                
+                $transaction_data = array(
+                    'orderID' => $new_order_id,
+                    'payment_intent_id' => $payment_intent_id ?: null,
+                    'userId' => $original_order['userId'],
+                    'featureId' => $original_order['featureId'],
+                    'optionId' => $new_option_id,
+                    'addonIds' => $original_order['addonIds'],
+                    'priceSelected' => $original_order['priceSelected'],
+                    'quantity' => 1,
+                    'totalPrice' => abs($actual_charge), // Store absolute value
+                    'totalPriceDiscount' => 0,
+                    'priceDiscountsInfo' => json_encode([
+                        'description' => $actual_charge > 0 ? 'Plan upgrade proration' : 'Plan downgrade credit'
+                    ]),
+                    'userData' => $original_order['userData'],
+                    'status' => $payment_intent_id ? 'paid' : 'completed',
+                    'transaction_type' => 'plan_change',
+                    'subscription_renewal' => 1,
+                    'createdAt' => current_time('mysql')
+                );
+                
+                $wpdb->insert($wpdb->prefix . 'ffc_orders', $transaction_data);
+                
+                // Send confirmation email
+                firefly_collective_orders_email($new_order_id, 'plan_change');
+            }
+            
+            // Remove the plan change marker
+            $stripe->subscriptions->update($subscription_id, [
+                'metadata' => [
+                    'plan_change_in_progress' => ''
+                ]
+            ]);
+            
+            return array(
+                'success' => true,
+                'message' => $is_renewal ? 'Subscription renewed successfully!' : 'Plan changed successfully!',
+                'newPlan' => $new_option['optionName'],
+                'newPrice' => floatval($new_option['staticPrice']),
+                'immediateCharge' => $actual_charge,
+                'transactionCreated' => $actual_charge != 0
+            );
+            
+        } catch (Exception $e) {
+            error_log('Complete plan change error: ' . $e->getMessage());
+            return new WP_Error('stripe_error', $e->getMessage(), array('status' => 500));
+        }
+    }
+
+
     // Update order payment status
     function firefly_collective_update_order_payment_status($order_id, $status) {
         global $wpdb;
@@ -1139,10 +1492,12 @@
             try {
                 // Verify the customer still exists in Stripe
                 $customer = \Stripe\Customer::retrieve($stripe_customer_id);
-                if ($customer && !$customer->deleted) {
+                
+                // Check if customer exists and is not deleted using isset
+                if ($customer && (!isset($customer->deleted) || !$customer->deleted)) {
                     // Update customer info if needed
                     \Stripe\Customer::update($stripe_customer_id, [
-                        'name' => $user->first_name . ' ' . $user->last_name,
+                        'name' => trim($user->first_name . ' ' . $user->last_name) ?: $user->display_name,
                         'email' => $user->user_email,
                     ]);
                     return $customer;
@@ -1179,26 +1534,30 @@
             return new WP_Error('not_logged_in', 'You must be logged in to view subscriptions.', array('status' => 401));
         }
 
-        // Get active subscriptions from database
+        // Get active subscriptions from database with current option details
         $subscriptions = $wpdb->get_results($wpdb->prepare(
-        "SELECT DISTINCT 
-            o.subscription_id, 
-            o.subscription_status,
-            o.subscription_current_period_end,
-            o.userId,  -- ADD THIS LINE
-            MIN(o.createdAt) as started_at,
-            SUM(o.totalPrice) as total_amount,
-            GROUP_CONCAT(DISTINCT f.featureName) as features,
-            GROUP_CONCAT(DISTINCT opt.optionName) as options,
-            GROUP_CONCAT(DISTINCT opt.interval) as intervals
-        FROM {$wpdb->prefix}ffc_orders o
-        JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
-        JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
-        WHERE o.subscription_id IS NOT NULL 
-        AND o.subscription_status IN ('active', 'trialing', 'past_due')
-        GROUP BY o.subscription_id, o.subscription_status, o.subscription_current_period_end, o.userId",
-        $user_id
-    ), ARRAY_A);
+            "SELECT DISTINCT 
+                o.subscription_id, 
+                o.subscription_status,
+                o.subscription_current_period_end,
+                o.userId,
+                o.featureId,
+                o.optionId,
+                MIN(o.createdAt) as started_at,
+                o.totalPrice as total_amount,
+                f.featureName as features,
+                opt.optionName as options,
+                opt.interval as intervals
+            FROM {$wpdb->prefix}ffc_orders o
+            JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+            JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
+            WHERE o.userId = %d
+            AND o.subscription_id IS NOT NULL 
+            AND o.subscription_status IN ('active', 'trialing', 'past_due')
+            AND o.subscription_renewal = 0
+            GROUP BY o.subscription_id, o.subscription_status, o.subscription_current_period_end, o.userId, o.featureId, o.optionId, o.totalPrice, f.featureName, opt.optionName, opt.interval",
+            $user_id
+        ), ARRAY_A);
         
         // Get payment method info from Stripe
         firefly_collective_stripe_init();

@@ -224,6 +224,122 @@
                     "optionMetric": "unit",
                     "addons": [],
                     "link_name": ""
+                },
+                {
+                    "optionName": "Agency - Monthly",
+                    "description": {
+                        "text": "This is the basic support package."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "day",
+                                "week",
+                                "month",
+                                "year",
+                                "none"
+                            ],
+                            "selected": 2
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 20,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Enterprise - Monthly",
+                    "description": {
+                        "text": "This is the basic support package."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "day",
+                                "week",
+                                "month",
+                                "year",
+                                "none"
+                            ],
+                            "selected": 2
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 30,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "unit",
+                    "addons": [],
+                    "link_name": ""
                 }
             ],
             "recurring": true,
