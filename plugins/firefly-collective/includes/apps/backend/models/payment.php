@@ -11,7 +11,103 @@
         \Stripe\Stripe::setApiKey($secret_key);
         
         // Set API version
-        \Stripe\Stripe::setApiVersion('2023-10-16');
+        \Stripe\Stripe::setApiVersion('2025-06-30.basil');
+    }
+
+    /**
+     * Safely get a PI id from an Invoice (works with Basil + older shapes)
+     */
+    function ff_invoice_pi_id($invoice) {
+        // Old field
+        if (isset($invoice->payment_intent) && $invoice->payment_intent) {
+            return $invoice->payment_intent;
+        }
+
+        // New payments array
+        if (isset($invoice->payments, $invoice->payments->data) && !empty($invoice->payments->data)) {
+            foreach ($invoice->payments->data as $p) {
+                if (isset($p->payment, $p->payment->payment_intent)) {
+                    return $p->payment->payment_intent;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the subscription id on an invoice, even if invoice.subscription is missing
+     * Updated for Basil API 2025-06-30
+     */
+    function ff_invoice_subscription_id($invoice) {
+        // Try the old direct field first
+        if (isset($invoice->subscription) && $invoice->subscription) {
+            return $invoice->subscription;
+        }
+        
+        // NEW: Try the Basil parent structure
+        if (isset($invoice->parent->subscription_details->subscription)) {
+            return $invoice->parent->subscription_details->subscription;
+        }
+        
+        // Try line items (both old and new structure)
+        if (isset($invoice->lines, $invoice->lines->data)) {
+            foreach ($invoice->lines->data as $line) {
+                // Old structure
+                if (isset($line->subscription) && $line->subscription) {
+                    return $line->subscription;
+                }
+                
+                // NEW: Basil structure
+                if (isset($line->parent->subscription_item_details->subscription)) {
+                    return $line->parent->subscription_item_details->subscription;
+                }
+                
+                // Legacy fallback: Some API versions only flag recurring lines by price.recurring
+                if (!empty($line->price->recurring) && isset($line->subscription)) {
+                    return $line->subscription;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * True if an invoice line is the recurring subscription line.
+     */
+    function ff_is_recurring_line($line) {
+        // Old structure
+        if (isset($line->type) && $line->type === 'subscription') {
+            return true;
+        }
+        
+        // NEW: Basil structure - check parent type
+        if (isset($line->parent->type) && $line->parent->type === 'subscription_item_details') {
+            return true;
+        }
+        
+        // Legacy fallback
+        return !empty($line->price) && !empty($line->price->recurring);
+    }
+
+    /**
+     * Get current period start/end safely (Basil or legacy).
+     */
+    function ff_subscription_period($sub) {
+        // Newer API keeps them on the subscription itself, but older code sometimes used the first item.
+        $start = isset($sub->current_period_start) ? $sub->current_period_start : null;
+        $end   = isset($sub->current_period_end)   ? $sub->current_period_end   : null;
+
+        if ((!$start || !$end) && isset($sub->items, $sub->items->data[0])) {
+            $item  = $sub->items->data[0];
+            $start = $start ?: (isset($item->current_period_start) ? $item->current_period_start : null);
+            $end   = $end   ?: (isset($item->current_period_end)   ? $item->current_period_end   : null);
+        }
+
+        return [
+            'start' => $start,
+            'end'   => $end,
+        ];
     }
 
     /**
@@ -178,309 +274,275 @@
      */
     function firefly_collective_create_subscription($customer, $order_id, $items) {
         global $wpdb;
-        
+
         // Group items by interval
         $items_by_interval = [];
         foreach ($items as $item) {
-            $interval = $item['interval'] ?: 'monthly'; // Default to monthly
-            if (!isset($items_by_interval[$interval])) {
-                $items_by_interval[$interval] = [];
-            }
+            $interval = $item['interval'] ?: 'monthly';
             $items_by_interval[$interval][] = $item;
         }
-        
-        // For now, we'll handle single interval subscriptions
-        // If you have multiple intervals, you'd need multiple subscriptions
+
         if (count($items_by_interval) > 1) {
-            return new WP_Error('multiple_intervals', 'Multiple subscription intervals in one order not yet supported', array('status' => 400));
+            return new WP_Error('multiple_intervals', 'Multiple subscription intervals in one order not yet supported', ['status' => 400]);
         }
-        
-        $interval = array_keys($items_by_interval)[0];
-        $subscription_items = array_values($items_by_interval)[0];
-        
-        // Build simplified description
+
+        $interval = array_key_first($items_by_interval);
+        $subscription_items = $items_by_interval[$interval];
+
+        // Description
         $item_descriptions = array_map(function($item) use ($wpdb) {
             return format_item_description($item, $wpdb);
         }, $subscription_items);
-        $order_description = implode(" | ", $item_descriptions);
-        
-        // Create subscription items
+        $order_description = implode(' | ', $item_descriptions);
+
+        // Create products/prices
         $stripe_items = [];
         foreach ($subscription_items as $item) {
             $item_desc = format_item_description($item, $wpdb);
-            
-            // Create or retrieve a product and price
+
             $product = \Stripe\Product::create([
-                'name' => $item_desc,
+                'name'     => $item_desc,
                 'metadata' => [
                     'feature_id' => $item['featureId'],
-                    'option_id' => $item['optionId'],
-                    'order_id' => $order_id
+                    'option_id'  => $item['optionId'],
+                    'order_id'   => $order_id
                 ]
             ]);
-            
-            // Create a price for this product
+
             $price = \Stripe\Price::create([
-                'product' => $product->id,
-                'unit_amount' => round(floatval($item['totalPrice']) * 100),
-                'currency' => 'usd',
+                'product'   => $product->id,
+                'unit_amount' => round((float)$item['totalPrice'] * 100),
+                'currency'  => 'usd',
                 'recurring' => [
-                    'interval' => $interval,
+                    'interval'       => $interval,
                     'interval_count' => 1
                 ]
             ]);
-            
+
             $stripe_items[] = [
-                'price' => $price->id,
+                'price'    => $price->id,
                 'quantity' => 1
             ];
         }
-        
-        // Build metadata
+
         $metadata = [
-            'order_id' => $order_id,
-            'wordpress_user_id' => get_current_user_id(),
-            'payment_type' => 'subscription',
+            'order_id'              => $order_id,
+            'wordpress_user_id'     => get_current_user_id(),
+            'payment_type'          => 'subscription',
             'subscription_interval' => $interval
         ];
-        
-        // Create subscription with expanded invoice
+
+        // IMPORTANT: expand the new path
         $subscription = \Stripe\Subscription::create([
-            'customer' => $customer->id,
-            'items' => $stripe_items,
-            'payment_behavior' => 'default_incomplete',
-            'payment_settings' => ['save_default_payment_method' => 'on_subscription'],
-            'expand' => ['latest_invoice.payment_intent'],
-            'metadata' => $metadata,
-            'description' => $order_description
+            'customer'          => $customer->id,
+            'items'             => $stripe_items,
+            'payment_behavior'  => 'default_incomplete',
+            'payment_settings'  => ['save_default_payment_method' => 'on_subscription'],
+            'expand'            => ['latest_invoice.payments.data.payment'],
+            'metadata'          => $metadata,
+            'description'       => $order_description
         ]);
-        
-        // Update the Payment Intent description
-        if ($subscription && $subscription->latest_invoice && $subscription->latest_invoice->payment_intent) {
-            \Stripe\PaymentIntent::update(
-                $subscription->latest_invoice->payment_intent->id,
-                [
-                    'description' => $order_description
-                ]
-            );
+
+        // Grab PI
+        $piId = ff_invoice_pi_id($subscription->latest_invoice);
+        if ($piId) {
+            \Stripe\PaymentIntent::update($piId, ['description' => $order_description]);
         }
-        
-        // Save subscription details to orders (only the subscription item row)
-        foreach ( $subscription_items as $item ) {
+
+        // Periods
+        $periods = ff_subscription_period($subscription);
+
+        // Save subscription details to DB
+        foreach ($subscription_items as $item) {
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
-                array(
-                    'payment_intent_id'               => $subscription->latest_invoice->payment_intent->id,
+                [
+                    'payment_intent_id'               => $piId,
                     'subscription_id'                 => $subscription->id,
                     'subscription_status'             => 'active',
                     'subscription_renewal'            => 0,
-                    'subscription_period_start'       => date('Y-m-d H:i:s', $subscription->current_period_start),
-                    'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
-                ),
-                array(
+                    'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
+                    'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
+                ],
+                [
                     'orderID' => $order_id,
                     'id'      => $item['id']
-                ),
-                array('%s','%s','%s','%d','%s','%s'),
-                array('%s','%d')
+                ],
+                ['%s','%s','%s','%d','%s','%s'],
+                ['%s','%d']
             );
         }
 
-        return array(
+        $clientSecret = $piId ? \Stripe\PaymentIntent::retrieve($piId)->client_secret : null;
+
+        return [
             'success'        => true,
-            'clientSecret'   => $subscription->latest_invoice->payment_intent->client_secret,
+            'clientSecret'   => $clientSecret,
             'type'           => 'subscription',
             'subscriptionId' => $subscription->id,
-        );
+        ];
     }
+
 
     /**
      * Handle mixed payment (one-time + subscription) using Stripe Invoice Items
      */
     function firefly_collective_create_mixed_payment($customer, $order_id, $recurring_items, $one_time_items) {
         global $wpdb;
-        
+
         try {
-            // Build simplified descriptions
+            // Descriptions
             $one_time_descriptions = array_map(function($item) use ($wpdb) {
                 return format_item_description($item, $wpdb);
             }, $one_time_items);
-            
+
             $recurring_descriptions = array_map(function($item) use ($wpdb) {
                 return format_item_description($item, $wpdb);
             }, $recurring_items);
-            
-            // Only describe the subscription line
-            $order_description = implode(" | ", $recurring_descriptions);
-            
-            // Calculate totals for reporting
-            $total_one_time = 0;
-            foreach ($one_time_items as $item) {
-                $total_one_time += floatval($item['totalPrice']);
-            }
-            
-            $total_recurring = 0;
-            foreach ($recurring_items as $item) {
-                $total_recurring += floatval($item['totalPrice']);
-            }
-            
-            // Build metadata with clear subscription amount
+
+            $order_description = implode(' | ', $recurring_descriptions);
+
+            // Totals
+            $total_one_time   = array_sum(array_map(fn($i)=> (float)$i['totalPrice'], $one_time_items));
+            $total_recurring  = array_sum(array_map(fn($i)=> (float)$i['totalPrice'], $recurring_items));
+            $interval         = $recurring_items[0]['interval'] ?: 'monthly';
+
             $metadata = [
-                'order_id' => $order_id,
-                'wordpress_user_id' => get_current_user_id(),
-                'payment_type' => 'mixed',
-                'has_one_time_items' => 'true',
-                'total_items' => count($one_time_items) + count($recurring_items),
-                'subscription_interval' => isset($recurring_items[0]['interval']) ? $recurring_items[0]['interval'] : 'monthly',
-                'subscription_amount_monthly' => number_format($total_recurring, 2), // Clear monthly amount
+                'order_id'                     => $order_id,
+                'wordpress_user_id'            => get_current_user_id(),
+                'payment_type'                 => 'mixed',
+                'has_one_time_items'           => 'true',
+                'total_items'                  => count($one_time_items) + count($recurring_items),
+                'subscription_interval'        => $interval,
+                'subscription_amount_monthly'  => number_format($total_recurring, 2),
             ];
-            
-            // Step 1: Add one-time items as invoice items to the customer
+
+            // 1. One-time items as invoice items
             foreach ($one_time_items as $item) {
                 $item_desc = format_item_description($item, $wpdb);
-                
                 \Stripe\InvoiceItem::create([
-                    'customer' => $customer->id,
-                    'amount' => round(floatval($item['totalPrice']) * 100), // Convert to cents
-                    'currency' => 'usd',
+                    'customer'    => $customer->id,
+                    'amount'      => round((float)$item['totalPrice'] * 100),
+                    'currency'    => 'usd',
                     'description' => $item_desc,
-                    'metadata' => [
-                        'order_id' => $order_id,
-                        'wordpress_user_id' => get_current_user_id(),
-                        'feature_id' => $item['featureId'],
-                        'option_id' => $item['optionId'],
-                        'type' => 'one_time'
+                    'metadata'    => [
+                        'order_id'           => $order_id,
+                        'wordpress_user_id'  => get_current_user_id(),
+                        'feature_id'         => $item['featureId'],
+                        'option_id'          => $item['optionId'],
+                        'type'               => 'one_time'
                     ]
                 ]);
             }
-            
-            // Step 2: Create subscription items for recurring items
+
+            // 2. Create products/prices for recurring items
             $stripe_items = [];
-            $interval = 'monthly'; // Default interval
-            
             foreach ($recurring_items as $item) {
                 $item_desc = format_item_description($item, $wpdb);
-                
-                // Create or retrieve a product with clear recurring amount in name
+
                 $product = \Stripe\Product::create([
-                    'name' => sprintf('%s ($%.2f/%s)', $item_desc, floatval($item['totalPrice']), $item['interval'] ?: 'month'),
+                    'name'     => sprintf('%s ($%.2f/%s)', $item_desc, (float)$item['totalPrice'], $item['interval'] ?: 'month'),
                     'metadata' => [
-                        'feature_id' => $item['featureId'],
-                        'option_id' => $item['optionId'],
-                        'order_id' => $order_id,
-                        'recurring_amount' => floatval($item['totalPrice'])
+                        'feature_id'        => $item['featureId'],
+                        'option_id'         => $item['optionId'],
+                        'order_id'          => $order_id,
+                        'recurring_amount'  => (float)$item['totalPrice']
                     ]
                 ]);
-                
-                // Determine interval (default to monthly if not specified)
-                $interval = $item['interval'] ?: 'monthly';
-                
-                // Create a price for this product
+
                 $price = \Stripe\Price::create([
-                    'product' => $product->id,
-                    'unit_amount' => round(floatval($item['totalPrice']) * 100),
-                    'currency' => 'usd',
+                    'product'   => $product->id,
+                    'unit_amount' => round((float)$item['totalPrice'] * 100),
+                    'currency'  => 'usd',
                     'recurring' => [
-                        'interval' => $interval,
+                        'interval'       => $interval,
                         'interval_count' => 1
                     ]
                 ]);
-                
-                $stripe_items[] = [
-                    'price' => $price->id,
-                    'quantity' => 1
-                ];
+
+                $stripe_items[] = ['price' => $price->id, 'quantity' => 1];
             }
-            
-            // Step 3: Create subscription (which will include the invoice items in the first invoice)
+
+            // 3. Create subscription (new expand path)
             $subscription = \Stripe\Subscription::create([
-                'customer' => $customer->id,
-                'items' => $stripe_items,
-                'payment_behavior' => 'default_incomplete',
-                'payment_settings' => ['save_default_payment_method' => 'on_subscription'],
-                'expand' => ['latest_invoice.payment_intent'],
-                'metadata' => $metadata,
-                'description' => sprintf('%s - $%.2f/%s', $order_description, $total_recurring, $interval)
+                'customer'          => $customer->id,
+                'items'             => $stripe_items,
+                'payment_behavior'  => 'default_incomplete',
+                'payment_settings'  => ['save_default_payment_method' => 'on_subscription'],
+                'expand'            => ['latest_invoice.payments.data.payment'],
+                'metadata'          => $metadata,
+                'description'       => sprintf('%s - $%.2f/%s', $order_description, $total_recurring, $interval)
             ]);
-            
-            // Step 4: Update the Payment Intent with a clear description
-            if ($subscription && $subscription->latest_invoice && $subscription->latest_invoice->payment_intent) {
-                \Stripe\PaymentIntent::update(
-                    $subscription->latest_invoice->payment_intent->id,
-                    [
-                        'description' => $order_description,
-                        'statement_descriptor_suffix' => 'SUB+SETUP' // Shows on bank statement
-                    ]
-                );
+
+            // 4. Update PI desc
+            $piId = ff_invoice_pi_id($subscription->latest_invoice);
+            if ($piId) {
+                \Stripe\PaymentIntent::update($piId, [
+                    'description'                   => $order_description,
+                    'statement_descriptor_suffix'   => 'SUB+SETUP'
+                ]);
             }
-            
-            // Step 5: Update database records
-            // Update recurring items with subscription info
+
+            // 5. Periods & DB updates
+            $periods = ff_subscription_period($subscription);
+
             foreach ($recurring_items as $item) {
                 $wpdb->update(
                     $wpdb->prefix . 'ffc_orders',
-                    array(
-                        'payment_intent_id' => $subscription->latest_invoice->payment_intent->id,
-                        'subscription_id' => $subscription->id,
-                        'subscription_status' => 'active',
-                        'subscription_renewal' => 0,  // Set to 0 for initial subscription
-                        'subscription_period_start' => date('Y-m-d H:i:s', $subscription->current_period_start),
-                        'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end),
-                    ),
-                    array(
+                    [
+                        'payment_intent_id'               => $piId,
+                        'subscription_id'                 => $subscription->id,
+                        'subscription_status'             => 'active',
+                        'subscription_renewal'            => 0,
+                        'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
+                        'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
+                    ],
+                    [
                         'orderID' => $order_id,
-                        'id' => $item['id']
-                    ),
-                    array('%s', '%s', '%s', '%d', '%s', '%s'),
-                    array('%s', '%d')
+                        'id'      => $item['id']
+                    ],
+                    ['%s','%s','%s','%d','%s','%s'],
+                    ['%s','%d']
                 );
             }
-            
-            // Update one-time items with payment intent info
+
             foreach ($one_time_items as $item) {
                 $wpdb->update(
                     $wpdb->prefix . 'ffc_orders',
-                    array(
-                        'payment_intent_id' => $subscription->latest_invoice->payment_intent->id,
-                    ),
-                    array(
-                        'orderID' => $order_id,
-                        'id' => $item['id']
-                    ),
-                    array('%s'),
-                    array('%s', '%d')
+                    ['payment_intent_id' => $piId],
+                    ['orderID' => $order_id, 'id' => $item['id']],
+                    ['%s'],
+                    ['%s','%d']
                 );
             }
-            
-            return array(
-                'success' => true,
-                'clientSecret' => $subscription->latest_invoice->payment_intent->client_secret,
-                'type' => 'mixed',
-                'subscriptionId' => $subscription->id,
-                'totalFirstPayment' => $total_one_time + $total_recurring,
-                'recurringAmount' => $total_recurring,
-                'oneTimeAmount' => $total_one_time
-            );
-            
+
+            return [
+                'success'          => true,
+                'clientSecret'     => $piId ? \Stripe\PaymentIntent::retrieve($piId)->client_secret : null,
+                'type'             => 'mixed',
+                'subscriptionId'   => $subscription->id,
+                'totalFirstPayment'=> $total_one_time + $total_recurring,
+                'recurringAmount'  => $total_recurring,
+                'oneTimeAmount'    => $total_one_time
+            ];
+
         } catch (Exception $e) {
-            // Clean up invoice items if an error occurs
+            // Cleanup pending invoice items
             try {
                 $invoice_items = \Stripe\InvoiceItem::all([
                     'customer' => $customer->id,
-                    'pending' => true,
-                    'limit' => 100
+                    'pending'  => true,
+                    'limit'    => 100
                 ]);
-                
                 foreach ($invoice_items->data as $item) {
                     if (isset($item->metadata->order_id) && $item->metadata->order_id === $order_id) {
                         $item->delete();
                     }
                 }
             } catch (Exception $cleanup_error) {
-                // Log cleanup error but don't throw
                 error_log('Failed to cleanup invoice items: ' . $cleanup_error->getMessage());
             }
-            
+
             throw new Exception('Failed to create mixed payment: ' . $e->getMessage());
         }
     }
@@ -512,30 +574,30 @@
             switch ($event->type) {
                 // One-time payment events
                 case 'payment_intent.succeeded':
-                    $payment_intent = $event->data->object;
-                    $order_id = $payment_intent->metadata->order_id;
-                    
-                    if ($order_id && $payment_intent->metadata->payment_type !== 'subscription_renewal') {
+                    $pi = $event->data->object;
+                    $order_id     = isset($pi->metadata->order_id) ? $pi->metadata->order_id : null;
+                    $payment_type = isset($pi->metadata->payment_type) ? $pi->metadata->payment_type : null;
+
+                    if ($order_id && $payment_type !== 'subscription_renewal') {
                         firefly_collective_update_order_payment_status($order_id, 'paid');
                     }
                     break;
                     
                 case 'payment_intent.payment_failed':
-                    $payment_intent = $event->data->object;
-                    $order_id = $payment_intent->metadata->order_id;
-                    
+                    $pi = $event->data->object;
+                    $order_id = isset($pi->metadata->order_id) ? $pi->metadata->order_id : null;
+
                     if ($order_id) {
                         firefly_collective_update_order_payment_status($order_id, 'failed');
                     }
                     break;
                 
                 case 'payment_intent.processing':
-                    // The ACH debit is pending settlement
                     $pi = $event->data->object;
-                    firefly_collective_update_order_payment_status(
-                        $pi->metadata->order_id,
-                        'processing'
-                    );
+                    $order_id = isset($pi->metadata->order_id) ? $pi->metadata->order_id : null;
+                    if ($order_id) {
+                        firefly_collective_update_order_payment_status($order_id, 'processing');
+                    }
                     break;
                     
                 // Subscription events
@@ -555,88 +617,84 @@
                     break;
                     
                 case 'invoice.paid':
-                    // This handles recurring subscription payments
+                    reliable_log('=== INVOICE.PAID WEBHOOK START ===', 'WEBHOOK');
+                    
                     $invoice = $event->data->object;
-                    if ($invoice->subscription) {
-                        // Check if this is a plan change invoice by looking for proration items
-                        $has_proration = false;
-                        foreach ($invoice->lines->data as $line) {
-                            if ($line->proration) {
-                                $has_proration = true;
-                                break;
-                            }
-                        }
+                    reliable_log('Original invoice ID: ' . $invoice->id, 'WEBHOOK');
+                    reliable_log('Original billing_reason: ' . ($invoice->billing_reason ?? 'null'), 'WEBHOOK');
+                    
+                    // Re-retrieve with a shallow expand (≤ 4 levels)
+                    $invoice = \Stripe\Invoice::retrieve($invoice->id, [
+                        'expand' => ['payments.data.payment', 'lines.data.price.product']
+                    ]);
+                    
+                    reliable_log('Expanded invoice retrieved', 'WEBHOOK');
+
+                    // USE THE NEW FUNCTION instead of hardcoded logic
+                    $subscriptionId = ff_invoice_subscription_id($invoice);
+                    reliable_log('Subscription ID found: ' . ($subscriptionId ?? 'null'), 'WEBHOOK');
+
+                    if ($subscriptionId) {
+                        reliable_log('Processing subscription: ' . $subscriptionId, 'WEBHOOK');
                         
-                        // If it's a plan change invoice, skip creating new orders
-                        if ($has_proration) {
-                            error_log('Plan change invoice detected, skipping order creation');
-                            break;
-                        }
-                        
-                        // Check if this is the first invoice with mixed payment
-                        $subscription = \Stripe\Subscription::retrieve($invoice->subscription);
-                        
-                        if ($invoice->billing_reason === 'subscription_create') {
-                            // First invoice - check if it has one-time items
-                            if (isset($subscription->metadata->has_one_time_items) && 
-                                $subscription->metadata->has_one_time_items === 'true') {
-                                
-                                // Update one-time and subscription items to 'paid' status
+                        $subscription = \Stripe\Subscription::retrieve($subscriptionId);
+                        reliable_log('Subscription retrieved, status: ' . $subscription->status, 'WEBHOOK');
+
+                        $is_create = (isset($invoice->billing_reason) && $invoice->billing_reason === 'subscription_create');
+                        reliable_log('Is subscription create: ' . ($is_create ? 'true' : 'false'), 'WEBHOOK');
+
+                        if ($is_create) {
+                            reliable_log('Handling subscription creation...', 'WEBHOOK');
+                            $order_id = isset($subscription->metadata->order_id) ? $subscription->metadata->order_id : null;
+                            reliable_log('Order ID from metadata: ' . ($order_id ?? 'null'), 'WEBHOOK');
+                            
+                            if ($order_id) {
                                 global $wpdb;
-                                $order_id = $subscription->metadata->order_id;
-                                
-                                if ($order_id) {
-                                    // Update all items in this order to 'paid'
-                                    $wpdb->update(
-                                        $wpdb->prefix . 'ffc_orders',
-                                        array('status' => 'paid'),
-                                        array('orderID' => $order_id),
-                                        array('%s'),
-                                        array('%s')
-                                    );
-                                    
-                                    // Send confirmation email for the complete order
-                                    firefly_collective_orders_email($order_id, 'paid');
-                                }
-                            } else {
-                                // Regular subscription creation without one-time items
-                                global $wpdb;
-                                $order_id = $subscription->metadata->order_id;
-                                
-                                if ($order_id) {
-                                    $wpdb->update(
-                                        $wpdb->prefix . 'ffc_orders',
-                                        array('status' => 'paid'),
-                                        array('orderID' => $order_id),
-                                        array('%s'),
-                                        array('%s')
-                                    );
-                                    
-                                    firefly_collective_orders_email($order_id, 'paid');
-                                }
+                                $wpdb->update(
+                                    $wpdb->prefix . 'ffc_orders',
+                                    ['status' => 'paid'],
+                                    ['orderID' => $order_id],
+                                    ['%s'],
+                                    ['%s']
+                                );
+                                firefly_collective_orders_email($order_id, 'paid');
+                                reliable_log('Subscription creation handled for order: ' . $order_id, 'WEBHOOK');
                             }
                         } else {
-                            // Recurring payment - create new order
+                            reliable_log('Handling subscription renewal...', 'WEBHOOK');
                             firefly_collective_handle_subscription_invoice_paid($invoice);
+                            reliable_log('Subscription renewal handled', 'WEBHOOK');
                         }
+                    } else {
+                        reliable_log('ERROR: No subscription ID found in invoice!', 'WEBHOOK');
                     }
+                    
+                    reliable_log('=== INVOICE.PAID WEBHOOK END ===', 'WEBHOOK');
                     break;
                     
                 case 'invoice.payment_failed':
                     $invoice = $event->data->object;
-                    if ($invoice->subscription) {
+
+                    // Re-retrieve with shallow expand
+                    $invoice = \Stripe\Invoice::retrieve($invoice->id, [
+                        'expand' => ['payments.data.payment']
+                    ]);
+
+                    $subscriptionId = ff_invoice_subscription_id($invoice);
+                    if ($subscriptionId) {
                         firefly_collective_handle_subscription_invoice_failed($invoice);
                     }
                     break;
 
                 case 'setup_intent.succeeded':
-                    $setup_intent = $event->data->object;
-                    if ($setup_intent->metadata->wordpress_user_id) {
-                        // Update the customer's default payment method
+                    $si = $event->data->object;
+                    $wp_user_id = isset($si->metadata->wordpress_user_id) ? $si->metadata->wordpress_user_id : null;
+
+                    if ($wp_user_id) {
                         try {
-                            \Stripe\Customer::update($setup_intent->customer, [
+                            \Stripe\Customer::update($si->customer, [
                                 'invoice_settings' => [
-                                    'default_payment_method' => $setup_intent->payment_method
+                                    'default_payment_method' => $si->payment_method
                                 ]
                             ]);
                         } catch (Exception $e) {
@@ -658,31 +716,35 @@
     function firefly_collective_handle_subscription_created( $subscription ) {
         global $wpdb;
 
-        if ( empty( $subscription->metadata->order_id ) ) {
+        if (!isset($subscription->metadata->order_id) || !$subscription->metadata->order_id) {
             return;
         }
 
-        // 1. Find the 1 row we already stamped with subscription_id in create_subscription()
+        firefly_collective_stripe_init(); 
+
+        $subscription = \Stripe\Subscription::retrieve($subscription->id, [
+            'expand' => ['items.data']
+        ]);
+
         $original = $wpdb->get_row( $wpdb->prepare(
             "SELECT id
             FROM {$wpdb->prefix}ffc_orders
             WHERE orderID = %s
-                AND subscription_id = %s
+            AND subscription_id = %s
             LIMIT 1",
             $subscription->metadata->order_id,
             $subscription->id
         ), ARRAY_A );
 
-        if ( ! $original ) {
-            return; // nothing to do
-        }
+        if ( ! $original ) { return; }
 
-        // 2. Update only that single row’s status & period_end
+        $p = ff_subscription_period($subscription);
+
         $wpdb->update(
             "{$wpdb->prefix}ffc_orders",
             [
                 'subscription_status'             => $subscription->status,
-                'subscription_current_period_end' => date( 'Y-m-d H:i:s', $subscription->current_period_end ),
+                'subscription_current_period_end' => $p['end'] ? date('Y-m-d H:i:s', $p['end']) : null,
             ],
             [ 'id' => $original['id'] ],
             [ '%s', '%s' ],
@@ -695,17 +757,24 @@
      */
     function firefly_collective_handle_subscription_updated($subscription) {
         global $wpdb;
-        
-        // Update subscription status in all related orders
+
+        firefly_collective_stripe_init();
+
+        $subscription = \Stripe\Subscription::retrieve($subscription->id, [
+            'expand' => ['items.data']
+        ]);
+
+        $p = ff_subscription_period($subscription);
+
         $wpdb->update(
             $wpdb->prefix . 'ffc_orders',
-            array(
-                'subscription_status' => $subscription->status,
-                'subscription_current_period_end' => date('Y-m-d H:i:s', $subscription->current_period_end)
-            ),
-            array('subscription_id' => $subscription->id),
-            array('%s', '%s', '%s'),
-            array('%s')
+            [
+                'subscription_status'             => $subscription->status,
+                'subscription_current_period_end' => $p['end'] ? date('Y-m-d H:i:s', $p['end']) : null
+            ],
+            ['subscription_id' => $subscription->id],
+            ['%s', '%s'],
+            ['%s']
         );
     }
 
@@ -746,18 +815,24 @@
     function firefly_collective_handle_subscription_invoice_paid( $invoice ) {
         global $wpdb;
         
-        // Fix: Use object notation instead of array notation
-        $subscriptionId = $invoice->subscription;
-        
-        // Add debug logging
-        error_log("Processing subscription invoice for subscription: " . $subscriptionId);
-        
+        reliable_log('=== RENEWAL FUNCTION START ===', 'RENEWAL');
+        reliable_log('Invoice ID: ' . $invoice->id, 'RENEWAL');
+        reliable_log('Billing reason: ' . ($invoice->billing_reason ?? 'null'), 'RENEWAL');
+
+        // Ensure expanded invoice
+        $invoice = \Stripe\Invoice::retrieve($invoice->id, [
+            'expand' => ['payments.data.payment', 'lines.data.price.product']
+        ]);
+
+        // USE THE NEW FUNCTION instead of old hardcoded logic
+        $subscriptionId = ff_invoice_subscription_id($invoice);
+        reliable_log('Subscription ID from invoice: ' . ($subscriptionId ?? 'null'), 'RENEWAL');
+
         if (!$subscriptionId) {
-            error_log("No subscription ID found in invoice");
+            reliable_log("ERROR: No subscription ID found in invoice", 'RENEWAL');
             return;
         }
 
-        // 1. Find the very first subscription-setup order
         $original = $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$wpdb->prefix}ffc_orders
@@ -768,60 +843,78 @@
             ),
             ARRAY_A
         );
-        
-        if ( ! $original ) {
-            error_log( "No subscription order found for {$subscriptionId}" );
+
+        if (!$original) {
+            reliable_log("ERROR: No subscription order found for {$subscriptionId}", 'RENEWAL');
             return;
         }
+        
+        reliable_log("Found original order: " . $original['orderID'], 'RENEWAL');
 
-        // 2. Insert any one-time invoice items as standalone orders
-        foreach ( $invoice->lines->data as $line ) {
-            // Stripe sometimes labels non-subscription lines as 'invoiceitem'
-            if ( isset($line->type) && $line->type === 'invoiceitem' ) {
+        $piId = ff_invoice_pi_id($invoice);
+        reliable_log("Payment Intent ID: " . ($piId ?? 'null'), 'RENEWAL');
+
+        // 2. Insert any one-time invoice items
+        foreach ($invoice->lines->data as $line) {
+            if (isset($line->type) && $line->type === 'invoiceitem') {
                 $amount   = $line->amount / 100;
-                $quantity = ! empty( $line->quantity ) ? $line->quantity : 1;
+                $quantity = !empty($line->quantity) ? $line->quantity : 1;
 
                 $wpdb->insert(
                     "{$wpdb->prefix}ffc_orders",
                     [
-                        'orderID'                          => $original['orderID'],
-                        'payment_intent_id'                => $invoice->payment_intent,
-                        'userId'                           => $original['userId'],
-                        'featureId'                        => $original['featureId'],
-                        'optionId'                         => $original['optionId'],
-                        'addonIds'                         => $original['addonIds'],
-                        'priceSelected'                    => $original['priceSelected'],
-                        'quantity'                         => $quantity,
-                        'totalPrice'                       => $amount,
-                        'status'                           => 'paid',
-                        'createdAt'                        => current_time( 'mysql' ),
-                        'updatedAt'                        => current_time( 'mysql' ),
-                        'subscription_id'                  => null,
-                        'subscription_status'              => null,
-                        'subscription_period_start'        => null,
-                        'subscription_current_period_end'  => null,
-                        'subscription_cancelled_at'        => null,
+                        'orderID'                         => $original['orderID'],
+                        'payment_intent_id'               => $piId,
+                        'userId'                          => $original['userId'],
+                        'featureId'                       => $original['featureId'],
+                        'optionId'                        => $original['optionId'],
+                        'addonIds'                        => $original['addonIds'],
+                        'priceSelected'                   => $original['priceSelected'],
+                        'quantity'                        => $quantity,
+                        'totalPrice'                      => $amount,
+                        'status'                          => 'paid',
+                        'createdAt'                       => current_time('mysql'),
+                        'updatedAt'                       => current_time('mysql'),
+                        'subscription_id'                 => null,
+                        'subscription_status'             => null,
+                        'subscription_period_start'       => null,
+                        'subscription_current_period_end' => null,
+                        'subscription_cancelled_at'       => null,
                     ]
                 );
             }
         }
 
-        // 3. Handle the recurring subscription line
-        foreach ( $invoice->lines->data as $line ) {
-            if ( $line->type !== 'subscription' ) {
+        // Log all invoice lines to see structure
+        reliable_log("Invoice has " . count($invoice->lines->data) . " lines", 'RENEWAL');
+        foreach ($invoice->lines->data as $i => $line) {
+            reliable_log("Line $i: type=" . ($line->type ?? 'null') . 
+                        ", amount=" . ($line->amount ?? 'null') . 
+                        ", period_start=" . ($line->period->start ?? 'null') . 
+                        ", period_end=" . ($line->period->end ?? 'null'), 'RENEWAL');
+        }
+
+        // 3. Handle the recurring line
+        foreach ($invoice->lines->data as $line) {
+            reliable_log("Checking line for recurring: type=" . ($line->type ?? 'null'), 'RENEWAL');
+            
+            // USE THE NEW FUNCTION instead of old hardcoded logic
+            if (!ff_is_recurring_line($line)) {
+                reliable_log("Line is not recurring, skipping", 'RENEWAL');
                 continue;
             }
+            
+            reliable_log("Processing recurring line", 'RENEWAL');
 
-            $periodStart = date( 'Y-m-d H:i:s', $line->period->start );
-            $periodEnd   = date( 'Y-m-d H:i:s', $line->period->end );
+            $periodStart = date('Y-m-d H:i:s', $line->period->start);
+            $periodEnd   = date('Y-m-d H:i:s', $line->period->end);
             $amount      = $line->amount / 100;
             $quantity    = $line->quantity;
+            
+            reliable_log("Period: $periodStart to $periodEnd, Amount: $amount", 'RENEWAL');
 
-            // Skip the first invoice (subscription creation)
             if ($invoice->billing_reason === 'subscription_create') {
-                error_log("Skipping renewal order creation for initial subscription invoice");
-                
-                // Just update the original order's period end
+                reliable_log("Skipping renewal order creation for initial subscription invoice", 'RENEWAL');
                 $wpdb->update(
                     "{$wpdb->prefix}ffc_orders",
                     [ 'subscription_current_period_end' => $periodEnd ],
@@ -830,48 +923,52 @@
                 continue;
             }
 
-            // 3a. Insert a renewal order for actual renewals
-            error_log("Creating renewal order for subscription {$subscriptionId}");
-            
-            // Generate new order ID for renewal
+            // Renewal order
+            reliable_log("Creating renewal order for subscription {$subscriptionId}", 'RENEWAL');
+
             $new_order_id = wp_generate_uuid4();
+            reliable_log("New order ID: " . $new_order_id, 'RENEWAL');
 
             $result = $wpdb->insert(
                 "{$wpdb->prefix}ffc_orders",
                 [
-                    'orderID'                          => $new_order_id, 
-                    'payment_intent_id'                => $invoice->payment_intent,
-                    'userId'                           => $original['userId'],
-                    'featureId'                        => $original['featureId'],
-                    'optionId'                         => $original['optionId'],
-                    'addonIds'                         => $original['addonIds'],
-                    'priceSelected'                    => $original['priceSelected'],
-                    'quantity'                         => $quantity,
-                    'totalPrice'                       => $amount,
-                    'status'                           => 'paid',
-                    'createdAt'                        => current_time( 'mysql' ),
-                    'updatedAt'                        => current_time( 'mysql' ),
-                    'subscription_id'                  => null, // Renewal orders don't need subscription info
-                    'subscription_status'              => null,
-                    'subscription_renewal'             => 1, // Mark as renewal
-                    'subscription_period_start'        => $periodStart,
-                    'subscription_current_period_end'  => $periodEnd,
+                    'orderID'                         => $new_order_id,
+                    'payment_intent_id'               => $piId,
+                    'userId'                          => $original['userId'],
+                    'featureId'                       => $original['featureId'],
+                    'optionId'                        => $original['optionId'],
+                    'addonIds'                        => $original['addonIds'],
+                    'priceSelected'                   => $original['priceSelected'],
+                    'quantity'                        => $quantity,
+                    'totalPrice'                      => $amount,
+                    'status'                          => 'paid',
+                    'createdAt'                       => current_time('mysql'),
+                    'updatedAt'                       => current_time('mysql'),
+                    'subscription_id'                 => null,
+                    'subscription_status'             => null,
+                    'subscription_renewal'            => 1,
+                    'subscription_period_start'       => $periodStart,
+                    'subscription_current_period_end' => $periodEnd,
                 ]
             );
-            
+
             if ($result === false) {
-                error_log("Failed to insert renewal order: " . $wpdb->last_error);
+                reliable_log("ERROR: Failed to insert renewal order: " . $wpdb->last_error, 'RENEWAL');
             } else {
+                reliable_log("SUCCESS: Inserted renewal order", 'RENEWAL');
                 firefly_collective_orders_email($new_order_id, 'paid');
             }
 
-            // 3b. Update the original subscription row's period end
+            // Update original row's period end
             $wpdb->update(
                 "{$wpdb->prefix}ffc_orders",
                 [ 'subscription_current_period_end' => $periodEnd ],
                 [ 'id' => $original['id'] ]
             );
+            reliable_log("Updated original order period end", 'RENEWAL');
         }
+        
+        reliable_log('=== RENEWAL FUNCTION END ===', 'RENEWAL');
     }
 
     /**
@@ -1006,27 +1103,23 @@
                 // Fallback: manual proration
                 error_log('Failed to preview invoice: ' . $e->getMessage());
 
-                // Calculate days remaining in period
-                $current_time   = time();
-                $period_end     = strtotime($current_sub['subscription_current_period_end']);
-                $period_start   = strtotime($stripe_sub->current_period_start);
+                // Manual proration fallback (Basil: use item periods)
+                $periods      = ff_subscription_period($stripe_sub);
+                $current_time = time();
+                $period_start = $periods['start'] ?? 0;
+                $period_end   = strtotime($current_sub['subscription_current_period_end']); // already stored in DB
+
                 $total_days     = ($period_end - $period_start) / 86400;
                 $days_remaining = max(0, ($period_end - $current_time) / 86400);
 
                 if ($days_remaining > 0 && $total_days > 0) {
-                    // Calculate the prorated amounts
-                    $old_price = (float)$current_sub['staticPrice'];
+                    $old_price        = (float)$current_sub['staticPrice'];
                     $new_price_amount = (float)$new_option['staticPrice'];
-                    
-                    // Credit for unused time on old plan
+
                     $credit = ($old_price / $total_days) * $days_remaining;
-                    
-                    // Charge for remaining time on new plan
                     $charge = ($new_price_amount / $total_days) * $days_remaining;
-                    
-                    // Net charge
+
                     $immediate_charge = round($charge - $credit, 2);
-                    
                     error_log("Manual proration: credit=$credit, charge=$charge, net=$immediate_charge");
                 }
             }
@@ -1121,13 +1214,15 @@
             $updated_sub = $stripe->subscriptions->update($subscription_id, $update_params);
             
             // Update the existing subscription record in database
+            $periods = ff_subscription_period($updated_sub);
+
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
                 array(
                     'optionId' => $new_option_id,
                     'totalPrice' => floatval($new_option['staticPrice']),
                     'subscription_status' => $updated_sub->status,
-                    'subscription_current_period_end' => date('Y-m-d H:i:s', $updated_sub->current_period_end),
+                    'subscription_current_period_end' => $periods['end'] ? date('Y-m-d H:i:s', $periods['end']) : null,
                     'updatedAt' => current_time('mysql')
                 ),
                 array(
@@ -1177,8 +1272,10 @@
                         }
                         
                         // Pay the invoice
-                        $paid_invoice = $stripe->invoices->pay($invoice->id);
-                        $payment_intent_id = $paid_invoice->payment_intent;
+                        $paid_invoice = $stripe->invoices->pay($invoice->id, [
+                            'expand' => ['payments.data.payment']
+                        ]);
+                        $payment_intent_id = ff_invoice_pi_id($paid_invoice);
                         
                         error_log('Paid proration invoice ' . $invoice->id . ' for $' . $actual_charge);
                         break;
@@ -1524,78 +1621,121 @@
     }
 
     /**
-     * Get user's active subscriptions
+     * Get subscriptions.
+     * - Admins see EVERYONE'S subscriptions.
+     * - Regular users see only their own active/trialing/past_due subs.
      */
-    function firefly_collective_get_subscriptions($request) {
+    function firefly_collective_get_subscriptions( $request ) {
         global $wpdb;
-        
-        $user_id = get_current_user_id();
-        if (!$user_id) {
-            return new WP_Error('not_logged_in', 'You must be logged in to view subscriptions.', array('status' => 401));
+
+        $user_id  = get_current_user_id();
+        $is_admin = current_user_can('manage_options');
+
+        if ( ! $user_id ) {
+            return new WP_Error('not_logged_in', 'You must be logged in to view subscriptions.', ['status' => 401]);
         }
 
-        // Get active subscriptions from database with current option details
-        $subscriptions = $wpdb->get_results($wpdb->prepare(
-            "SELECT DISTINCT 
-                o.subscription_id, 
+        // Base pieces of the query
+        $select = "
+            SELECT DISTINCT
+                o.subscription_id,
                 o.subscription_status,
                 o.subscription_current_period_end,
                 o.userId,
                 o.featureId,
                 o.optionId,
-                MIN(o.createdAt) as started_at,
-                o.totalPrice as total_amount,
-                f.featureName as features,
-                opt.optionName as options,
-                opt.interval as intervals
+                MIN(o.createdAt) AS started_at,
+                o.totalPrice AS total_amount,
+                f.featureName AS features,
+                opt.optionName AS options,
+                opt.interval AS intervals
+        ";
+
+        $from = "
             FROM {$wpdb->prefix}ffc_orders o
             JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
-            JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
-            WHERE o.userId = %d
-            AND o.subscription_id IS NOT NULL 
-            AND o.subscription_status IN ('active', 'trialing', 'past_due')
-            AND o.subscription_renewal = 0
-            GROUP BY o.subscription_id, o.subscription_status, o.subscription_current_period_end, o.userId, o.featureId, o.optionId, o.totalPrice, f.featureName, opt.optionName, opt.interval",
-            $user_id
-        ), ARRAY_A);
-        
-        // Get payment method info from Stripe
-        firefly_collective_stripe_init();
-        $stripe_customer_id = get_user_meta($user_id, 'stripe_customer_id', true);
-        
-        if ($stripe_customer_id) {
-            try {
-                $customer = \Stripe\Customer::retrieve($stripe_customer_id, [
-                    'expand' => ['default_source', 'invoice_settings.default_payment_method']
-                ]);
-                
-                // Get default payment method details
-                $payment_method = null;
-                if ($customer->invoice_settings->default_payment_method) {
-                    $pm = \Stripe\PaymentMethod::retrieve($customer->invoice_settings->default_payment_method);
-                    $payment_method = [
-                        'type' => $pm->type,
-                        'last4' => $pm->card->last4 ?? null,
-                        'brand' => $pm->card->brand ?? null,
-                        'exp_month' => $pm->card->exp_month ?? null,
-                        'exp_year' => $pm->card->exp_year ?? null
-                    ];
+            JOIN {$wpdb->prefix}ffc_options  opt ON o.optionId = opt.id
+        ";
+
+        $group_by = "
+            GROUP BY
+                o.subscription_id,
+                o.subscription_status,
+                o.subscription_current_period_end,
+                o.userId,
+                o.featureId,
+                o.optionId,
+                o.totalPrice,
+                f.featureName,
+                opt.optionName,
+                opt.interval
+        ";
+
+        // Common WHERE parts
+        $where_base = "o.subscription_id IS NOT NULL AND o.subscription_renewal = 0";
+
+        if ( $is_admin ) {
+            // Admin: show everything, any status
+            $sql = "
+                $select
+                $from
+                WHERE $where_base
+                $group_by
+            ";
+            $subscriptions = $wpdb->get_results( $sql, ARRAY_A );
+
+            // Don't bother pulling a Stripe payment method for every user here (performance).
+            foreach ( $subscriptions as &$sub ) {
+                $sub['payment_method'] = null;
+            }
+        } else {
+            // Regular user: only their subscriptions and only active-ish ones
+            $sql = $wpdb->prepare("
+                $select
+                $from
+                WHERE $where_base
+                AND o.userId = %d
+                AND o.subscription_status IN ('active','trialing','past_due')
+                $group_by
+            ", $user_id );
+
+            $subscriptions = $wpdb->get_results( $sql, ARRAY_A );
+
+            // Enrich with the user's default payment method (optional, as before)
+            firefly_collective_stripe_init();
+            $stripe_customer_id = get_user_meta( $user_id, 'stripe_customer_id', true );
+
+            if ( $stripe_customer_id ) {
+                try {
+                    $customer = \Stripe\Customer::retrieve($stripe_customer_id, [
+                        'expand' => ['invoice_settings.default_payment_method']
+                    ]);
+
+                    $payment_method = null;
+                    if ( $customer->invoice_settings->default_payment_method ) {
+                        $pm = \Stripe\PaymentMethod::retrieve($customer->invoice_settings->default_payment_method);
+                        $payment_method = [
+                            'type'      => $pm->type,
+                            'last4'     => $pm->card->last4 ?? null,
+                            'brand'     => $pm->card->brand ?? null,
+                            'exp_month' => $pm->card->exp_month ?? null,
+                            'exp_year'  => $pm->card->exp_year ?? null,
+                        ];
+                    }
+
+                    foreach ( $subscriptions as &$sub ) {
+                        $sub['payment_method'] = $payment_method;
+                    }
+                } catch ( Exception $e ) {
+                    error_log('Error retrieving Stripe customer: ' . $e->getMessage());
                 }
-                
-                // Add payment method to response
-                foreach ($subscriptions as &$sub) {
-                    $sub['payment_method'] = $payment_method;
-                }
-            } catch (Exception $e) {
-                // Log error but continue
-                error_log('Error retrieving Stripe customer: ' . $e->getMessage());
             }
         }
-        
-        return array(
-            'success' => true,
-            'subscriptions' => $subscriptions
-        );
+
+        return [
+            'success'        => true,
+            'subscriptions'  => $subscriptions,
+        ];
     }
 
     /**
@@ -1643,19 +1783,21 @@
             
             // Update database
             $update_data = array(
-                'subscription_status' => 'cancelled',
-                'subscription_cancelled_at' => current_time('mysql')
+                'subscription_status'      => 'cancelled',
+                'subscription_cancelled_at'=> current_time('mysql')
             );
-            
+
             if ($should_refund) {
                 $update_data['status'] = 'refunded';
             }
-            
+
+            $format = $should_refund ? array('%s','%s','%s') : array('%s','%s');
+
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
                 $update_data,
                 array('subscription_id' => $subscription_id),
-                array('%s', '%s', '%s'),
+                $format,
                 array('%s')
             );
             
