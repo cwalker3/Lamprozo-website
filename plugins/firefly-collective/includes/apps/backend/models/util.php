@@ -30,66 +30,11 @@
         return $safeUri;
     }
 
-    function firefly_collective_make_log($request) {
-        $params = $request->get_json_params();
-        if ($params['secret'] !== FIREFLY_SHARED_SECRET) {
-            return rest_ensure_response( array('success' => false, 
-                                            'message' => 'Not authorized') );
-        }
-        error_log(print_r($params, true));
-        return rest_ensure_response( array('success' => true, 
-                                        'message' => 'Log successful') );
-    }
-
-    /**
-     * Makes a log request to an endpoint
-     */
-    function make_log_request($api_url, $shared_secret, $log_data) {
-        // Prepare the data to be sent
-        $data = array(
-            'secret' => $shared_secret,
-            'log_data' => $log_data
-        );
+    function reliable_log($message, $context = '') {
+        $log_file = ABSPATH . 'wp-content/debug.log';  // Changed ABS to ABSPATH
+        $timestamp = date('Y-m-d H:i:s');
+        $entry = "[{$timestamp}] {$context}: {$message}" . PHP_EOL;
         
-        // Initialize cURL session
-        $ch = curl_init();
-        
-        // Set cURL options
-        curl_setopt_array($ch, array(
-            CURLOPT_URL => $api_url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_HTTPHEADER => array(
-                'Content-Type: application/json',
-                'Accept: application/json'
-            ),
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => true  // Set to false only in development if needed
-        ));
-        
-        // Execute the request
-        $response = curl_exec($ch);
-        
-        // Check for errors
-        if ($response === false) {
-            $result = array(
-                'success' => false,
-                'message' => 'cURL Error: ' . curl_error($ch)
-            );
-        } else {
-            // Decode the JSON response
-            $decoded_response = json_decode($response, true);
-            
-            // Use the decoded response if valid, otherwise use the raw response
-            $result = is_array($decoded_response) ? $decoded_response : array(
-                'success' => true,
-                'message' => $response
-            );
-        }
-        
-        // Close cURL session
-        curl_close($ch);
-        
-        return $result;
+        // Use file locking to prevent corruption
+        file_put_contents($log_file, $entry, FILE_APPEND | LOCK_EX);
     }
