@@ -294,6 +294,34 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
+  // Never cache these payment/subscription endpoints
+  const NEVER_CACHE_PATHS = [
+    '/wp-json/custom-api/v1/create-payment-intent',
+    '/wp-json/custom-api/v1/place-order',
+    '/wp-json/custom-api/v1/update-payment-status',
+    '/wp-json/custom-api/v1/stripe-webhook',
+    '/wp-json/custom-api/v1/refund-payment',
+    '/wp-json/custom-api/v1/change-subscription-plan',
+    '/wp-json/custom-api/v1/complete-plan-change',
+    '/wp-json/custom-api/v1/cancel-subscription',
+    '/wp-json/custom-api/v1/update-payment-method',
+    '/wp-json/custom-api/v1/check-subscription-status',
+    '/wp-json/custom-api/v1/get-subscriptions'
+  ];
+
+  if (NEVER_CACHE_PATHS.some(p => url.pathname.startsWith(p))) {
+    // Network-only, don't touch Cache Storage
+    event.respondWith(
+      fetch(request, { cache: 'no-store' }).catch(() =>
+        new Response(JSON.stringify({ success: false, message: 'Offline' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+    );
+    return;
+  }
+
   // Skip non-GET/POST
   if (!['GET', 'POST'].includes(request.method)) {
     return;
