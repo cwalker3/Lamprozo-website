@@ -3018,6 +3018,8 @@
                 const featureId = parseInt(sub.featureId);
                 const currentOptionId = parseInt(sub.optionId);
                 
+                const isPastDue = sub.subscription_status === 'past_due';
+
                 // Check if this recurring feature has other options
                 let availablePlans = [];
                 
@@ -3025,11 +3027,9 @@
                     const feature = dashboardData.features.find(f => parseInt(f.id) === featureId);
                     if (feature && feature.recurring && feature.options) {
                         // Filter out the current option
-                        availablePlans = feature.options.filter(opt => parseInt(opt.id) !== currentOptionId);
+                        availablePlans = feature.options.filter(opt => isPastDue || parseInt(opt.id) !== currentOptionId);
                     }
                 }
-
-                const isPastDue = sub.subscription_status === 'past_due';
                 
                 card.innerHTML = `
                     <div class="subscription-header">
