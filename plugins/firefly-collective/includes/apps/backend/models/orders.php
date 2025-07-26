@@ -128,49 +128,55 @@
     }
     add_action('admin_enqueue_scripts', 'enqueue_orders_styles_and_scripts');
 
+    /**
+     * Create or update the ffc_orders table to include invoice_id and its index.
+     */
     function create_ffc_orders_table_if_not_exist() {
         global $wpdb;
         $collate = $wpdb->get_charset_collate();
         
         $sql = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}ffc_orders (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            orderID VARCHAR(36) DEFAULT NULL,
-            payment_intent_id VARCHAR(255) NULL,
-            userId INT UNSIGNED NOT NULL,
-            featureId INT UNSIGNED NOT NULL,
-            optionId INT UNSIGNED NOT NULL,
-            addonIds JSON DEFAULT NULL,
-            priceSelected INT DEFAULT NULL,
-            quantity INT DEFAULT NULL,
-            totalPrice DECIMAL(10,2) DEFAULT NULL,
-            totalPriceDiscount DECIMAL(10,2) DEFAULT NULL,
-            priceDiscountsInfo JSON DEFAULT NULL,
-            userData JSON NOT NULL,
-            status VARCHAR(50) NOT NULL DEFAULT 'pending',
-            transaction_type VARCHAR(50) NULL DEFAULT 'initial',
-            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id                                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            orderID                             VARCHAR(36)        DEFAULT NULL,
+            invoice_id                          VARCHAR(255)       NULL,
+            payment_intent_id                   VARCHAR(255)       NULL,
+            userId                              INT UNSIGNED       NOT NULL,
+            featureId                           INT UNSIGNED       NOT NULL,
+            optionId                            INT UNSIGNED       NOT NULL,
+            addonIds                            JSON               DEFAULT NULL,
+            priceSelected                       INT                DEFAULT NULL,
+            quantity                            INT                DEFAULT NULL,
+            totalPrice                          DECIMAL(10,2)      DEFAULT NULL,
+            totalPriceDiscount                  DECIMAL(10,2)      DEFAULT NULL,
+            priceDiscountsInfo                  JSON               DEFAULT NULL,
+            userData                            JSON               NOT NULL,
+            status                              VARCHAR(50)        NOT NULL DEFAULT 'pending',
+            transaction_type                    VARCHAR(50)        DEFAULT 'initial',
+            createdAt                           TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,
+            updatedAt                           TIMESTAMP          DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             
-            subscription_id VARCHAR(255) NULL,
-            subscription_status VARCHAR(50) NULL,
-            subscription_renewal TINYINT(1) DEFAULT 0,
-            subscription_period_start DATETIME NULL,
-            subscription_current_period_end DATETIME NULL,
-            subscription_cancelled_at DATETIME NULL,
-
-            PRIMARY KEY(id),
-            INDEX idx_order (orderID),
-            INDEX idx_user (userId),
-            INDEX idx_feature (featureId),
-            INDEX idx_option (optionId),
-            INDEX idx_status (status),
-            INDEX idx_created (createdAt),
-            INDEX idx_subscription_id (subscription_id)
+            subscription_id                     VARCHAR(255)       NULL,
+            subscription_status                 VARCHAR(50)        NULL,
+            subscription_renewal                TINYINT(1)         DEFAULT 0,
+            subscription_period_start           DATETIME           NULL,
+            subscription_current_period_end     DATETIME           NULL,
+            subscription_cancelled_at           DATETIME           NULL,
+            
+            PRIMARY KEY  (id),
+            UNIQUE KEY   uniq_ffc_orders_invoice (invoice_id),
+            KEY          idx_order              (orderID),
+            KEY          idx_user               (userId),
+            KEY          idx_feature            (featureId),
+            KEY          idx_option             (optionId),
+            KEY          idx_status             (status),
+            KEY          idx_created            (createdAt),
+            KEY          idx_subscription_id    (subscription_id)
         ) {$collate};";
-        
+
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         dbDelta( $sql );
     }
+    add_action( 'plugins_loaded', 'create_ffc_orders_table_if_not_exist' );
 
     function firefly_collective_place_order($request) {
         global $wpdb;
