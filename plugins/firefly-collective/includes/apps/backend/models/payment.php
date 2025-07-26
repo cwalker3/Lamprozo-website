@@ -1265,7 +1265,6 @@
                     "{$wpdb->prefix}ffc_orders",
                     [
                         'optionId'                         => $new_option_id,
-                        'totalPrice'                       => floatval($new_option['staticPrice']),
                         'subscription_status'              => $updated_sub->status,
                         'subscription_current_period_end'  => $periods['end']
                             ? date('Y-m-d H:i:s', $periods['end'])
@@ -1276,7 +1275,7 @@
                         'subscription_id'       => $subscription_id,
                         'subscription_renewal'  => 0,
                     ],
-                    ['%d','%s','%s','%s','%s'],
+                    ['%d','%s','%s','%s'],
                     ['%s','%d']
                 );
                 
@@ -1365,7 +1364,6 @@
                     "{$wpdb->prefix}ffc_orders",
                     [
                         'optionId'                        => $new_option_id,
-                        'totalPrice'                      => floatval($new_option['staticPrice']),
                         'subscription_status'             => $updated_sub->status,
                         'subscription_current_period_end' => $periods['end']
                                                             ? date('Y-m-d H:i:s', $periods['end'])
@@ -1376,7 +1374,7 @@
                         'subscription_id'      => $subscription_id,
                         'subscription_renewal' => 0,
                     ],
-                    ['%d','%s','%s','%s','%s'],
+                    ['%d','%s','%s','%s'],
                     ['%s','%d']
                 );
                 
@@ -1432,7 +1430,6 @@
             return new WP_Error('stripe_error', $e->getMessage(), ['status' => 500]);
         }
     }
-
 
     // Update order payment status
     function firefly_collective_update_order_payment_status($order_id, $status) {
