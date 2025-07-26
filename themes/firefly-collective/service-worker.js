@@ -306,6 +306,7 @@ self.addEventListener('fetch', event => {
     '/wp-json/custom-api/v1/cancel-subscription',
     '/wp-json/custom-api/v1/update-payment-method',
     '/wp-json/custom-api/v1/check-subscription-status',
+    '/wp-json/custom-api/v1/get-orders',
     '/wp-json/custom-api/v1/get-subscriptions'
   ];
 
