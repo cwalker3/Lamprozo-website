@@ -3089,7 +3089,9 @@
                     ` : ''}
                     
                     <div class="subscription-actions">
-                        <button class="btn-primary update-payment-btn" data-subscription-id="${sub.subscription_id}">
+                        <button class="btn-primary update-payment-btn" 
+                                ${isPastDue > 0 ? 'disabled ' : ''}
+                                data-subscription-id="${sub.subscription_id}">
                             Update Payment Method
                         </button>
                         ${sub.subscription_status === 'active' && !isPastDue ? 
