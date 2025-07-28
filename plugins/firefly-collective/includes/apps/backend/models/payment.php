@@ -642,25 +642,30 @@
                     break;
                     
                 case 'invoice.paid':
-                    // Grab the raw invoice object from Stripe
-                    $eventInvoice = $event->data->object;
-
-                    // Determine subscription ID using the new Basil path
+                    $eventInvoice   = $event->data->object;
                     $subscriptionId = ff_invoice_subscription_id($eventInvoice);
-                    if (! $subscriptionId) {
-                        error_log("WEBHOOK: invoice.paid received but no subscription ID (Basil)"); 
-                        break;
-                    }
 
-                    // Is this the creation invoice or a renewal?
-                    if (isset($eventInvoice->billing_reason) 
+                    if (
+                        isset($eventInvoice->billing_reason)
                         && $eventInvoice->billing_reason === 'subscription_create'
                     ) {
-                        // First subscription payment—update original row only
-                        // (your existing subscription‑create logic)
-                        firefly_collective_handle_subscription_created(\Stripe\Subscription::retrieve($subscriptionId));
-                    } else {
-                        // Renewal payment—insert a new order
+                        // Update your original row (existing logic)
+                        firefly_collective_handle_subscription_created(
+                            \Stripe\Subscription::retrieve($subscriptionId)
+                        );
+
+                        // Send receipts now that the first subscription invoice succeeded
+                        $order_id = $eventInvoice
+                            ->subscription_details
+                            ->metadata
+                            ->order_id ?? null;
+
+                        if ($order_id) {
+                            firefly_collective_orders_email($order_id, 'paid');
+                        }
+                    }
+                    // Subsequent renewals
+                    else {
                         firefly_collective_handle_subscription_invoice_paid($eventInvoice);
                     }
                     break;
