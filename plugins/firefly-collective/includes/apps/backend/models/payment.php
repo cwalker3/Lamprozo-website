@@ -1908,8 +1908,15 @@
             
             reliable_log("- Time used for calculation: " . date('Y-m-d H:i:s', $current_time), "REFUND_DEBUG");
             
-            // Calculate refund based on the appropriate time
-            if ($period_start && $period_end && $period_end > $period_start) {
+            // Check for 3-day grace period first
+            $subscription_created = strtotime($order->createdAt);
+            $days_since_creation = ($current_time - $subscription_created) / 86400;
+
+            if ($days_since_creation <= 3) {
+                // Within 3-day grace period - full refund
+                $unused_fraction = 1.0;
+                reliable_log(sprintf("- Within 3-day grace period (%.1f days old), full refund", $days_since_creation), "REFUND_DEBUG");
+            } else if ($period_start && $period_end && $period_end > $period_start) {
                 if ($current_time < $period_start) {
                     // Subscription hasn't started yet - full refund
                     $unused_fraction = 1.0;
@@ -1919,7 +1926,7 @@
                     $unused_fraction = 0.0;
                     reliable_log("- Full period elapsed, no refund", "REFUND_DEBUG");
                 } else {
-                    // Calculate based on time progression
+                    // Calculate based on time progression (4+ days old)
                     $total_period_seconds = $period_end - $period_start;
                     $elapsed_seconds = $current_time - $period_start;
                     $unused_seconds = $period_end - $current_time;
@@ -1929,18 +1936,20 @@
                     reliable_log("- Elapsed time: " . round($elapsed_seconds / 86400, 1) . " days", "REFUND_DEBUG");
                     reliable_log("- Unused time: " . round($unused_seconds / 86400, 1) . " days", "REFUND_DEBUG");
                 }
-                
-                // Calculate refund amount
-                $subscription_price = floatval($order->subscriptionPrice ?: $order->totalPrice);
-                $refund_amount_cents = round($subscription_price * $unused_fraction * 100);
-                
-                reliable_log("- Unused fraction: " . round($unused_fraction * 100, 1) . "%", "REFUND_DEBUG");
-                reliable_log("- Subscription price: $" . $subscription_price, "REFUND_DEBUG");
-                reliable_log("- Calculated refund: $" . ($refund_amount_cents / 100), "REFUND_DEBUG");
             } else {
+                // No valid periods, but still honor grace period
+                $unused_fraction = $days_since_creation <= 3 ? 1.0 : 0.0;
                 reliable_log("- No valid periods found for refund calculation", "REFUND_DEBUG");
             }
-            
+
+            // Calculate refund amount
+            $subscription_price = floatval($order->subscriptionPrice ?: $order->totalPrice);
+            $refund_amount_cents = round($subscription_price * $unused_fraction * 100);
+
+            reliable_log(sprintf("- Subscription price: $%.2f", $subscription_price), "REFUND_DEBUG");
+            reliable_log(sprintf("- Unused fraction: %.3f", $unused_fraction), "REFUND_DEBUG");
+            reliable_log(sprintf("- Calculated refund: $%.2f", ($refund_amount_cents / 100)), "REFUND_DEBUG");
+
             // Cancel the subscription
             try {
                 $canceled = $subscription->cancel();
@@ -2115,25 +2124,37 @@
                             
                             if ($refund_this_transaction >= 50) { // Minimum 50 cents
                                 reliable_log("Creating refund: PI=$payment_intent_id, amount=$refund_this_transaction cents", "REFUND_DEBUG");
-                                $refund = \Stripe\Refund::create([
-                                    'payment_intent' => $payment_intent_id,
-                                    'amount' => $refund_this_transaction
-                                ]);
                                 
-                                $total_refunded += $refund_this_transaction;
-                                reliable_log("Refunded {$refund_this_transaction} cents from PI: $payment_intent_id", "REFUND_DEBUG");
-                                
-                                // Update with refund amount
-                                $wpdb->update(
-                                    $wpdb->prefix . 'ffc_orders',
-                                    array(
-                                        'status' => 'refunded',
-                                        'refundAmount' => $refund_this_transaction / 100 // Convert cents to dollars
-                                    ),
-                                    array('id' => $transaction->id),
-                                    array('%s', '%f'),
-                                    array('%d')
-                                );
+                                try {
+                                    $refund = \Stripe\Refund::create([
+                                        'payment_intent' => $payment_intent_id,
+                                        'amount' => $refund_this_transaction,
+                                        'reason' => 'requested_by_customer'
+                                    ]);
+                                    
+                                    // Check if refund was successful
+                                    if ($refund->status === 'succeeded') {
+                                        $total_refunded += $refund_this_transaction;
+                                        reliable_log("✅ Stripe refund succeeded: {$refund->id} for {$refund_this_transaction} cents from PI: $payment_intent_id", "REFUND_DEBUG");
+                                        
+                                        // Update with refund amount
+                                        $wpdb->update(
+                                            $wpdb->prefix . 'ffc_orders',
+                                            array(
+                                                'status' => 'refunded',
+                                                'refundAmount' => $refund_this_transaction / 100 // Convert cents to dollars
+                                            ),
+                                            array('id' => $transaction->id),
+                                            array('%s', '%f'),
+                                            array('%d')
+                                        );
+                                    } else {
+                                        reliable_log("❌ Stripe refund failed with status: {$refund->status} for PI: $payment_intent_id", "REFUND_DEBUG");
+                                    }
+                                    
+                                } catch (Exception $e) {
+                                    reliable_log("❌ Stripe refund error for PI $payment_intent_id: " . $e->getMessage(), "REFUND_DEBUG");
+                                }
                             }
                         } catch (Exception $e) {
                             reliable_log("Refund failed for PI $payment_intent_id: " . $e->getMessage(), "REFUND_DEBUG");
