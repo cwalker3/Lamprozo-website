@@ -297,6 +297,11 @@ td.ffc-total-price > button {
     color: #fff;
 }
 
+.ffc-status-partial {
+    background-color: #fd7e14;
+    color: white;
+}
+
 /* Pagination */
 .ffc-pagination {
     margin-top: 20px;

@@ -147,8 +147,10 @@
             priceSelected                       INT                DEFAULT NULL,
             quantity                            INT                DEFAULT NULL,
             totalPrice                          DECIMAL(10,2)      DEFAULT NULL,
+            subscriptionPrice                   DECIMAL(10,2)      DEFAULT NULL,
             totalPriceDiscount                  DECIMAL(10,2)      DEFAULT NULL,
             priceDiscountsInfo                  JSON               DEFAULT NULL,
+            refundAmount                        DECIMAL(10,2)      DEFAULT 0.00,
             userData                            JSON               NOT NULL,
             status                              VARCHAR(50)        NOT NULL DEFAULT 'pending',
             transaction_type                    VARCHAR(50)        DEFAULT 'initial',
@@ -344,7 +346,7 @@
         $offset = ($page - 1) * $per_page;
         
         $orders_query = "
-            SELECT * FROM {$wpdb->prefix}ffc_orders
+            SELECT *, refundAmount FROM {$wpdb->prefix}ffc_orders
             $where_sql
             ORDER BY $sort_field $sort_direction
             LIMIT %d OFFSET %d

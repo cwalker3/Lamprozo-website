@@ -140,7 +140,7 @@
                                 <button
                                     class="button button-small button-link-delete"
                                     @click="confirmRefund(group.orderID)"
-                                    :disabled="group.status === 'refunded' || (group.totalValue - group.refundedAmount) <= 0"
+                                    :disabled="group.refundedAmount >= group.totalValue"
                                     :title="group.hasPartialRefund ? `Refund remaining $${formatPrice(group.totalValue - group.refundedAmount)}` : 'Refund order'"
                                 >
                                     {{ group.hasPartialRefund ? 'Refund Rest' : 'Refund' }}

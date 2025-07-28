@@ -84,54 +84,56 @@ function initOrdersApp() {
             
             // Computed properties
             const groupedOrders = computed(() => {
-                const groups = {};
+            const groups = {};
+            
+            orders.value.forEach(order => {
+                if (!groups[order.orderID]) {
+                    groups[order.orderID] = {
+                        orderID: order.orderID,
+                        userId: order.userId,
+                        status: order.status,
+                        createdAt: order.createdAt,
+                        totalValue: 0,
+                        items: [],
+                        userData: order.userData ? JSON.parse(order.userData) : {},
+                        hasPartialRefund: false,
+                        refundedAmount: 0
+                    };
+                }
                 
-                orders.value.forEach(order => {
-                    if (!groups[order.orderID]) {
-                        groups[order.orderID] = {
-                            orderID: order.orderID,
-                            userId: order.userId,
-                            status: order.status,
-                            createdAt: order.createdAt,
-                            totalValue: 0,
-                            items: [],
-                            userData: order.userData ? JSON.parse(order.userData) : {},
-                            // Add tracking for mixed status
-                            hasPartialRefund: false,
-                            refundedAmount: 0
-                        };
-                    }
-                    
-                    groups[order.orderID].items.push(order);
-                    groups[order.orderID].totalValue += parseFloat(order.totalPrice);
-                    
-                    // Track refunded items
-                    if (order.status === 'refunded') {
-                        groups[order.orderID].hasPartialRefund = true;
-                        groups[order.orderID].refundedAmount += parseFloat(order.totalPrice) || 0;
-                    }
-                });
+                groups[order.orderID].items.push(order);
+                groups[order.orderID].totalValue += parseFloat(order.totalPrice) || 0;
                 
-                // Determine overall status for each group
-                Object.values(groups).forEach(group => {
-                    const statuses = group.items.map(item => item.status);
-                    const uniqueStatuses = [...new Set(statuses)];
-                    
-                    if (uniqueStatuses.length === 1) {
-                        // All items have the same status
-                        group.status = uniqueStatuses[0];
-                    } else if (statuses.includes('refunded') && statuses.some(s => s !== 'refunded')) {
-                        // Mixed: some refunded, some not
-                        group.status = 'partial';
-                        group.hasPartialRefund = true;
-                    } else {
-                        // Use the most recent status
-                        group.status = group.items[group.items.length - 1].status;
-                    }
-                });
-                
-                return Object.values(groups);
+                // ONLY use the database refundAmount field - ignore item status for refund calculation
+                const dbRefundAmount = parseFloat(order.refundAmount) || 0;
+                if (dbRefundAmount > 0) {
+                    // For orders with multiple items, take the maximum refundAmount (should be same across items in same order)
+                    groups[order.orderID].refundedAmount = Math.max(groups[order.orderID].refundedAmount, dbRefundAmount);
+                }
             });
+            
+            // Determine overall status for each group based on actual refund amounts
+            Object.values(groups).forEach(group => {
+                const totalPrice = group.totalValue;
+                const refundedAmount = group.refundedAmount;
+                
+                if (refundedAmount === 0) {
+                    // No refund - use the most common item status
+                    const statuses = group.items.map(item => item.status);
+                    group.status = statuses[0]; // Use first item's status as default
+                } else if (Math.abs(refundedAmount - totalPrice) < 0.01) { // Account for rounding
+                    // Full refund
+                    group.status = 'refunded';
+                    group.hasPartialRefund = false;
+                } else {
+                    // Partial refund
+                    group.status = 'partial';
+                    group.hasPartialRefund = true;
+                }
+            });
+            
+            return Object.values(groups);
+        });
             
             const allSelected = computed(() => {
                 return groupedOrders.value.length > 0 && selectedOrders.value.length === groupedOrders.value.length;

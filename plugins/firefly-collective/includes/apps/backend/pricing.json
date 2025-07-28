@@ -1,15 +1,15 @@
 {
     "features": [
         {
-            "featureName": "Website",
+            "featureName": "WordPress Platform Solutions",
             "description": {
-                "text": "These are the website bundles."
+                "text": "Complete WordPress business management platform with integrated features for membership, e-commerce, bookings, and email marketing."
             },
             "options": [
                 {
-                    "optionName": "Singe Page",
+                    "optionName": "Standard License",
                     "description": {
-                        "text": "This is a single page WordPress website with a beautiful template design."
+                        "text": "Core Theme & Framework, Dynamic Navigation System, Email System Integration, Security & Performance."
                     },
                     "interval": {
                         "level": "admin",
@@ -35,7 +35,7 @@
                     },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 1050,
+                    "staticPrice": 3500,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",
@@ -56,14 +56,254 @@
                         }
                     },
                     "maxAddons": -1,
-                    "optionMetric": "unit",
+                    "optionMetric": "license",
                     "addons": [
                         {
-                            "addonName": "Email Catcher",
+                            "addonName": "PWA Functionality",
                             "description": {
-                                "text": "This is an email catcher."
+                                "text": ""
                             },
-                            "addOnMetric": "",
+                            "addOnMetric": "extra",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1000,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "User Management & Authentication",
+                            "description": {
+                                "text": ""
+                            },
+                            "addOnMetric": "extra",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 2250,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "E-commerce & Payment System",
+                            "description": {
+                                "text": ""
+                            },
+                            "addOnMetric": "extra",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 4000,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Booking System",
+                            "description": {
+                                "text": ""
+                            },
+                            "addOnMetric": "extra",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 1250,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Blog System",
+                            "description": {
+                                "text": ""
+                            },
+                            "addOnMetric": "extra",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 600,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "",
+                                            "discount": ""
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Contact Form System",
+                            "description": {
+                                "text": ""
+                            },
+                            "addOnMetric": "extra",
                             "floorPriceMod": 0,
                             "ceilingPriceMod": 0,
                             "pricingType": {
@@ -107,11 +347,11 @@
                             "link_name": ""
                         },
                         {
-                            "addonName": "Contact Form",
+                            "addonName": "Newsletter System",
                             "description": {
-                                "text": "This is a contact form."
+                                "text": ""
                             },
-                            "addOnMetric": "unit",
+                            "addOnMetric": "extra",
                             "floorPriceMod": 0,
                             "ceilingPriceMod": 0,
                             "pricingType": {
@@ -136,7 +376,7 @@
                                     "selected": 0
                                 }
                             },
-                            "staticPriceMod": 250,
+                            "staticPriceMod": 1750,
                             "groupName": "",
                             "groupThresholdDiscounts": {
                                 "level": "admin",
@@ -156,34 +396,269 @@
                         }
                     ],
                     "link_name": ""
+                },
+                {
+                    "optionName": "Professional License",
+                    "description": {
+                        "text": "Full platform with all features, 2 years of updates, priority support, and up to 3 site licenses. Includes newsletter system and analytics dashboard."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 22000,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "license",
+                    "addons": [
+                        {
+                            "addonName": "White Label Branding",
+                            "description": {
+                                "text": "Remove all platform branding and replace with your own company branding throughout."
+                            },
+                            "addOnMetric": "feature",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 5000,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Advanced Training Package",
+                            "description": {
+                                "text": "8 hours of personalized training for your team on all platform features."
+                            },
+                            "addOnMetric": "package",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 2000,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Agency License",
+                    "description": {
+                        "text": "Full platform with lifetime updates, white-label options, unlimited site licenses, and dedicated account management. Perfect for agencies and developers."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 35000,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "license",
+                    "addons": [
+                        {
+                            "addonName": "Partner Program Access",
+                            "description": {
+                                "text": "Become a certified partner with sales support, co-marketing opportunities, and revenue sharing."
+                            },
+                            "addOnMetric": "program",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 10000,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
                 }
             ],
             "recurring": false,
             "link_name": ""
         },
         {
-            "featureName": "Support Packages",
+            "featureName": "Custom Development Services",
             "description": {
-                "text": "These are the support packages."
+                "text": "Professional customization and development services for your WordPress platform implementation."
             },
             "options": [
                 {
-                    "optionName": "Basic - Monthly",
+                    "optionName": "Basic Customization",
                     "description": {
-                        "text": "This is the basic support package."
+                        "text": "Up to 20 hours of customization including theme adjustments, basic feature modifications, and initial setup assistance."
                     },
                     "interval": {
                         "level": "admin",
                         "ui_type": "array",
                         "value": {
                             "types": [
-                                "day",
-                                "week",
-                                "month",
-                                "year",
                                 "none"
                             ],
-                            "selected": 2
+                            "selected": 0
                         }
                     },
                     "pricingType": {
@@ -195,12 +670,12 @@
                                 "price range",
                                 "price options"
                             ],
-                            "selected": 0
+                            "selected": 1
                         }
                     },
-                    "priceFloor": 0,
-                    "priceCeiling": 0,
-                    "staticPrice": 10,
+                    "priceFloor": 2000,
+                    "priceCeiling": 3000,
+                    "staticPrice": 0,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",
@@ -221,14 +696,175 @@
                         }
                     },
                     "maxAddons": -1,
-                    "optionMetric": "unit",
-                    "addons": [],
+                    "optionMetric": "package",
+                    "addons": [
+                        {
+                            "addonName": "Additional Development Hours",
+                            "description": {
+                                "text": "Extra development hours beyond the package limit."
+                            },
+                            "addOnMetric": "hour",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 125,
+                            "groupName": "development-hours",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "10",
+                                            "discount": "10"
+                                        },
+                                        {
+                                            "itemCount": "20",
+                                            "discount": "15"
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
                     "link_name": ""
                 },
                 {
-                    "optionName": "Agency - Monthly",
+                    "optionName": "Advanced Integration",
                     "description": {
-                        "text": "This is the basic support package."
+                        "text": "Complex integrations with third-party systems, custom API development, and advanced feature implementation. 40-80 hours."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "none"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 1
+                        }
+                    },
+                    "priceFloor": 5000,
+                    "priceCeiling": 10000,
+                    "staticPrice": 0,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "project",
+                    "addons": [
+                        {
+                            "addonName": "Priority Development",
+                            "description": {
+                                "text": "Fast-track your project with dedicated developer resources."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 1
+                                }
+                            },
+                            "staticPriceMod": 1.25,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
+                }
+            ],
+            "recurring": false,
+            "link_name": ""
+        },
+        {
+            "featureName": "Support & Maintenance",
+            "description": {
+                "text": "Ongoing support, updates, and maintenance services to keep your platform running smoothly."
+            },
+            "options": [
+                {
+                    "optionName": "Essential Support",
+                    "description": {
+                        "text": "Monthly support including security updates, basic troubleshooting, and email support. Response time within 48 hours."
                     },
                     "interval": {
                         "level": "admin",
@@ -258,7 +894,7 @@
                     },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 20,
+                    "staticPrice": 299,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",
@@ -279,14 +915,63 @@
                         }
                     },
                     "maxAddons": -1,
-                    "optionMetric": "unit",
-                    "addons": [],
+                    "optionMetric": "site",
+                    "addons": [
+                        {
+                            "addonName": "Additional Sites",
+                            "description": {
+                                "text": "Add more sites to your support plan."
+                            },
+                            "addOnMetric": "site",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 199,
+                            "groupName": "support-sites",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": [
+                                        {
+                                            "itemCount": "5",
+                                            "discount": "20"
+                                        }
+                                    ]
+                                }
+                            },
+                            "enableGrouping": true,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
                     "link_name": ""
                 },
                 {
-                    "optionName": "Enterprise - Monthly",
+                    "optionName": "Premium Support",
                     "description": {
-                        "text": "This is the basic support package."
+                        "text": "Priority support with 24-hour response time, monthly performance optimization, backup management, and phone support."
                     },
                     "interval": {
                         "level": "admin",
@@ -316,7 +1001,167 @@
                     },
                     "priceFloor": 0,
                     "priceCeiling": 0,
-                    "staticPrice": 30,
+                    "staticPrice": 599,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "itemCount": "12",
+                                    "discount": "15"
+                                }
+                            ]
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "site",
+                    "addons": [
+                        {
+                            "addonName": "Emergency Support",
+                            "description": {
+                                "text": "24\/7 emergency support with 1-hour response time."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 200,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Development Hours Bundle",
+                            "description": {
+                                "text": "5 hours of development time per month for minor changes and updates."
+                            },
+                            "addOnMetric": "bundle",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 500,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
+                }
+            ],
+            "recurring": true,
+            "link_name": ""
+        },
+        {
+            "featureName": "Hosting & Infrastructure",
+            "description": {
+                "text": "Managed WordPress hosting optimized for our platform with CDN, backups, and security."
+            },
+            "options": [
+                {
+                    "optionName": "Starter Hosting",
+                    "description": {
+                        "text": "Managed hosting for up to 25,000 monthly visitors. Includes SSL, daily backups, and CDN."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "day",
+                                "week",
+                                "month",
+                                "year",
+                                "none"
+                            ],
+                            "selected": 2
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 99,
                     "priceOptions": {
                         "level": "admin",
                         "ui_type": "array-obj",
@@ -337,8 +1182,197 @@
                         }
                     },
                     "maxAddons": -1,
-                    "optionMetric": "unit",
-                    "addons": [],
+                    "optionMetric": "site",
+                    "addons": [
+                        {
+                            "addonName": "Staging Environment",
+                            "description": {
+                                "text": "Separate staging site for testing updates and changes."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 25,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
+                    "link_name": ""
+                },
+                {
+                    "optionName": "Business Hosting",
+                    "description": {
+                        "text": "High-performance hosting for up to 100,000 monthly visitors. Includes priority support and advanced caching."
+                    },
+                    "interval": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "day",
+                                "week",
+                                "month",
+                                "year",
+                                "none"
+                            ],
+                            "selected": 2
+                        }
+                    },
+                    "pricingType": {
+                        "level": "admin",
+                        "ui_type": "array",
+                        "value": {
+                            "types": [
+                                "static price",
+                                "price range",
+                                "price options"
+                            ],
+                            "selected": 0
+                        }
+                    },
+                    "priceFloor": 0,
+                    "priceCeiling": 0,
+                    "staticPrice": 299,
+                    "priceOptions": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": [
+                                {
+                                    "label": "Default",
+                                    "price": 0
+                                }
+                            ]
+                        }
+                    },
+                    "thresholdDiscounts": {
+                        "level": "admin",
+                        "ui_type": "array-obj",
+                        "value": {
+                            "types": []
+                        }
+                    },
+                    "maxAddons": -1,
+                    "optionMetric": "site",
+                    "addons": [
+                        {
+                            "addonName": "Load Balancing",
+                            "description": {
+                                "text": "Distribute traffic across multiple servers for maximum uptime."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 150,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        },
+                        {
+                            "addonName": "Advanced Security Suite",
+                            "description": {
+                                "text": "WAF, DDoS protection, and real-time threat monitoring."
+                            },
+                            "addOnMetric": "",
+                            "floorPriceMod": 0,
+                            "ceilingPriceMod": 0,
+                            "pricingType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "static price",
+                                        "price range"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "priceModifierType": {
+                                "level": "admin",
+                                "ui_type": "array",
+                                "value": {
+                                    "types": [
+                                        "add",
+                                        "multiply"
+                                    ],
+                                    "selected": 0
+                                }
+                            },
+                            "staticPriceMod": 99,
+                            "groupName": "",
+                            "groupThresholdDiscounts": {
+                                "level": "admin",
+                                "ui_type": "array-obj",
+                                "value": {
+                                    "types": []
+                                }
+                            },
+                            "enableGrouping": false,
+                            "maxGroupItems": -1,
+                            "link_name": ""
+                        }
+                    ],
                     "link_name": ""
                 }
             ],

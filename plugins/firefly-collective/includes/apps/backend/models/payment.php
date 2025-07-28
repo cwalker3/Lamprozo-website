@@ -386,6 +386,7 @@
                     'subscription_renewal'            => 0,
                     'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
                     'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
+                    'subscriptionPrice'               => floatval($item['totalPrice']), // Add this line
                 ],
                 [
                     'orderID' => $order_id,
@@ -519,6 +520,7 @@
                         'subscription_renewal'            => 0,
                         'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
                         'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
+                        'subscriptionPrice'               => floatval($item['totalPrice']), // Add this line
                     ],
                     [
                         'orderID' => $order_id,
@@ -914,6 +916,7 @@
                     'priceSelected'                   => $original['priceSelected'],
                     'quantity'                        => $quantity,
                     'totalPrice'                      => $amount,
+                    'subscriptionPrice'               => $amount,
                     'totalPriceDiscount'              => $original['totalPriceDiscount'],
                     'priceDiscountsInfo'              => $original['priceDiscountsInfo'],
                     'userData'                        => $original['userData'],
@@ -1265,17 +1268,18 @@
                     "{$wpdb->prefix}ffc_orders",
                     [
                         'optionId'                         => $new_option_id,
+                        'subscriptionPrice'                => floatval($new_option['staticPrice']),
                         'subscription_status'              => $updated_sub->status,
                         'subscription_current_period_end'  => $periods['end']
-                            ? date('Y-m-d H:i:s', $periods['end'])
-                            : null,
+                                                            ? date('Y-m-d H:i:s', $periods['end'])
+                                                            : null,
                         'updatedAt'                        => current_time('mysql'),
                     ],
                     [
                         'subscription_id'       => $subscription_id,
                         'subscription_renewal'  => 0,
                     ],
-                    ['%d','%s','%s','%s'],
+                    ['%d','%s','%s','%s','%s'],
                     ['%s','%d']
                 );
                 
@@ -1364,6 +1368,7 @@
                     "{$wpdb->prefix}ffc_orders",
                     [
                         'optionId'                        => $new_option_id,
+                        'subscriptionPrice'               => floatval($new_option['staticPrice']),
                         'subscription_status'             => $updated_sub->status,
                         'subscription_current_period_end' => $periods['end']
                                                             ? date('Y-m-d H:i:s', $periods['end'])
@@ -1374,7 +1379,7 @@
                         'subscription_id'      => $subscription_id,
                         'subscription_renewal' => 0,
                     ],
-                    ['%d','%s','%s','%s'],
+                    ['%d','%s','%s','%s','%s'],
                     ['%s','%d']
                 );
                 
@@ -1730,7 +1735,7 @@
                 o.featureId,
                 o.optionId,
                 MIN(o.createdAt) AS started_at,
-                o.totalPrice AS total_amount,
+                COALESCE(o.subscriptionPrice, o.totalPrice) AS total_amount,
                 f.featureName AS features,
                 opt.optionName AS options,
                 opt.interval AS intervals
@@ -1750,6 +1755,7 @@
                 o.userId,
                 o.featureId,
                 o.optionId,
+                o.subscriptionPrice,
                 o.totalPrice,
                 f.featureName,
                 opt.optionName,
@@ -1837,9 +1843,14 @@
         
         global $wpdb;
         
-        // Get order details to check if refund eligible
+        // Get original order details
         $order = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE subscription_id = %s",
+            "SELECT * FROM {$wpdb->prefix}ffc_orders 
+            WHERE subscription_id = %s 
+            AND subscription_renewal = 0 
+            AND transaction_type = 'initial'
+            ORDER BY createdAt ASC 
+            LIMIT 1",
             $subscription_id
         ));
         
@@ -1847,53 +1858,314 @@
             return new WP_Error('order_not_found', 'Order not found', array('status' => 404));
         }
         
-        // Check if order is 3 days old or less
-        $order_age_days = (time() - strtotime($order->createdAt)) / (60 * 60 * 24);
-        $should_refund = $order_age_days <= 3;
-        
-        // Cancel in Stripe
         firefly_collective_stripe_init();
-        
+
         try {
-            $subscription = \Stripe\Subscription::retrieve($subscription_id);
-            $subscription->cancel();
+            // Get subscription details with expand to ensure we have all data
+            $subscription = \Stripe\Subscription::retrieve($subscription_id, [
+                'expand' => ['latest_invoice', 'items.data', 'test_clock']
+            ]);
             
-            // Process refund if eligible
-            if ($should_refund && !empty($order->payment_intent_id)) {
-                $refund = \Stripe\Refund::create([
-                    'payment_intent' => $order->payment_intent_id,
-                    'amount' => $order->totalPrice * 100 // Convert to cents
-                ]);
+            // Use your existing helper function to get periods safely
+            $periods = ff_subscription_period($subscription);
+            $period_start = $periods['start'];
+            $period_end = $periods['end'];
+            
+            // Initialize refund amount
+            $refund_amount_cents = 0;
+            
+            reliable_log("Refund calculation:", "REFUND_DEBUG");
+            reliable_log("- Subscription ID: " . $subscription_id, "REFUND_DEBUG");
+            reliable_log("- Subscription status: " . $subscription->status, "REFUND_DEBUG");
+            reliable_log("- Period start: " . ($period_start ? date('Y-m-d H:i:s', $period_start) : 'null'), "REFUND_DEBUG");
+            reliable_log("- Period end: " . ($period_end ? date('Y-m-d H:i:s', $period_end) : 'null'), "REFUND_DEBUG");
+            
+            // Check if subscription has a test clock
+            $has_test_clock = !empty($subscription->test_clock);
+            $current_time = time();
+            
+            if ($has_test_clock) {
+                try {
+                    // Retrieve the test clock to get the simulated time
+                    $test_clock = \Stripe\TestHelpers\TestClock::retrieve($subscription->test_clock);
+                    $simulated_time = $test_clock->frozen_time;
+                    
+                    reliable_log("- Test clock detected", "REFUND_DEBUG");
+                    reliable_log("- Test clock frozen time: " . date('Y-m-d H:i:s', $simulated_time), "REFUND_DEBUG");
+                    reliable_log("- System time: " . date('Y-m-d H:i:s', $current_time), "REFUND_DEBUG");
+                    
+                    // Use the simulated time for calculations
+                    $current_time = $simulated_time;
+                } catch (Exception $e) {
+                    reliable_log("- Could not retrieve test clock: " . $e->getMessage(), "REFUND_DEBUG");
+                }
             }
             
-            // Update database
-            $update_data = array(
-                'subscription_status'      => 'cancelled',
-                'subscription_cancelled_at'=> current_time('mysql')
-            );
-
-            if ($should_refund) {
-                $update_data['status'] = 'refunded';
+            reliable_log("- Time used for calculation: " . date('Y-m-d H:i:s', $current_time), "REFUND_DEBUG");
+            
+            // Calculate refund based on the appropriate time
+            if ($period_start && $period_end && $period_end > $period_start) {
+                if ($current_time < $period_start) {
+                    // Subscription hasn't started yet - full refund
+                    $unused_fraction = 1.0;
+                    reliable_log("- Subscription not started yet, full refund", "REFUND_DEBUG");
+                } else if ($current_time >= $period_end) {
+                    // Full period elapsed - no refund
+                    $unused_fraction = 0.0;
+                    reliable_log("- Full period elapsed, no refund", "REFUND_DEBUG");
+                } else {
+                    // Calculate based on time progression
+                    $total_period_seconds = $period_end - $period_start;
+                    $elapsed_seconds = $current_time - $period_start;
+                    $unused_seconds = $period_end - $current_time;
+                    $unused_fraction = $unused_seconds / $total_period_seconds;
+                    
+                    reliable_log("- Total period: " . round($total_period_seconds / 86400, 1) . " days", "REFUND_DEBUG");
+                    reliable_log("- Elapsed time: " . round($elapsed_seconds / 86400, 1) . " days", "REFUND_DEBUG");
+                    reliable_log("- Unused time: " . round($unused_seconds / 86400, 1) . " days", "REFUND_DEBUG");
+                }
+                
+                // Calculate refund amount
+                $subscription_price = floatval($order->subscriptionPrice ?: $order->totalPrice);
+                $refund_amount_cents = round($subscription_price * $unused_fraction * 100);
+                
+                reliable_log("- Unused fraction: " . round($unused_fraction * 100, 1) . "%", "REFUND_DEBUG");
+                reliable_log("- Subscription price: $" . $subscription_price, "REFUND_DEBUG");
+                reliable_log("- Calculated refund: $" . ($refund_amount_cents / 100), "REFUND_DEBUG");
+            } else {
+                reliable_log("- No valid periods found for refund calculation", "REFUND_DEBUG");
             }
-
-            $format = $should_refund ? array('%s','%s','%s') : array('%s','%s');
-
+            
+            // Cancel the subscription
+            try {
+                $canceled = $subscription->cancel();
+                reliable_log("- Subscription cancelled successfully", "REFUND_DEBUG");
+            } catch (Exception $e) {
+                reliable_log("- Error cancelling subscription: " . $e->getMessage(), "REFUND_DEBUG");
+                throw $e;
+            }
+            
+            // For subscriptions with plan changes, we need to calculate actual consumption
+            $has_plan_changes = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders 
+                WHERE subscription_id = %s 
+                AND transaction_type = 'plan_change'
+                AND status = 'paid'",
+                $subscription_id
+            ));
+            
+            if ($has_plan_changes > 0) {
+                reliable_log("Plan changes detected - calculating precise consumption", "REFUND_DEBUG");
+                
+                // Get all transactions for this subscription in the current period
+                $all_transactions = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders 
+                    WHERE subscription_id = %s 
+                    AND status IN ('paid', 'refunded')
+                    ORDER BY createdAt ASC",
+                    $subscription_id
+                ), ARRAY_A);
+                
+                // Calculate total paid in current period
+                $total_paid_cents = 0;
+                $plan_changes = [];
+                $initial_transaction = null;
+                
+                foreach ($all_transactions as $trans) {
+                    if ($trans['transaction_type'] === 'initial' && $trans['subscription_renewal'] == 0) {
+                        $initial_transaction = $trans;
+                        $total_paid_cents += $trans['totalPrice'] * 100;
+                        $plan_changes[] = [
+                            'timestamp' => strtotime($trans['createdAt']),
+                            'price_per_month' => floatval($trans['subscriptionPrice'] ?: $trans['totalPrice']),
+                            'option_id' => $trans['optionId']
+                        ];
+                    } else if ($trans['transaction_type'] === 'plan_change' && $trans['status'] === 'paid') {
+                        $total_paid_cents += $trans['totalPrice'] * 100;
+                        // Get the new price from the updated subscription
+                        $new_price = $wpdb->get_var($wpdb->prepare(
+                            "SELECT subscriptionPrice FROM {$wpdb->prefix}ffc_orders 
+                            WHERE subscription_id = %s 
+                            AND optionId = %d
+                            AND subscription_renewal = 0
+                            ORDER BY updatedAt DESC LIMIT 1",
+                            $subscription_id,
+                            $trans['optionId']
+                        ));
+                        $plan_changes[] = [
+                            'timestamp' => strtotime($trans['createdAt']),
+                            'price_per_month' => floatval($new_price),
+                            'option_id' => $trans['optionId']
+                        ];
+                    }
+                }
+                
+                reliable_log("Total paid in period: $" . ($total_paid_cents / 100), "REFUND_DEBUG");
+                
+                // Calculate consumed value based on time spent on each plan
+                $consumed_value_cents = 0;
+                $period_days = ($period_end - $period_start) / 86400;
+                
+                for ($i = 0; $i < count($plan_changes); $i++) {
+                    $plan_start = $plan_changes[$i]['timestamp'];
+                    $plan_end = ($i + 1 < count($plan_changes)) ? $plan_changes[$i + 1]['timestamp'] : $current_time;
+                    
+                    // Don't count beyond the cancellation time
+                    $plan_end = min($plan_end, $current_time);
+                    
+                    $days_on_plan = max(0, ($plan_end - $plan_start) / 86400);
+                    $daily_rate = $plan_changes[$i]['price_per_month'] / $period_days;
+                    $plan_cost = $daily_rate * $days_on_plan;
+                    
+                    $consumed_value_cents += $plan_cost * 100;
+                    
+                    reliable_log(sprintf(
+                        "Plan %d: %s to %s (%.1f days) at $%.2f/month = $%.2f",
+                        $i + 1,
+                        date('Y-m-d', $plan_start),
+                        date('Y-m-d', $plan_end),
+                        $days_on_plan,
+                        $plan_changes[$i]['price_per_month'],
+                        $plan_cost
+                    ), "REFUND_DEBUG");
+                }
+                
+                reliable_log("Total consumed value: $" . ($consumed_value_cents / 100), "REFUND_DEBUG");
+                
+                // Override the refund amount with the precise calculation
+                $refund_amount_cents = max(0, $total_paid_cents - $consumed_value_cents);
+                reliable_log("Calculated precise refund: $" . ($refund_amount_cents / 100), "REFUND_DEBUG");
+                
+                // Get transactions to process refunds
+                $cycle_transactions = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders 
+                    WHERE subscription_id = %s 
+                    AND status = 'paid'
+                    AND transaction_type IN ('initial', 'plan_change')
+                    ORDER BY createdAt DESC",
+                    $subscription_id
+                ));
+                
+            } else {
+                // Original logic for subscriptions without plan changes
+                $renewal_transactions = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders 
+                    WHERE subscription_id = %s 
+                    AND subscription_renewal = 1 
+                    AND status = 'paid'
+                    ORDER BY createdAt DESC",
+                    $subscription_id
+                ));
+                
+                if (!empty($renewal_transactions)) {
+                    $cycle_transactions = $renewal_transactions;
+                    reliable_log("Using renewal period transactions", "REFUND_DEBUG");
+                } else {
+                    $period_start_db = $order->subscription_period_start;
+                    $period_end_db = $order->subscription_current_period_end;
+                    
+                    $cycle_transactions = $wpdb->get_results($wpdb->prepare(
+                        "SELECT * FROM {$wpdb->prefix}ffc_orders 
+                        WHERE userId = %d AND featureId = %d AND status = 'paid'
+                        AND (
+                            (subscription_id = %s AND subscription_renewal = 0) OR
+                            (createdAt >= %s AND createdAt <= %s)
+                        )
+                        ORDER BY createdAt DESC",
+                        $order->userId,
+                        $order->featureId,
+                        $order->subscription_id,
+                        $period_start_db,
+                        $period_end_db
+                    ));
+                    reliable_log("Using original period transactions", "REFUND_DEBUG");
+                }
+            }
+            
+            // Process refunds if we have credit to give
+            $total_refunded = 0;
+            if ($refund_amount_cents > 0) {
+                foreach ($cycle_transactions as $transaction) {
+                    if ($total_refunded >= $refund_amount_cents) break;
+                    
+                    $payment_intent_id = $transaction->payment_intent_id;
+                    
+                    // Get payment intent from invoice if needed
+                    if (!$payment_intent_id && !empty($transaction->invoice_id)) {
+                        try {
+                            $invoice = \Stripe\Invoice::retrieve($transaction->invoice_id, [
+                                'expand' => ['payments.data.payment']
+                            ]);
+                            $payment_intent_id = ff_invoice_pi_id($invoice);
+                        } catch (Exception $e) {
+                            continue;
+                        }
+                    }
+                    
+                    if ($payment_intent_id) {
+                        try {
+                            $payment_intent = \Stripe\PaymentIntent::retrieve($payment_intent_id);
+                            $remaining_credit = $refund_amount_cents - $total_refunded;
+                            $refund_this_transaction = min($payment_intent->amount, $remaining_credit);
+                            
+                            if ($refund_this_transaction >= 50) { // Minimum 50 cents
+                                reliable_log("Creating refund: PI=$payment_intent_id, amount=$refund_this_transaction cents", "REFUND_DEBUG");
+                                $refund = \Stripe\Refund::create([
+                                    'payment_intent' => $payment_intent_id,
+                                    'amount' => $refund_this_transaction
+                                ]);
+                                
+                                $total_refunded += $refund_this_transaction;
+                                reliable_log("Refunded {$refund_this_transaction} cents from PI: $payment_intent_id", "REFUND_DEBUG");
+                                
+                                // Update with refund amount
+                                $wpdb->update(
+                                    $wpdb->prefix . 'ffc_orders',
+                                    array(
+                                        'status' => 'refunded',
+                                        'refundAmount' => $refund_this_transaction / 100 // Convert cents to dollars
+                                    ),
+                                    array('id' => $transaction->id),
+                                    array('%s', '%f'),
+                                    array('%d')
+                                );
+                            }
+                        } catch (Exception $e) {
+                            reliable_log("Refund failed for PI $payment_intent_id: " . $e->getMessage(), "REFUND_DEBUG");
+                        }
+                    }
+                }
+            }
+            
+            // Update subscription as cancelled
             $wpdb->update(
                 $wpdb->prefix . 'ffc_orders',
-                $update_data,
+                array(
+                    'subscription_status' => 'cancelled',
+                    'subscription_cancelled_at' => current_time('mysql')
+                ),
                 array('subscription_id' => $subscription_id),
-                $format,
+                array('%s','%s'),
                 array('%s')
             );
             
-            $message = $should_refund 
-                ? 'Subscription cancelled and refunded successfully' 
-                : 'Subscription cancelled successfully';
+            $refund_percentage = $total_refunded > 0 ? ($total_refunded / ($order->totalPrice * 100)) * 100 : 0;
+            $refund_amount_dollars = $total_refunded / 100;
             
+            if ($refund_percentage >= 99) {
+                $message = "Subscription cancelled successfully and fully refunded ($" . number_format($refund_amount_dollars, 2) . ")";
+            } else if ($refund_percentage > 0) {
+                $message = "Subscription cancelled successfully and partially refunded ($" . number_format($refund_amount_dollars, 2) . " - " . round($refund_percentage, 1) . "%)";
+            } else {
+                $message = "Subscription cancelled successfully (no refund - billing period completed)";
+            }
+
             return array(
                 'success' => true,
                 'message' => $message,
-                'refunded' => $should_refund
+                'refunded' => $total_refunded > 0,
+                'refund_percentage' => round($refund_percentage, 1),
+                'refund_amount' => $refund_amount_dollars
             );
             
         } catch (Exception $e) {
