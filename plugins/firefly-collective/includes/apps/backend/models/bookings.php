@@ -559,19 +559,6 @@
                                         'deleted_types' => $deletedTypes) );
     }
 
-    function firefly_collective_add_bookings_link() {
-        // Top-level menu
-        add_menu_page(
-            'My Bookings', // Title of the page
-            'Bookings', // Text to show on the menu link
-            'manage_options', // Capability requirement to see the link
-            'my-bookings', // The 'slug' - file to display when clicking the link
-            'firefly_collective_bookings_dashboard', // Function to call when admin link is clicked
-            'dashicons-calendar', // Icon for the menu
-        );
-    }
-    add_action('admin_menu', 'firefly_collective_add_bookings_link');
-
     function firefly_collective_bookings_dashboard() {
         // Navigate up one directory from /models to the plugin root
         $plugin_root = dirname(plugin_dir_path(__FILE__));

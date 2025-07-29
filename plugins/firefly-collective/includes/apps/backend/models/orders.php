@@ -2,30 +2,6 @@
 
     // plugin/models/orders.php
 
-    function firefly_collective_add_orders_link() {
-        add_menu_page(
-            'Orders',
-            'Orders',
-            'manage_options',
-            'orders',
-            'firefly_collective_orders_dashboard',
-            'dashicons-cart'
-        );
-    }
-    add_action('admin_menu', 'firefly_collective_add_orders_link');
-
-    function firefly_collective_add_subscriptions_link() {
-        add_menu_page(
-            'Subscriptions',
-            'Subscriptions',
-            'manage_options',
-            'subscriptions',
-            'firefly_collective_subscriptions_dashboard',
-            'dashicons-tickets-alt'
-        );
-    }
-    add_action('admin_menu', 'firefly_collective_add_subscriptions_link');
-
     function firefly_collective_orders_dashboard() {
         $plugin_root = dirname(plugin_dir_path(__FILE__));
         $view_path   = $plugin_root . '/views/orders.php';

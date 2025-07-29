@@ -2,21 +2,6 @@
 
     // plugin/models/pricing.php
 
-    /* ------------------------------ *
-    * Admin Menu & Assets
-    * ------------------------------ */
-    function firefly_collective_add_pricing_link() {
-        add_menu_page(
-            'Pricing',
-            'Pricing',
-            'manage_options',
-            'pricing',
-            'firefly_collective_pricing_dashboard',
-            'dashicons-money-alt'
-        );
-    }
-    add_action('admin_menu', 'firefly_collective_add_pricing_link');
-
     function enqueue_pricing_styles_and_scripts($hook) {
         if ($hook !== 'toplevel_page_pricing') {
             return;
