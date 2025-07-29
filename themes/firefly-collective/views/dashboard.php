@@ -66,7 +66,22 @@
                 <button class="button" id="cancel-update-payment">Cancel</button>
                 <button class="button button-primary" id="update-payment-submit">Update</button>
             </div>
+            <img id="update-modal-loader" src="<?=$theme_path_web?>/images/loading-dark.gif">
         </div>
+    </div>
+
+    <!-- Cancel Subscription Modal -->
+    <div id="cancel-subscription-modal" class="update-payment-modal" style="display: none;">
+        <div id="cancel-subscription-content">
+            <h3>Cancel Subscription</h3>
+
+            <p>Are you sure you want to cancel this subscription? This action cannot be undone.</p>
+            <div class="cancel-actions">
+                <button class="button" id="close-cancel-modal">Close</button>
+                <button class="button button-danger" id="confirm-cancel-subscription">Confirm Cancel</button>
+            </div>
+        </div>
+        <img id="cancel-modal-loader" src="<?=$theme_path_web?>/images/loading.gif" style="display: none;">
     </div>
 
     <!-- Price Calculator Interface -->

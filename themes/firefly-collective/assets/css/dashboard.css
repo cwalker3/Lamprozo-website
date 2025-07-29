@@ -968,12 +968,28 @@ td .feature-fields-list {
     z-index: 9999;
 }
 
-.update-payment-content {
+.update-payment-content,
+#cancel-subscription-content {
     background: white;
     padding: 30px;
     border-radius: 8px;
     max-width: 500px;
     width: 90%;
+}
+
+#cancel-subscription-content {
+    display: grid;
+    place-content: center;
+    min-height: 30vh;
+}
+
+#cancel-subscription-content h3 {
+    text-align: center;
+}
+
+.update-payment-content {
+    position: relative;
+    min-height: 90vh;
     max-height: 90vh;
     overflow-y: auto;
 }
@@ -988,9 +1004,52 @@ td .feature-fields-list {
 }
 
 .update-payment-actions {
-    display: flex;
+    display: none;
+}
+
+.update-payment-actions,
+.cancel-actions {
     gap: 10px;
     justify-content: flex-end;
+}
+
+.update-payment-actions button,
+.cancel-actions button {
+    cursor: pointer;
+}
+
+.cancel-actions button {
+    font-size: 1.1rem;
+    padding: 0.5rem;
+    border-radius: 5px;
+}
+
+.cancel-actions {
+    display: flex;
+    justify-content: space-evenly;
+}
+
+#cancel-modal-loader {
+    width: 30px;
+    height: auto;
+}
+
+#update-modal-loader {
+    width: 30px;
+    height: auto;
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.button-danger {
+    background-color: #dc3545;
+    color: white;
+}
+.button-danger:hover {
+    background-color: #c82333;
 }
 
 .plan-change-section {

@@ -79,6 +79,7 @@
             }, 0);
         }
 
+        const updateModal = document.getElementById('update-payment-modal');
         const invoiceDetails = document.getElementById('invoice-details');
         const invoiceTotal = document.getElementById('invoice-total');
         const themePath = dashboardData.theme_path;
@@ -3152,40 +3153,171 @@
         }
 
         async function cancelSubscription(subscriptionId) {
-            if (!confirm('Are you sure you want to cancel this subscription? This action cannot be undone.')) {
-                return;
+            const modal = document.getElementById('cancel-subscription-modal');
+            const content = document.getElementById('cancel-subscription-content');
+            const loader = document.getElementById('cancel-modal-loader');
+            const closeBtn = document.getElementById('close-cancel-modal');
+            const confirmBtn = document.getElementById('confirm-cancel-subscription');
+            const actionButtons = document.querySelector('.update-payment-actions');
+            
+            // Show modal
+            modal.style.display = 'flex';
+            content.style.display = 'block';
+            loader.style.display = 'none';
+            actionButtons.style.display = 'flex';
+            
+            // Store subscription ID for the confirm handler
+            modal.dataset.subscriptionId = subscriptionId;
+            
+            // Close button handler
+            const closeHandler = () => {
+                modal.style.display = 'none';
+                modal.dataset.subscriptionId = '';
+            };
+            
+            // Remove any existing listeners
+            closeBtn.removeEventListener('click', closeHandler);
+            modal.removeEventListener('click', modalClickHandler);
+            
+            // Add close handlers
+            closeBtn.addEventListener('click', closeHandler);
+            
+            // Click outside to close
+            function modalClickHandler(e) {
+                if (e.target === modal) {
+                    closeHandler();
+                }
+            }
+            modal.addEventListener('click', modalClickHandler);
+            
+            // Confirm button handler (one-time use)
+            confirmBtn.onclick = async () => {
+                // Hide content and show loader
+                content.style.display = 'none';
+                loader.style.display = 'block';
+                
+                try {
+                    const response = await fetch(`${myApi.api_url}cancel-subscription`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            subscriptionId: modal.dataset.subscriptionId
+                        })
+                    });
+                    
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Close modal
+                        modal.style.display = 'none';
+                        
+                        // Show success message
+                        const successMessage = document.createElement('div');
+                        successMessage.style.cssText = `
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: #4CAF50;
+                            color: white;
+                            padding: 15px 20px;
+                            border-radius: 4px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                            z-index: 10000;
+                        `;
+                        successMessage.textContent = 'Successfully canceled';
+                        document.body.appendChild(successMessage);
+                        
+                        // Remove success message after 3 seconds
+                        setTimeout(() => {
+                            successMessage.remove();
+                        }, 3000);
+                        
+                        // Reload subscriptions
+                        loadSubscriptions();
+                    } else {
+                        throw new Error(data.message || 'Failed to cancel subscription');
+                    }
+                } catch (error) {
+                    // Show error in modal
+                    loader.style.display = 'none';
+                    content.innerHTML = `
+                        <div style="color: #d83838; margin-bottom: 20px;">
+                            <p><strong>Error:</strong> ${error.message}</p>
+                        </div>
+                        <div class="update-payment-actions">
+                            <button class="button" id="error-close-cancel">Close</button>
+                        </div>
+                    `;
+                    content.style.display = 'block';
+                    
+                    // Add close handler to error button
+                    document.getElementById('error-close-cancel').addEventListener('click', closeHandler);
+                }
+            };
+        }
+
+        if (updateModal) {
+            // Ensure payment element container exists
+            if (!document.getElementById('update-payment-element')) {
+                const modalContent = updateModal.querySelector('.update-payment-content');
+                if (modalContent) {
+                    const paymentElementDiv = document.createElement('div');
+                    paymentElementDiv.id = 'update-payment-element';
+                    
+                    // Insert before error div if it exists
+                    const errorDiv = document.getElementById('update-payment-error');
+                    if (errorDiv) {
+                        errorDiv.parentNode.insertBefore(paymentElementDiv, errorDiv);
+                    } else {
+                        modalContent.appendChild(paymentElementDiv);
+                    }
+                }
             }
             
-            try {
-                const response = await fetch(`${myApi.api_url}cancel-subscription`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        subscriptionId: subscriptionId
-                    })
-                });
-                
-                const data = await response.json();
+            // Ensure submit button is disabled by default
+            const submitBtn = document.getElementById('update-payment-submit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Update';
+            }
+        }
 
-                if (data.success) {
-                    alert('Subscription cancelled successfully.');
-                    loadSubscriptions(); // Reload the list
-                } else {
-                    throw new Error(data.message || 'Failed to cancel subscription');
-                }
-            } catch (error) {
-                console.error('Error cancelling subscription:', error);
-                alert('Error cancelling subscription: ' + error.message);
+        // Helper to show action buttons after payment element loads
+        function showModalActionButtons() {
+            const actionButtons = document.querySelector('.update-payment-actions');
+            if (actionButtons) {
+                // Use requestAnimationFrame to ensure the browser has rendered the payment element
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        actionButtons.style.display = 'flex';
+                    });
+                });
             }
         }
 
         async function updatePaymentMethod() {
             const modal = document.getElementById('update-payment-modal');
+            const modalLoader = document.querySelector('#update-modal-loader');
             const cancelBtn = document.querySelector('#cancel-update-payment');
-            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
+            const submitBtn = document.getElementById('update-payment-submit');
+            const actionButtons = document.querySelector('.update-payment-actions');
+            
+            // Setup modal
             modal.style.display = 'flex';
+            modalLoader.style.display = 'block';
+            submitBtn.disabled = true; // Keep disabled until loaded
+            submitBtn.textContent = 'Update';
+            
+            // Hide action buttons until payment element loads
+            if (actionButtons) {
+                actionButtons.style.display = 'none';
+            }
+
+            // Add cancel handler (remove any existing first)
+            cancelBtn.removeEventListener('pointerup', closeUpdatePaymentModal);
+            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
             
             try {
                 const response = await fetch(`${myApi.api_url}update-payment-method`, {
@@ -3209,9 +3341,14 @@
                     updatePaymentElement = updatePaymentElements.create('payment');
                     updatePaymentElement.mount('#update-payment-element');
                     
+                    // Show action buttons after payment element is rendered
+                    showModalActionButtons();
+
+                    // Enable submit button now that content is loaded
+                    submitBtn.disabled = false;
+                    
                     // Handle form submission
-                    document.getElementById('update-payment-submit').onclick = async () => {
-                        const submitBtn = document.getElementById('update-payment-submit');
+                    submitBtn.onclick = async () => {
                         const errorDiv = document.getElementById('update-payment-error');
                         
                         submitBtn.disabled = true;
@@ -3242,6 +3379,8 @@
                 console.error('Error setting up payment update:', error);
                 alert('Error setting up payment update. Please try again.');
                 closeUpdatePaymentModal();
+            } finally {
+                modalLoader.style.display = 'none';
             }
         }
 
@@ -3249,16 +3388,20 @@
             const modal = document.getElementById('update-payment-modal');
             modal.style.display = 'none';
             
-            // Clean up any plan change details
-            const detailsDiv = modal.querySelector('div[style*="marginBottom: 15px"]');
-            if (detailsDiv) {
-                detailsDiv.remove();
+            // Hide action buttons for next time
+            const actionButtons = document.querySelector('.update-payment-actions');
+            if (actionButtons) {
+                actionButtons.style.display = 'none';
             }
             
             // Reset modal title
             const modalTitle = modal.querySelector('h3');
-            if (modalTitle) {
-                modalTitle.textContent = 'Update Payment Method';
+            if (modalTitle) modalTitle.textContent = 'Update Payment Method';
+            
+            // Clear any plan change details
+            const detailsDiv = modal.querySelector('.plan-change-details');
+            if (detailsDiv) {
+                detailsDiv.remove();
             }
             
             // Reset error display
@@ -3268,26 +3411,63 @@
                 errorDiv.textContent = '';
             }
             
+            // Unmount payment element if it exists
             if (updatePaymentElement) {
                 updatePaymentElement.unmount();
                 updatePaymentElement = null;
                 updatePaymentElements = null;
+            }
+            
+            // IMPORTANT: Recreate the payment element container
+            let paymentElementContainer = document.getElementById('update-payment-element');
+            if (!paymentElementContainer) {
+                const modalContent = modal.querySelector('.update-payment-content');
+                const newPaymentElement = document.createElement('div');
+                newPaymentElement.id = 'update-payment-element';
+                
+                // Insert before the error div
+                const errorElement = document.getElementById('update-payment-error');
+                if (errorElement && errorElement.parentNode) {
+                    errorElement.parentNode.insertBefore(newPaymentElement, errorElement);
+                } else if (modalContent) {
+                    modalContent.appendChild(newPaymentElement);
+                }
+            }
+            
+            // Reset submit button
+            const submitBtn = document.getElementById('update-payment-submit');
+            if (submitBtn) {
+                submitBtn.textContent = 'Update';
+                submitBtn.disabled = true; // Disabled by default
+                submitBtn.onclick = null; // Clear any existing handlers
             }
         }
 
         // Plan change functions
         async function initiatePlanChange(subscriptionId, newOptionId, isRenewal = false) {
             const modal = document.getElementById('update-payment-modal');
+            const modalLoader = document.querySelector('#update-modal-loader');
             const modalTitle = modal.querySelector('h3');
             const submitBtn = document.getElementById('update-payment-submit');
             const errorDiv = document.getElementById('update-payment-error');
             const cancelBtn = document.querySelector('#cancel-update-payment');
-            const updatePaymentSubmit = document.querySelector('#update-payment-submit');
-            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
-
+            const actionButtons = document.querySelector('.update-payment-actions');
+            
             // Update modal for plan change context
             modalTitle.textContent = isRenewal ? 'Renew Subscription' : 'Change Subscription Plan';
             modal.style.display = 'flex';
+            modalLoader.style.display = 'block';
+            submitBtn.disabled = true; // Keep disabled until loaded
+            submitBtn.textContent = isRenewal ? 'Renew Plan' : 'Change Plan';
+            
+            // Hide action buttons until payment element loads
+            if (actionButtons) {
+                actionButtons.style.display = 'none';
+            }
+
+            // Add cancel handler (remove any existing first)
+            cancelBtn.removeEventListener('pointerup', closeUpdatePaymentModal);
+            cancelBtn.addEventListener('pointerup', closeUpdatePaymentModal);
 
             try {
                 const response = await fetch(`${myApi.api_url}change-subscription-plan`, {
@@ -3312,6 +3492,7 @@
                 if (data.success && stripe) {
                     // Show plan change details
                     const detailsDiv = document.createElement('div');
+                    detailsDiv.className = 'plan-change-details'; // Use class for easy identification
                     detailsDiv.style.marginBottom = '15px';
                     detailsDiv.innerHTML = `
                         <p><strong>Current Plan:</strong> ${data.currentPlan} ($${data.currentPrice.toFixed(2)})</p>
@@ -3324,8 +3505,11 @@
                         }
                     `;
                     
+                    // Insert details before the payment element
                     const paymentElement = document.getElementById('update-payment-element');
-                    paymentElement.parentNode.insertBefore(detailsDiv, paymentElement);
+                    if (paymentElement && paymentElement.parentNode) {
+                        paymentElement.parentNode.insertBefore(detailsDiv, paymentElement);
+                    }
                     
                     // Create elements for plan change
                     updatePaymentElements = stripe.elements({
@@ -3338,8 +3522,11 @@
                     updatePaymentElement = updatePaymentElements.create('payment');
                     updatePaymentElement.mount('#update-payment-element');
                     
-                    // Update button text based on context
-                    submitBtn.textContent = isRenewal ? 'Renew Plan' : 'Change Plan';
+                    // Show action buttons after payment element is rendered
+                    showModalActionButtons();
+
+                    // Enable submit button now that content is loaded
+                    submitBtn.disabled = false;
                     
                     // Handle form submission
                     submitBtn.onclick = async () => {
@@ -3372,6 +3559,8 @@
                 console.error('Error setting up plan change:', error);
                 alert('Error: ' + error.message);
                 closeUpdatePaymentModal();
+            } finally {
+                modalLoader.style.display = 'none';
             }
         }
 
