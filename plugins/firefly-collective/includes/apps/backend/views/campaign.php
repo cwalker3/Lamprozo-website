@@ -179,7 +179,7 @@
             <div v-if="expandedCampaigns.includes(campaign.id)" class="campaign-details">
                 <div class="campaign-content">
                     <div class="campaign-links">
-                        <p><strong>Dashboard URL:</strong> <a :href="campaign.dashboard_url" target="_blank">{{ campaign.dashboard_url }}</a></p>
+                        <p><a :href="campaign.dashboard_url" target="_blank">Campaign URL</a></p>
                         <p><strong>Token:</strong> {{ campaign.token }}</p>
                     </div>
                     
@@ -192,7 +192,7 @@
                     <div class="campaign-config-summary">
                         <h4>Configuration Summary</h4>
                         <p><strong>Features Shown:</strong> {{ getFeaturesSummary(campaign) }}</p>
-                        <p><strong>Preselected Items:</strong> {{ getPreselectSummary(campaign) }}</p>
+                        <div><strong>Preselected Items:</strong><br><span v-html="getPreselectSummary(campaign)"></span></div>
                     </div>
                 </div>
                 

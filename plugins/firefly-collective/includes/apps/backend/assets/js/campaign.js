@@ -238,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             editCampaign(campaign) {
-                
                 this.editingCampaign = campaign;
                 
                 const formUnlimited = campaign.unlimited === true || campaign.unlimited === 1 || campaign.unlimited === "1";
@@ -253,30 +252,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     preselect_config: JSON.parse(JSON.stringify(campaign.preselect_config || {}))
                 };
                 
-                // Assign the new form
+                // Assign the new form and show it
                 this.campaignForm = newForm;
                 this.showCreateForm = true;
-            },
-            
-            async deleteCampaign(campaignId) {
-                if (!confirm('Are you sure you want to delete this campaign?')) return;
                 
-                try {
-                    const response = await fetch(`${campaignData.api_url}delete-campaign`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ id: campaignId })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        this.loadCampaigns();
-                    }
-                } catch (error) {
-                    console.error('Error deleting campaign:', error);
-                }
+                // Scroll after Vue renders the form
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const formTitle = document.querySelector('.ffc-campaign-form h3');
+                        if (formTitle) {
+                            formTitle.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'start' 
+                            });
+                        }
+                    }, 100);
+                });
             },
             
             cancelForm() {
@@ -317,11 +308,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         const feature = this.features.find(f => f.id == featureId);
                         const option = feature?.options.find(o => o.id == config.selectedOption);
                         if (feature && option) {
-                            preselected.push(`${feature.featureName}: ${option.optionName}`);
+                            let summary = `<strong>${feature.featureName}:</strong> ${option.optionName}`;
+                            
+                            // Add selected addons if any
+                            if (config.selectedAddons && config.selectedAddons.length > 0) {
+                                const addonNames = [];
+                                config.selectedAddons.forEach(addonId => {
+                                    const addon = option.addons?.find(a => a.id == addonId);
+                                    if (addon) {
+                                        addonNames.push(addon.addonName);
+                                    }
+                                });
+                                
+                                if (addonNames.length > 0) {
+                                    summary += `<br>&nbsp;&nbsp;&nbsp;&nbsp;<em>+ ${addonNames.join(', ')}</em>`;
+                                }
+                            }
+                            
+                            // Add quantity for non-recurring features
+                            if (!feature.recurring && config.quantity && config.quantity > 1) {
+                                summary += ` <span style="color: #666;">(Qty: ${config.quantity})</span>`;
+                            }
+                            
+                            preselected.push(summary);
                         }
                     }
                 });
-                return preselected.length ? preselected.join(', ') : 'None';
+                return preselected.length ? preselected.join('<br>') : 'None';
             }
         }
     }).mount('#ffc-campaign-app');
