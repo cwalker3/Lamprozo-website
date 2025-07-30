@@ -74,8 +74,10 @@
         // Dashboard
         if (determine_view() === 'dashboard') {
             $features_options_addons = get_features_options_addons();
-            global $theme_path;
+            global $theme_path, $is_campaign_mode;
             $theme_path = get_template_directory_uri();
+
+            $is_campaign_mode = !empty($_COOKIE['campaign_token']);
             
             // Get Stripe configuration
             $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
@@ -85,13 +87,41 @@
             $request->set_param('user_id', $user_id);
             
             $subscription_status = firefly_collective_check_subscription_status($request);
+            
+            // Check for campaign token (from URL or cookie)
+            $campaign_config = null;
+            $campaign_token = null;
+
+            // First check URL path for token
+            $request_uri = $_SERVER['REQUEST_URI'];
+            if (preg_match('/\/dashboard\/([a-zA-Z0-9]+)/', $request_uri, $matches)) {
+                $campaign_token = $matches[1];
+            } elseif (!empty($_COOKIE['campaign_token'])) {
+                $campaign_token = $_COOKIE['campaign_token'];
+            }
+
+            if ($campaign_token) {
+                global $wpdb;
+                $campaign = $wpdb->get_row($wpdb->prepare(
+                    "SELECT features_config, preselect_config FROM {$wpdb->prefix}ffc_campaigns WHERE token = %s",
+                    $campaign_token
+                ));
+                
+                if ($campaign) {
+                    $campaign_config = array(
+                        'features_config' => json_decode($campaign->features_config, true),
+                        'preselect_config' => json_decode($campaign->preselect_config, true)
+                    );
+                }
+            }
 
             wp_localize_script('dashboard-js', 'dashboardData', array(
                 'nonce'                 => $nonce,
                 'features'              => $features_options_addons,
                 'theme_path'            => $theme_path,
                 'stripeKey'             => $publishable_key,
-                'subscription_status'   => $subscription_status
+                'subscription_status'   => $subscription_status,
+                'campaign_config'       => $campaign_config
             ));
         }
 

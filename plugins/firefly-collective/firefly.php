@@ -27,3 +27,7 @@
     // Pricing system
     register_activation_hook(__FILE__, 'firefly_collective_pricing_init');
     register_deactivation_hook(__FILE__, 'drop_ffc_pricing_tables');
+
+    // Campaigns
+    register_activation_hook(__FILE__, 'firefly_collective_init_campaigns');
+    register_deactivation_hook(__FILE__, 'firefly_collective_terminate_campaigns');

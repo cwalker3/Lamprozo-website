@@ -263,5 +263,45 @@
             )
         );
         
+        register_rest_route(
+            'custom-api/v1',
+            '/get-campaigns',
+            array(
+                'methods'             => 'GET',
+                'callback'            => 'firefly_collective_get_campaigns',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/create-campaign',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_create_campaign',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/update-campaign',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_update_campaign',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/delete-campaign',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_delete_campaign',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+        
     }
     add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

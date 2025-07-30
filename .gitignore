@@ -1,16 +1,40 @@
-# Ignore everything
+# ┌──────────────────────
+# │ 1. Ignore everything
+# └──────────────────────
 *
 
-# Don't ignore specific files
+# ┌──────────────────────
+# │ 2. Whitelist root files
+# └──────────────────────
+!/.gitignore
 !/.htaccess
-!.gitignore
-!LICENSE.md
+!/LICENSE.md
 
-# Don't ignore specific directories and their contents
+# ┌──────────────────────
+# │ 3. Plugins directory
+# └──────────────────────
 !plugins/
+plugins/*
 !plugins/firefly-collective/
-!plugins/firefly-collective/**
+plugins/firefly-collective/**
 
+# ┌──────────────────────
+# │ 4. Themes directory
+# └──────────────────────
 !themes/
+themes/*
 !themes/firefly-collective/
-!themes/firefly-collective/**
+themes/firefly-collective/**
+
+# ┌──────────────────────
+# │ 5. Uploads directory
+# └──────────────────────
+!uploads/
+# ignore everything under uploads
+uploads/**
+# except the campaigns folder itself
+!uploads/campaigns/
+# then ignore all files inside campaigns
+uploads/campaigns/**
+# except the .gitkeep placeholder
+!uploads/campaigns/.gitkeep

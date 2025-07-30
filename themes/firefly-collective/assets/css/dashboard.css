@@ -23,6 +23,22 @@ h1 {
     text-align: center;
 }
 
+/* Campaigns */
+#campaign-head {
+    width: 900px;
+    max-width: var(--calcMaxWidth);
+    margin: 0 auto;
+    background: #f0f8ff; 
+    border-radius: 5px;
+    margin-bottom: 20px;
+    margin-top: 1rem;
+    border-radius: 5px;
+    background: #ffffff;
+    color: black;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
 /* Profile Section */
 #profile-container {
     width: 100%;
@@ -1207,6 +1223,7 @@ td .feature-fields-list {
     :root {
         --profileMaxWidth: 90vw;
     }
+    #campaign-head,
     #price-calculator,
     #invoice-container {
         width: 90vw;

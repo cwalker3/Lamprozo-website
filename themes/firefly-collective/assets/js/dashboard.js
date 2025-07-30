@@ -33,9 +33,83 @@
             }
         }
 
+        // Apply campaign configuration if present
+        if (dashboardData.campaign_config) {
+            const campaignConfig = dashboardData.campaign_config;
+            
+            // Store original features before filtering for reference
+            const originalFeatures = [...dashboardData.features];
+            
+            // Filter features based on campaign config
+            dashboardData.features = dashboardData.features.filter(feature => {
+                if (campaignConfig.features_config[feature.id] && campaignConfig.features_config[feature.id].show) {
+                    // Filter options
+                    feature.options = feature.options.filter(option => {
+                        if (campaignConfig.features_config[feature.id].options[option.id] && 
+                            campaignConfig.features_config[feature.id].options[option.id].show) {
+                            // Filter addons
+                            if (option.addons) {
+                                option.addons = option.addons.filter(addon => 
+                                    campaignConfig.features_config[feature.id].options[option.id].addons[addon.id]
+                                );
+                            }
+                            return true;
+                        }
+                        return false;
+                    });
+                    return feature.options.length > 0;
+                }
+                return false;
+            });
+            
+            // Clear and rebuild selections object completely
+            selections = {};
+            
+            // Initialize selections for each filtered feature
+            dashboardData.features.forEach((feature, fIndex) => {
+                selections[fIndex] = [{}]; // Initialize with empty instance
+                
+                // Apply preselections for this feature
+                if (campaignConfig.preselect_config[feature.id]) {
+                    const preselect = campaignConfig.preselect_config[feature.id];
+                    if (preselect.selectedOption) {
+                        // Find the option index in the filtered options
+                        const optionIndex = feature.options.findIndex(o => o.id == preselect.selectedOption);
+                        if (optionIndex !== -1) {
+                            selections[fIndex][0].optionIndex = optionIndex;
+                            
+                            // Preselect addons
+                            if (preselect.selectedAddons && preselect.selectedAddons.length) {
+                                selections[fIndex][0].addons = [...preselect.selectedAddons];
+                            }
+                            
+                            // Set quantity if specified
+                            if (preselect.quantity && !feature.recurring) {
+                                selections[fIndex][0].quantity = parseInt(preselect.quantity) || 1;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            saveSelections();
+            
+            // Hide "Add new" buttons in campaign mode
+            setTimeout(() => {
+                document.querySelectorAll('.add-new-feature').forEach(btn => {
+                    btn.style.display = 'none';
+                });
+                
+                // Also hide delete instance buttons
+                document.querySelectorAll('.delete-instance').forEach(btn => {
+                    btn.style.display = 'none';
+                });
+            }, 100);
+        }
+
         // Global state: keys are feature type indexes; each value is an array of instance objects.
         // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
-        let selections = {};
+        var selections = {};
 
         // Keeps track of mode
         let estimateMode = false;
@@ -47,7 +121,6 @@
                 const orderInfo = JSON.parse(orderData);
                 if (!orderInfo || !orderInfo.orderID || (orderInfo.status !== 'pending' && orderInfo.status !== 'paid')) {
                     // If the data doesn't look like a valid order, clear it
-                    console.log('Clearing invalid order data');
                     sessionStorage.removeItem('placedOrder');
                 }
             }
@@ -69,8 +142,15 @@
         }
 
         // Load any saved state from sessionStorage
-        if (sessionStorage.getItem('priceCalcSelections')) {
-            selections = JSON.parse(sessionStorage.getItem('priceCalcSelections'));
+        const stored = sessionStorage.getItem('priceCalcSelections');
+        if ( stored && stored !== 'undefined' ) {
+            try {
+                selections = JSON.parse( stored );
+            } catch(e) {
+                console.warn('Corrupt priceCalcSelections, clearing it:', e);
+                sessionStorage.removeItem('priceCalcSelections');
+                selections = {};
+            }
         }
 
         if (isOrderPaid()) {
@@ -2399,6 +2479,8 @@
         // Update profile handler
         const updateProfileBtn = document.getElementById('update-profile-btn');
         if (updateProfileBtn) updateProfileBtn.addEventListener('click', async () =>{
+            if (dashboardData.campaign_config) return;
+
             const profileMessage   = document.getElementById('profile-message');
             const updateProfileBtn = document.getElementById('update-profile-btn');
 

@@ -383,20 +383,52 @@
     }
 
    add_action('template_redirect', function() {
-        if (determine_view() === 'dashboard' && empty($_COOKIE['auth_id'])) {
-            // Log the user out of WordPress
-            wp_logout();
-            
-            // Clear any additional session data if needed
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_destroy();
+        $path = trim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
+        if ( preg_match('#^dashboard/([A-Za-z0-9]+)$#', $path, $m) ) {
+            global $wpdb;
+            $token = $m[1];
+            // use only the date part
+            $today = current_time('Y-m-d');
+
+            $campaign = $wpdb->get_row( $wpdb->prepare(
+                "
+                SELECT id
+                FROM {$wpdb->prefix}ffc_campaigns
+                WHERE token = %s
+                AND DATE(start_date) <= %s
+                AND (
+                    unlimited = 1
+                    OR end_date IS NULL
+                    OR DATE(end_date) >= %s
+                )
+                ",
+                $token, $today, $today
+            ) );
+
+            if ( $campaign ) {
+                setcookie('campaign_token', $token, [
+                    'expires'  => time() + DAY_IN_SECONDS,
+                    'path'     => '/',
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+                $_COOKIE['campaign_token'] = $token;
+                wp_redirect( home_url('/dashboard') );
+                exit;
             }
-            
-            // Redirect to custom login URL instead of /admin
-            wp_redirect(home_url(CUSTOM_LOGIN_SLUG));
-            exit();
         }
-    }, 1);
+
+        // fallback to login if neither auth_id nor campaign_token
+        if ( determine_view()==='dashboard'
+        && empty($_COOKIE['auth_id'])
+        && empty($_COOKIE['campaign_token']) ) {
+            wp_logout();
+            if (session_status()===PHP_SESSION_ACTIVE) session_destroy();
+            wp_redirect( home_url(CUSTOM_LOGIN_SLUG) );
+            exit;
+        }
+    }, 5 );
 
     // Hook into regular login to set the auth_id cookie for subscribers.
     function set_auth_cookie_on_wp_login($user_login, $user) {
