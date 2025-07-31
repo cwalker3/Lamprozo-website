@@ -1,6 +1,6 @@
 <?php
 
-    // theme/models/rest.php
+    // plugin/models/rest.php
 
     function register_plugin_custom_api_endpoints() {
         register_rest_route(

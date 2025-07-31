@@ -1,3 +1,5 @@
+// plugin/assets/js/campaign.js
+
 // Vue.js Campaign Management Component
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for features data to be available
