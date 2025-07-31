@@ -196,9 +196,11 @@
                     </div>
                 </div>
                 
-                <div class="campaign-detail-actions">
-                    <button @click="editCampaign(campaign)" class="button">Edit</button>
-                    <button @click="deleteCampaign(campaign.id)" class="button button-link-delete">Delete</button>
+               <div class="campaign-detail-actions">
+                    <button type="button" @click="editCampaign(campaign)" class="button">Edit</button>
+                    <button type="button" @click="deleteCampaign(campaign.id)" class="button button-link-delete">
+                        Delete
+                    </button>
                 </div>
             </div>
         </div>

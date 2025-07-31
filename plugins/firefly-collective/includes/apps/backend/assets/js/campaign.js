@@ -337,6 +337,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
                 return preselected.length ? preselected.join('<br>') : 'None';
+            },
+            async deleteCampaign(campaignId) {
+                if (!confirm('Are you sure you want to delete this campaign?')) {
+                    return;
+                }
+                try {
+                    const response = await fetch(`${campaignData.api_url}delete-campaign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: campaignId })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        this.campaigns = this.campaigns.filter(c => c.id !== campaignId);
+                    } else {
+                        alert('Failed to delete campaign: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error deleting campaign:', error);
+                    alert('Error deleting campaign');
+                }
             }
         }
     }).mount('#ffc-campaign-app');
