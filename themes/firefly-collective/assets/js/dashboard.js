@@ -565,8 +565,8 @@
                             
                             // Use actual database IDs instead of array indices
                             const orderItem = {
-                                featureId: feature.id, // Use actual feature ID
-                                optionId: option.id,   // Use actual option ID
+                                featureId: feature.id,
+                                optionId: option.id,
                                 addonIds: instance.addons || [],
                                 userData: {},
                                 clientCalculatedPrice: calculateInstancePrice(feature, instance)
@@ -584,12 +584,12 @@
 
                             // Collect user fields
                             if (instance.userFields) {
-                                orderItem.userData = {...orderItem.userData, ...instance.userFields};
+                                orderItem.userData = { ...orderItem.userData, ...instance.userFields };
                             }
 
                             // Add feature-level fields if they exist
                             if (instance.featureFields) {
-                                orderItem.userData = {...orderItem.userData, ...instance.featureFields};
+                                orderItem.userData = { ...orderItem.userData, ...instance.featureFields };
                             }
                             
                             orderItems.push(orderItem);
@@ -605,27 +605,25 @@
                 return;
             }
 
-            // Check if we already have an ongoing order
+            // Check for existing order
             let orderID = null;
             const existingOrder = sessionStorage.getItem('placedOrder');
             if (existingOrder) {
                 try {
                     const orderInfo = JSON.parse(existingOrder);
-                    if (orderInfo.orderID) {
-                        orderID = orderInfo.orderID;
-                    }
+                    if (orderInfo.orderID) orderID = orderInfo.orderID;
                 } catch (e) {
                     console.error('Error parsing existing order data', e);
                 }
             }
             
-            // In submitOrder function, before creating orderData, add:
+            // Handle anonymous user in campaign mode
             let anonUser = null;
             if (dashboardData.campaign_config && !window.auth_id) {
                 const firstName = document.getElementById('anon-firstName')?.value || '';
-                const lastName = document.getElementById('anon-lastName')?.value || '';
-                const email = document.getElementById('anon-email')?.value || '';
-                const phone = document.getElementById('anon-phone')?.value || '';
+                const lastName  = document.getElementById('anon-lastName')?.value  || '';
+                const email     = document.getElementById('anon-email')?.value     || '';
+                const phone     = document.getElementById('anon-phone')?.value     || '';
                 
                 if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                     hideLoadingOverlay(overlay);
@@ -673,12 +671,8 @@
                 }
             }
 
-            // Create the batch request
-            const orderData = {
-                items: orderItems
-            };
-
-            // Add authentication data
+            // Build payload
+            const orderData = { items: orderItems };
             if (window.auth_id) {
                 orderData.auth_id = window.auth_id;
             } else if (anonUser) {
@@ -690,84 +684,63 @@
                 orderData.orderID = orderID;
             }
 
-            // Prepare request
-            const url = `${myApi.api_url}place-order`;
-            const options = {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(orderData)
-            };
-
+            // Send request
             try {
-                const response = await fetch(url, options);
+                const response = await fetch(`${myApi.api_url}place-order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
 
-                // If we got a 403 specifically, handle it first
                 if (response.status === 403) {
-                    console.error('You\'re not authorized to update this profile.');
+                    console.error('You\'re not authorized to place this order.');
+                    hideLoadingOverlay(overlay);
                     return;
                 }
 
                 // For any non-2xx status, attempt to pull an error message from JSON
                 if (!response.ok) {
-                    let errMsg = response.statusText; // fallback
-                try {
-                    const errJson = await response.json();
-                    // adjust these keys to whatever your API returns
-                    errMsg = errJson.error || errJson.message || errMsg;
-                } catch (e) {
-                    // non-JSON body or parse failed; keep statusText
-                }
+                    let errMsg = response.statusText;
+                    try {
+                        const errJson = await response.json();
+                        errMsg = errJson.error || errJson.message || errMsg;
+                    } catch (e) { /* ignore */ }
                     console.error(`Error (${response.status}): ${errMsg}`);
+                    hideLoadingOverlay(overlay);
                     return;
                 }
 
                 // Success path
                 const data = await response.json();
 
+                // Persist a “pending” order
+                sessionStorage.setItem('placedOrder', JSON.stringify({
+                    recordId: data.records ? data.records[0].recordId : null,
+                    orderID: data.orderID,
+                    status: 'pending',
+                    itemCount: orderItems.length,
+                    totalValue: data.totalOrderValue,
+                    type: data.type === 'subscription' ? 'subscription' : 'one_time',
+                    subscriptionId: data.subscriptionId || undefined
+                }));
+
+                updateOrderButton();
+                // → no disableFormInteraction() here
+
                 if (data.type === 'subscription') {
-                    // Handle subscription response
-                    sessionStorage.setItem('placedOrder', JSON.stringify({
-                        recordId: data.records ? data.records[0].recordId : null,
-                        orderID: data.orderID,
-                        status: 'pending',
-                        itemCount: orderItems.length,
-                        totalValue: data.totalOrderValue,
-                        type: 'subscription',
-                        subscriptionId: data.subscriptionId
-                    }));
-                    
-                    updateOrderButton();
-                    disableFormInteraction();
-                    
-                    // Initialize Stripe payment for subscription
                     handleSubscriptionPayment(data.clientSecret, data.subscriptionId);
                 } else {
-                    // Handle one-time payment as before
-                    sessionStorage.setItem('placedOrder', JSON.stringify({
-                        recordId: data.records[0].recordId,
-                        orderID: data.orderID,
-                        status: 'pending',
-                        itemCount: orderItems.length,
-                        totalValue: data.totalOrderValue,
-                        type: 'one_time'
-                    }));
-                    
-                    updateOrderButton();
-                    disableFormInteraction();
-                    
                     initializeStripePayment();
                 }
 
                 hideLoadingOverlay(overlay);
-            }
-            catch (error) {
+            } catch (error) {
                 hideLoadingOverlay(overlay);
                 alert(error.message || 'An error occurred while placing your order.');
                 console.error('Order submission error:', error);
             }
         }
+
 
         // Check if there's actually a valid order
         function hasValidOrder() {
@@ -3050,18 +3023,16 @@
         
         // Create and mount the Stripe payment form
         function createPaymentForm(clientSecret) {
-
             if (isOrderPaid()) {
                 showPaymentSuccess();
                 return;
             }
 
-            // Create a container for the payment form
+            // Create container + form + error div
             const paymentContainer = document.createElement('div');
             paymentContainer.id = 'payment-element-container';
             paymentContainer.style.marginBottom = '20px';
-            
-            // Create the form element
+
             const form = document.createElement('form');
             form.id = 'payment-form';
             
@@ -3069,22 +3040,19 @@
             const paymentElementDiv = document.createElement('div');
             paymentElementDiv.id = 'payment-element';
             form.appendChild(paymentElementDiv);
-            
-            // Create an error message container
+
             const errorDiv = document.createElement('div');
             errorDiv.id = 'payment-error';
             errorDiv.style.color = 'red';
             errorDiv.style.marginTop = '10px';
             errorDiv.style.display = 'none';
             form.appendChild(errorDiv);
-            
-            // Append the form to the container
+
             paymentContainer.appendChild(form);
-            
-            // Insert the payment container before the pay now button
+
             const payNowBtn = document.getElementById('pay-now');
             payNowBtn.parentNode.insertBefore(paymentContainer, payNowBtn);
-            
+
             // Initialize Stripe Elements
             elements = stripe.elements({
                 clientSecret: clientSecret,
@@ -3100,14 +3068,20 @@
                     }
                 }
             });
-            
-            // Create and mount the Payment Element
+
+            // Mount the Payment Element
             paymentElement = elements.create('payment');
             paymentElement.mount('#payment-element');
-            
-            // Update the Pay Now button text and handler
+
+            // Re-enable “Pay Now” and only disable on click
             payNowBtn.textContent = 'Pay Now';
-            payNowBtn.onclick = handlePayment;
+            payNowBtn.disabled = false;
+            payNowBtn.onclick = function(e) {
+                e.preventDefault();
+                payNowBtn.disabled = true;
+                payNowBtn.textContent = 'Processing...';
+                handlePayment(e);
+            };
 
             setTimeout(() => {
                 smoothScrollToElement(paymentContainer, 120);
