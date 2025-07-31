@@ -107,6 +107,200 @@
             }, 100);
         }
 
+        // Handle anonymous user form for campaign mode
+        if (dashboardData.campaign_config && !window.auth_id) {
+            // Find the campaign head notice and inject the form after it
+            const campaignHead = document.getElementById('campaign-head');
+            
+            if (campaignHead) {
+                // Create the conditional anonymous user form
+                const anonFormHTML = `
+                    <div id="anonymous-user-form">
+                        <h3>Contact Information</h3>
+                        <div class="anon-field">
+                            <input type="text" id="anon-firstName" placeholder="First Name (optional)">
+                        </div>
+                        <div class="anon-field">
+                            <input type="text" id="anon-lastName" placeholder="Last Name (optional)">
+                        </div>
+                        <div class="anon-field">
+                            <input type="email" id="anon-email" placeholder="Email Address (required)" required>
+                        </div>
+                        <div class="anon-field">
+                            <input type="tel" id="anon-phone" placeholder="Phone Number (optional)">
+                        </div>
+                        <div id="anon-email-error" style="color: red; display: none; margin-top: 5px;">
+                            Please enter a valid email address
+                        </div>
+                        
+                        <!-- Account Creation Section (shown/hidden based on recurring features) -->
+                        <div id="account-required-section" style="display: none;">
+                            <div class="account-required-notice">
+                                <strong>Account Required:</strong> Subscription services require an account for management and billing.
+                            </div>
+                            
+                            <div class="account-fields">
+                                <div class="anon-field">
+                                    <input type="text" id="anon-username" placeholder="Username (required)" autocomplete="username">
+                                    <div id="username-error" style="color: red; display: none; margin-top: 3px; font-size: 12px;"></div>
+                                </div>
+                                <div class="anon-field password-field">
+                                    <input type="password" id="anon-password" placeholder="Password (required)" autocomplete="new-password">
+                                    <button type="button" class="password-toggle" id="password-toggle">
+                                        <span class="password-eye">👁️</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Insert the form after the campaign notice
+                campaignHead.insertAdjacentHTML('afterend', anonFormHTML);
+                
+                // Form interaction handlers
+                const emailInput = document.getElementById('anon-email');
+                const emailError = document.getElementById('anon-email-error');
+                const usernameField = document.getElementById('anon-username');
+                const passwordField = document.getElementById('anon-password');
+                const passwordToggle = document.getElementById('password-toggle');
+                const usernameError = document.getElementById('username-error');
+                const accountSection = document.getElementById('account-required-section');
+                
+                // Function to check if current selections have recurring features
+                function hasRecurringFeatures() {
+                    for (const [fIdx, instances] of Object.entries(selections)) {
+                        for (const instance of instances) {
+                            if (instance.optionIndex !== undefined) {
+                                const feature = dashboardData.features[fIdx];
+                                if (feature && feature.recurring) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }
+                
+                // Function to update form visibility based on selections
+                function updateFormVisibility() {
+                    const hasRecurring = hasRecurringFeatures();
+                    accountSection.style.display = hasRecurring ? 'block' : 'none';
+                    
+                    // Update email placeholder and validation
+                    if (hasRecurring) {
+                        emailInput.placeholder = "Email Address (required - will be used for account)";
+                    } else {
+                        emailInput.placeholder = "Email Address (required)";
+                    }
+                    
+                    updateOrderButton();
+                }
+                
+                // Email validation (enhanced for account creation)
+                async function validateEmail() {
+                    const email = emailInput.value.trim();
+                    const isValidFormat = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                    
+                    if (email && !isValidFormat) {
+                        emailError.textContent = 'Please enter a valid email address';
+                        emailError.style.display = 'block';
+                        updateOrderButton();
+                        return false;
+                    }
+                    
+                    // Check if email exists only when account creation is required
+                    if (isValidFormat && hasRecurringFeatures()) {
+                        try {
+                            const response = await fetch(`${myApi.api_url}check-email?email=${encodeURIComponent(email)}`);
+                            const data = await response.json();
+                            
+                            if (data.exists) {
+                                emailError.textContent = 'An account with this email already exists. Please log in instead.';
+                                emailError.style.display = 'block';
+                                updateOrderButton();
+                                return false;
+                            }
+                        } catch (error) {
+                            console.error('Email validation error:', error);
+                        }
+                    }
+                    
+                    emailError.style.display = 'none';
+                    updateOrderButton();
+                    return isValidFormat;
+                }
+                
+                // Username validation
+                async function validateUsername() {
+                    const username = usernameField.value.trim();
+                    if (!username) {
+                        usernameError.style.display = 'none';
+                        updateOrderButton();
+                        return !hasRecurringFeatures(); // Required only for recurring
+                    }
+                    
+                    try {
+                        const response = await fetch(`${myApi.api_url}check-username?username=${encodeURIComponent(username)}`);
+                        const data = await response.json();
+                        
+                        if (data.exists) {
+                            usernameError.textContent = 'Username already taken';
+                            usernameError.style.display = 'block';
+                            updateOrderButton();
+                            return false;
+                        } else {
+                            usernameError.style.display = 'none';
+                            updateOrderButton();
+                            return true;
+                        }
+                    } catch (error) {
+                        console.error('Username validation error:', error);
+                        updateOrderButton();
+                        return true; // Allow on error
+                    }
+                }
+                
+                // Event listeners
+                emailInput.addEventListener('input', () => {
+                    clearTimeout(window.emailValidationTimeout);
+                    window.emailValidationTimeout = setTimeout(validateEmail, 500);
+                });
+                emailInput.addEventListener('blur', validateEmail);
+                
+                // Username validation with debounce
+                usernameField.addEventListener('input', () => {
+                    clearTimeout(window.usernameValidationTimeout);
+                    window.usernameValidationTimeout = setTimeout(validateUsername, 500);
+                });
+                
+                // Password toggle
+                passwordToggle.addEventListener('click', function() {
+                    const isPassword = passwordField.type === 'password';
+                    passwordField.type = isPassword ? 'text' : 'password';
+                    this.querySelector('.password-eye').textContent = isPassword ? '🙈' : '👁️';
+                });
+                
+                // Listen for selection changes to update form visibility
+                const originalUpdateInvoice = updateInvoice;
+                updateInvoice = function() {
+                    originalUpdateInvoice.call(this);
+                    updateFormVisibility();
+                };
+                
+                // Initial form visibility check
+                updateFormVisibility();
+                
+                // Also trigger validation on other inputs to update button state
+                ['anon-firstName', 'anon-lastName', 'anon-phone', 'anon-password'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (input) {
+                        input.addEventListener('input', updateOrderButton);
+                    }
+                });
+            }
+        }
+
         // Global state: keys are feature type indexes; each value is an array of instance objects.
         // Each instance object: { optionIndex: number, addons: [number, ...], quantity?: number }
         var selections = {};
@@ -425,12 +619,72 @@
                 }
             }
             
+            // In submitOrder function, before creating orderData, add:
+            let anonUser = null;
+            if (dashboardData.campaign_config && !window.auth_id) {
+                const firstName = document.getElementById('anon-firstName')?.value || '';
+                const lastName = document.getElementById('anon-lastName')?.value || '';
+                const email = document.getElementById('anon-email')?.value || '';
+                const phone = document.getElementById('anon-phone')?.value || '';
+                
+                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    hideLoadingOverlay(overlay);
+                    alert('Please enter a valid email address.');
+                    // Re-enable button
+                    const btn = document.getElementById('pay-now');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Place Order';
+                    }
+                    return;
+                }
+                
+                anonUser = { firstName, lastName, email, phone };
+                
+                // Check if order has recurring features - if so, require account creation
+                let hasRecurringFeatures = false;
+                for (const item of orderItems) {
+                    const feature = dashboardData.features.find(f => f.id === item.featureId);
+                    if (feature && feature.recurring) {
+                        hasRecurringFeatures = true;
+                        break;
+                    }
+                }
+                
+                if (hasRecurringFeatures) {
+                    const username = document.getElementById('anon-username')?.value.trim() || '';
+                    const password = document.getElementById('anon-password')?.value.trim() || '';
+                    
+                    if (!username || !password) {
+                        hideLoadingOverlay(overlay);
+                        alert('Username and password are required for subscription services.');
+                        const btn = document.getElementById('pay-now');
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = 'Place Order';
+                        }
+                        return;
+                    }
+                    
+                    anonUser.createAccount = true;
+                    anonUser.signupMethod = 'username';
+                    anonUser.username = username;
+                    anonUser.password = password;
+                }
+            }
+
             // Create the batch request
             const orderData = {
-                items: orderItems,
-                auth_id: window.auth_id
+                items: orderItems
             };
-            
+
+            // Add authentication data
+            if (window.auth_id) {
+                orderData.auth_id = window.auth_id;
+            } else if (anonUser) {
+                orderData.anonUser = anonUser;
+            }
+
             // Add orderID if we have one
             if (orderID) {
                 orderData.orderID = orderID;
@@ -547,24 +801,97 @@
                 btn.style.cursor = 'not-allowed';
                 return;
             }
-            else if (hasValidOrder()) {
+
+            // Check validation for anonymous users
+            if (dashboardData.campaign_config && !window.auth_id) {
+                const emailInput = document.getElementById('anon-email');
+                const email = emailInput?.value.trim() || '';
+                const isValidEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                
+                // Function to check if current selections have recurring features
+                function hasRecurringFeatures() {
+                    for (const [fIdx, instances] of Object.entries(selections)) {
+                        for (const instance of instances) {
+                            if (instance.optionIndex !== undefined) {
+                                const feature = dashboardData.features[fIdx];
+                                if (feature && feature.recurring) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }
+                
+                const hasRecurring = hasRecurringFeatures();
+                
+                // PRIORITY 1: If has recurring features, focus on account setup
+                if (hasRecurring) {
+                    // First check if email is provided and valid
+                    if (!isValidEmail) {
+                        btn.textContent = 'Complete Account Setup';
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        return;
+                    }
+                    
+                    // Then check username and password
+                    const username = document.getElementById('anon-username')?.value.trim() || '';
+                    const password = document.getElementById('anon-password')?.value.trim() || '';
+                    const usernameError = document.getElementById('username-error');
+                    const emailError = document.getElementById('anon-email-error');
+                    
+                    if (!username || !password) {
+                        btn.textContent = 'Complete Account Setup';
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        return;
+                    }
+                    
+                    if (usernameError?.style.display === 'block' || emailError?.style.display === 'block') {
+                        btn.textContent = 'Fix Validation Errors';
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        return;
+                    }
+                }
+                // PRIORITY 2: No recurring features, just need email
+                else {
+                    if (!isValidEmail) {
+                        btn.textContent = 'Enter Email to Continue';
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        return;
+                    }
+                }
+                
+                // All validations passed
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+
+            // Rest of existing logic...
+            if (hasValidOrder() && !isOrderPaid()) {
                 btn.textContent = 'Pay Now';
                 btn.onclick = function(e) {
                     e.preventDefault();
                     initializeStripePayment();
                 };
-            }
-            else if (estimateMode) {
+            } else if (estimateMode) {
                 btn.textContent = 'Request Estimate';
                 btn.onclick = function(e) {
                     e.preventDefault();
                     alert('Estimate request functionality coming soon!');
                 };
-            }
-            else {
+            } else {
                 btn.textContent = 'Place Order';
                 btn.onclick = function(e) {
                     e.preventDefault();
+                    // Prevent double submission
+                    if (btn.disabled) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Processing...';
+                    
                     showOrderConfirmation();
                 };
             }

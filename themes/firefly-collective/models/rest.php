@@ -104,7 +104,7 @@
     }
 
     function verify_rest_request( WP_REST_Request $request ) {
-        // 1. Use WordPress’s logged-in cookie authentication
+        // 1. Use WordPress's logged-in cookie authentication
         if ( ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
             $cookie_value = sanitize_text_field( $_COOKIE[ LOGGED_IN_COOKIE ] );
             $user_id      = wp_validate_auth_cookie( $cookie_value, 'logged_in' );
@@ -121,21 +121,39 @@
             }
         }
 
-        // 3. Fallback: validate your custom auth_id cookie
-        if ( empty( $_COOKIE['auth_id'] ) ) {
-            return false;
+        // 3. Check custom auth_id cookie
+        if ( ! empty( $_COOKIE['auth_id'] ) ) {
+            $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
+            $decrypted = decrypt_with_auth_key( $raw );
+            $uid       = intval( $decrypted );
+            $user      = get_user_by( 'id', $uid );
+
+            if ( $uid && $user ) {
+                wp_set_current_user( $uid );
+                wp_set_auth_cookie( $uid, true, is_ssl() );
+                return true;
+            }
         }
 
-        $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
-        $decrypted = decrypt_with_auth_key( $raw );
-        $uid       = intval( $decrypted );
-        $user      = get_user_by( 'id', $uid );
-
-        // decrypt_with_auth_key() returns false on any tampering
-        if ( $uid && $user ) {
-            wp_set_current_user( $uid );
-            wp_set_auth_cookie( $uid, true, is_ssl() );
-            return true;
+        // 4. Check campaign token for anonymous access
+        if ( ! empty( $_COOKIE['campaign_token'] ) ) {
+            $token = sanitize_text_field( $_COOKIE['campaign_token'] );
+            
+            // Validate campaign token using same logic as signin model
+            global $wpdb;
+            $today = current_time('Y-m-d');
+            
+            $campaign = $wpdb->get_row( $wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}ffc_campaigns
+                WHERE token = %s
+                AND DATE(start_date) <= %s
+                AND (unlimited = 1 OR end_date IS NULL OR DATE(end_date) >= %s)",
+                $token, $today, $today
+            ) );
+            
+            if ( $campaign ) {
+                return true; // Allow anonymous access for valid campaigns
+            }
         }
 
         return false;

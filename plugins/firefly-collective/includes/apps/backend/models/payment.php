@@ -193,10 +193,28 @@
                 return new WP_Error('invalid_order', 'Order not found', array('status' => 400));
             }
             
-            $user_id = get_current_user_id();
+            $first_item = $order_items[0];
+            $user_id = intval($first_item['userId']);
             
-            // Get or create Stripe customer
-            $customer = firefly_collective_get_or_create_stripe_customer($user_id);
+            // Handle anonymous vs authenticated users for Stripe customer
+            if ($user_id === 0) {
+                // Anonymous user - use data from order
+                $anon_data = [
+                    'firstName' => $first_item['anonUserFirstName'] ?? '',
+                    'lastName' => $first_item['anonUserLastName'] ?? '',
+                    'email' => $first_item['anonUserEmail'] ?? '',
+                    'phone' => $first_item['anonUserPhone'] ?? ''
+                ];
+                
+                if (empty($anon_data['email'])) {
+                    return new WP_Error('missing_email', 'Email required for anonymous orders', array('status' => 400));
+                }
+                
+                $customer = firefly_collective_get_or_create_stripe_customer(0, $anon_data);
+            } else {
+                // Authenticated user
+                $customer = firefly_collective_get_or_create_stripe_customer($user_id);
+            }
             
             // Check if any items are recurring
             $has_recurring = false;
@@ -216,10 +234,10 @@
             
             // Handle different payment scenarios
             if ($has_recurring && $has_one_time) {
-                // Mixed payment - use the new implementation
+                // Mixed payment
                 return firefly_collective_create_mixed_payment($customer, $order_id, $recurring_items, $one_time_items);
             } elseif ($has_recurring) {
-                // Subscription only
+                // Subscription only - works for both authenticated and anonymous users
                 return firefly_collective_create_subscription($customer, $order_id, $recurring_items);
             } else {
                 // One-time payment only
@@ -600,11 +618,14 @@
                 // One-time payment events
                 case 'payment_intent.succeeded':
                     $pi = $event->data->object;
-                    $order_id     = isset($pi->metadata->order_id) ? $pi->metadata->order_id : null;
+                    $order_id = isset($pi->metadata->order_id) ? $pi->metadata->order_id : null;
                     $payment_type = isset($pi->metadata->payment_type) ? $pi->metadata->payment_type : null;
 
                     if ($order_id && $payment_type !== 'subscription_renewal') {
                         firefly_collective_update_order_payment_status($order_id, 'paid');
+                        
+                        // Create user account if requested
+                        firefly_collective_create_user_after_payment($order_id);
                     }
                     break;
                     
@@ -642,29 +663,30 @@
                     break;
                     
                 case 'invoice.paid':
-                    $eventInvoice   = $event->data->object;
+                    $eventInvoice = $event->data->object;
                     $subscriptionId = ff_invoice_subscription_id($eventInvoice);
 
                     if (
                         isset($eventInvoice->billing_reason)
                         && $eventInvoice->billing_reason === 'subscription_create'
                     ) {
-                        // Update your original row (existing logic)
+                        // Update subscription data
                         firefly_collective_handle_subscription_created(
                             \Stripe\Subscription::retrieve($subscriptionId)
                         );
 
-                        // Send receipts now that the first subscription invoice succeeded
-                        $order_id = $eventInvoice
-                            ->subscription_details
-                            ->metadata
-                            ->order_id ?? null;
+                        // Get order ID from subscription metadata
+                        $subscription = \Stripe\Subscription::retrieve($subscriptionId);
+                        $order_id = $subscription->metadata->order_id ?? null;
 
                         if ($order_id) {
                             firefly_collective_orders_email($order_id, 'paid');
+                            
+                            // Create user account for subscription orders
+                            firefly_collective_create_user_after_payment($order_id);
                         }
                     }
-                    // Subsequent renewals
+                    // Handle renewal payments...
                     else {
                         firefly_collective_handle_subscription_invoice_paid($eventInvoice);
                     }
@@ -1669,9 +1691,29 @@
     /**
      * Get or create a Stripe customer for a WordPress user
      */
-    function firefly_collective_get_or_create_stripe_customer($user_id) {
+    function firefly_collective_get_or_create_stripe_customer($user_id, $anon_data = null) {
         firefly_collective_stripe_init();
         
+        // Handle anonymous users
+        if ($user_id === 0 && $anon_data) {
+            // For anonymous users, create a new Stripe customer each time
+            $customer_name = trim($anon_data['firstName'] . ' ' . $anon_data['lastName']) ?: 'Anonymous Customer';
+            
+            $customer = \Stripe\Customer::create([
+                'name' => $customer_name,
+                'email' => $anon_data['email'],
+                'phone' => $anon_data['phone'] ?: null,
+                'metadata' => [
+                    'anonymous_order' => 'true',
+                    'first_name' => $anon_data['firstName'],
+                    'last_name' => $anon_data['lastName']
+                ]
+            ]);
+            
+            return $customer;
+        }
+        
+        // Handle authenticated users
         $user = get_userdata($user_id);
         if (!$user) {
             throw new Exception('User not found');
@@ -2231,6 +2273,130 @@
         } catch (Exception $e) {
             return new WP_Error('stripe_error', $e->getMessage(), array('status' => 500));
         }
+    }
+
+    function firefly_collective_create_user_after_payment($order_id) {
+        global $wpdb;
+        
+        // Look for ANY order item in this order that has account creation data
+        $order_items = $wpdb->get_results($wpdb->prepare(
+            "SELECT o.*, f.recurring FROM {$wpdb->prefix}ffc_orders o
+            JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+            WHERE o.orderID = %s AND o.userId = 0
+            ORDER BY f.recurring DESC",
+            $order_id
+        ), ARRAY_A);
+        
+        if (!$order_items) {
+            error_log("DEBUG: No anonymous order items found for order: {$order_id}");
+            return;
+        }
+        
+        // Find the first recurring item with account creation data
+        $account_item = null;
+        foreach ($order_items as $item) {
+            
+            if ($item['recurring'] == 1) {
+                $user_data = json_decode($item['userData'], true);
+                
+                if ($user_data && isset($user_data['createAccount']) && $user_data['createAccount']) {
+                    $account_item = $item;
+                    break;
+                }
+            }
+        }
+        
+        if (!$account_item) {
+            error_log("DEBUG: No recurring items with account creation data found for order: {$order_id}");
+            return;
+        }
+        
+        $user_data = json_decode($account_item['userData'], true);
+        
+        // Validate required fields
+        if (!$user_data['username'] || !$user_data['password']) {
+            error_log('ERROR: Cannot create user - missing username or password');
+            return;
+        }
+        
+        // Check if user already exists
+        if (username_exists($user_data['username'])) {
+            error_log('ERROR: Username already exists: ' . $user_data['username']);
+            return;
+        }
+        
+        if (email_exists($account_item['anonUserEmail'])) {
+            error_log('ERROR: Email already exists: ' . $account_item['anonUserEmail']);
+            return;
+        }
+        
+        // Create WordPress user
+        $user_id = wp_create_user(
+            $user_data['username'],
+            $user_data['password'],
+            $account_item['anonUserEmail']
+        );
+        
+        if (is_wp_error($user_id)) {
+            error_log('ERROR: Failed to create user: ' . $user_id->get_error_message());
+            return;
+        }
+        
+        // Update user meta
+        wp_update_user([
+            'ID' => $user_id,
+            'first_name' => $account_item['anonUserFirstName'],
+            'last_name' => $account_item['anonUserLastName']
+        ]);
+        
+        // Link ALL orders with this email to the new user
+        $updated_rows = $wpdb->update(
+            $wpdb->prefix . 'ffc_orders',
+            ['userId' => $user_id],
+            [
+                'userId' => 0,
+                'anonUserEmail' => $account_item['anonUserEmail']
+            ],
+            ['%d'],
+            ['%d', '%s']
+        );
+        
+        // Update Stripe subscription metadata with the new user ID
+        if (!empty($account_item['subscription_id'])) {
+            try {
+                firefly_collective_stripe_init();
+                
+                \Stripe\Subscription::update($account_item['subscription_id'], [
+                    'metadata' => [
+                        'wordpress_user_id' => $user_id,
+                        'order_id' => $order_id,
+                        'username' => $user_data['username']
+                    ]
+                ]);
+                
+                error_log("SUCCESS: Updated Stripe subscription {$account_item['subscription_id']} metadata with user ID {$user_id}");
+            } catch (Exception $e) {
+                error_log("ERROR: Failed to update Stripe subscription metadata: " . $e->getMessage());
+            }
+        }
+        
+        error_log("SUCCESS: Created user ID {$user_id} and linked {$updated_rows} orders for order {$order_id}");
+    }
+
+    function firefly_collective_link_anonymous_orders($email, $user_id) {
+        global $wpdb;
+        
+        // Update all anonymous orders with this email to the new user ID
+        $wpdb->update(
+            $wpdb->prefix . 'ffc_orders',
+            ['userId' => $user_id],
+            [
+                'userId' => 0,
+                'anonUserEmail' => $email
+            ],
+            ['%d'],
+            ['%d', '%s']
+        );
     }
 
     // Add Stripe settings page to admin

@@ -128,6 +128,10 @@
             priceDiscountsInfo                  JSON               DEFAULT NULL,
             refundAmount                        DECIMAL(10,2)      DEFAULT 0.00,
             userData                            JSON               NOT NULL,
+            anonUserFirstName                   VARCHAR(255)       DEFAULT NULL,
+            anonUserLastName                    VARCHAR(255)       DEFAULT NULL,
+            anonUserEmail                       VARCHAR(255)       DEFAULT NULL,
+            anonUserPhone                       VARCHAR(255)       DEFAULT NULL,
             status                              VARCHAR(50)        NOT NULL DEFAULT 'pending',
             transaction_type                    VARCHAR(50)        DEFAULT 'initial',
             createdAt                           TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,
@@ -158,17 +162,47 @@
 
     function firefly_collective_place_order($request) {
         global $wpdb;
-        if ( ! is_user_logged_in() ) {
-            return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
-        }
+        
         $data = $request->get_json_params();
         
         $is_batch = isset($data['items']) && is_array($data['items']);
         $order_items = $is_batch ? $data['items'] : [$data];
         
-        $user_id = get_current_user_id();
-        if (!$user_id) {
-            return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
+        // Determine if this is an authenticated user or anonymous campaign order
+        $user_id = 0;
+        $anon_data = [];
+        
+        if (!empty($_COOKIE['auth_id'])) {
+            // Authenticated user
+            if (!is_user_logged_in()) {
+                return new WP_Error('not_logged_in', 'You must be logged in to place an order.', array('status' => 401));
+            }
+            $user_id = get_current_user_id();
+        } elseif (!empty($_COOKIE['campaign_token']) && !empty($data['anonUser'])) {
+            // Anonymous campaign order
+            $anon_data = [
+                'firstName' => sanitize_text_field($data['anonUser']['firstName'] ?? ''),
+                'lastName'  => sanitize_text_field($data['anonUser']['lastName'] ?? ''),
+                'email'     => sanitize_email($data['anonUser']['email'] ?? ''),
+                'phone'     => sanitize_text_field($data['anonUser']['phone'] ?? '')
+            ];
+            
+            // Add account creation data if present
+            if (isset($data['anonUser']['createAccount'])) {
+                $anon_data['createAccount'] = $data['anonUser']['createAccount'];
+                $anon_data['signupMethod'] = $data['anonUser']['signupMethod'] ?? 'username';
+                $anon_data['username'] = sanitize_text_field($data['anonUser']['username'] ?? '');
+                $anon_data['password'] = $data['anonUser']['password'] ?? ''; // Don't sanitize password
+            }
+            
+            // Validate required email
+            if (empty($anon_data['email']) || !is_email($anon_data['email'])) {
+                return new WP_Error('invalid_email', 'Valid email address is required.', array('status' => 400));
+            }
+            
+            $user_id = 0; // Anonymous user
+        } else {
+            return new WP_Error('unauthorized', 'Authentication required.', array('status' => 401));
         }
         
         $order_id = isset($data['orderID']) ? sanitize_text_field($data['orderID']) : wp_generate_uuid4();
@@ -184,26 +218,53 @@
             $price_option_index = isset($item['priceOptionIndex']) ? intval($item['priceOptionIndex']) : 0;
             $quantity = isset($item['quantity']) ? intval($item['quantity']) : 1;
             
+            // Add account creation data for recurring features
+            if ($user_id === 0 && !empty($anon_data) && isset($anon_data['createAccount']) && $anon_data['createAccount']) {
+                
+                // Get feature info to check if it's recurring
+                $feature_info = $wpdb->get_row($wpdb->prepare(
+                    "SELECT recurring FROM {$wpdb->prefix}ffc_features WHERE id = %d",
+                    $feature_id
+                ));
+                
+                // If this is a recurring feature, store the account creation data
+                if ($feature_info && $feature_info->recurring == 1) {
+                    $user_data['createAccount'] = true;
+                    $user_data['signupMethod'] = $anon_data['signupMethod'];
+                    $user_data['username'] = $anon_data['username'];
+                    $user_data['password'] = $anon_data['password'];
+                } else {
+                    error_log("DEBUG: Feature {$feature_id} is not recurring, skipping account data");
+                }
+            }
+            
             $price_data = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
             
-            $result = $wpdb->insert(
-                $wpdb->prefix . 'ffc_orders',
-                array(
-                    'orderID'            => $order_id,
-                    'userId'             => $user_id,
-                    'featureId'          => $feature_id,
-                    'optionId'           => $option_id,
-                    'addonIds'           => json_encode($addon_ids),
-                    'priceSelected'      => $price_option_index,
-                    'quantity'           => $quantity,
-                    'totalPrice'         => $price_data['totalPrice'],
-                    'totalPriceDiscount' => $price_data['totalPriceDiscount'],
-                    'priceDiscountsInfo' => json_encode($price_data['priceDiscountsInfo']),
-                    'userData'           => json_encode($user_data),
-                    'status'             => 'pending',
-                    'createdAt'          => current_time('mysql')
-                )
+            $insert_data = array(
+                'orderID'            => $order_id,
+                'userId'             => $user_id,
+                'featureId'          => $feature_id,
+                'optionId'           => $option_id,
+                'addonIds'           => json_encode($addon_ids),
+                'priceSelected'      => $price_option_index,
+                'quantity'           => $quantity,
+                'totalPrice'         => $price_data['totalPrice'],
+                'totalPriceDiscount' => $price_data['totalPriceDiscount'],
+                'priceDiscountsInfo' => json_encode($price_data['priceDiscountsInfo']),
+                'userData'           => json_encode($user_data),
+                'status'             => 'pending',
+                'createdAt'          => current_time('mysql')
             );
+            
+            // Add anonymous user contact data if present
+            if ($user_id === 0 && !empty($anon_data)) {
+                $insert_data['anonUserFirstName'] = $anon_data['firstName'];
+                $insert_data['anonUserLastName'] = $anon_data['lastName'];
+                $insert_data['anonUserEmail'] = $anon_data['email'];
+                $insert_data['anonUserPhone'] = $anon_data['phone'];
+            }
+            
+            $result = $wpdb->insert($wpdb->prefix . 'ffc_orders', $insert_data);
             
             if ($result === false) {
                 return new WP_Error('db_error', 'Failed to save order item: ' . $wpdb->last_error, array('status' => 500));
@@ -825,9 +886,26 @@
         
         $first_item = $order_items[0];
         
-        $user = get_userdata($first_item['userId']);
-        if (!$user) {
-            return false;
+        // Handle anonymous vs authenticated users
+        $user_email = '';
+        $user_name = '';
+
+        if (intval($first_item['userId']) === 0) {
+            // Anonymous order
+            $user_email = $first_item['anonUserEmail'];
+            $user_name = trim($first_item['anonUserFirstName'] . ' ' . $first_item['anonUserLastName']) ?: 'Customer';
+            
+            if (empty($user_email)) {
+                return false; // Can't send email without address
+            }
+        } else {
+            // Authenticated user
+            $user = get_userdata($first_item['userId']);
+            if (!$user) {
+                return false;
+            }
+            $user_email = $user->user_email;
+            $user_name = $user->display_name;
         }
         
         $status = !empty($new_status) ? $new_status : $first_item['status'];

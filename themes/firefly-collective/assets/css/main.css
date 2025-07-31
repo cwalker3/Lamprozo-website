@@ -375,7 +375,7 @@ input.error {
     }
 }
 
-@media(max-width: 800px) {
+@media(max-width: 1100px) {
     main {
         margin-left: 2vw;
         margin-right: 2vw;

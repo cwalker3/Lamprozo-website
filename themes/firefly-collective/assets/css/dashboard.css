@@ -1191,6 +1191,139 @@ td .feature-fields-list {
   color: #333;
 }
 
+/* Anonymous users */
+
+#anonymous-user-form {
+    width: 900px;
+    max-width: var(--calcMaxWidth);
+    margin: 0 auto;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: black;
+}
+
+#anonymous-user-form h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.anon-field {
+    margin-bottom: 12px;
+}
+
+.anon-field input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.anon-field input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.anon-signup-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.anon-checkbox-label,
+.anon-radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.anon-checkbox-label input,
+.anon-radio-label input {
+    margin-right: 8px;
+    width: auto;
+}
+
+.anon-radio-group {
+    margin-left: 20px;
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.password-toggle:hover {
+    opacity: 0.7;
+}
+
+#username-password-fields {
+    margin-left: 20px;
+}
+
+#account-required-section {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f0f8ff;
+    border: 1px solid #007bff;
+    border-radius: 6px;
+}
+
+.account-required-notice {
+    color: #007bff;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.account-fields .anon-field {
+    margin-bottom: 12px;
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.password-toggle:hover {
+    opacity: 0.7;
+}
+
 /* Responsive adjustments */
 @media (min-width: 800px) {
     #profile-container,
@@ -1225,7 +1358,8 @@ td .feature-fields-list {
     }
     #campaign-head,
     #price-calculator,
-    #invoice-container {
+    #invoice-container,
+    #anonymous-user-form {
         width: 90vw;
     }
 }

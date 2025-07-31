@@ -30,4 +30,4 @@
 
     // Campaigns
     register_activation_hook(__FILE__, 'firefly_collective_init_campaigns');
-    register_deactivation_hook(__FILE__, 'firefly_collective_terminate_campaigns');
+    // register_deactivation_hook(__FILE__, 'firefly_collective_terminate_campaigns');
