@@ -145,7 +145,6 @@
             subscription_cancelled_at           DATETIME           NULL,
             
             PRIMARY KEY  (id),
-            UNIQUE KEY   uniq_ffc_orders_invoice (invoice_id),
             KEY          idx_order              (orderID),
             KEY          idx_user               (userId),
             KEY          idx_feature            (featureId),

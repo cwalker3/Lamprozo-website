@@ -250,64 +250,109 @@
     }
 
     /**
-     * Create a one-time payment using Stripe Payment Intent
+     * Create a one-time invoice and charge using Stripe Invoicing API
      */
     function firefly_collective_create_one_time_payment($customer, $order_id, $items) {
         global $wpdb;
+        firefly_collective_stripe_init();
 
-        try {
-            // Calculate total amount and build description
-            $total_amount = 0;
-            $item_descriptions = [];
-
-            foreach ($items as $item) {
-                $item_desc = format_item_description($item, $wpdb);
-                $item_descriptions[] = $item_desc;
-                $total_amount += floatval($item['totalPrice']);
-            }
-
-            // Create description
-            $order_description = implode(" | ", $item_descriptions);
-            
-            // Build metadata
-            $metadata = [
-                'order_id'          => $order_id,
-                'wordpress_user_id' => get_current_user_id(),
-                'payment_type'      => 'one_time',
-                'total_items'       => count($items),
-                'features'          => implode(', ', array_unique(array_map(function($i){return $i['featureName'];}, $items))),
-            ];
-
-            // Create a Payment Intent directly
-            $payment_intent = \Stripe\PaymentIntent::create([
-                'amount'                    => round($total_amount * 100), // Convert to cents
-                'currency'                  => 'usd',
-                'customer'                  => $customer->id,
-                'description'               => $order_description,
-                'metadata'                  => $metadata,
-                'automatic_payment_methods' => [
-                    'enabled' => true,
+        // 1. Create an InvoiceItem for each one-time order row, splitting base + addons
+        foreach ($items as $item) {
+            // Build a description like: "FeatureName – OptionName"
+            $baseDesc = format_item_description([
+                'featureName' => $item['featureName'],
+                'optionName'  => $item['optionName'],
+                'addonIds'    => json_encode([]),
+            ], $wpdb);
+            $baseCents = round((float)$item['totalPrice'] * 100) 
+                - array_sum(array_map(fn($aid) => round((float)$wpdb->get_var($wpdb->prepare(
+                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    )) * 100), json_decode($item['addonIds'], true)));
+            \Stripe\InvoiceItem::create([
+                'customer'    => $customer->id,
+                'amount'      => $baseCents,
+                'currency'    => 'usd',
+                'description' => $baseDesc,
+                'metadata'    => [
+                    'order_id' => $order_id,
+                    'item_id'  => $item['id'],
+                    'type'     => 'base',
                 ],
             ]);
 
-            // Update orders table with the Payment Intent ID
-            $wpdb->update(
-                $wpdb->prefix . 'ffc_orders',
-                ['payment_intent_id' => $payment_intent->id],
-                ['orderID'          => $order_id],
-                ['%s'],
-                ['%s']
-            );
-
-            return [
-                'success'      => true,
-                'clientSecret' => $payment_intent->client_secret,
-                'type'         => 'one_time',
-            ];
-
-        } catch (Exception $e) {
-            throw new Exception('Failed to create one-time payment: ' . $e->getMessage());
+            // -- one line per addon --
+            $addonIds = json_decode($item['addonIds'], true);
+            if (!empty($addonIds)) {
+                foreach ($addonIds as $aid) {
+                    $addonName  = $wpdb->get_var($wpdb->prepare(
+                        "SELECT addonName FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    ));
+                    $addonCents = round((float)$wpdb->get_var($wpdb->prepare(
+                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    )) * 100);
+                    \Stripe\InvoiceItem::create([
+                        'customer'    => $customer->id,
+                        'amount'      => $addonCents,
+                        'currency'    => 'usd',
+                        'description' => $addonName,
+                        'metadata'    => [
+                            'order_id' => $order_id,
+                            'item_id'  => $item['id'],
+                            'type'     => 'addon',
+                            'addon_id' => $aid,
+                        ],
+                    ]);
+                }
+            }
         }
+
+        // 2. Create a draft invoice, including all pending InvoiceItems
+        $invoice = \Stripe\Invoice::create([
+            'customer'                       => $customer->id,
+            'collection_method'              => 'charge_automatically',
+            'auto_advance'                   => true,
+            'pending_invoice_items_behavior' => 'include',
+            'metadata'                       => [ 'order_id' => $order_id ],
+        ]);
+
+        // 3. Finalize the invoice (this will open it and, if amount > $0, create a PI)
+        $invoice = $invoice->finalizeInvoice([
+            'expand' => ['payments.data.payment'],
+        ]);
+
+        // 4. Grab the PaymentIntent ID (if any)
+        $piId = ff_invoice_pi_id($invoice);
+
+        // 5. Update *each* order-row to stamp in invoice_id + payment_intent_id
+        foreach ($items as $item) {
+            $wpdb->update(
+                "{$wpdb->prefix}ffc_orders",
+                [
+                    'invoice_id'        => $invoice->id,
+                    'payment_intent_id' => $piId,
+                ],
+                [
+                    'orderID' => $order_id,
+                    'id'      => $item['id'],
+                ],
+                ['%s','%s'],
+                ['%s','%d']
+            );
+        }
+
+        // 6. Return the client secret to the front-end (if we have a PI)
+        $clientSecret = $piId
+            ? \Stripe\PaymentIntent::retrieve($piId)->client_secret
+            : null;
+
+        return [
+            'success'      => true,
+            'invoiceId'    => $invoice->id,
+            'clientSecret' => $clientSecret,
+        ];
     }
 
     /**
@@ -433,104 +478,126 @@
         global $wpdb;
 
         try {
-            // Descriptions
-            $one_time_descriptions = array_map(function($item) use ($wpdb) {
-                return format_item_description($item, $wpdb);
-            }, $one_time_items);
-
-            $recurring_descriptions = array_map(function($item) use ($wpdb) {
-                return format_item_description($item, $wpdb);
-            }, $recurring_items);
-
-            $order_description = implode(' | ', $recurring_descriptions);
-
-            // Totals
-            $total_one_time   = array_sum(array_map(fn($i)=> (float)$i['totalPrice'], $one_time_items));
-            $total_recurring  = array_sum(array_map(fn($i)=> (float)$i['totalPrice'], $recurring_items));
-            $interval         = $recurring_items[0]['interval'] ?: 'monthly';
-
-            $metadata = [
-                'order_id'                     => $order_id,
-                'wordpress_user_id'            => get_current_user_id(),
-                'payment_type'                 => 'mixed',
-                'has_one_time_items'           => 'true',
-                'total_items'                  => count($one_time_items) + count($recurring_items),
-                'subscription_interval'        => $interval,
-                'subscription_amount_monthly'  => number_format($total_recurring, 2),
-            ];
-
-            // 1. One-time items as invoice items
+            // 1. Create InvoiceItems for each one-time item, splitting base + addons
             foreach ($one_time_items as $item) {
-                $item_desc = format_item_description($item, $wpdb);
+                // Build base description: "FeatureName – OptionName"
+                $baseDesc = format_item_description([
+                    'featureName' => $item['featureName'],
+                    'optionName'  => $item['optionName'],
+                    'addonIds'    => json_encode([]),
+                ], $wpdb);
+
+                // Calculate base amount (totalPrice minus sum of addon mods)
+                $addonIds = json_decode($item['addonIds'], true);
+                $addonTotalCents = 0;
+                foreach ($addonIds as $aid) {
+                    $mod = (float)$wpdb->get_var($wpdb->prepare(
+                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    ));
+                    $addonTotalCents += round($mod * 100);
+                }
+                $baseCents = round((float)$item['totalPrice'] * 100) - $addonTotalCents;
+
                 \Stripe\InvoiceItem::create([
                     'customer'    => $customer->id,
-                    'amount'      => round((float)$item['totalPrice'] * 100),
+                    'amount'      => $baseCents,
                     'currency'    => 'usd',
-                    'description' => $item_desc,
+                    'description' => $baseDesc,
                     'metadata'    => [
-                        'order_id'           => $order_id,
-                        'wordpress_user_id'  => get_current_user_id(),
-                        'feature_id'         => $item['featureId'],
-                        'option_id'          => $item['optionId'],
-                        'type'               => 'one_time'
-                    ]
+                        'order_id' => $order_id,
+                        'item_id'  => $item['id'],
+                        'type'     => 'base',
+                    ],
                 ]);
+
+                // Create one line per addon
+                foreach ($addonIds as $aid) {
+                    $addonName  = $wpdb->get_var($wpdb->prepare(
+                        "SELECT addonName FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    ));
+                    $addonMod   = (float)$wpdb->get_var($wpdb->prepare(
+                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                        intval($aid)
+                    ));
+                    $addonCents = round($addonMod * 100);
+
+                    \Stripe\InvoiceItem::create([
+                        'customer'    => $customer->id,
+                        'amount'      => $addonCents,
+                        'currency'    => 'usd',
+                        'description' => $addonName,
+                        'metadata'    => [
+                            'order_id' => $order_id,
+                            'item_id'  => $item['id'],
+                            'type'     => 'addon',
+                            'addon_id' => $aid,
+                        ],
+                    ]);
+                }
             }
 
             // 2. Create products/prices for recurring items
             $stripe_items = [];
+            $interval     = $recurring_items[0]['interval'] ?: 'monthly';
             foreach ($recurring_items as $item) {
-                $item_desc = format_item_description($item, $wpdb);
+                $itemDesc = format_item_description($item, $wpdb);
 
                 $product = \Stripe\Product::create([
-                    'name'     => sprintf('%s ($%.2f/%s)', $item_desc, (float)$item['totalPrice'], $item['interval'] ?: 'month'),
+                    'name'     => sprintf('%s ($%.2f/%s)', $itemDesc, (float)$item['totalPrice'], $interval),
                     'metadata' => [
-                        'feature_id'        => $item['featureId'],
-                        'option_id'         => $item['optionId'],
-                        'order_id'          => $order_id,
-                        'recurring_amount'  => (float)$item['totalPrice']
-                    ]
+                        'feature_id'       => $item['featureId'],
+                        'option_id'        => $item['optionId'],
+                        'order_id'         => $order_id,
+                        'recurring_amount' => (float)$item['totalPrice'],
+                    ],
                 ]);
 
                 $price = \Stripe\Price::create([
-                    'product'   => $product->id,
-                    'unit_amount' => round((float)$item['totalPrice'] * 100),
-                    'currency'  => 'usd',
-                    'recurring' => [
+                    'product'      => $product->id,
+                    'unit_amount'  => round((float)$item['totalPrice'] * 100),
+                    'currency'     => 'usd',
+                    'recurring'    => [
                         'interval'       => $interval,
-                        'interval_count' => 1
-                    ]
+                        'interval_count' => 1,
+                    ],
                 ]);
 
                 $stripe_items[] = ['price' => $price->id, 'quantity' => 1];
             }
 
-            // 3. Create subscription (new expand path)
+            // 3. Create the subscription, expanding the first invoice’s payment
             $subscription = \Stripe\Subscription::create([
-                'customer'          => $customer->id,
-                'items'             => $stripe_items,
-                'payment_behavior'  => 'default_incomplete',
-                'payment_settings'  => ['save_default_payment_method' => 'on_subscription'],
-                'expand'            => ['latest_invoice.payments.data.payment'],
-                'metadata'          => $metadata,
-                'description'       => sprintf('%s - $%.2f/%s', $order_description, $total_recurring, $interval)
+                'customer'         => $customer->id,
+                'items'            => $stripe_items,
+                'payment_behavior' => 'default_incomplete',
+                'payment_settings' => ['save_default_payment_method' => 'on_subscription'],
+                'expand'           => ['latest_invoice.payments.data.payment'],
+                'metadata'         => [
+                    'order_id'                  => $order_id,
+                    'payment_type'              => 'mixed',
+                    'subscription_interval'     => $interval,
+                    'has_one_time_items'        => 'true',
+                    'total_one_time_amount'     => number_format(array_sum(array_map(fn($i)=>(float)$i['totalPrice'], $one_time_items)),2),
+                    'subscription_amount_monthly'=> number_format(array_sum(array_map(fn($i)=>(float)$i['totalPrice'], $recurring_items)),2),
+                ],
             ]);
 
-            // 4. Update PI desc
+            // 4. Retrieve and update the PaymentIntent description
             $piId = ff_invoice_pi_id($subscription->latest_invoice);
             if ($piId) {
                 \Stripe\PaymentIntent::update($piId, [
-                    'description'                   => $order_description,
-                    'statement_descriptor_suffix'   => 'SUB+SETUP'
+                    'description'                 => 'Mixed order: ' . implode(' | ', array_map(fn($i)=>$i['featureName'].'–'.$i['optionName'], $recurring_items)),
+                    'statement_descriptor_suffix' => 'MIXED+SETUP',
                 ]);
             }
 
-            // 5. Periods & DB updates
+            // 5. Persist subscription and payment intent into DB
             $periods = ff_subscription_period($subscription);
-
             foreach ($recurring_items as $item) {
                 $wpdb->update(
-                    $wpdb->prefix . 'ffc_orders',
+                    "{$wpdb->prefix}ffc_orders",
                     [
                         'payment_intent_id'               => $piId,
                         'subscription_id'                 => $subscription->id,
@@ -538,20 +605,16 @@
                         'subscription_renewal'            => 0,
                         'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
                         'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
-                        'subscriptionPrice'               => floatval($item['totalPrice']), // Add this line
+                        'subscriptionPrice'               => (float)$item['totalPrice'],
                     ],
-                    [
-                        'orderID' => $order_id,
-                        'id'      => $item['id']
-                    ],
-                    ['%s','%s','%s','%d','%s','%s'],
+                    ['orderID' => $order_id, 'id' => $item['id']],
+                    ['%s','%d','%s','%d','%s','%s','%f'],
                     ['%s','%d']
                 );
             }
-
             foreach ($one_time_items as $item) {
                 $wpdb->update(
-                    $wpdb->prefix . 'ffc_orders',
+                    "{$wpdb->prefix}ffc_orders",
                     ['payment_intent_id' => $piId],
                     ['orderID' => $order_id, 'id' => $item['id']],
                     ['%s'],
@@ -559,34 +622,27 @@
                 );
             }
 
+            // 6. Return client secret for front-end confirmation
             return [
-                'success'          => true,
-                'clientSecret'     => $piId ? \Stripe\PaymentIntent::retrieve($piId)->client_secret : null,
-                'type'             => 'mixed',
-                'subscriptionId'   => $subscription->id,
-                'totalFirstPayment'=> $total_one_time + $total_recurring,
-                'recurringAmount'  => $total_recurring,
-                'oneTimeAmount'    => $total_one_time
+                'success'        => true,
+                'clientSecret'   => $piId ? \Stripe\PaymentIntent::retrieve($piId)->client_secret : null,
+                'subscriptionId' => $subscription->id,
+                'type'           => 'mixed',
             ];
 
         } catch (Exception $e) {
-            // Cleanup pending invoice items
+            // Clean up pending InvoiceItems on error
             try {
-                $invoice_items = \Stripe\InvoiceItem::all([
-                    'customer' => $customer->id,
-                    'pending'  => true,
-                    'limit'    => 100
-                ]);
-                foreach ($invoice_items->data as $item) {
-                    if (isset($item->metadata->order_id) && $item->metadata->order_id === $order_id) {
-                        $item->delete();
+                $pending = \Stripe\InvoiceItem::all(['customer' => $customer->id, 'pending' => true, 'limit' => 100]);
+                foreach ($pending->data as $ii) {
+                    if ($ii->metadata->order_id === $order_id) {
+                        $ii->delete();
                     }
                 }
-            } catch (Exception $cleanup_error) {
-                error_log('Failed to cleanup invoice items: ' . $cleanup_error->getMessage());
+            } catch (Exception $cleanup) {
+                error_log("Cleanup failed: " . $cleanup->getMessage());
             }
-
-            throw new Exception('Failed to create mixed payment: ' . $e->getMessage());
+            throw new Exception("Failed to create mixed payment: " . $e->getMessage());
         }
     }
 
