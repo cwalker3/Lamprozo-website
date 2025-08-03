@@ -229,8 +229,6 @@
         $response->header('Set-Cookie', $cookie_header, false);
         $response->header('Content-Type', 'text/html');
         
-        error_log("google_auth_init: Set cookie header: $cookie_header on host: $host");
-        
         return $response;
     }
 
@@ -241,15 +239,12 @@
         $code  = sanitize_text_field($request->get_param('code') ?? '');
         $state = sanitize_text_field($request->get_param('state') ?? '');
         
-        error_log("google_auth_callback: Received state: $state");
-        
         if (empty($_COOKIE['google_auth_state'])) {
             error_log("google_auth_callback: Cookie 'google_auth_state' is missing.");
             $response = new WP_REST_Response('Invalid state: cookie missing', 400);
             $response->header('Content-Type', 'text/html');
             return $response;
         }
-        error_log("google_auth_callback: Cookie 'google_auth_state': " . $_COOKIE['google_auth_state']);
         
         if ($_COOKIE['google_auth_state'] !== $state) {
             error_log("google_auth_callback: State mismatch: cookie (" . $_COOKIE['google_auth_state'] . ") vs received ($state)");
