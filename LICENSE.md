@@ -84,5 +84,4 @@ This license shall be governed by and construed in accordance with the laws of t
 
 **Alex Strait**  
 Firefly Creative, LLC  
-Email: alex@fireflycreativeio.io  
-Address: 1050 Jaxon Way, Redding - California, USA
+Email: alex@fireflycreativeio.io
