@@ -100,7 +100,7 @@
                         <?php endif; ?>
 
                         <td>{{ formatOrderID(group.orderID) }}</td>
-                        <td>{{ getUserName(group.userId) }}</td>
+                        <td>{{ getUserName(group.userId, group.anonUserEmail, group.anonUserFirstName, group.anonUserLastName) }}</td>
                         <td>
                             {{ group.items.length }} item(s)
                             <button class="ffc-expand-btn" @click="toggleExpand(group.orderID)">
@@ -264,7 +264,7 @@
                         <strong>Order ID:</strong> {{ formatOrderID(currentOrder.orderID) }}
                     </div>
                     <div class="ffc-summary-item">
-                        <strong>Customer:</strong> {{ getUserName(currentOrder.userId) }}
+                        <strong>Customer:</strong> {{ getUserName(currentOrder.userId, currentOrder.anonUserEmail, currentOrder.anonUserFirstName, currentOrder.anonUserLastName) }}
                     </div>
                     <div class="ffc-summary-item">
                         <strong>Date:</strong> {{ formatDate(currentOrder.createdAt) }}

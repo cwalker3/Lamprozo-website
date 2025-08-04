@@ -97,7 +97,10 @@ function initOrdersApp() {
                         items: [],
                         userData: order.userData ? JSON.parse(order.userData) : {},
                         hasPartialRefund: false,
-                        refundedAmount: 0
+                        refundedAmount: 0,
+                        anonUserEmail: order.anonUserEmail || null,
+                        anonUserFirstName: order.anonUserFirstName || null,
+                        anonUserLastName: order.anonUserLastName || null
                     };
                 }
                 
@@ -406,7 +409,7 @@ function initOrdersApp() {
                 printContent.innerHTML = `
                     <h1>Order #${this.formatOrderID(this.currentOrder.orderID)}</h1>
                     <div style="margin-bottom: 20px;">
-                        <div><strong>Customer:</strong> ${this.getUserName(this.currentOrder.userId)}</div>
+                        <div><strong>Customer:</strong> ${this.getUserName(this.currentOrder.userId, this.currentOrder.anonUserEmail, this.currentOrder.anonUserFirstName, this.currentOrder.anonUserLastName)}</div>
                         <div><strong>Date:</strong> ${this.formatDate(this.currentOrder.createdAt)}</div>
                         <div><strong>Status:</strong> ${this.capitalizeFirst(this.currentOrder.status)}</div>
                     </div>
@@ -866,7 +869,16 @@ function initOrdersApp() {
                 return [...new Set(descriptions)];
             }
             
-            function getUserName(userId) {
+            function getUserName(userId, anonUserEmail = null, anonUserFirstName = null, anonUserLastName = null) {
+                // Convert userId to number for comparison, or check both string and number
+                if ((userId === 0 || userId === "0") && anonUserEmail) {
+                    // Check if we have both first and last name
+                    if (anonUserFirstName && anonUserLastName) {
+                        return `${anonUserFirstName} ${anonUserLastName} (${anonUserEmail})`;
+                    }
+                    // Otherwise just return the email
+                    return anonUserEmail;
+                }
                 return users.value[userId] || `User #${userId}`;
             }
             
