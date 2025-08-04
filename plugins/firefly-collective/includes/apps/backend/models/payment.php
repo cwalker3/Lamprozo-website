@@ -134,6 +134,140 @@
     }
 
     /**
+     * Calculate discounted prices for an order item (replicates frontend logic)
+     * Returns array with discounted base price and addon prices
+     */
+    function calculate_discounted_prices($item, $wpdb) {
+        $quantity = max(1, intval($item['quantity']));
+        
+        // Get option and addons data
+        $option = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
+            intval($item['optionId'])
+        ), ARRAY_A);
+        
+        if (!$option) return ['base_per_unit' => 0, 'addons' => []];
+        
+        // Get base price from price options or static price
+        $base_price = 0;
+        if ($option['priceOptions']) {
+            try {
+                $price_options = json_decode($option['priceOptions'], true);
+                if (isset($price_options['types']) && isset($item['priceSelected'])) {
+                    $price_index = intval($item['priceSelected']);
+                    if (isset($price_options['types'][$price_index])) {
+                        $base_price = floatval($price_options['types'][$price_index]['price']);
+                    }
+                }
+            } catch (Exception $e) {
+                $base_price = floatval($option['staticPrice']);
+            }
+        } else {
+            $base_price = floatval($option['staticPrice']);
+        }
+        
+        // Calculate addon prices with group discounts
+        $addon_prices = [];
+        $addons_by_group = [];
+        $addon_ids = json_decode($item['addonIds'], true) ?: [];
+        
+        // Group addons and calculate base addon prices
+        foreach ($addon_ids as $addon_id) {
+            $addon = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                intval($addon_id)
+            ), ARRAY_A);
+            
+            if (!$addon) continue;
+            
+            $addon_price = floatval($addon['staticPriceMod']);
+            
+            if ($addon['enableGrouping'] && $addon['groupName']) {
+                if (!isset($addons_by_group[$addon['groupName']])) {
+                    $addons_by_group[$addon['groupName']] = [
+                        'addons' => [],
+                        'thresholds' => []
+                    ];
+                    
+                    // Parse group threshold discounts
+                    if ($addon['groupThresholdDiscounts']) {
+                        try {
+                            $threshold_data = json_decode($addon['groupThresholdDiscounts'], true);
+                            if (isset($threshold_data['types'])) {
+                                $addons_by_group[$addon['groupName']]['thresholds'] = $threshold_data['types'];
+                            }
+                        } catch (Exception $e) {
+                            // Ignore parse errors
+                        }
+                    }
+                }
+                $addons_by_group[$addon['groupName']]['addons'][] = [
+                    'id' => $addon_id,
+                    'price' => $addon_price
+                ];
+            }
+            
+            $addon_prices[$addon_id] = $addon_price; // Start with base price
+        }
+        
+        // Apply group discounts
+        foreach ($addons_by_group as $group_name => $group_data) {
+            $group_count = count($group_data['addons']);
+            $thresholds = $group_data['thresholds'];
+            
+            // Find applicable discount
+            $applicable_discount = 0;
+            foreach ($thresholds as $threshold) {
+                if ($group_count >= intval($threshold['itemCount'])) {
+                    $applicable_discount = max($applicable_discount, floatval($threshold['discount']));
+                }
+            }
+            
+            // Apply discount to group addons
+            if ($applicable_discount > 0) {
+                foreach ($group_data['addons'] as $addon_data) {
+                    $original_price = $addon_data['price'];
+                    $discounted_price = $original_price * (1 - $applicable_discount / 100);
+                    $addon_prices[$addon_data['id']] = $discounted_price;
+                }
+            }
+        }
+        
+        // Calculate total addon cost per unit
+        $total_addon_cost_per_unit = array_sum($addon_prices);
+        
+        // Apply quantity discount to base price
+        $discounted_base_total = $base_price * $quantity;
+        if ($option['thresholdDiscounts']) {
+            try {
+                $threshold_data = json_decode($option['thresholdDiscounts'], true);
+                $thresholds = $threshold_data ?: [];
+                
+                // Find highest applicable discount
+                $best_discount = 0;
+                foreach ($thresholds as $threshold) {
+                    if ($quantity >= intval($threshold['itemCount'])) {
+                        $best_discount = max($best_discount, floatval($threshold['discount']));
+                    }
+                }
+                
+                if ($best_discount > 0) {
+                    $discounted_base_total = ($base_price * $quantity) * (1 - $best_discount / 100);
+                }
+            } catch (Exception $e) {
+                // Ignore parse errors
+            }
+        }
+        
+        $base_per_unit = $discounted_base_total / $quantity;
+        
+        return [
+            'base_per_unit' => $base_per_unit,
+            'addons' => $addon_prices
+        ];
+    }
+
+    /**
      * Format item description consistently
      */
     function format_item_description($item, $wpdb) {
@@ -258,23 +392,27 @@
 
         // 1. Create an InvoiceItem for each one-time order row, splitting base + addons
         foreach ($items as $item) {
+            $quantity = max(1, intval($item['quantity'])); // Ensure minimum quantity of 1
+            
+            // Calculate discounted prices
+            $discounted_prices = calculate_discounted_prices($item, $wpdb);
+            
             // Build a description like: "FeatureName – OptionName"
             $baseDesc = format_item_description([
                 'featureName' => $item['featureName'],
                 'optionName'  => $item['optionName'],
                 'addonIds'    => json_encode([]),
             ], $wpdb);
-            $baseCents = round((float)$item['totalPrice'] * 100) 
-                - array_sum(array_map(fn($aid) => round((float)$wpdb->get_var($wpdb->prepare(
-                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                        intval($aid)
-                    )) * 100), json_decode($item['addonIds'], true)));
+            
+            $baseCents = round($discounted_prices['base_per_unit'] * 100);
+            
             \Stripe\InvoiceItem::create([
-                'customer'    => $customer->id,
-                'amount'      => $baseCents,
-                'currency'    => 'usd',
-                'description' => $baseDesc,
-                'metadata'    => [
+                'customer'              => $customer->id,
+                'unit_amount_decimal'   => $baseCents,
+                'quantity'              => $quantity,
+                'currency'              => 'usd',
+                'description'           => $baseDesc,
+                'metadata'              => [
                     'order_id' => $order_id,
                     'item_id'  => $item['id'],
                     'type'     => 'base',
@@ -285,20 +423,19 @@
             $addonIds = json_decode($item['addonIds'], true);
             if (!empty($addonIds)) {
                 foreach ($addonIds as $aid) {
-                    $addonName  = $wpdb->get_var($wpdb->prepare(
+                    $addonName = $wpdb->get_var($wpdb->prepare(
                         "SELECT addonName FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
                         intval($aid)
                     ));
-                    $addonCents = round((float)$wpdb->get_var($wpdb->prepare(
-                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                        intval($aid)
-                    )) * 100);
+                    $addonCents = round($discounted_prices['addons'][$aid] * 100);
+                    
                     \Stripe\InvoiceItem::create([
-                        'customer'    => $customer->id,
-                        'amount'      => $addonCents,
-                        'currency'    => 'usd',
-                        'description' => $addonName,
-                        'metadata'    => [
+                        'customer'              => $customer->id,
+                        'unit_amount_decimal'   => $addonCents,
+                        'quantity'              => $quantity,
+                        'currency'              => 'usd',
+                        'description'           => $addonName,
+                        'metadata'              => [
                             'order_id' => $order_id,
                             'item_id'  => $item['id'],
                             'type'     => 'addon',
@@ -480,6 +617,11 @@
         try {
             // 1. Create InvoiceItems for each one-time item, splitting base + addons
             foreach ($one_time_items as $item) {
+                $quantity = max(1, intval($item['quantity'])); // Ensure minimum quantity of 1
+                
+                // Calculate discounted prices
+                $discounted_prices = calculate_discounted_prices($item, $wpdb);
+                
                 // Build base description: "FeatureName – OptionName"
                 $baseDesc = format_item_description([
                     'featureName' => $item['featureName'],
@@ -487,24 +629,15 @@
                     'addonIds'    => json_encode([]),
                 ], $wpdb);
 
-                // Calculate base amount (totalPrice minus sum of addon mods)
-                $addonIds = json_decode($item['addonIds'], true);
-                $addonTotalCents = 0;
-                foreach ($addonIds as $aid) {
-                    $mod = (float)$wpdb->get_var($wpdb->prepare(
-                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                        intval($aid)
-                    ));
-                    $addonTotalCents += round($mod * 100);
-                }
-                $baseCents = round((float)$item['totalPrice'] * 100) - $addonTotalCents;
+                $baseCents = round($discounted_prices['base_per_unit'] * 100);
 
                 \Stripe\InvoiceItem::create([
-                    'customer'    => $customer->id,
-                    'amount'      => $baseCents,
-                    'currency'    => 'usd',
-                    'description' => $baseDesc,
-                    'metadata'    => [
+                    'customer'              => $customer->id,
+                    'unit_amount_decimal'   => $baseCents,
+                    'quantity'              => $quantity,
+                    'currency'              => 'usd',
+                    'description'           => $baseDesc,
+                    'metadata'              => [
                         'order_id' => $order_id,
                         'item_id'  => $item['id'],
                         'type'     => 'base',
@@ -512,29 +645,29 @@
                 ]);
 
                 // Create one line per addon
-                foreach ($addonIds as $aid) {
-                    $addonName  = $wpdb->get_var($wpdb->prepare(
-                        "SELECT addonName FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                        intval($aid)
-                    ));
-                    $addonMod   = (float)$wpdb->get_var($wpdb->prepare(
-                        "SELECT staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                        intval($aid)
-                    ));
-                    $addonCents = round($addonMod * 100);
+                $addonIds = json_decode($item['addonIds'], true);
+                if (!empty($addonIds)) {
+                    foreach ($addonIds as $aid) {
+                        $addonName = $wpdb->get_var($wpdb->prepare(
+                            "SELECT addonName FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                            intval($aid)
+                        ));
+                        $addonCents = round($discounted_prices['addons'][$aid] * 100);
 
-                    \Stripe\InvoiceItem::create([
-                        'customer'    => $customer->id,
-                        'amount'      => $addonCents,
-                        'currency'    => 'usd',
-                        'description' => $addonName,
-                        'metadata'    => [
-                            'order_id' => $order_id,
-                            'item_id'  => $item['id'],
-                            'type'     => 'addon',
-                            'addon_id' => $aid,
-                        ],
-                    ]);
+                        \Stripe\InvoiceItem::create([
+                            'customer'              => $customer->id,
+                            'unit_amount_decimal'   => $addonCents,
+                            'quantity'              => $quantity,
+                            'currency'              => 'usd',
+                            'description'           => $addonName,
+                            'metadata'     => [
+                                'order_id' => $order_id,
+                                'item_id'  => $item['id'],
+                                'type'     => 'addon',
+                                'addon_id' => $aid,
+                            ],
+                        ]);
+                    }
                 }
             }
 
