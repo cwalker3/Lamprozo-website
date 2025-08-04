@@ -404,7 +404,56 @@ function initOrdersApp() {
             }
             
             function printOrder() {
-                // Build a hidden <div> containing our new “inline-discount” HTML
+                // Build itemized content for printing
+                let itemsHtml = '';
+                
+                this.currentOrder.items.forEach((item, itemIndex) => {
+                    const pricing = this.getItemizedPricing(item);
+                    
+                    pricing.lines.forEach((line) => {
+                        let rowClass = '';
+                        let rowStyle = 'padding: 8px; border: 1px solid #ddd;';
+                        
+                        if (line.isBase) {
+                            rowClass = 'base-item';
+                            rowStyle += ' font-weight: bold;';
+                        } else if (line.isAddon) {
+                            rowClass = 'addon-item';
+                            rowStyle += ' font-size: 0.95em; padding-left: 20px;';
+                        } else if (line.isDiscount) {
+                            rowClass = 'discount-item';
+                            rowStyle += ' font-size: 0.85em; font-style: italic; color: #0066cc; padding-left: 30px;';
+                        }
+                        
+                        itemsHtml += `
+                            <tr class="${rowClass}">
+                                <td style="${rowStyle}">
+                                    ${line.isAddon ? '+ ' : ''}${line.name}
+                                </td>
+                                <td style="${rowStyle} text-align: center;">
+                                    ${line.quantity}
+                                </td>
+                                <td style="${rowStyle} text-align: right;">
+                                    ${line.isDiscount ? '-' : '$' + this.formatPrice(line.unitPrice)}
+                                </td>
+                                <td style="${rowStyle} text-align: right;">
+                                    ${line.isDiscount ? '-' : '$' + this.formatPrice(line.totalPrice)}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    // Add separator between items
+                    if (itemIndex < this.currentOrder.items.length - 1) {
+                        itemsHtml += `
+                            <tr class="item-separator">
+                                <td colspan="4" style="border: none; padding: 10px 0;"></td>
+                            </tr>
+                        `;
+                    }
+                });
+                
+                // Build the complete print content
                 const printContent = document.createElement('div');
                 printContent.innerHTML = `
                     <h1>Order #${this.formatOrderID(this.currentOrder.orderID)}</h1>
@@ -418,82 +467,24 @@ function initOrdersApp() {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <thead>
                             <tr>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Item</th>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Options</th>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Addons</th>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Quantity</th>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Price</th>
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Item</th>
+                                <th style="text-align: center; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Quantity</th>
+                                <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Unit Price</th>
+                                <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Total Price</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${this.currentOrder.items.map(item => `
-                                <tr>
-                                    <!-- Item Name -->
-                                    <td style="padding: 8px; border: 1px solid #ddd;">
-                                        ${this.getFeatureName(item.featureId)}
-                                    </td>
-                                    
-                                    <!-- Options + inline option discount -->
-                                    <td style="padding: 8px; border: 1px solid #ddd;">
-                                        ${this.getOptionName(item.optionId)}
-                                        ${this.hasOptionDiscount(item)
-                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
-                                                - ${this.getOptionDiscountText(item)}
-                                            </div>`
-                                            : ''}
-                                    </td>
-                                    
-                                    <!-- Addons + inline addon discounts -->
-                                    <td style="padding: 8px; border: 1px solid #ddd;">
-                                        ${this.getAddonNames(item.addonIds).length
-                                            ? this.getAddonNames(item.addonIds).join(', ')
-                                            : 'No addons'}
-                                        ${this.getAllAddonDiscounts(item).length
-                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
-                                                - ${this.getAllAddonDiscounts(item).join(', ')}
-                                            </div>`
-                                            : ''}
-                                    </td>
-                                    
-                                    <!-- Quantity -->
-                                    <td style="padding: 8px; border: 1px solid #ddd;">
-                                        ${item.quantity}
-                                    </td>
-                                    
-                                    <!-- Price + inline item-level discount -->
-                                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">
-                                        $${this.formatPrice(item.totalPrice)}
-                                        ${parseFloat(item.totalPriceDiscount) > 0
-                                            ? `<div style="font-size:0.85em; font-style:italic; color:#0066cc; margin-top:2px;">
-                                                - $${this.formatPrice(item.totalPriceDiscount)}
-                                            </div>`
-                                            : ''}
-                                    </td>
-                                </tr>
-                            `).join('')}
+                            ${itemsHtml}
                         </tbody>
                         <tfoot>
-                            <!-- Order-level Total -->
                             <tr>
-                                <td colspan="4" style="text-align: right; padding: 8px; border: 1px solid #ddd;">
-                                    <strong>Total</strong>
+                                <td colspan="3" style="text-align: right; padding: 8px; border: 1px solid #ddd; font-weight: bold;">
+                                    Total
                                 </td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">
                                     $${this.formatPrice(this.currentOrder.totalValue)}
                                 </td>
                             </tr>
-                            
-                            <!-- Order-level Discount (right-aligned under Total) -->
-                            ${parseFloat(this.getTotalDiscount(this.currentOrder)) > 0
-                                ? `
-                                <tr>
-                                    <td colspan="4"></td>
-                                    <td style="padding: 8px; font-size:0.85em; font-style:italic; color:#0066cc; text-align: right;">
-                                        - $${this.formatPrice(this.getTotalDiscount(this.currentOrder))} discount
-                                    </td>
-                                </tr>
-                                `
-                                : ''}
                         </tfoot>
                     </table>
                     
@@ -509,7 +500,7 @@ function initOrdersApp() {
                     ` : ''}
                 `;
 
-                // Open a new window/tab and write our inline-discount HTML into it
+                // Open print window
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
@@ -521,6 +512,8 @@ function initOrdersApp() {
                                 table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                                 th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
                                 th { background-color: #f2f2f2; }
+                                .discount-item { color: #0066cc; font-style: italic; }
+                                .addon-item { font-size: 0.95em; }
                             </style>
                         </head>
                         <body>
@@ -531,13 +524,11 @@ function initOrdersApp() {
                 printWindow.document.close();
                 printWindow.focus();
 
-                // Delay slightly so the content fully renders, then trigger print
                 setTimeout(() => {
                     printWindow.print();
                     printWindow.close();
                 }, 250);
             }
-
 
             function updateOrderStatus(orderID) {
                 currentOrderId.value = orderID;
@@ -833,6 +824,115 @@ function initOrdersApp() {
                 );
             }
 
+            /**
+             * Calculate itemized pricing breakdown for an order item
+             */
+            function getItemizedPricing(item) {
+                const result = {
+                    lines: [],
+                    subtotal: 0
+                };
+                
+                // Get base option info and price
+                const option = options.value.find(o => o.id == item.optionId);
+                const feature = features.value.find(f => f.id == item.featureId);
+                
+                if (!option || !feature) return result;
+                
+                // Parse discount info
+                let discountInfo = {};
+                try {
+                    discountInfo = typeof item.priceDiscountsInfo === 'string' 
+                        ? JSON.parse(item.priceDiscountsInfo) 
+                        : (item.priceDiscountsInfo || {});
+                } catch (e) {
+                    console.warn('Error parsing discount info:', e);
+                }
+                
+                // Calculate base option price (work backwards from total)
+                let basePrice = parseFloat(item.totalPrice) + parseFloat(item.totalPriceDiscount || 0);
+                
+                // Subtract addon costs to get base option price
+                const addonIds = JSON.parse(item.addonIds || '[]');
+                addonIds.forEach(addonId => {
+                    const addon = addons.value.find(a => a.id == addonId);
+                    if (addon) {
+                        basePrice -= parseFloat(addon.staticPriceMod || 0) * item.quantity;
+                    }
+                });
+                
+                // Add base option line
+                result.lines.push({
+                    type: 'option',
+                    name: `${feature.featureName} - ${option.optionName}`,
+                    quantity: item.quantity,
+                    unitPrice: basePrice / item.quantity,
+                    totalPrice: basePrice,
+                    isBase: true
+                });
+                result.subtotal += basePrice;
+                
+                // Add option discount if present
+                if (discountInfo.option && discountInfo.option.trim()) {
+                    result.lines.push({
+                        type: 'discount',
+                        name: discountInfo.option,
+                        quantity: 1,
+                        unitPrice: 0,
+                        totalPrice: 0,
+                        isDiscount: true,
+                        parentType: 'option'
+                    });
+                }
+                
+                // Add individual addons
+                addonIds.forEach((addonId, index) => {
+                    const addon = addons.value.find(a => a.id == addonId);
+                    if (addon) {
+                        const addonPrice = parseFloat(addon.staticPriceMod || 0) * item.quantity;
+                        result.lines.push({
+                            type: 'addon',
+                            name: addon.addonName,
+                            quantity: item.quantity,
+                            unitPrice: parseFloat(addon.staticPriceMod || 0),
+                            totalPrice: addonPrice,
+                            isAddon: true
+                        });
+                        result.subtotal += addonPrice;
+                        
+                        // Add addon-specific discount if present
+                        if (discountInfo.addons && discountInfo.addons[index] && discountInfo.addons[index].trim()) {
+                            result.lines.push({
+                                type: 'discount',
+                                name: discountInfo.addons[index],
+                                quantity: 1,
+                                unitPrice: 0,
+                                totalPrice: 0,
+                                isDiscount: true,
+                                parentType: 'addon'
+                            });
+                        }
+                    }
+                });
+                
+                // Add item-level discount if present
+                if (parseFloat(item.totalPriceDiscount) > 0) {
+                    const discountAmount = -parseFloat(item.totalPriceDiscount);
+                    result.lines.push({
+                        type: 'discount',
+                        name: 'Item Discount',
+                        quantity: 1,
+                        unitPrice: discountAmount,
+                        totalPrice: discountAmount,
+                        isDiscount: true,
+                        parentType: 'item'
+                    });
+                    result.subtotal += discountAmount;
+                }
+                
+                return result;
+            }
+
             function getTotalDiscount(order) {
                 return order.items.reduce((total, item) => 
                     total + parseFloat(item.totalPriceDiscount || 0), 0
@@ -974,6 +1074,7 @@ function initOrdersApp() {
                 hasDiscounts,
                 getTotalDiscount,
                 getDiscountDescriptions,
+                getItemizedPricing,
 
                 /**
                  * Parse the item.addonIds JSON into an array of numeric IDs.

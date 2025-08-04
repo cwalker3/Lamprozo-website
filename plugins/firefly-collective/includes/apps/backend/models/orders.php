@@ -864,6 +864,105 @@
         );
     }
 
+    // Calculate itemized pricing
+    function get_itemized_pricing_breakdown($item, $wpdb) {
+        $lines = array();
+        
+        // Get feature and option info
+        $feature = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d", intval($item['featureId'])),
+            ARRAY_A
+        );
+        $option = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d", intval($item['optionId'])),
+            ARRAY_A
+        );
+        
+        if (!$feature || !$option) {
+            return array('lines' => array());
+        }
+        
+        // Parse discount info
+        $discount_info = array();
+        if (!empty($item['priceDiscountsInfo'])) {
+            $discount_info = json_decode($item['priceDiscountsInfo'], true) ?: array();
+        }
+        
+        // Calculate base option price (work backwards from total)
+        $base_price = floatval($item['totalPrice']) + floatval($item['totalPriceDiscount'] ?: 0);
+        
+        // Subtract addon costs
+        $addon_ids = json_decode($item['addonIds'] ?: '[]', true) ?: array();
+        foreach ($addon_ids as $addon_id) {
+            $addon = $wpdb->get_row(
+                $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d", intval($addon_id)),
+                ARRAY_A
+            );
+            if ($addon) {
+                $base_price -= floatval($addon['staticPriceMod'] ?: 0) * intval($item['quantity']);
+            }
+        }
+        
+        // Add base option line
+        $lines[] = array(
+            'name' => $feature['featureName'] . ' - ' . $option['optionName'],
+            'quantity' => intval($item['quantity']),
+            'unit_price' => $base_price / intval($item['quantity']),
+            'total_price' => $base_price,
+            'is_base' => true,
+            'is_addon' => false,
+            'is_discount' => false
+        );
+        
+        // Add option discount if present
+        if (!empty($discount_info['option'])) {
+            $lines[] = array(
+                'name' => $discount_info['option'],
+                'quantity' => 1,
+                'unit_price' => 0,
+                'total_price' => 0,
+                'is_base' => false,
+                'is_addon' => false,
+                'is_discount' => true
+            );
+        }
+        
+        // Add individual addons
+        foreach ($addon_ids as $index => $addon_id) {
+            $addon = $wpdb->get_row(
+                $wpdb->prepare("SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d", intval($addon_id)),
+                ARRAY_A
+            );
+            if ($addon) {
+                $addon_price = floatval($addon['staticPriceMod'] ?: 0) * intval($item['quantity']);
+                $lines[] = array(
+                    'name' => $addon['addonName'],
+                    'quantity' => intval($item['quantity']),
+                    'unit_price' => floatval($addon['staticPriceMod'] ?: 0),
+                    'total_price' => $addon_price,
+                    'is_base' => false,
+                    'is_addon' => true,
+                    'is_discount' => false
+                );
+                
+                // Add addon discount if present
+                if (!empty($discount_info['addons'][$index])) {
+                    $lines[] = array(
+                        'name' => $discount_info['addons'][$index],
+                        'quantity' => 1,
+                        'unit_price' => 0,
+                        'total_price' => 0,
+                        'is_base' => false,
+                        'is_addon' => false,
+                        'is_discount' => true
+                    );
+                }
+            }
+        }
+        
+        return array('lines' => $lines);
+    }
+
     function firefly_collective_orders_email($order_id, $new_status = '', $order_data = null) {
         global $wpdb;
         
@@ -961,11 +1060,9 @@
             }
         }
         
-        // Rebuild $items_html so that prices/right‐align, item column is first and wide,
-        // “Addons:” appears under that same first column, not in its own column. ──
         $items_html = '';
         foreach ($order_items as $item) {
-            // Fetch feature + option as before
+            // Fetch feature + option
             $feature = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
@@ -980,126 +1077,51 @@
                 ),
                 ARRAY_A
             );
-            if (!$feature || !$option) {
+            if (!$feature || !option) {
                 continue;
             }
             
-            // If “price options” exist
-            $size_label = '';
-            $base_price = 0;
-            if (!empty($option['pricingType']) && $option['pricingType'] === 'price options') {
-                $price_options = json_decode($option['priceOptions'], true);
-                if (isset($price_options['types']) && isset($item['priceSelected'])) {
-                    $sel = intval($item['priceSelected']);
-                    if (isset($price_options['types'][$sel])) {
-                        $size_label = $price_options['types'][$sel]['label'];
-                        $base_price = floatval($price_options['types'][$sel]['price']);
-                    }
+            // Get itemized pricing breakdown
+            $pricing_breakdown = get_itemized_pricing_breakdown($item, $wpdb);
+            
+            foreach ($pricing_breakdown['lines'] as $line) {
+                $line_class = '';
+                $line_style = 'padding: 8px 10px; border-bottom: 1px solid #dee2e6;';
+                
+                if ($line['is_base']) {
+                    $line_class = 'ffc-base-item';
+                    $line_style .= ' font-weight: bold;';
+                } elseif ($line['is_addon']) {
+                    $line_class = 'ffc-addon-item';
+                    $line_style .= ' padding-left: 20px; font-size: 0.95em;';
+                } elseif ($line['is_discount']) {
+                    $line_class = 'ffc-discount-item';
+                    $line_style .= ' padding-left: 30px; font-size: 0.85em; font-style: italic; color: #0066cc;';
                 }
+                
+                $items_html .= "
+                    <tr class='{$line_class}'>
+                        <td style='{$line_style}'>
+                            " . ($line['is_addon'] ? '+ ' : '') . esc_html($line['name']) . "
+                        </td>
+                        <td style='{$line_style} text-align: center;'>
+                            " . intval($line['quantity']) . "
+                        </td>
+                        <td style='{$line_style} text-align: right;'>
+                            " . ($line['is_discount'] ? '-' : '$' . number_format($line['unit_price'], 2)) . "
+                        </td>
+                        <td style='{$line_style} text-align: right;'>
+                            " . ($line['is_discount'] ? '-' : '$' . number_format($line['total_price'], 2)) . "
+                        </td>
+                    </tr>
+                ";
             }
             
-            $formatted_item_price = '$' . number_format(floatval($item['totalPrice']), 2);
-            
-            // Decode any discount info JSON
-            $info = array();
-            if (!empty($item['priceDiscountsInfo'])) {
-                $decoded = json_decode($item['priceDiscountsInfo'], true);
-                if (is_array($decoded)) {
-                    $info = $decoded;
-                }
-            }
-            
-            // 1) Print the “Item - Option (size)” + Quantity + Price row
+            // Add separator between items
             $items_html .= "
-                <tr>
-                    <td style='width:70%; vertical-align: top;'>
-                        <strong>{$feature['featureName']} - {$option['optionName']}" .
-                            (!empty($size_label) ? " ({$size_label})" : "") .
-                        "</strong>
-                    </td>
-                    <td style='width:15%; text-align:center; vertical-align: top;'>
-                        <strong>" . intval($item['quantity']) . "</strong>
-                    </td>
-                    <td style='width:15%; text-align:right; vertical-align: top;'>
-                        <strong>{$formatted_item_price}</strong>
-                    </td>
+                <tr class='item-spacer'>
+                    <td colspan='4' style='border: none; padding: 10px 0;'></td>
                 </tr>
-            ";
-            
-            // 2) Option‐level discount (if present):
-            if (!empty($info['option']) && trim($info['option']) !== '') {
-                $opt_disc = esc_html($info['option']);
-                $items_html .= "
-                    <tr>
-                        <td colspan='3' style='font-size:0.85em; font-style:italic; color:#0066cc; padding-left:12px;'>
-                            - {$opt_disc}
-                        </td>
-                    </tr>
-                ";
-            }
-            
-            // 3) “Addons:” under the same first column, not a separate column
-            $decoded_addon_ids = array();
-            if (!empty($item['addonIds'])) {
-                $decoded_addon_ids = json_decode($item['addonIds'], true);
-                if (!is_array($decoded_addon_ids)) {
-                    $decoded_addon_ids = array();
-                }
-            }
-            
-            if (!empty($decoded_addon_ids)) {
-                $addon_names = array();
-                foreach ($decoded_addon_ids as $aid) {
-                    $aid = intval($aid);
-                    $addon_row = $wpdb->get_row(
-                        $wpdb->prepare(
-                            "SELECT * FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
-                            $aid
-                        ),
-                        ARRAY_A
-                    );
-                    if ($addon_row) {
-                        $addon_names[] = $addon_row['addonName'];
-                    }
-                }
-                $join_names = implode(', ', $addon_names);
-                $items_html .= "
-                    <tr>
-                        <td colspan='3' style='padding-left:10px;'>
-                            <em>Addons:</em> {$join_names}
-                        </td>
-                    </tr>
-                ";
-            } else {
-                $items_html .= "
-                    <tr>
-                        <td colspan='3' style='padding-left:10px;'>
-                            <em>Addons:</em> None
-                        </td>
-                    </tr>
-                ";
-            }
-            
-            // 4) Addon‐level discounts (if any)
-            if (!empty($info['addons']) && is_array($info['addons'])) {
-                $addon_discounts = array_filter($info['addons'], function($x) {
-                    return (is_string($x) && trim($x) !== '');
-                });
-                if (!empty($addon_discounts)) {
-                    $join_addon_disc = implode(', ', $addon_discounts);
-                    $items_html .= "
-                        <tr>
-                            <td colspan='3' style='font-size:0.85em; font-style:italic; color:#0066cc; padding-left:12px;'>
-                                - {$join_addon_disc}
-                            </td>
-                        </tr>
-                    ";
-                }
-            }
-            
-            // 5) Spacer row between items
-            $items_html .= "
-                <tr class='item-spacer'><td colspan='3'>&nbsp;</td></tr>
             ";
         }
         

@@ -151,69 +151,66 @@
                     <!-- Expanded Order Items -->
                     <tr v-if="expandedOrders.includes(group.orderID)" class="ffc-order-details-row">
                         <td colspan="8">
+                            <!-- Replace the existing .ffc-order-items table section in orders.php -->
                             <div class="ffc-order-items">
                                 <table class="ffc-items-table">
                                     <thead>
                                         <tr>
                                             <th>Item</th>
-                                            <th>Option</th>
-                                            <th>Addons</th>
                                             <th>Quantity</th>
-                                            <th>Price</th>
+                                            <th>Unit Price</th>
+                                            <th>Total Price</th>
+                                            <th v-if="currentUserIdAdmin">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="(item, itemIndex) in group.items" 
-                                            :key="'item-' + itemIndex"
-                                            :class="{'refunded-item': item.status === 'refunded'}">
-                                            <td>{{ getFeatureName(item.featureId) }}</td>
-                                            <td>
-                                                {{ getOptionName(item.optionId) }}
-                                                <!-- Option discount if present -->
-                                                <div v-if="hasOptionDiscount(item)" class="ffc-discount-inline">
-                                                    - {{ getOptionDiscountText(item) }}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <!-- Addons list -->
-                                                <span v-if="getAddonNames(item.addonIds).length">
-                                                    {{ getAddonNames(item.addonIds).join(', ') }}
-                                                </span>
-                                                <span v-else>No addons</span>
-                                                <!-- Addon discounts if present -->
-                                                <div v-if="getAllAddonDiscounts(item).length" class="ffc-discount-inline">
-                                                    - {{ getAllAddonDiscounts(item).join(', ') }}
-                                                </div>
-                                            </td>
-                                            <td>{{ item.quantity }}</td>
-                                            <td class="ffc-total-price">
-                                                <span>${{ formatPrice(item.totalPrice) }}</span>
-                                                
-                                                <!-- Individual refund button - ONLY FOR ADMINS -->
-                                                <button 
-                                                    v-if="currentUserIdAdmin"
-                                                    class="button button-small item-refund-btn"
-                                                    @click="confirmItemRefund(group.orderID, item.id)"
-                                                    :disabled="item.status === 'refunded'"
-                                                    :title="item.status === 'refunded' ? 'Already refunded' : 'Refund this item'"
-                                                >
-                                                    {{ item.status === 'refunded' ? 'Refunded' : 'Refund' }}
-                                                </button>
-                                                
-                                                <!-- For non-admins, just show refunded status -->
-                                                <span v-else-if="item.status === 'refunded'" class="ffc-status-badge ffc-status-refunded">
-                                                    Refunded
-                                                </span>
-                                                
-                                                <!-- Item discount if present -->
-                                                <div v-if="parseFloat(item.totalPriceDiscount) > 0" class="ffc-discount-inline">
-                                                    - ${{ formatPrice(item.totalPriceDiscount) }}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        <template v-for="(item, itemIndex) in group.items" :key="'item-' + itemIndex">
+                                            <template v-for="(line, lineIndex) in getItemizedPricing(item).lines" :key="'line-' + itemIndex + '-' + lineIndex">
+                                                <tr :class="{
+                                                    'refunded-item': item.status === 'refunded',
+                                                    'ffc-base-item': line.isBase,
+                                                    'ffc-addon-item': line.isAddon,
+                                                    'ffc-discount-item': line.isDiscount
+                                                }">
+                                                    <td>
+                                                        <span v-if="line.isBase" class="ffc-item-name">{{ line.name }}</span>
+                                                        <span v-else-if="line.isAddon" class="ffc-addon-name">+ {{ line.name }}</span>
+                                                        <span v-else-if="line.isDiscount" class="ffc-discount-name">{{ line.name }}</span>
+                                                    </td>
+                                                    <td>{{ line.quantity }}</td>
+                                                    <td>${{ formatPrice(line.unitPrice) }}</td>
+                                                    <td class="ffc-line-total">
+                                                        <span v-if="!line.isDiscount">${{ formatPrice(line.totalPrice) }}</span>
+                                                        <span v-else class="ffc-discount-amount">-</span>
+                                                        
+                                                        <!-- Individual item refund button - only show on base item line -->
+                                                        <button 
+                                                            v-if="currentUserIdAdmin && line.isBase"
+                                                            class="button button-small item-refund-btn"
+                                                            @click="confirmItemRefund(group.orderID, item.id)"
+                                                            :disabled="item.status === 'refunded'"
+                                                            :title="item.status === 'refunded' ? 'Already refunded' : 'Refund this item'"
+                                                        >
+                                                            {{ item.status === 'refunded' ? 'Refunded' : 'Refund' }}
+                                                        </button>
+                                                    </td>
+                                                    <td v-if="currentUserIdAdmin">
+                                                        <!-- Actions column - only show content on base item line -->
+                                                        <span v-if="line.isBase && item.status === 'refunded'" class="ffc-status-badge ffc-status-refunded">
+                                                            Refunded
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <!-- Separator row between different items -->
+                                            <tr v-if="itemIndex < group.items.length - 1" class="ffc-item-separator">
+                                                <td colspan="5" style="border: none; padding: 10px 0;"></td>
+                                            </tr>
+                                        </template>
                                     </tbody>
                                 </table>
                                 
+                                <!-- Keep existing user data section -->
                                 <div class="ffc-user-data" v-if="Object.keys(group.userData || {}).length > 0">
                                     <h4>Additional Information</h4>
                                     <div v-for="(value, key) in group.userData" :key="key" class="ffc-user-data-item">
@@ -280,75 +277,57 @@
                     </div>
                 </div>
                 
+                <!-- Replace the modal's items table section in orders.php -->
                 <h3>Order Items</h3>
                 <table class="ffc-items-table">
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th>Option</th>
-                            <th>Addons</th>
                             <th>Quantity</th>
-                            <th>Price</th>
+                            <th>Unit Price</th>
+                            <th>Total Price</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(item, itemIndex) in currentOrder.items" 
-                            :key="'modal-item-' + itemIndex"
-                            :class="{'refunded-item': item.status === 'refunded'}">
-                            <td>{{ getFeatureName(item.featureId) }}</td>
-                            <td>
-                                {{ getOptionName(item.optionId) }}
-
-                                <!-- If this option got a discount, show it right below -->
-                                <div v-if="hasOptionDiscount(item)" class="ffc-discount-inline">
-                                    - {{ getOptionDiscountText(item) }}
-                                </div>
-                            </td>
-                            <td>
-                                <!-- First: show all addons as a comma-separated list (or “No addons”). -->
-                                <span v-if="getAddonNames(item.addonIds).length">
-                                    {{ getAddonNames(item.addonIds).join(', ') }}
-                                </span>
-                                <span v-else>No addons</span>
-
-                                <!-- Then: if there are one or more addon-discount messages, show them all on one line. -->
-                                <div v-if="getAllAddonDiscounts(item).length" class="ffc-discount-inline">
-                                    - {{ getAllAddonDiscounts(item).join(', ') }}
-                                </div>
-                            </td>
-                            <td>{{ item.quantity }}</td>
-                            <td>
-                                ${{ formatPrice(item.totalPrice) }}
-
-                                <!-- If this item had a “totalPriceDiscount” > 0, show it immediately below -->
-                                <div v-if="parseFloat(item.totalPriceDiscount) > 0" class="ffc-discount-inline">
-                                    - ${{ formatPrice(item.totalPriceDiscount) }}
-                                </div>
-                            </td>
-                        </tr>
+                        <template v-for="(item, itemIndex) in currentOrder.items" :key="'modal-item-' + itemIndex">
+                            <template v-for="(line, lineIndex) in getItemizedPricing(item).lines" :key="'modal-line-' + itemIndex + '-' + lineIndex">
+                                <tr :class="{
+                                    'refunded-item': item.status === 'refunded',
+                                    'ffc-base-item': line.isBase,
+                                    'ffc-addon-item': line.isAddon,
+                                    'ffc-discount-item': line.isDiscount
+                                }">
+                                    <td>
+                                        <span v-if="line.isBase" class="ffc-item-name">{{ line.name }}</span>
+                                        <span v-else-if="line.isAddon" class="ffc-addon-name">+ {{ line.name }}</span>
+                                        <span v-else-if="line.isDiscount" class="ffc-discount-name">{{ line.name }}</span>
+                                    </td>
+                                    <td>{{ line.quantity }}</td>
+                                    <td>${{ formatPrice(line.unitPrice) }}</td>
+                                    <td>
+                                        <span v-if="!line.isDiscount">${{ formatPrice(line.totalPrice) }}</span>
+                                        <span v-else class="ffc-discount-amount">-</span>
+                                    </td>
+                                </tr>
+                            </template>
+                            <!-- Separator row between different items -->
+                            <tr v-if="itemIndex < currentOrder.items.length - 1" class="ffc-item-separator">
+                                <td colspan="4" style="border: none; padding: 10px 0;"></td>
+                            </tr>
+                        </template>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="4" class="ffc-total-label">Subtotal</td>
+                            <td colspan="3" class="ffc-total-label">Subtotal</td>
                             <td>${{ formatPrice(currentOrder.totalValue) }}</td>
                         </tr>
                         <tr v-if="currentOrder.refundedAmount > 0">
-                            <td colspan="4" class="ffc-total-label">Already Refunded</td>
+                            <td colspan="3" class="ffc-total-label">Already Refunded</td>
                             <td style="color: #dc3545;">-${{ formatPrice(currentOrder.refundedAmount) }}</td>
                         </tr>
-                        <tr v-if="currentOrder.refundedAmount > 0">
-                            <td colspan="4" class="ffc-total-label"><strong>Current Total</strong></td>
-                            <td><strong>${{ formatPrice(currentOrder.totalValue - currentOrder.refundedAmount) }}</strong></td>
-                        </tr>
-                        <tr v-else>
-                            <td colspan="4" class="ffc-total-label"><strong>Total</strong></td>
-                            <td><strong>${{ formatPrice(currentOrder.totalValue) }}</strong></td>
-                        </tr>
-                        <tr v-if="parseFloat(getTotalDiscount(currentOrder)) > 0">
-                            <td colspan="4"></td>
-                            <td class="ffc-discount-inline" style="text-align: right;">
-                                - ${{ formatPrice(getTotalDiscount(currentOrder)) }} discount
-                            </td>
+                        <tr>
+                            <td colspan="3" class="ffc-total-label"><strong>{{ currentOrder.refundedAmount > 0 ? 'Current Total' : 'Total' }}</strong></td>
+                            <td><strong>${{ formatPrice(currentOrder.totalValue - (currentOrder.refundedAmount || 0)) }}</strong></td>
                         </tr>
                     </tfoot>
                 </table>

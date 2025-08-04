@@ -447,6 +447,93 @@ td.ffc-total-price > button {
   color: #0066cc;
 }
 
+/* Base item styling */
+.ffc-base-item {
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
+
+.ffc-base-item .ffc-item-name {
+    color: #333;
+    font-weight: bold;
+}
+
+/* Addon item styling */
+.ffc-addon-item {
+    font-size: 0.95em;
+    background-color: #fdfdfd;
+}
+
+.ffc-addon-item .ffc-addon-name {
+    color: #555;
+    padding-left: 10px;
+}
+
+/* Discount item styling */
+.ffc-discount-item {
+    font-size: 0.85em;
+    font-style: italic;
+    color: #0066cc;
+    background-color: #f0f8ff;
+}
+
+.ffc-discount-item .ffc-discount-name {
+    padding-left: 20px;
+}
+
+.ffc-discount-amount {
+    color: #0066cc;
+    font-style: italic;
+}
+
+/* Item separator */
+.ffc-item-separator {
+    border: none !important;
+}
+
+.ffc-item-separator td {
+    border: none !important;
+    padding: 5px 0 !important;
+}
+
+/* Line total column */
+.ffc-line-total {
+    position: relative;
+}
+
+.ffc-line-total .item-refund-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 10px;
+}
+
+/* Ensure proper spacing for refund buttons */
+.ffc-base-item .ffc-line-total {
+    padding-right: 80px;
+}
+
+/* Print-specific styles */
+@media print {
+    .base-item {
+        font-weight: bold;
+        background-color: #f8f9fa !important;
+    }
+    
+    .addon-item {
+        font-size: 0.95em;
+        padding-left: 15px;
+    }
+    
+    .discount-item {
+        font-size: 0.85em;
+        font-style: italic;
+        color: #0066cc !important;
+        padding-left: 20px;
+    }
+}
+
 /* Responsive Media Queries */
 @media screen and (max-width: 1200px) {
     .ffc-filter-item {
@@ -502,6 +589,17 @@ td.ffc-total-price > button {
     
     .ffc-order-summary {
         grid-template-columns: 1fr;
+    }
+    .ffc-line-total .item-refund-btn {
+        position: static;
+        transform: none;
+        margin-top: 5px;
+        display: block;
+        width: 100%;
+    }
+    
+    .ffc-base-item .ffc-line-total {
+        padding-right: 10px;
     }
 }
 
