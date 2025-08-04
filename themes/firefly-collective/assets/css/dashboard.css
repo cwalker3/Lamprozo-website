@@ -422,7 +422,7 @@ td .feature-fields-list {
 
 /* Max addons message */
 .max-addons-message {
-    color: #d83838;
+    color: #216900;
     font-size: var(--fontSizeSmaller);
     margin-top: 8px;
     font-weight: bold;
@@ -576,7 +576,7 @@ td .feature-fields-list {
 
 /* Discount row styling */
 .discount-row td {
-    color: #d83838;
+    color: #216900;
     padding-left: 24px;
     border-top: none;
     padding-top: 6px;
@@ -591,7 +591,7 @@ td .feature-fields-list {
 
 .discount-item-name::before {
     content: "└ ";
-    color: #d83838;
+    color: #216900;
     font-weight: bold;
     margin-right: 4px;
 }
@@ -611,14 +611,14 @@ td .feature-fields-list {
 }
 
 .discounted-price {
-    color: #d83838;
+    color: #216900;
     font-weight: bold;
     font-size: var(--fontSizeSmall);
 }
 
 .discount-note {
     font-size: var(--fontSizeSmallest);
-    color: #d83838;
+    color: #216900;
     font-style: italic;
 }
 
@@ -743,7 +743,7 @@ td .feature-fields-list {
 }
 
 #payment-error {
-    color: #d83838;
+    color: #216900;
     background-color: #ffeaea;
     padding: 10px;
     border-radius: 4px;
