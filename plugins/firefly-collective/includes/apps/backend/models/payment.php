@@ -586,13 +586,13 @@
                     'subscription_renewal'            => 0,
                     'subscription_period_start'       => $periods['start'] ? date('Y-m-d H:i:s', $periods['start']) : null,
                     'subscription_current_period_end' => $periods['end']   ? date('Y-m-d H:i:s', $periods['end'])   : null,
-                    'subscriptionPrice'               => floatval($item['totalPrice']), // Add this line
+                    'subscriptionPrice'               => floatval($item['totalPrice']),
                 ],
                 [
                     'orderID' => $order_id,
                     'id'      => $item['id']
                 ],
-                ['%s','%s','%s','%d','%s','%s'],
+                ['%s','%s','%s','%d','%s','%s','%f'],
                 ['%s','%d']
             );
         }
@@ -741,7 +741,7 @@
                         'subscriptionPrice'               => (float)$item['totalPrice'],
                     ],
                     ['orderID' => $order_id, 'id' => $item['id']],
-                    ['%s','%d','%s','%d','%s','%s','%f'],
+                    ['%s','%s','%s','%d','%s','%s','%f'],
                     ['%s','%d']
                 );
             }
