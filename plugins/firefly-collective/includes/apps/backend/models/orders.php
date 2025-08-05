@@ -969,9 +969,15 @@
         if ($order_data !== null) {
             $order_items = $order_data;
         } else {
+            // Get order items with joined feature and option data
             $order_items = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT * FROM {$wpdb->prefix}ffc_orders WHERE orderID = %s ORDER BY id ASC",
+                    "SELECT o.*, f.featureName, opt.optionName, opt.priceOptions 
+                    FROM {$wpdb->prefix}ffc_orders o
+                    LEFT JOIN {$wpdb->prefix}ffc_features f ON o.featureId = f.id
+                    LEFT JOIN {$wpdb->prefix}ffc_options opt ON o.optionId = opt.id
+                    WHERE o.orderID = %s 
+                    ORDER BY o.id ASC",
                     $order_id
                 ),
                 ARRAY_A
@@ -1012,7 +1018,7 @@
         
         switch ($status) {
             case 'completed':
-            case 'paid':        // if you ever use “paid” as distinct
+            case 'paid':
                 $status_color = '#28a745';
                 break;
             case 'pending':
@@ -1031,27 +1037,20 @@
         $order_date = date('F j, Y, g:i a', strtotime($first_item['createdAt']));
         $invoice_number = str_replace('-', '', substr($first_item['orderID'], 0, 8));
         
-        // Compute “order total”:
+        // Compute order total from stored values
         $order_total = 0;
-        foreach ($order_items as $item) {
-            $order_total += floatval($item['totalPrice']);
-        }
-        $formatted_order_total = '$' . number_format($order_total, 2);
-        
-        // Sum up all item‐level discounts (we’ll use this under “Order Total”) ──
         $total_discount = 0;
         foreach ($order_items as $item) {
-            $item_discount = floatval($item['totalPriceDiscount']);
-            if ($item_discount > 0) {
-                $total_discount += $item_discount;
-            }
+            $order_total += floatval($item['totalPrice']);
+            $total_discount += floatval($item['totalPriceDiscount']);
         }
+        $formatted_order_total = '$' . number_format($order_total, 2);
         $formatted_discount = '$' . number_format($total_discount, 2);
         
         $service_type = '';
         if (!empty($first_item['userData'])) {
             $user_data = json_decode($first_item['userData'], true);
-            if (isset($user_data['dineInTakeOutDelivery'])) {
+            if (is_array($user_data) && isset($user_data['dineInTakeOutDelivery'])) {
                 $service_types = array('Dine In', 'Take Out', 'Delivery');
                 $selected_type = intval($user_data['dineInTakeOutDelivery']);
                 if (isset($service_types[$selected_type])) {
@@ -1060,58 +1059,138 @@
             }
         }
         
+        // Build items HTML from stored data
         $items_html = '';
         foreach ($order_items as $item) {
-            // Fetch feature + option
-            $feature = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
-                    intval($item['featureId'])
-                ),
-                ARRAY_A
-            );
-            $option = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
-                    intval($item['optionId'])
-                ),
-                ARRAY_A
-            );
-            if (!$feature || !$option) {
+            // Ensure required fields exist
+            if (!isset($item['quantity']) || !isset($item['featureName']) || !isset($item['optionName'])) {
                 continue;
             }
             
-            // Get itemized pricing breakdown
-            $pricing_breakdown = get_itemized_pricing_breakdown($item, $wpdb);
+            $quantity = intval($item['quantity']);
             
-            foreach ($pricing_breakdown['lines'] as $line) {
-                $line_class = '';
-                $line_style = 'padding: 8px 10px; border-bottom: 1px solid #dee2e6;';
-                
-                if ($line['is_base']) {
-                    $line_class = 'ffc-base-item';
-                    $line_style .= ' font-weight: bold;';
-                } elseif ($line['is_addon']) {
-                    $line_class = 'ffc-addon-item';
-                    $line_style .= ' padding-left: 20px; font-size: 0.95em;';
-                } elseif ($line['is_discount']) {
-                    $line_class = 'ffc-discount-item';
-                    $line_style .= ' padding-left: 30px; font-size: 0.85em; font-style: italic; color: #0066cc;';
+            // Get the selected price option details
+            $price_options = null;
+            $size_label = '';
+            $base_unit_price = 0;
+            
+            if (!empty($item['priceOptions'])) {
+                $price_options = json_decode($item['priceOptions'], true);
+            }
+            
+            if ($price_options && isset($price_options['types']) && is_array($price_options['types'])) {
+                $price_selected_index = intval($item['priceSelected']);
+                if (isset($price_options['types'][$price_selected_index]) && is_array($price_options['types'][$price_selected_index])) {
+                    $size_label = isset($price_options['types'][$price_selected_index]['label']) ? $price_options['types'][$price_selected_index]['label'] : '';
+                    $base_unit_price = isset($price_options['types'][$price_selected_index]['price']) ? floatval($price_options['types'][$price_selected_index]['price']) : 0;
                 }
-                
+            }
+            
+            // Base item row
+            $base_name = $item['featureName'] . ' - ' . $item['optionName'] . ($size_label ? ' (' . $size_label . ')' : '');
+            $items_html .= "
+                <tr class='ffc-base-item'>
+                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; font-weight: bold;'>
+                        " . esc_html($base_name) . "
+                    </td>
+                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: center; font-weight: bold;'>
+                        {$quantity}
+                    </td>
+                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-weight: bold;'>
+                        $" . number_format($base_unit_price, 2) . "
+                    </td>
+                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-weight: bold;'>
+                        $" . number_format($base_unit_price * $quantity, 2) . "
+                    </td>
+                </tr>
+            ";
+            
+            // Show option-level discount right after the base item
+            $discount_info = null;
+            if (!empty($item['priceDiscountsInfo'])) {
+                $discount_info = json_decode($item['priceDiscountsInfo'], true);
+                if (is_array($discount_info) && isset($discount_info['option'])) {
+                    $items_html .= "
+                        <tr class='ffc-discount-item'>
+                            <td colspan='4' style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; padding-left: 30px; font-size: 0.85em; font-style: italic; color: #0066cc; text-align: left;'>
+                                " . esc_html($discount_info['option']) . "
+                            </td>
+                        </tr>
+                    ";
+                }
+            }
+            
+            // Add-ons from stored JSON
+            if (!empty($item['addonIds'])) {
+                $addon_ids = json_decode($item['addonIds'], true);
+                if (is_array($addon_ids)) {
+                    foreach ($addon_ids as $addon_id_str) {
+                        $addon_id = intval($addon_id_str);
+                        $addon_quantity = $quantity; // Use base item quantity for addons
+                        
+                        // Get addon details
+                        $addon = $wpdb->get_row(
+                            $wpdb->prepare(
+                                "SELECT addonName, staticPriceMod FROM {$wpdb->prefix}ffc_addons WHERE id = %d",
+                                $addon_id
+                            ),
+                            ARRAY_A
+                        );
+                        
+                        if ($addon) {
+                            $addon_unit_price = floatval($addon['staticPriceMod']);
+                            $addon_total_price = $addon_unit_price * $addon_quantity;
+                            
+                            $items_html .= "
+                                <tr class='ffc-addon-item'>
+                                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; padding-left: 20px; font-size: 0.95em;'>
+                                        + " . esc_html($addon['addonName']) . "
+                                    </td>
+                                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: center; font-size: 0.95em;'>
+                                        {$addon_quantity}
+                                    </td>
+                                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-size: 0.95em;'>
+                                        $" . number_format($addon_unit_price, 2) . "
+                                    </td>
+                                    <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-size: 0.95em;'>
+                                        $" . number_format($addon_total_price, 2) . "
+                                    </td>
+                                </tr>
+                            ";
+                        }
+                    }
+                }
+            }
+            
+            // Show group/addon discounts after addons
+            if ($discount_info && isset($discount_info['addons']) && is_array($discount_info['addons'])) {
+                foreach ($discount_info['addons'] as $addon_discount) {
+                    $items_html .= "
+                        <tr class='ffc-discount-item'>
+                            <td colspan='4' style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; padding-left: 30px; font-size: 0.85em; font-style: italic; color: #0066cc; text-align: left;'>
+                                " . esc_html($addon_discount) . "
+                            </td>
+                        </tr>
+                    ";
+                }
+            }
+            
+            // Show final item discount amount
+            $item_discount = floatval($item['totalPriceDiscount']);
+            if ($item_discount > 0) {
                 $items_html .= "
-                    <tr class='{$line_class}'>
-                        <td style='{$line_style}'>
-                            " . ($line['is_addon'] ? '+ ' : '') . esc_html($line['name']) . "
+                    <tr class='ffc-discount-item'>
+                        <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; padding-left: 30px; font-size: 0.85em; font-style: italic; color: #0066cc;'>
+                            Item Discount
                         </td>
-                        <td style='{$line_style} text-align: center;'>
-                            " . intval($line['quantity']) . "
+                        <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: center; font-size: 0.85em; color: #0066cc;'>
+                            1
                         </td>
-                        <td style='{$line_style} text-align: right;'>
-                            " . ($line['is_discount'] ? '-' : '$' . number_format($line['unit_price'], 2)) . "
+                        <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-size: 0.85em; color: #0066cc;'>
+                            
                         </td>
-                        <td style='{$line_style} text-align: right;'>
-                            " . ($line['is_discount'] ? '-' : '$' . number_format($line['total_price'], 2)) . "
+                        <td style='padding: 8px 10px; border-bottom: 1px solid #dee2e6; text-align: right; font-size: 0.85em; color: #0066cc;'>
+                            -$" . number_format($item_discount, 2) . "
                         </td>
                     </tr>
                 ";
@@ -1142,18 +1221,13 @@
             .customer-details { margin: 20px 0; }
         ";
         
-        //
-        // Build the dynamic “thank‐you” or “if you have questions” message ──
-        //
+        // Build the dynamic "thank‐you" or "if you have questions" message 
         if ($status === 'completed' || $status === 'paid') {
             $closing_paragraph = "<p>Thank you for your order! If you have any questions, please contact us.</p>";
         } else {
-            // for cancelled / refunded / deleted, no “thank you,” just “please contact us.”
             $closing_paragraph = "<p>If you have any questions, please contact us.</p>";
         }
         
-        // Update the <table> so that prices are right‐aligned, item column is wide,
-        // and print the single “order‐level” discount under “Order Total.” ──
         $user_subject = "Your Order #{$invoice_number} is now {$status_formatted}";
         $user_html = "
             <html>
@@ -1178,16 +1252,17 @@
                     </div>
                     
                     <div class='customer-details'>
-                        <strong>Customer:</strong> {$user->display_name}<br>
-                        <strong>Email:</strong> {$user->user_email}
+                        <strong>Customer:</strong> {$user_name}<br>
+                        <strong>Email:</strong> {$user_email}
                     </div>
                     
                     <table class='invoice-table'>
                         <thead>
                             <tr>
-                                <th style='width:70%;'>Item</th>
+                                <th style='width:50%;'>Item</th>
                                 <th style='width:15%; text-align:center;'>Quantity</th>
-                                <th style='width:15%; text-align:right;'>Price</th>
+                                <th style='width:15%; text-align:right;'>Unit Price</th>
+                                <th style='width:20%; text-align:right;'>Total Price</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1195,17 +1270,16 @@
                         </tbody>
                         <tfoot>
                             <tr class='total-row'>
-                                <td></td>
-                                <td style='text-align:right;'>Order Total:</td>
+                                <td colspan='3' style='text-align:right;'>Order Total:</td>
                                 <td style='text-align:right;'>{$formatted_order_total}</td>
                             </tr>"
                             . (
                                 $total_discount > 0
                                 ? "
                                 <tr>
-                                    <td colspan='2'></td>
+                                    <td colspan='3'></td>
                                     <td style='font-size:0.85em; font-style:italic; color:#0066cc; text-align:right;'>
-                                        - {$formatted_discount} discount
+                                        Total Savings: -{$formatted_discount}
                                     </td>
                                 </tr>
                                 "
@@ -1236,13 +1310,13 @@
 
         // Send user email
         $user_sent = wp_mail(
-            $user->user_email,
+            $user_email,
             $user_subject,
             $user_html,
             $headers
         );
         
-        $admin_subject = "Order #{$invoice_number} from {$user->display_name} is now {$status_formatted}";
+        $admin_subject = "Order #{$invoice_number} from {$user_name} is now {$status_formatted}";
         $admin_html = "
             <html>
             <head>
@@ -1267,17 +1341,18 @@
                     
                     <div class='customer-details'>
                         <strong>Customer Information:</strong><br>
-                        <strong>Name:</strong> {$user->display_name}<br>
-                        <strong>Email:</strong> {$user->user_email}<br>
+                        <strong>Name:</strong> {$user_name}<br>
+                        <strong>Email:</strong> {$user_email}<br>
                         <strong>User ID:</strong> {$first_item['userId']}
                     </div>
                     
                     <table class='invoice-table'>
                         <thead>
                             <tr>
-                                <th style='width:70%;'>Item</th>
+                                <th style='width:50%;'>Item</th>
                                 <th style='width:15%; text-align:center;'>Quantity</th>
-                                <th style='width:15%; text-align:right;'>Price</th>
+                                <th style='width:15%; text-align:right;'>Unit Price</th>
+                                <th style='width:20%; text-align:right;'>Total Price</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1285,17 +1360,16 @@
                         </tbody>
                         <tfoot>
                             <tr class='total-row'>
-                                <td></td>
-                                <td style='text-align:right;'>Order Total:</td>
+                                <td colspan='3' style='text-align:right;'>Order Total:</td>
                                 <td style='text-align:right;'>{$formatted_order_total}</td>
                             </tr>"
                             . (
                                 $total_discount > 0
                                 ? "
                                 <tr>
-                                    <td colspan='2'></td>
+                                    <td colspan='3'></td>
                                     <td style='font-size:0.85em; font-style:italic; color:#0066cc; text-align:right;'>
-                                        - {$formatted_discount} discount
+                                        Total Savings: -{$formatted_discount}
                                     </td>
                                 </tr>
                                 "
@@ -1320,6 +1394,7 @@
             </body>
             </html>
         ";
+        
         // Send admin notification
         $admin_email = get_option('admin_email');
         $admin_sent = wp_mail(
