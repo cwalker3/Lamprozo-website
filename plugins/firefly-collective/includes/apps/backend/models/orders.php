@@ -1077,7 +1077,7 @@
                 ),
                 ARRAY_A
             );
-            if (!$feature || !option) {
+            if (!$feature || !$option) {
                 continue;
             }
             

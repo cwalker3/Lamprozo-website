@@ -976,7 +976,7 @@
                         
                         // Apply discount to the total price
                         totalPrice -= discountAmount;
-                        
+
                         // Store discount info for display in the invoice
                         instance.groupDiscounts[group.addons[0].groupName] = {
                             count: group.addons.length,
@@ -1181,35 +1181,32 @@
             // Function to render item rows
             const renderItemRow = (itemData) => {
                 const { feature, option, instance, fIndex } = itemData;
-                
-                // Build the combined item description
+                calculateInstancePrice(feature, instance);
+
                 let itemDescription = `<div class="item-main">
                     <div class="feature-name">${feature.featureName}</div>
                     <div class="option-details">`;
 
-                // Add option name with price option if selected
+                // handle priceOptions label
                 let selectedOptionText = '';
                 let priceOptionsArray = [];
                 if (option.priceOptions) {
                     try {
                         if (typeof option.priceOptions === 'string') {
                             priceOptionsArray = JSON.parse(option.priceOptions).types || [];
-                        } else if (option.priceOptions.types) {
-                            priceOptionsArray = option.priceOptions.types;
+                        } else {
+                            priceOptionsArray = option.priceOptions.types || [];
                         }
-                        if (
-                            priceOptionsArray.length > 0 &&
-                            instance.priceOptionIndex !== undefined &&
-                            priceOptionsArray[instance.priceOptionIndex]
-                        ) {
-                            selectedOptionText = ` (${priceOptionsArray[instance.priceOptionIndex].label})`;
+                        const idx = instance.priceOptionIndex;
+                        if (priceOptionsArray.length > 0 && idx != null && priceOptionsArray[idx]) {
+                            selectedOptionText = ` (${priceOptionsArray[idx].label})`;
                         }
                     } catch (e) {
                         console.error("Error parsing price options:", e);
                     }
                 }
 
-                // Move Qty into the option-name parentheses
+                // quantity label for non-recurring
                 let qtyLabel = '';
                 if (!feature.recurring) {
                     const qty = parseInt(instance.quantity) || 1;
@@ -1220,164 +1217,120 @@
                     ${option.optionName}${selectedOptionText}${qtyLabel}
                 </div>`;
 
-                // Add interval for recurring items
+                // recurring label
                 if (feature.recurring && option.interval) {
                     itemDescription += `<div class="recurring-interval">Billed ${option.interval}ly</div>`;
                 }
 
-                // Collect any extra lines (user fields & addons)
-                let additionalDetails = [];
-
-                // Include user fields
+                // extra lines: userFields + addons
+                const additionalDetails = [];
                 if (instance.userFields) {
-                    for (const [fieldName, selectedIndex] of Object.entries(instance.userFields)) {
+                    for (const [fieldName, selIdx] of Object.entries(instance.userFields)) {
                         const userField = option[`${fieldName}_user`];
                         if (!userField) continue;
                         try {
-                            const fieldData = typeof userField === 'string'
-                                ? JSON.parse(userField)
-                                : userField;
-                            if (
-                                fieldData &&
-                                Array.isArray(fieldData.types) &&
-                                fieldData.types[selectedIndex]
-                            ) {
-                                const formattedFieldName = fieldName
+                            const fd = typeof userField === 'string' ? JSON.parse(userField) : userField;
+                            if (fd && Array.isArray(fd.types) && fd.types[selIdx]) {
+                                const niceName = fieldName
                                     .replace(/([A-Z])/g, ' $1')
-                                    .replace(/^./, str => str.toUpperCase())
+                                    .replace(/^./, s => s.toUpperCase())
                                     .trim();
-                                additionalDetails.push(`${formattedFieldName}: ${fieldData.types[selectedIndex]}`);
+                                additionalDetails.push(`${niceName}: ${fd.types[selIdx]}`);
                             }
                         } catch (e) {
-                            console.error(`Error processing user field ${fieldName}:`, e);
+                            console.error(`Error user field ${fieldName}:`, e);
                         }
                     }
                 }
 
-                // Include selected addons
-                let isAddon = false;
-                let dot = '• ';
-                if (Array.isArray(instance.addons) && instance.addons.length) {
+                let hasAddon = false;
+                if (Array.isArray(instance.addons)) {
                     instance.addons.forEach(addonId => {
-                        const addonObj = option.addons.find(a => a.id === addonId);
-                        if (addonObj) {
-                            additionalDetails.push(`
-                                <span class="addon-item-name">${addonObj.addonName}</span>
-                            `);
-                            isAddon = true;
+                        const a = option.addons.find(x => x.id === addonId);
+                        if (a) {
+                            additionalDetails.push(`<span class="addon-item-name">${a.addonName}</span>`);
+                            hasAddon = true;
                         }
                     });
                 }
-                if (isAddon) dot = '';
 
-                // Render any additional lines
-                if (additionalDetails.length > 0) {
-                    additionalDetails.forEach(detail => {
-                        itemDescription += `<div class="option-detail-line">${dot}${detail}</div>`;
-                    });
-                }
+                const bullet = hasAddon ? '' : '• ';
+                additionalDetails.forEach(detail => {
+                    itemDescription += `<div class="option-detail-line">${bullet}${detail}</div>`;
+                });
 
                 itemDescription += `</div></div>`;
 
-                // Calculate ORIGINAL price (before discounts) for display
-                let originalPrice = parseSafe(option.staticPrice, 0);
+                //
+                // --- pricing logic (same as before) ---
+                //
 
-                // Handle price options
+                // 1) per-unit base price
+                let unitBasePrice = parseSafe(option.staticPrice, 0);
                 priceOptionsArray = [];
                 if (option.priceOptions) {
                     try {
                         if (typeof option.priceOptions === 'string') {
                             priceOptionsArray = JSON.parse(option.priceOptions).types || [];
-                        } else if (option.priceOptions.types) {
-                            priceOptionsArray = option.priceOptions.types;
+                        } else {
+                            priceOptionsArray = option.priceOptions.types || [];
                         }
-                        
-                        if (priceOptionsArray.length > 0 && 
-                            instance.priceOptionIndex !== undefined &&
-                            priceOptionsArray[instance.priceOptionIndex]) {
-                            originalPrice = parseSafe(priceOptionsArray[instance.priceOptionIndex].price, originalPrice);
+                        const idx = instance.priceOptionIndex;
+                        if (priceOptionsArray.length > 0 && idx != null && priceOptionsArray[idx]) {
+                            unitBasePrice = parseSafe(priceOptionsArray[idx].price, unitBasePrice);
                         }
-                    } catch(e) {
+                    } catch (e) {
                         console.error("Error parsing price options:", e);
                     }
                 }
 
-                // Add original addon prices
-                if (instance.addons && Array.isArray(instance.addons)) {
+                // 2) per-unit addons total
+                let addonUnitTotal = 0;
+                if (Array.isArray(instance.addons)) {
                     instance.addons.forEach(addonId => {
-                        const addon = option.addons.find(a => a.id === addonId);
-                        if (addon) {
-                            originalPrice += parseSafe(addon.staticPriceMod, 0);
+                        const a = option.addons.find(x => x.id === addonId);
+                        if (a) {
+                            addonUnitTotal += parseSafe(a.staticPriceMod, 0);
                         }
                     });
                 }
 
-                // Apply quantity for non-recurring items
-                if (!feature.recurring) {
-                    const qty = parseInt(instance.quantity) || 1;
-                    originalPrice *= qty;
-                }
+                // 3) compute totals
+                const qty      = feature.recurring ? 1 : (parseInt(instance.quantity) || 1);
+                const baseTotal  = unitBasePrice * qty;
+                const addonTotal = addonUnitTotal * qty;
+                const originalPrice = baseTotal + addonTotal;
 
-                // Use exact backend calculation results to match database
-                let finalPrice = originalPrice;
+                // 4) read any group-discount amounts (populated by calculateInstancePrice)
+                const groupDiscountTotal = (!feature.recurring && instance.groupDiscounts)
+                    ? Object.values(instance.groupDiscounts).reduce((sum, g) => sum + g.amount, 0)
+                    : 0;
 
-                // Apply discounts to match backend exactly
+                // 5) figure out percent discount (stored or threshold)
+                let pct = 0;
                 if (!feature.recurring && instance.appliedDiscount) {
-                    // For pizza (qty 5): backend shows $54.00
-                    // For salad (qty 3): backend shows $31.50
-                    
-                    const qty = parseInt(instance.quantity) || 1;
-                    const discountPercent = instance.appliedDiscount.percentage;
-                    
-                    // Apply quantity discount first
-                    let afterQuantityDiscount = originalPrice * (1 - discountPercent / 100);
-                    
-                    // Apply group discounts to the total (not per-unit)
-                    if (instance.groupDiscounts) {
-                        for (const groupName in instance.groupDiscounts) {
-                            const groupDiscount = instance.groupDiscounts[groupName];
-                            // Group discount amount is already calculated for the total quantity
-                            afterQuantityDiscount -= groupDiscount.amount;
-                        }
-                    }
-                    
-                    finalPrice = afterQuantityDiscount;
-                    
-                    // Ensure we match the exact backend values
-                    if (feature.featureName === 'Pizza' && qty === 5) {
-                        finalPrice = 54.00; // Exact backend value
-                    } else if (feature.featureName === 'Salad' && qty === 3) {
-                        finalPrice = 31.50; // Exact backend value
-                    }
-                    
+                    pct = instance.appliedDiscount.percentage || 0;
                 } else if (!feature.recurring && option.thresholdDiscounts) {
-                    // Fallback calculation for items without stored discount data
-                    const qty = parseInt(instance.quantity) || 1;
                     try {
-                        let thresholds = [];
-                        if (typeof option.thresholdDiscounts === 'string') {
-                            thresholds = JSON.parse(option.thresholdDiscounts);
-                        } else if (Array.isArray(option.thresholdDiscounts)) {
-                            thresholds = option.thresholdDiscounts;
-                        }
-                        
+                        let thresholds = typeof option.thresholdDiscounts === 'string'
+                            ? JSON.parse(option.thresholdDiscounts)
+                            : option.thresholdDiscounts;
                         if (Array.isArray(thresholds)) {
-                            let bestDiscount = 0;
-                            thresholds.forEach(threshold => {
-                                if (qty >= parseInt(threshold.itemCount)) {
-                                    bestDiscount = Math.max(bestDiscount, parseFloat(threshold.discount));
-                                }
+                            thresholds.forEach(t => {
+                                const count = parseInt(t.itemCount, 10);
+                                const d = parseFloat(t.discount);
+                                if (qty >= count) pct = Math.max(pct, d);
                             });
-                            
-                            if (bestDiscount > 0) {
-                                finalPrice = originalPrice * (1 - bestDiscount / 100);
-                                finalPrice = Math.round(finalPrice * 100) / 100;
-                            }
                         }
                     } catch (e) {
-                        console.error("Error processing discounts:", e);
+                        console.error("Error parsing thresholds:", e);
                     }
                 }
+
+                // 6) apply percent only to base, then subtract group discounts, then add addons
+                const afterPct   = baseTotal * (1 - pct/100);
+                let finalPrice = afterPct - groupDiscountTotal + addonTotal;
+                finalPrice = Math.round(finalPrice * 100) / 100;
 
                 return {
                     html: `<tr>
@@ -1388,8 +1341,8 @@
                                 : originalPrice.toFixed(2)
                         }</td>
                     </tr>`,
-                    price: finalPrice, // Use our corrected price calculation
-                    originalPrice: originalPrice, // Store original for discount calculation
+                    price: finalPrice,
+                    originalPrice,
                     isRecurring: feature.recurring
                 };
             };
