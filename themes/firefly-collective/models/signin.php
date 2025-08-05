@@ -379,28 +379,30 @@
 
    add_action('template_redirect', function() {
         $path = trim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
+        
+        // Handle campaign URLs: /dashboard/{token}
         if ( preg_match('#^dashboard/([A-Za-z0-9]+)$#', $path, $m) ) {
             global $wpdb;
             $token = $m[1];
-            // use only the date part
-            $today = current_time('Y-m-d');
-
+            $now = current_time('mysql'); // Full datetime, not just date
+            
             $campaign = $wpdb->get_row( $wpdb->prepare(
                 "
-                SELECT id
+                SELECT id, name, start_date, end_date, unlimited
                 FROM {$wpdb->prefix}ffc_campaigns
                 WHERE token = %s
-                AND DATE(start_date) <= %s
+                AND start_date <= %s
                 AND (
                     unlimited = 1
                     OR end_date IS NULL
-                    OR DATE(end_date) >= %s
+                    OR end_date >= %s
                 )
                 ",
-                $token, $today, $today
+                $token, $now, $now
             ) );
 
             if ( $campaign ) {
+                // Valid campaign - set cookie and redirect to dashboard
                 setcookie('campaign_token', $token, [
                     'expires'  => time() + DAY_IN_SECONDS,
                     'path'     => '/',
@@ -411,19 +413,84 @@
                 $_COOKIE['campaign_token'] = $token;
                 wp_redirect( home_url('/dashboard') );
                 exit;
+            } else {
+                // Invalid or expired campaign token
+                // Clean up any existing campaign cookies
+                cleanup_expired_campaign_cookies();
+                
+                // Redirect to login with error message
+                wp_redirect( home_url(CUSTOM_LOGIN_SLUG . '/?campaign_error=invalid') );
+                exit;
             }
         }
+        
+        // Clean up expired campaign cookies on dashboard access
+        if ( determine_view() === 'dashboard' ) {
+            cleanup_expired_campaign_cookies();
+        }
 
-        // fallback to login if neither auth_id nor campaign_token
-        if ( determine_view()==='dashboard'
+        // Fallback to login if neither auth_id nor valid campaign_token
+        if ( determine_view() === 'dashboard'
         && empty($_COOKIE['auth_id'])
         && empty($_COOKIE['campaign_token']) ) {
             wp_logout();
-            if (session_status()===PHP_SESSION_ACTIVE) session_destroy();
+            if (session_status() === PHP_SESSION_ACTIVE) session_destroy();
             wp_redirect( home_url(CUSTOM_LOGIN_SLUG) );
             exit;
         }
     }, 5 );
+
+    /**
+     * Clean up expired campaign cookies
+     */
+    function cleanup_expired_campaign_cookies() {
+        if ( empty($_COOKIE['campaign_token']) ) {
+            return;
+        }
+        
+        global $wpdb;
+        $token = sanitize_text_field($_COOKIE['campaign_token']);
+        $now = current_time('mysql');
+        
+        // Check if the current campaign token is still valid
+        $valid_campaign = $wpdb->get_var( $wpdb->prepare(
+            "
+            SELECT COUNT(*)
+            FROM {$wpdb->prefix}ffc_campaigns
+            WHERE token = %s
+            AND start_date <= %s
+            AND (
+                unlimited = 1
+                OR end_date IS NULL
+                OR end_date >= %s
+            )
+            ",
+            $token, $now, $now
+        ) );
+        
+        // If campaign is expired or doesn't exist, remove the cookie
+        if ( !$valid_campaign ) {
+            setcookie('campaign_token', '', [
+                'expires'  => time() - 3600,
+                'path'     => '/',
+                'secure'   => is_ssl(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            unset($_COOKIE['campaign_token']);
+        }
+    }
+
+    /**
+     * Show campaign error messages on login page
+     */
+    add_action('login_message', 'show_campaign_error_message');
+    function show_campaign_error_message($message) {
+        if ( isset($_GET['campaign_error']) && $_GET['campaign_error'] === 'invalid' ) {
+            $message = '<div id="login_error">The campaign link you used is invalid or has expired. Please log in with your account.</div>';
+        }
+        return $message;
+    }
 
     // Hook into regular login to set the auth_id cookie for subscribers.
     function set_auth_cookie_on_wp_login($user_login, $user) {
