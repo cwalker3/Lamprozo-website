@@ -3236,7 +3236,8 @@
                     // If we're still on the page (no redirect happened), update the UI
                     if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
                         // Update order status in the database
-                        updateOrderAfterPayment(result.paymentIntent);
+                        await updateOrderAfterPayment(result.paymentIntent);
+                        // showPaymentSuccess() will be called by updateOrderAfterPayment()
                     }
                 }
             } catch (error) {
@@ -3284,40 +3285,34 @@
             try {
                 const response = await fetch(url, options);
 
-                // If we got a 403 specifically, handle it first
                 if (response.status === 403) {
                     console.error('You\'re not authorized.');
                     return;
                 }
 
-                // For any non-2xx status, attempt to pull an error message from JSON
                 if (!response.ok) {
-                    let errMsg = response.statusText; // fallback
-                try {
-                    const errJson = await response.json();
-                    // adjust these keys to whatever your API returns
-                    errMsg = errJson.error || errJson.message || errMsg;
-                } catch (e) {
-                    // non-JSON body or parse failed; keep statusText
-                }
+                    let errMsg = response.statusText;
+                    try {
+                        const errJson = await response.json();
+                        errMsg = errJson.error || errJson.message || errMsg;
+                    } catch (e) {
+                        // non-JSON body or parse failed; keep statusText
+                    }
                     console.error(`Error (${response.status}): ${errMsg}`);
                     return;
                 }
 
-                // Success path
                 const data = await response.json();
 
-               if (data.success) {
-                    // Update UI to reflect paid status
-                    const payNowBtn = document.getElementById('pay-now');
-                    payNowBtn.textContent = 'Payment Successful!';
-                    payNowBtn.disabled = true;
-                    
-                    // Save order in session
+                if (data.success) {
+                    // Update session storage
                     orderInfo.status = 'paid';
                     orderInfo.paymentIntentId = paymentIntent.id;
                     orderInfo.paidAt = new Date().toISOString();
                     sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
+                    
+                    // Show success UI - ADD THIS LINE
+                    showPaymentSuccess();
                 } else {
                     console.error('Failed to update order status:', data);
                 }
@@ -3342,10 +3337,24 @@
         function showPaymentSuccess() {
             const payNowBtn = document.getElementById('pay-now');
             
+            // Disable form interaction immediately
+            disableFormInteraction();
+            
             // Remove any existing payment form
             const existingPaymentContainer = document.getElementById('payment-element-container');
             if (existingPaymentContainer) {
                 existingPaymentContainer.remove();
+            }
+            
+            // Clear any Stripe elements
+            if (paymentElement) {
+                try {
+                    paymentElement.unmount();
+                    paymentElement = null;
+                    elements = null;
+                } catch (error) {
+                    console.log('Payment element already unmounted');
+                }
             }
             
             // Remove any existing success container to avoid duplicates
@@ -3406,18 +3415,13 @@
             if (paymentIntent && paymentIntentClientSecret && redirectStatus) {
                 // Handle the redirect back from Stripe
                 if (redirectStatus === 'succeeded') {
-                    // Payment was successful
-                    const payNowBtn = document.getElementById('pay-now');
-                    if (payNowBtn) {
-                        payNowBtn.textContent = 'Payment Successful!';
-                        payNowBtn.disabled = true;
-                    }
-
                     // Update order session
                     const orderData = sessionStorage.getItem('placedOrder');
                     if (orderData) {
                         const orderInfo = JSON.parse(orderData);
                         orderInfo.status = 'paid';
+                        orderInfo.paymentIntentId = paymentIntent;
+                        orderInfo.paidAt = new Date().toISOString();
                         sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
                     }
                     
@@ -3426,10 +3430,13 @@
                         .then(({paymentIntent}) => {
                             if (paymentIntent && paymentIntent.status === 'succeeded') {
                                 updateOrderAfterPayment(paymentIntent);
+                                // showPaymentSuccess() will be called by updateOrderAfterPayment()
                             }
                         })
                         .catch(error => {
                             console.error('Error retrieving payment intent:', error);
+                            // Still show success since we know it succeeded from redirect
+                            showPaymentSuccess();
                         });
                 } else {
                     // Payment failed or was cancelled
