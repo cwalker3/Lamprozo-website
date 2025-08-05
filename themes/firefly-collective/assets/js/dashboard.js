@@ -775,6 +775,15 @@
                 return;
             }
 
+            // PRIORITY 0: Check if there are any valid selections - ADD THIS BLOCK
+            if (!hasValidSelections()) {
+                btn.textContent = 'Select Items to Continue';
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                return;
+            }
+
             // Check validation for anonymous users
             if (dashboardData.campaign_config && !window.auth_id) {
                 const emailInput = document.getElementById('anon-email');
@@ -841,23 +850,33 @@
                 // All validations passed
                 btn.disabled = false;
                 btn.style.opacity = '1';
+                btn.style.cursor = 'pointer'; // ADD THIS LINE
             }
 
             // Rest of existing logic...
             if (hasValidOrder() && !isOrderPaid()) {
                 btn.textContent = 'Pay Now';
+                btn.disabled = false; // ADD THIS LINE
+                btn.style.opacity = '1'; // ADD THIS LINE
+                btn.style.cursor = 'pointer'; // ADD THIS LINE
                 btn.onclick = function(e) {
                     e.preventDefault();
                     initializeStripePayment();
                 };
             } else if (estimateMode) {
                 btn.textContent = 'Request Estimate';
+                btn.disabled = false; // ADD THIS LINE
+                btn.style.opacity = '1'; // ADD THIS LINE
+                btn.style.cursor = 'pointer'; // ADD THIS LINE
                 btn.onclick = function(e) {
                     e.preventDefault();
                     alert('Estimate request functionality coming soon!');
                 };
             } else {
                 btn.textContent = 'Place Order';
+                btn.disabled = false; // ADD THIS LINE
+                btn.style.opacity = '1'; // ADD THIS LINE
+                btn.style.cursor = 'pointer'; // ADD THIS LINE
                 btn.onclick = function(e) {
                     e.preventDefault();
                     // Prevent double submission
@@ -1469,6 +1488,21 @@
             if (invoiceDetails) invoiceDetails.innerHTML = tableHTML;
 
             updateOrderButton();
+        }
+
+        // Check if there are any valid selections in the invoice
+        function hasValidSelections() {
+            for (const [fIndex, instances] of Object.entries(selections)) {
+                for (const instance of instances) {
+                    if (instance.optionIndex !== undefined) {
+                        const feature = dashboardData.features[fIndex];
+                        if (feature && feature.options && feature.options[instance.optionIndex]) {
+                            return true; // Found at least one valid selection
+                        }
+                    }
+                }
+            }
+            return false; // No valid selections found
         }
 
         // Render feature-level user fields
