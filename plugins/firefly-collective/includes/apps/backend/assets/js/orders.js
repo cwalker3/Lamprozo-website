@@ -404,121 +404,130 @@ function initOrdersApp() {
             }
             
             function printOrder() {
-                // Build itemized content for printing
+                // Build itemized rows
                 let itemsHtml = '';
-                
                 this.currentOrder.items.forEach((item, itemIndex) => {
                     const pricing = this.getItemizedPricing(item);
-                    
+
                     pricing.lines.forEach((line) => {
-                        let rowClass = '';
-                        let rowStyle = 'padding: 8px; border: 1px solid #ddd;';
-                        
-                        if (line.isBase) {
-                            rowClass = 'base-item';
-                            rowStyle += ' font-weight: bold;';
-                        } else if (line.isAddon) {
-                            rowClass = 'addon-item';
-                            rowStyle += ' font-size: 0.95em; padding-left: 20px;';
-                        } else if (line.isDiscount) {
-                            rowClass = 'discount-item';
-                            rowStyle += ' font-size: 0.85em; font-style: italic; color: #0066cc; padding-left: 30px;';
-                        }
-                        
-                        itemsHtml += `
-                            <tr class="${rowClass}">
-                                <td style="${rowStyle}">
-                                    ${line.isAddon ? '+ ' : ''}${line.name}
-                                </td>
-                                <td style="${rowStyle} text-align: center;">
-                                    ${line.quantity}
-                                </td>
-                                <td style="${rowStyle} text-align: right;">
-                                    ${line.isDiscount ? '-' : '$' + this.formatPrice(line.unitPrice)}
-                                </td>
-                                <td style="${rowStyle} text-align: right;">
-                                    ${line.isDiscount ? '-' : '$' + this.formatPrice(line.totalPrice)}
-                                </td>
-                            </tr>
-                        `;
+                    let rowClass = '';
+                    let rowStyle = 'padding: 8px; border: 1px solid #ddd;';
+
+                    if (line.isBase) {
+                        rowClass = 'base-item';
+                        rowStyle += ' font-weight: bold;';
+                    } else if (line.isAddon) {
+                        rowClass = 'addon-item';
+                        rowStyle += ' font-size: 0.95em; padding-left: 20px;';
+                    } else if (line.isDiscount) {
+                        rowClass = 'discount-item';
+                        rowStyle +=
+                        ' font-size: 0.85em; font-style: italic; color: #0066cc; padding-left: 30px;';
+                    }
+
+                    itemsHtml += `
+                        <tr class="${rowClass}">
+                        <td style="${rowStyle}">
+                            ${line.isAddon ? '+ ' : ''}${line.name}
+                        </td>
+                        <td style="${rowStyle} text-align: center;">
+                            ${line.quantity || ''}
+                        </td>
+                        <td style="${rowStyle} text-align: right;">
+                            ${this.formatMoney(line.unitPrice)}
+                        </td>
+                        <td style="${rowStyle} text-align: right;">
+                            ${this.formatMoney(line.totalPrice)}
+                        </td>
+                        </tr>
+                    `;
                     });
-                    
-                    // Add separator between items
+
+                    // separator between items
                     if (itemIndex < this.currentOrder.items.length - 1) {
-                        itemsHtml += `
-                            <tr class="item-separator">
-                                <td colspan="4" style="border: none; padding: 10px 0;"></td>
-                            </tr>
-                        `;
+                    itemsHtml += `
+                        <tr class="item-separator">
+                        <td colspan="4" style="border: none; padding: 10px 0;"></td>
+                        </tr>
+                    `;
                     }
                 });
-                
-                // Build the complete print content
+
+                // Build full print content
                 const printContent = document.createElement('div');
                 printContent.innerHTML = `
                     <h1>Order #${this.formatOrderID(this.currentOrder.orderID)}</h1>
                     <div style="margin-bottom: 20px;">
-                        <div><strong>Customer:</strong> ${this.getUserName(this.currentOrder.userId, this.currentOrder.anonUserEmail, this.currentOrder.anonUserFirstName, this.currentOrder.anonUserLastName)}</div>
-                        <div><strong>Date:</strong> ${this.formatDate(this.currentOrder.createdAt)}</div>
-                        <div><strong>Status:</strong> ${this.capitalizeFirst(this.currentOrder.status)}</div>
+                    <div><strong>Customer:</strong> ${this.getUserName(
+                        this.currentOrder.userId,
+                        this.currentOrder.anonUserEmail,
+                        this.currentOrder.anonUserFirstName,
+                        this.currentOrder.anonUserLastName
+                    )}</div>
+                    <div><strong>Date:</strong> ${this.formatDate(this.currentOrder.createdAt)}</div>
+                    <div><strong>Status:</strong> ${this.capitalizeFirst(this.currentOrder.status)}</div>
                     </div>
-                    
+
                     <h2>Order Items</h2>
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Item</th>
-                                <th style="text-align: center; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Quantity</th>
-                                <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Unit Price</th>
-                                <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Total Price</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${itemsHtml}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="3" style="text-align: right; padding: 8px; border: 1px solid #ddd; font-weight: bold;">
-                                    Total
-                                </td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">
-                                    $${this.formatPrice(this.currentOrder.totalValue)}
-                                </td>
-                            </tr>
-                        </tfoot>
+                    <thead>
+                        <tr>
+                        <th style="text-align: left; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Item</th>
+                        <th style="text-align: center; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Quantity</th>
+                        <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Unit Price</th>
+                        <th style="text-align: right; padding: 8px; border: 1px solid #ddd; background-color: #f2f2f2;">Total Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                        <td colspan="3" style="text-align: right; padding: 8px; border: 1px solid #ddd; font-weight: bold;">
+                            Total
+                        </td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">
+                            ${this.formatMoney(this.currentOrder.totalValue)}
+                        </td>
+                        </tr>
+                    </tfoot>
                     </table>
-                    
-                    ${Object.keys(this.currentOrder.userData || {}).length > 0 ? `
-                        <h2>Additional Information</h2>
+
+                    ${Object.keys(this.currentOrder.userData || {}).length > 0
+                    ? `<h2>Additional Information</h2>
                         <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px;">
-                            ${Object.entries(this.currentOrder.userData).map(([key, value]) => `
-                                <div style="margin-bottom: 5px;">
-                                    <strong>${this.formatKey(key)}:</strong> ${this.formatValue(value)}
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
+                        ${Object.entries(this.currentOrder.userData)
+                            .map(
+                            ([key, value]) => `
+                            <div style="margin-bottom: 5px;">
+                            <strong>${this.formatKey(key)}:</strong> ${this.formatValue(value)}
+                            </div>
+                        `
+                            )
+                            .join('')}
+                        </div>`
+                    : ''
+                    }
                 `;
 
                 // Open print window
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
-                        <head>
-                            <title>Order #${this.formatOrderID(this.currentOrder.orderID)}</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; margin: 30px; }
-                                h1 { margin-bottom: 20px; }
-                                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                                th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-                                th { background-color: #f2f2f2; }
-                                .discount-item { color: #0066cc; font-style: italic; }
-                                .addon-item { font-size: 0.95em; }
-                            </style>
-                        </head>
-                        <body>
-                            ${printContent.innerHTML}
-                        </body>
+                    <head>
+                        <title>Order #${this.formatOrderID(this.currentOrder.orderID)}</title>
+                        <style>
+                        body { font-family: Arial; margin: 30px; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        .discount-item { color: #0066cc; font-style: italic; }
+                        .addon-item { font-size: 0.95em; }
+                        </style>
+                    </head>
+                    <body>
+                        ${printContent.innerHTML}
+                    </body>
                     </html>
                 `);
                 printWindow.document.close();
@@ -528,7 +537,8 @@ function initOrdersApp() {
                     printWindow.print();
                     printWindow.close();
                 }, 250);
-            }
+                }
+
 
             function updateOrderStatus(orderID) {
                 currentOrderId.value = orderID;
@@ -777,8 +787,12 @@ function initOrdersApp() {
                 return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
             }
             
-            function formatPrice(price) {
-                return parseFloat(price).toFixed(2);
+            function formatMoney(price) {
+                const n = parseFloat(price);
+                if (isNaN(n)) return '';
+                return n < 0
+                ? '-$' + Math.abs(n).toFixed(2)
+                :  '$' +       n.toFixed(2);
             }
             
             function capitalizeFirst(string) {
@@ -832,36 +846,35 @@ function initOrdersApp() {
                     lines: [],
                     subtotal: 0
                 };
-                
-                // Get base option info and price
-                const option = options.value.find(o => o.id == item.optionId);
+
+                // 1) Base option info + price
+                const option  = options.value.find(o => o.id == item.optionId);
                 const feature = features.value.find(f => f.id == item.featureId);
-                
                 if (!option || !feature) return result;
-                
-                // Parse discount info
+
+                // 2) Parse discount info
                 let discountInfo = {};
                 try {
-                    discountInfo = typeof item.priceDiscountsInfo === 'string' 
-                        ? JSON.parse(item.priceDiscountsInfo) 
-                        : (item.priceDiscountsInfo || {});
+                    discountInfo = typeof item.priceDiscountsInfo === 'string'
+                    ? JSON.parse(item.priceDiscountsInfo)
+                    : (item.priceDiscountsInfo || {});
                 } catch (e) {
                     console.warn('Error parsing discount info:', e);
                 }
-                
-                // Calculate base option price (work backwards from total)
+
+                // 3) Compute basePrice
                 let basePrice = parseFloat(item.totalPrice) + parseFloat(item.totalPriceDiscount || 0);
-                
-                // Subtract addon costs to get base option price
+
+                // subtract all add-on costs
                 const addonIds = JSON.parse(item.addonIds || '[]');
                 addonIds.forEach(addonId => {
-                    const addon = addons.value.find(a => a.id == addonId);
-                    if (addon) {
-                        basePrice -= parseFloat(addon.staticPriceMod || 0) * item.quantity;
+                    const a = addons.value.find(x => x.id == addonId);
+                    if (a) {
+                    basePrice -= parseFloat(a.staticPriceMod || 0) * item.quantity;
                     }
                 });
-                
-                // Add base option line
+
+                // 4) Push base option row
                 result.lines.push({
                     type: 'option',
                     name: `${feature.featureName} - ${option.optionName}`,
@@ -871,65 +884,73 @@ function initOrdersApp() {
                     isBase: true
                 });
                 result.subtotal += basePrice;
-                
-                // Add option discount if present
-                if (discountInfo.option && discountInfo.option.trim()) {
+
+                // 5) Option-level discount?
+                if (discountInfo.option?.trim()) {
                     result.lines.push({
-                        type: 'discount',
-                        name: discountInfo.option,
-                        quantity: 1,
-                        unitPrice: 0,
-                        totalPrice: 0,
-                        isDiscount: true,
-                        parentType: 'option'
+                    type: 'discount',
+                    name: discountInfo.option,
+                    quantity: null,
+                    unitPrice: null,
+                    totalPrice: null,
+                    isDiscount: true,
+                    parentType: 'option'
                     });
                 }
-                
-                // Add individual addons
-                addonIds.forEach((addonId, index) => {
-                    const addon = addons.value.find(a => a.id == addonId);
-                    if (addon) {
-                        const addonPrice = parseFloat(addon.staticPriceMod || 0) * item.quantity;
-                        result.lines.push({
-                            type: 'addon',
-                            name: addon.addonName,
-                            quantity: item.quantity,
-                            unitPrice: parseFloat(addon.staticPriceMod || 0),
-                            totalPrice: addonPrice,
-                            isAddon: true
-                        });
-                        result.subtotal += addonPrice;
-                        
-                        // Add addon-specific discount if present
-                        if (discountInfo.addons && discountInfo.addons[index] && discountInfo.addons[index].trim()) {
-                            result.lines.push({
-                                type: 'discount',
-                                name: discountInfo.addons[index],
-                                quantity: 1,
-                                unitPrice: 0,
-                                totalPrice: 0,
-                                isDiscount: true,
-                                parentType: 'addon'
-                            });
-                        }
+
+                // 6) Add individual addons, _collecting_ their discounts_
+                const collectedAddonDiscounts = [];
+                addonIds.forEach((addonId, idx) => {
+                    const a = addons.value.find(x => x.id == addonId);
+                    if (!a) return;
+
+                    const unitPrice  = parseFloat(a.staticPriceMod || 0);
+                    const totalPrice = unitPrice * item.quantity;
+
+                    // a) the addon row
+                    result.lines.push({
+                    type: 'addon',
+                    name: a.addonName,
+                    quantity: item.quantity,
+                    unitPrice,
+                    totalPrice,
+                    isAddon: true
+                    });
+                    result.subtotal += totalPrice;
+
+                    // b) collect its discount text for later
+                    const txt = discountInfo.addons?.[idx]?.trim();
+                    if (txt) {
+                    collectedAddonDiscounts.push({
+                        type: 'discount',
+                        name: txt,
+                        quantity: null,
+                        unitPrice: null,
+                        totalPrice: null,
+                        isDiscount: true,
+                        parentType: 'addon'
+                    });
                     }
                 });
-                
-                // Add item-level discount if present
+
+                // 7) Append _all_ addon discounts at the end
+                collectedAddonDiscounts.forEach(line => result.lines.push(line));
+
+                // 8) Finally, the item‐level discount (negative totalPrice)
                 if (parseFloat(item.totalPriceDiscount) > 0) {
-                    const discountAmount = -parseFloat(item.totalPriceDiscount);
+                    const amt = -parseFloat(item.totalPriceDiscount);
                     result.lines.push({
-                        type: 'discount',
-                        name: 'Item Discount',
-                        quantity: 1,
-                        unitPrice: discountAmount,
-                        totalPrice: discountAmount,
-                        isDiscount: true,
-                        parentType: 'item'
+                    type: 'discount',
+                    name: 'Item Discount',
+                    quantity: null,
+                    unitPrice: null,
+                    totalPrice: amt,
+                    isDiscount: true,
+                    parentType: 'item'
                     });
-                    result.subtotal += discountAmount;
+                    result.subtotal += amt;
                 }
-                
+
                 return result;
             }
 
@@ -1063,7 +1084,7 @@ function initOrdersApp() {
                 // Helper functions
                 formatOrderID,
                 formatDate,
-                formatPrice,
+                formatMoney,
                 capitalizeFirst,
                 getUserName,
                 getFeatureName,

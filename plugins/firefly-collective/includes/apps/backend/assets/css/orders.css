@@ -192,6 +192,17 @@
     text-transform: uppercase;
 }
 
+td:has(> button.item-refund-btn) {
+  position: relative;
+}
+
+.item-refund-btn {
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
 /* Order Details Row */
 .ffc-order-details-row {
     background-color: #f9f9f9;

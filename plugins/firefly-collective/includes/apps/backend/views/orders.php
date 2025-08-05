@@ -109,12 +109,12 @@
                         </td>
                         <td>
                             <span v-if="!group.hasPartialRefund">
-                                ${{ formatPrice(group.totalValue) }}
+                                {{ formatMoney(group.totalValue) }}
                             </span>
                             <span v-else>
-                                ${{ formatPrice(getActualOrderValue(group)) }}
+                                {{ formatMoney(getActualOrderValue(group)) }}
                                 <span class="ffc-original-price">
-                                    (was ${{ formatPrice(group.totalValue) }})
+                                    (was {{ formatMoney(group.totalValue) }})
                                 </span>
                             </span>
                         </td>
@@ -141,7 +141,7 @@
                                     class="button button-small button-link-delete"
                                     @click="confirmRefund(group.orderID)"
                                     :disabled="group.refundedAmount >= group.totalValue"
-                                    :title="group.hasPartialRefund ? `Refund remaining $${formatPrice(group.totalValue - group.refundedAmount)}` : 'Refund order'"
+                                    :title="group.hasPartialRefund ? `Refund remaining ${formatMoney(group.totalValue - group.refundedAmount)}` : 'Refund order'"
                                 >
                                     {{ group.hasPartialRefund ? 'Refund Rest' : 'Refund' }}
                                 </button>
@@ -178,10 +178,11 @@
                                                         <span v-else-if="line.isDiscount" class="ffc-discount-name">{{ line.name }}</span>
                                                     </td>
                                                     <td>{{ line.quantity }}</td>
-                                                    <td>${{ formatPrice(line.unitPrice) }}</td>
-                                                    <td class="ffc-line-total">
-                                                        <span v-if="!line.isDiscount">${{ formatPrice(line.totalPrice) }}</span>
-                                                        <span v-else class="ffc-discount-amount">-</span>
+                                                    <td>
+                                                        <span v-if="line.unitPrice !== null">{{ formatMoney(line.unitPrice) }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span v-if="line.totalPrice !== null">{{ formatMoney(line.totalPrice) }}</span>
                                                         
                                                         <!-- Individual item refund button - only show on base item line -->
                                                         <button 
@@ -273,7 +274,7 @@
                         </span>
                     </div>
                     <div class="ffc-summary-item">
-                        <strong>Total:</strong> ${{ formatPrice(currentOrder.totalValue) }}
+                        <strong>Total:</strong> {{ formatMoney(currentOrder.totalValue) }}
                     </div>
                 </div>
                 
@@ -303,10 +304,9 @@
                                         <span v-else-if="line.isDiscount" class="ffc-discount-name">{{ line.name }}</span>
                                     </td>
                                     <td>{{ line.quantity }}</td>
-                                    <td>${{ formatPrice(line.unitPrice) }}</td>
-                                    <td>
-                                        <span v-if="!line.isDiscount">${{ formatPrice(line.totalPrice) }}</span>
-                                        <span v-else class="ffc-discount-amount">-</span>
+                                    <td>{{ formatMoney(line.unitPrice) }}</td>
+                                    <td class="text-right">
+                                        {{ formatMoney(line.totalPrice) }}
                                     </td>
                                 </tr>
                             </template>
@@ -319,15 +319,15 @@
                     <tfoot>
                         <tr>
                             <td colspan="3" class="ffc-total-label">Subtotal</td>
-                            <td>${{ formatPrice(currentOrder.totalValue) }}</td>
+                            <td>{{ formatMoney(currentOrder.totalValue) }}</td>
                         </tr>
                         <tr v-if="currentOrder.refundedAmount > 0">
                             <td colspan="3" class="ffc-total-label">Already Refunded</td>
-                            <td style="color: #dc3545;">-${{ formatPrice(currentOrder.refundedAmount) }}</td>
+                            <td style="color: #dc3545;">-{{ formatMoney(currentOrder.refundedAmount) }}</td>
                         </tr>
                         <tr>
                             <td colspan="3" class="ffc-total-label"><strong>{{ currentOrder.refundedAmount > 0 ? 'Current Total' : 'Total' }}</strong></td>
-                            <td><strong>${{ formatPrice(currentOrder.totalValue - (currentOrder.refundedAmount || 0)) }}</strong></td>
+                            <td><strong>{{ formatMoney(currentOrder.totalValue - (currentOrder.refundedAmount || 0)) }}</strong></td>
                         </tr>
                     </tfoot>
                 </table>

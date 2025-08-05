@@ -833,7 +833,7 @@
         }
         
         $addons = $wpdb->get_results(
-            "SELECT id, optionId, addonName FROM {$wpdb->prefix}ffc_addons",
+            "SELECT id, optionId, addonName, staticPriceMod, groupName FROM {$wpdb->prefix}ffc_addons",
             ARRAY_A
         );
         
