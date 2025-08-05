@@ -5,6 +5,42 @@
     display: none;
 }
 
+/* Copy button styles */
+.campaign-url-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+}
+
+.copy-button {
+    background: #f6f7f7;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    min-width: auto;
+}
+
+.copy-button:hover {
+    background: #e8e9ea;
+    border-color: #999;
+}
+
+.copy-button:active {
+    background: #d4d5d6;
+    transform: scale(0.95);
+}
+
+.copy-button.copied {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
 .ffc-loading {
     text-align: center;
     padding: 40px;

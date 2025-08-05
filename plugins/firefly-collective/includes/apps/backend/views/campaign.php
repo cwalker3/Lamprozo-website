@@ -179,7 +179,14 @@
             <div v-if="expandedCampaigns.includes(campaign.id)" class="campaign-details">
                 <div class="campaign-content">
                     <div class="campaign-links">
-                        <p><a :href="campaign.dashboard_url" target="_blank">Campaign URL</a></p>
+                        <div class="campaign-url-row">
+                            <a :href="campaign.dashboard_url" target="_blank">Campaign URL</a>
+                            <button @click="copyToClipboard(campaign.dashboard_url, $event)" 
+                                    class="copy-button" 
+                                    title="Copy URL to clipboard">
+                                📋
+                            </button>
+                        </div>
                         <p><strong>Token:</strong> {{ campaign.token }}</p>
                     </div>
                     

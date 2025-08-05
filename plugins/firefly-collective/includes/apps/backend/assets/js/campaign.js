@@ -119,6 +119,57 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.campaignForm.preselect_config = preselectConfig;
             },
             
+            // Copy to clipboard functionality
+            async copyToClipboard(text, event) {
+                try {
+                    // Modern clipboard API
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(text);
+                    } else {
+                        // Fallback for older browsers or non-HTTPS
+                        const textArea = document.createElement('textarea');
+                        textArea.value = text;
+                        textArea.style.position = 'fixed';
+                        textArea.style.opacity = '0';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                    }
+                    
+                    // Visual feedback
+                    const button = event.target;
+                    const originalText = button.textContent;
+                    
+                    // Change appearance to show success
+                    button.classList.add('copied');
+                    button.textContent = '✓';
+                    button.title = 'Copied!';
+                    
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        button.classList.remove('copied');
+                        button.textContent = originalText;
+                        button.title = 'Copy URL to clipboard';
+                    }, 2000);
+                    
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    // Show error feedback
+                    const button = event.target;
+                    const originalText = button.textContent;
+                    
+                    button.textContent = '✗';
+                    button.title = 'Copy failed';
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.title = 'Copy URL to clipboard';
+                    }, 2000);
+                }
+            },
+            
             // Get available addons for a specific option (filtered by what's marked as show)
             getAvailableAddons(feature, option) {
                 if (!option.addons || !Array.isArray(option.addons)) return [];
