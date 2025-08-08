@@ -852,32 +852,39 @@
                     break;
                     
                 case 'invoice.paid':
-                    $eventInvoice = $event->data->object;
-                    $subscriptionId = ff_invoice_subscription_id($eventInvoice);
+                    $invoice = $event->data->object;
+                    $subscription_id = ff_invoice_subscription_id($invoice);
+                    
+                    // Check deduplication BEFORE any other logic
+                    global $wpdb;
+                    $exists = $wpdb->get_var($wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders WHERE invoice_id = %s",
+                        $invoice->id
+                    ));
+                    
+                    if ($exists) {
+                        // Optional: Log for debugging
+                        reliable_log("Duplicate invoice webhook ignored: {$invoice->id}", "WEBHOOK_DEDUP");
+                        return new WP_REST_Response('Webhook received', 200);
+                    }
 
-                    if (
-                        isset($eventInvoice->billing_reason)
-                        && $eventInvoice->billing_reason === 'subscription_create'
-                    ) {
-                        // Update subscription data
+                    // Now continue with consistent variable names
+                    if (isset($invoice->billing_reason) && $invoice->billing_reason === 'subscription_create') {
+                        // Handle initial subscription
                         firefly_collective_handle_subscription_created(
-                            \Stripe\Subscription::retrieve($subscriptionId)
+                            \Stripe\Subscription::retrieve($subscription_id)
                         );
 
-                        // Get order ID from subscription metadata
-                        $subscription = \Stripe\Subscription::retrieve($subscriptionId);
+                        $subscription = \Stripe\Subscription::retrieve($subscription_id);
                         $order_id = $subscription->metadata->order_id ?? null;
 
                         if ($order_id) {
                             firefly_collective_orders_email($order_id, 'paid');
-                            
-                            // Create user account for subscription orders
                             firefly_collective_create_user_after_payment($order_id);
                         }
-                    }
-                    // Handle renewal payments...
-                    else {
-                        firefly_collective_handle_subscription_invoice_paid($eventInvoice);
+                    } else {
+                        // Handle renewal payments
+                        firefly_collective_handle_subscription_invoice_paid($invoice);
                     }
                     break;
                     
@@ -1499,51 +1506,10 @@
                     ['%s','%d']
                 );
                 
-                // Create renewal transaction record
-                if ($total_paid > 0 && !empty($paid_invoices[0])) {
-                    $new_order_id    = wp_generate_uuid4();
-                    $original_order  = $wpdb->get_row($wpdb->prepare(
-                        "SELECT * FROM {$wpdb->prefix}ffc_orders
-                        WHERE subscription_id = %s
-                        ORDER BY createdAt ASC LIMIT 1",
-                        $subscription_id
-                    ), ARRAY_A);
-                    
-                    $transaction_data = [
-                        'invoice_id'                      => $paid_invoices[0]['invoice']->id,
-                        'orderID'                         => $new_order_id,
-                        'payment_intent_id'               => $paid_invoices[0]['payment_intent_id'],
-                        'userId'                          => $original_order['userId'],
-                        'featureId'                       => $original_order['featureId'],
-                        'optionId'                        => $new_option_id,
-                        'addonIds'                        => $original_order['addonIds'],
-                        'priceSelected'                   => $original_order['priceSelected'],
-                        'quantity'                        => 1,
-                        'totalPrice'                      => $total_paid,
-                        'totalPriceDiscount'              => 0,
-                        'priceDiscountsInfo'              => json_encode([
-                                                            'description' => 'Past due subscription renewal'
-                                                            ]),
-                        'userData'                        => $original_order['userData'],
-                        'status'                          => 'paid',
-                        'transaction_type'                => 'renewal',
-                        'subscription_renewal'            => 1,
-                        'subscription_period_start'       => $periods['start']
-                                                            ? date('Y-m-d H:i:s', $periods['start'])
-                                                            : null,
-                        'subscription_current_period_end' => $periods['end']
-                                                            ? date('Y-m-d H:i:s', $periods['end'])
-                                                            : null,
-                        'createdAt'                       => current_time('mysql'),
-                    ];
-                    
-                    $wpdb->insert("{$wpdb->prefix}ffc_orders", $transaction_data);
-                    reliable_log(
-                        "PLAN_CHANGE: Created renewal transaction record: $new_order_id with invoice_id={$paid_invoices[0]['invoice']->id}",
-                        "PLAN_CHANGE"
-                    );
-                    firefly_collective_orders_email($new_order_id, 'renewed');
-                }
+                // DO NOT CREATE RENEWAL TRANSACTION RECORDS HERE
+                // The invoice.paid webhook will handle creating the renewal record
+                // This prevents duplicates caused by race conditions
+                reliable_log("PLAN_CHANGE: Skipping renewal record creation - webhook will handle it", "PLAN_CHANGE");
                 
             } else {
                 // Not past_due / proration branch
@@ -1599,39 +1565,49 @@
                     ['%s','%d']
                 );
                 
-                // Create proration transaction record
+                // Create proration transaction record (only for non-past-due plan changes)
                 if ($actual_charge > 0) {
-                    $new_order_id   = wp_generate_uuid4();
-                    $original_order = $wpdb->get_row($wpdb->prepare(
-                        "SELECT * FROM {$wpdb->prefix}ffc_orders
-                        WHERE subscription_id = %s
-                        ORDER BY createdAt ASC LIMIT 1",
-                        $subscription_id
-                    ), ARRAY_A);
+                    // Check if record already exists to prevent duplicates
+                    $existing = $wpdb->get_var($wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders WHERE invoice_id = %s",
+                        $latest_invoice->id
+                    ));
                     
-                    $transaction_data = [
-                        'invoice_id'          => $latest_invoice->id,
-                        'orderID'             => $new_order_id,
-                        'payment_intent_id'   => ff_invoice_pi_id($latest_invoice),
-                        'userId'              => $original_order['userId'],
-                        'featureId'           => $original_order['featureId'],
-                        'optionId'            => $new_option_id,
-                        'addonIds'            => $original_order['addonIds'],
-                        'priceSelected'       => $original_order['priceSelected'],
-                        'quantity'            => 1,
-                        'totalPrice'          => $actual_charge,
-                        'totalPriceDiscount'  => 0,
-                        'priceDiscountsInfo'  => json_encode(['description' => 'Plan change proration']),
-                        'userData'            => $original_order['userData'],
-                        'status'              => 'paid',
-                        'transaction_type'    => 'plan_change',
-                        'subscription_renewal'=> 1,
-                        'createdAt'           => current_time('mysql'),
-                    ];
-                    
-                    $wpdb->insert("{$wpdb->prefix}ffc_orders", $transaction_data);
-                    reliable_log("PLAN_CHANGE: Created plan change transaction record: $new_order_id with invoice_id={$latest_invoice->id}", "PLAN_CHANGE");
-                    firefly_collective_orders_email($new_order_id, 'plan_change');
+                    if ($existing == 0) {
+                        $new_order_id   = wp_generate_uuid4();
+                        $original_order = $wpdb->get_row($wpdb->prepare(
+                            "SELECT * FROM {$wpdb->prefix}ffc_orders
+                            WHERE subscription_id = %s
+                            ORDER BY createdAt ASC LIMIT 1",
+                            $subscription_id
+                        ), ARRAY_A);
+                        
+                        $transaction_data = [
+                            'invoice_id'          => $latest_invoice->id,
+                            'orderID'             => $new_order_id,
+                            'payment_intent_id'   => ff_invoice_pi_id($latest_invoice),
+                            'userId'              => $original_order['userId'],
+                            'featureId'           => $original_order['featureId'],
+                            'optionId'            => $new_option_id,
+                            'addonIds'            => $original_order['addonIds'],
+                            'priceSelected'       => $original_order['priceSelected'],
+                            'quantity'            => 1,
+                            'totalPrice'          => $actual_charge,
+                            'totalPriceDiscount'  => 0,
+                            'priceDiscountsInfo'  => json_encode(['description' => 'Plan change proration']),
+                            'userData'            => $original_order['userData'],
+                            'status'              => 'paid',
+                            'transaction_type'    => 'plan_change',
+                            'subscription_renewal'=> 1,
+                            'createdAt'           => current_time('mysql'),
+                        ];
+                        
+                        $wpdb->insert("{$wpdb->prefix}ffc_orders", $transaction_data);
+                        reliable_log("PLAN_CHANGE: Created plan change transaction record: $new_order_id with invoice_id={$latest_invoice->id}", "PLAN_CHANGE");
+                        firefly_collective_orders_email($new_order_id, 'plan_change');
+                    } else {
+                        reliable_log("PLAN_CHANGE: Skipping proration record - already exists for invoice: {$latest_invoice->id}", "PLAN_CHANGE");
+                    }
                 }
             }
             
@@ -1643,7 +1619,7 @@
                                         : 'Plan changed successfully!',
                 'newPlan'             => $new_option['optionName'],
                 'newPrice'            => floatval($new_option['staticPrice']),
-                'transactionCreated'  => true,
+                'transactionCreated'  => false, // Set to false for past-due renewals
             ];
             
         } catch (Exception $e) {
