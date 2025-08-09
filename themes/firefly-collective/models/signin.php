@@ -935,3 +935,22 @@
         }
         return $show;
     });
+
+    // Hide the admin bar (and its top-margin "bump") whenever we're in a Customizer preview.
+    add_action('after_setup_theme', function () {
+        $in_customizer =
+            ( function_exists('is_customize_preview') && is_customize_preview() )
+            || isset($_GET['customize_changeset_uuid'])     // preview session UUID
+            || isset($_GET['customize_theme'])              // theme-switch previews
+            || isset($_GET['customize_messenger_channel']); // preview iframe messaging
+
+        if ( $in_customizer ) {
+            // Don’t render the toolbar.
+            add_filter('show_admin_bar', '__return_false', PHP_INT_MAX);
+
+            // Also stop WordPress from injecting the top-margin “bump” CSS.
+            add_theme_support('admin-bar', ['callback' => '__return_false']);
+            remove_action('wp_head', 'wp_enqueue_admin_bar_bump_styles');
+            remove_action('wp_head', '_admin_bar_bump_cb'); // legacy
+        }
+    }, 0);
