@@ -209,3 +209,22 @@
             'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
         ));
     });
+
+    // Remove 'jquery-migrate' as a dependency of WordPress' jQuery
+    add_action('wp_default_scripts', function ($scripts) {
+        if (isset($scripts->registered['jquery'])) {
+            $scripts->registered['jquery']->deps = array_diff(
+                $scripts->registered['jquery']->deps,
+                ['jquery-migrate']
+            );
+        }
+    });
+
+    // If any plugin enqueues it explicitly, dequeue as a fallback
+    add_action('wp_print_scripts', function () {
+        wp_dequeue_script('jquery-migrate');
+    }, 100);
+
+    add_action('admin_print_scripts', function () {
+        wp_dequeue_script('jquery-migrate');
+    }, 100);
