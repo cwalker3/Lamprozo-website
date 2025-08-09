@@ -3052,12 +3052,39 @@
         // ---------------------------------------------------------------
         let stripe, elements, paymentElement;
         
+        // Decide which Stripe confirm* to call based on server response
+        async function confirmByIntentType(resp, elements) {
+        const s = stripe || window.stripe;
+        if (!s) throw new Error('Stripe.js not initialized');
+
+        const confirmParams = { return_url: window.location.href };
+
+        if (resp.intentType === 'payment_intent') {
+            const { error, paymentIntent } = await s.confirmPayment({
+                elements,
+                confirmParams,
+                redirect: 'if_required',
+            });
+            if (error) throw error;
+            return { kind: 'payment_intent', id: paymentIntent.id };
+        } else {
+            const { error, setupIntent } = await s.confirmSetup({
+                elements,
+                confirmParams,
+                redirect: 'if_required',
+            });
+            if (error) throw error;
+            return { kind: 'setup_intent', id: setupIntent.id };
+        }
+        }
+
         // Initialize Stripe if the library is loaded
         if (typeof Stripe !== 'undefined' && dashboardData.stripeKey) {
             
             if (window.Stripe && navigator.onLine) {
                 // Initialize Stripe only when online
                 stripe = Stripe(dashboardData.stripeKey);
+                window.stripe = stripe;
             } else {
                 console.log('Stripe not available offline');
                 // Disable payment features or show offline message
@@ -3878,20 +3905,25 @@
                     submitBtn.onclick = async () => {
                         const errorDiv = document.getElementById('update-payment-error');
                         
-                        submitBtn.disabled = true;
-                        submitBtn.textContent = 'Updating...';
-                        errorDiv.style.display = 'none';
-                        
-                        const {error} = await stripe.confirmSetup({
+                        const usePI = data.intentType === 'payment_intent';
+                        let result;
+
+                        if (usePI) {
+                        result = await stripe.confirmPayment({
                             elements: updatePaymentElements,
-                            confirmParams: {
-                                return_url: window.location.href,
-                            },
+                            confirmParams: { return_url: window.location.href },
                             redirect: 'if_required'
                         });
-                        
-                        if (error) {
-                            errorDiv.textContent = error.message;
+                        } else {
+                        result = await stripe.confirmSetup({
+                            elements: updatePaymentElements,
+                            confirmParams: { return_url: window.location.href },
+                            redirect: 'if_required'
+                        });
+                        }
+
+                        if (result.error) {
+                            errorDiv.textContent = result.error.message;
                             errorDiv.style.display = 'block';
                             submitBtn.disabled = false;
                             submitBtn.textContent = 'Update';
@@ -4060,23 +4092,39 @@
                         submitBtn.disabled = true;
                         submitBtn.textContent = isRenewal ? 'Renewing...' : 'Changing Plan...';
                         errorDiv.style.display = 'none';
-                        
-                        const {error, setupIntent} = await stripe.confirmSetup({
-                            elements: updatePaymentElements,
-                            confirmParams: {
-                                return_url: window.location.href,
-                            },
-                            redirect: 'if_required'
-                        });
-                        
-                        if (error) {
-                            errorDiv.textContent = error.message;
+
+                        try {
+                            // Confirm with the correct API based on server response
+                            const confirmed = await confirmByIntentType(data, updatePaymentElements);
+
+                            // Tell the server we’re done (support PI or SI)
+                            await completePlanChange({
+                                ...(confirmed.kind === 'payment_intent'
+                                    ? { paymentIntentId: confirmed.id }
+                                    : { setupIntentId: confirmed.id }),
+                                invoiceId: data.invoiceId || null,
+                                newOptionId: parseInt(newOptionId),
+                                isRenewal: !!isRenewal,
+                            });
+
+                            // Success UI
+                            closeUpdatePaymentModal();
+
+                            const successMessage = document.createElement('div');
+                            successMessage.style.cssText = `
+                                position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white;
+                                padding: 15px 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10000;
+                            `;
+                            successMessage.textContent = isRenewal ? 'Subscription renewed successfully!' : 'Plan changed successfully!';
+                            document.body.appendChild(successMessage);
+                            setTimeout(() => successMessage.remove(), 3000);
+                            setTimeout(() => loadSubscriptions(), 500);
+
+                        } catch (err) {
+                            errorDiv.textContent = err.message || 'Something went wrong.';
                             errorDiv.style.display = 'block';
                             submitBtn.disabled = false;
                             submitBtn.textContent = isRenewal ? 'Renew Plan' : 'Change Plan';
-                        } else {
-                            // Complete the plan change
-                            await completePlanChange(setupIntent.id);
                         }
                     };
                 } else {
@@ -4091,64 +4139,23 @@
             }
         }
 
-        async function completePlanChange(setupIntentId) {
-            try {
-                const response = await fetch(`${myApi.api_url}complete-plan-change`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        setupIntentId: setupIntentId,
-                        auth_id: window.auth_id
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Close the modal first
-                    closeUpdatePaymentModal();
-                    
-                    // Show success message
-                    const successMessage = document.createElement('div');
-                    successMessage.style.cssText = `
-                        position: fixed;
-                        top: 20px;
-                        right: 20px;
-                        background: #4CAF50;
-                        color: white;
-                        padding: 15px 20px;
-                        border-radius: 4px;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                        z-index: 10000;
-                    `;
-                    successMessage.textContent = data.message || 'Plan changed successfully!';
-                    document.body.appendChild(successMessage);
-                    
-                    // Remove success message after 3 seconds
-                    setTimeout(() => {
-                        successMessage.remove();
-                    }, 3000);
-                    
-                    // Reload subscriptions to show updated plan
-                    setTimeout(() => {
-                        loadSubscriptions();
-                    }, 500);
-                    
-                } else {
-                    throw new Error(data.message || 'Failed to complete plan change');
-                }
-            } catch (error) {
-                console.error('Error completing plan change:', error);
-                const errorDiv = document.getElementById('update-payment-error');
-                errorDiv.textContent = 'Error: ' + error.message;
-                errorDiv.style.display = 'block';
-                
-                const submitBtn = document.getElementById('update-payment-submit');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Update';
+        async function completePlanChange(payload) {
+            // payload: { paymentIntentId? , setupIntentId?, newOptionId?, isRenewal? }
+            const body = { ...payload, auth_id: window.auth_id };
+
+            const response = await fetch(`${myApi.api_url}complete-plan-change`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.success !== true) {
+                throw new Error(data.message || 'Failed to complete plan change');
             }
+
+            return data;
         }
 
         // Handle subscription response

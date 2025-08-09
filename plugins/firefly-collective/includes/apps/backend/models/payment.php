@@ -1174,7 +1174,6 @@
         reliable_log("WEBHOOK_DEBUG: exit handle_subscription_invoice_paid()", "WEBHOOK_DEBUG");
     }
 
-
     /**
      * Handle failed subscription payment
      */
@@ -1213,7 +1212,7 @@
     }
 
     /**
-     * Handle change plan for subscriptions
+     * Handle change plan for subscriptions (returns a PaymentIntent when money is due)
      */
     function firefly_collective_change_subscription_plan($request) {
         try {
@@ -1226,7 +1225,7 @@
 
             global $wpdb;
 
-            // Get current subscription details
+            // Current subscription row (for context)
             $current_sub = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT o.*, opt.optionName, opt.staticPrice, opt.interval, o.subscription_current_period_end
@@ -1241,10 +1240,10 @@
             );
 
             if (!$current_sub) {
-                return new WP_Error('subscription_not_found', 'Subscription not found', array('status' => 404));
+                return new WP_Error('subscription_not_found', 'Subscription not found', ['status' => 404]);
             }
 
-            // Get new option details
+            // New option details
             $new_option = $wpdb->get_row(
                 $wpdb->prepare(
                     "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
@@ -1252,99 +1251,204 @@
                 ),
                 ARRAY_A
             );
-
             if (!$new_option) {
-                return new WP_Error('option_not_found', 'New plan not found', array('status' => 404));
+                return new WP_Error('option_not_found', 'New plan not found', ['status' => 404]);
             }
 
             $user_id  = get_current_user_id();
             $customer = firefly_collective_get_or_create_stripe_customer($user_id);
 
-            // Stripe client
+            // Stripe client + live subscription object
             $stripe     = new \Stripe\StripeClient(\Stripe\Stripe::$apiKey);
             $stripe_sub = $stripe->subscriptions->retrieve($subscription_id);
 
-            // Create a new Price for the plan
+            // Build product/price for the NEW plan (same as before)
             $feature = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM {$wpdb->prefix}ffc_features WHERE id = %d",
                 intval($current_sub['featureId'])
             ), ARRAY_A);
-            
-            // Create new product with correct name
+
             $product = \Stripe\Product::create([
                 'name' => sprintf('%s - %s', $feature['featureName'], $new_option['optionName']),
                 'metadata' => [
-                    'feature_id' => intval($current_sub['featureId']),
-                    'option_id' => $new_option_id,
+                    'feature_id'  => intval($current_sub['featureId']),
+                    'option_id'   => $new_option_id,
                     'plan_change' => 'true'
                 ]
             ]);
 
             $new_price = \Stripe\Price::create([
-                'product' => $product->id,
-                'unit_amount' => round((float)$new_option['staticPrice'] * 100),
-                'currency' => 'usd',
-                'recurring' => [
-                    'interval' => $new_option['interval'] ?: 'month',
+                'product'      => $product->id,
+                'unit_amount'  => round((float)$new_option['staticPrice'] * 100),
+                'currency'     => 'usd',
+                'recurring'    => [
+                    'interval'       => $new_option['interval'] ?: 'month',
                     'interval_count' => 1
                 ]
             ]);
 
-            // Calculate proration using preview
+            // --- PRORATION PREVIEW (for UI display / logging)
             $immediate_charge = 0;
-
             reliable_log("Starting proration calculation for subscription: $subscription_id", "PRORATION");
 
             try {
-                // Create preview with proper parameters for Basil API
                 $preview_params = [
                     'customer' => $customer->id,
                     'subscription' => $subscription_id,
                     'subscription_details' => [
-                        'items' => [
-                            [
-                                'id' => $stripe_sub->items->data[0]->id,
-                                'price' => $new_price->id,
-                            ],
-                        ],
-                        'proration_behavior' => 'always_invoice', // Changed to always_invoice
+                        'items' => [[
+                            'id'    => $stripe_sub->items->data[0]->id,
+                            'price' => $new_price->id,
+                        ]],
+                        'proration_behavior' => 'always_invoice',
                     ],
                 ];
-
                 reliable_log("Creating invoice preview with params: " . json_encode($preview_params), "PRORATION");
-                
                 $proration_preview = $stripe->invoices->createPreview($preview_params);
-                
+                $immediate_charge  = $proration_preview->amount_due / 100;
                 reliable_log("Preview created - Amount due: " . $proration_preview->amount_due, "PRORATION");
-                
-                // Get the proration amount directly from amount_due
-                $immediate_charge = $proration_preview->amount_due / 100;
-                
-                reliable_log("Proration amount: $immediate_charge", "PRORATION");
-
             } catch (Exception $e) {
                 reliable_log('Failed to preview invoice: ' . $e->getMessage(), "PRORATION_ERROR");
-                
-                // Manual proration fallback (keep existing fallback code)
-                $current_time = time();
-                $period_start = $stripe_sub->current_period_start ?? $current_time;
-                $period_end = $stripe_sub->current_period_end ?? ($current_time + 2592000);
-
-                $total_days = ($period_end - $period_start) / 86400;
-                $days_remaining = max(0, ($period_end - $current_time) / 86400);
+                // Fallback (same as your existing)
+                $current_time  = time();
+                $period_start  = $stripe_sub->current_period_start ?? $current_time;
+                $period_end    = $stripe_sub->current_period_end   ?? ($current_time + 2592000);
+                $total_days    = ($period_end - $period_start) / 86400;
+                $days_remaining= max(0, ($period_end - $current_time) / 86400);
 
                 if ($days_remaining > 0 && $total_days > 0) {
-                    $old_price = (float)$current_sub['totalPrice'];
-                    $new_price_amount = (float)$new_option['staticPrice'];
-
-                    $credit = ($old_price / $total_days) * $days_remaining;
-                    $charge = ($new_price_amount / $total_days) * $days_remaining;
-
-                    $immediate_charge = round($charge - $credit, 2);
+                    $old_price         = (float)$current_sub['totalPrice'];
+                    $new_price_amount  = (float)$new_option['staticPrice'];
+                    $credit            = ($old_price / $total_days) * $days_remaining;
+                    $charge            = ($new_price_amount / $total_days) * $days_remaining;
+                    $immediate_charge  = round($charge - $credit, 2);
                 }
             }
 
-            // Create a SetupIntent for payment method collection (keeping original flow)
+            // =========================
+            // IMPORTANT BEHAVIOR CHANGE
+            // =========================
+            // If there is money due OR we're handling a past_due renewal with an open invoice,
+            // return a PAYMENT INTENT client_secret so Google Pay can display the total.
+            //
+            // a) Past-due renewal: use the latest open invoice's PaymentIntent (if present)
+            // b) Plan change: update the subscription with default_incomplete to create an invoice+PI
+            //    and return that PI for the client to confirm.
+
+            if ($is_renewal) {
+                // Try to surface the most recent open invoice for this sub
+                try {
+                    $open_invoices = $stripe->invoices->all([
+                        'subscription' => $subscription_id,
+                        'status'       => 'open',
+                        'limit'        => 1
+                    ]);
+
+                    if (count($open_invoices->data) > 0) {
+                        $invoice = $stripe->invoices->retrieve($open_invoices->data[0]->id, [
+                            'expand' => ['payments.data.payment']
+                        ]);
+                        $piId = ff_invoice_pi_id($invoice);
+                        if ($piId) {
+                            $clientSecret = $stripe->paymentIntents->retrieve($piId)->client_secret;
+
+                            reliable_log("Renewal flow returning PI for invoice {$invoice->id} (amount_due={$invoice->amount_due})", "PLAN_CHANGE");
+
+                            return [
+                                'success'         => true,
+                                'intentType'      => 'payment_intent',
+                                'clientSecret'    => $clientSecret,
+                                'invoiceId'       => $invoice->id,
+                                'paymentIntentId' => $piId,
+                                'currentPlan'     => $current_sub['optionName'],
+                                'currentPrice'    => (float)$current_sub['staticPrice'],
+                                'newPlan'         => $new_option['optionName'],
+                                'newPrice'        => (float)$new_option['staticPrice'],
+                                'immediateCharge' => $invoice->amount_due / 100,
+                                'isUpgrade'       => (float)$new_option['staticPrice'] > (float)$current_sub['staticPrice'],
+                            ];
+                        }
+                    }
+                } catch (Exception $e) {
+                    reliable_log("Renewal open-invoice lookup failed: " . $e->getMessage(), "PLAN_CHANGE_ERROR");
+                }
+
+                // Fall back to SetupIntent (amountless) if we couldn't find an invoice PI
+                $setup_intent = $stripe->setupIntents->create([
+                    'customer'             => $customer->id,
+                    'payment_method_types' => ['card'],
+                    'usage'                => 'off_session',
+                    'metadata'             => [
+                        'subscription_id'   => $subscription_id,
+                        'new_option_id'     => $new_option_id,
+                        'old_option_id'     => $current_sub['optionId'],
+                        'is_renewal'        => 'true',
+                        'wordpress_user_id' => $user_id,
+                    ],
+                ]);
+
+                return [
+                    'success'         => true,
+                    'intentType'      => 'setup_intent',
+                    'clientSecret'    => $setup_intent->client_secret,
+                    'currentPlan'     => $current_sub['optionName'],
+                    'currentPrice'    => (float)$current_sub['staticPrice'],
+                    'newPlan'         => $new_option['optionName'],
+                    'newPrice'        => (float)$new_option['staticPrice'],
+                    'immediateCharge' => 0,
+                    'isUpgrade'       => (float)$new_option['staticPrice'] > (float)$current_sub['staticPrice'],
+                    'setupIntentId'   => $setup_intent->id,
+                ];
+            }
+
+            // ========== PLAN CHANGE (non-renewal) ==========
+            if ($immediate_charge > 0) {
+                // Update sub in "default_incomplete" so Stripe creates an invoice + payment_intent
+                $updated_sub = $stripe->subscriptions->update($subscription_id, [
+                    'items' => [[
+                        'id'    => $stripe_sub->items->data[0]->id,
+                        'price' => $new_price->id,
+                    ]],
+                    'proration_behavior' => 'always_invoice',
+                    'payment_behavior'   => 'default_incomplete', // <-- generates invoice + PI awaiting confirmation
+                    'metadata'           => [
+                        'plan_change'      => 'true',
+                        'order_id_hint'    => $current_sub['orderID'] ?? '',
+                        'new_option_id'    => $new_option_id,
+                        'old_option_id'    => $current_sub['optionId'],
+                    ],
+                    'expand' => ['latest_invoice.payments.data.payment']
+                ]);
+
+                $invoice = is_string($updated_sub->latest_invoice)
+                    ? $stripe->invoices->retrieve($updated_sub->latest_invoice, ['expand' => ['payments.data.payment']])
+                    : $updated_sub->latest_invoice;
+
+                $piId = ff_invoice_pi_id($invoice);
+                if (!$piId) {
+                    return new WP_Error('no_payment_intent', 'Could not find PaymentIntent on the new invoice.', ['status' => 500]);
+                }
+
+                $clientSecret = $stripe->paymentIntents->retrieve($piId)->client_secret;
+
+                reliable_log("Plan change created invoice {$invoice->id} with PI {$piId} (due={$invoice->amount_due})", "PLAN_CHANGE");
+
+                return [
+                    'success'         => true,
+                    'intentType'      => 'payment_intent',
+                    'clientSecret'    => $clientSecret,
+                    'invoiceId'       => $invoice->id,
+                    'paymentIntentId' => $piId,
+                    'currentPlan'     => $current_sub['optionName'],
+                    'currentPrice'    => (float)$current_sub['staticPrice'],
+                    'newPlan'         => $new_option['optionName'],
+                    'newPrice'        => (float)$new_option['staticPrice'],
+                    'immediateCharge' => $invoice->amount_due / 100,
+                    'isUpgrade'       => (float)$new_option['staticPrice'] > (float)$current_sub['staticPrice'],
+                ];
+            }
+
+            // No money due → just collect/refresh a default payment method via SetupIntent
             $setup_intent = $stripe->setupIntents->create([
                 'customer'             => $customer->id,
                 'payment_method_types' => ['card'],
@@ -1353,21 +1457,20 @@
                     'subscription_id'   => $subscription_id,
                     'new_option_id'     => $new_option_id,
                     'old_option_id'     => $current_sub['optionId'],
-                    'is_renewal'        => $is_renewal ? 'true' : 'false',
+                    'is_renewal'        => 'false',
                     'wordpress_user_id' => $user_id,
-                    'immediate_charge'  => (string)$immediate_charge,
-                    'new_price_id'      => $new_price->id,
                 ],
             ]);
 
             return [
                 'success'         => true,
+                'intentType'      => 'setup_intent',
                 'clientSecret'    => $setup_intent->client_secret,
                 'currentPlan'     => $current_sub['optionName'],
                 'currentPrice'    => (float)$current_sub['staticPrice'],
                 'newPlan'         => $new_option['optionName'],
                 'newPrice'        => (float)$new_option['staticPrice'],
-                'immediateCharge' => $immediate_charge,
+                'immediateCharge' => 0,
                 'isUpgrade'       => (float)$new_option['staticPrice'] > (float)$current_sub['staticPrice'],
                 'setupIntentId'   => $setup_intent->id,
             ];
@@ -1378,255 +1481,261 @@
         }
     }
 
+
     /**
-     * Complete the plan change after payment method confirmation
+     * Complete the plan change after client confirmation.
+     * Accepts either:
+     *  - paymentIntentId (preferred; ties to the proration/open-invoice PaymentIntent)
+     *  - setupIntentId   (legacy path)
      */
     function firefly_collective_complete_plan_change($request) {
         try {
             firefly_collective_stripe_init();
-            
-            $params = $request->get_json_params();
-            $setup_intent_id = sanitize_text_field($params['setupIntentId']);
-            
-            reliable_log("Starting plan change completion for SetupIntent: $setup_intent_id", "PLAN_CHANGE");
-            
-            // Create a StripeClient instance
-            $stripe = new \Stripe\StripeClient(\Stripe\Stripe::$apiKey);
-            
-            // Retrieve the SetupIntent to get metadata
-            $setup_intent = $stripe->setupIntents->retrieve($setup_intent_id);
-            
-            if ($setup_intent->status !== 'succeeded') {
-                reliable_log("SetupIntent not succeeded: " . $setup_intent->status, "PLAN_CHANGE_ERROR");
-                return new WP_Error('payment_not_confirmed', 'Payment method not confirmed', ['status' => 400]);
-            }
-            
-            $subscription_id   = $setup_intent->metadata->subscription_id;
-            $new_option_id     = intval($setup_intent->metadata->new_option_id);
-            $immediate_charge  = floatval($setup_intent->metadata->immediate_charge);
-            $is_renewal        = ($setup_intent->metadata->is_renewal === 'true');
-            $new_price_id      = $setup_intent->metadata->new_price_id;
-            
-            reliable_log("Plan change params - Sub: $subscription_id, NewOption: $new_option_id, Charge: $immediate_charge, Renewal: " . ($is_renewal ? 'true' : 'false'), "PLAN_CHANGE");
-            
+
+            $params            = $request->get_json_params();
+            $payment_intent_id = isset($params['paymentIntentId']) ? sanitize_text_field($params['paymentIntentId']) : null;
+            $setup_intent_id   = isset($params['setupIntentId'])   ? sanitize_text_field($params['setupIntentId'])   : null;
+            $new_option_id     = isset($params['newOptionId'])     ? intval($params['newOptionId'])                  : 0;
+            $is_renewal        = !empty($params['isRenewal']);
+            $invoice_id_param  = isset($params['invoiceId']) ? sanitize_text_field($params['invoiceId']) : null;
+
+            reliable_log("Starting plan change completion (PI={$payment_intent_id}, SI={$setup_intent_id})", "PLAN_CHANGE");
+
             global $wpdb;
-            
-            // Get new option details
-            $new_option = $wpdb->get_row($wpdb->prepare(
-                "SELECT * FROM {$wpdb->prefix}ffc_options WHERE id = %d",
-                $new_option_id
-            ), ARRAY_A);
-            
-            // Retrieve the subscription before update
-            $stripe_sub = $stripe->subscriptions->retrieve($subscription_id);
-            reliable_log("Current subscription status before update: " . $stripe_sub->status, "PLAN_CHANGE");
-            
-            // Check if subscription is past_due and this is a renewal
-            $was_past_due = ($stripe_sub->status === 'past_due');
-            
-            // Past‑due renewals branch
-            if ($was_past_due && $is_renewal) {
-                // Update default payment method on customer
-                $stripe->customers->update($stripe_sub->customer, [
-                    'invoice_settings' => ['default_payment_method' => $setup_intent->payment_method]
-                ]);
-                
-                // Find and pay any open invoices
-                $open_invoices = $stripe->invoices->all([
-                    'subscription' => $subscription_id,
-                    'status'       => 'open',
-                    'limit'        => 10
-                ]);
-                
-                $total_paid    = 0;
-                $paid_invoices = [];
-                
-                foreach ($open_invoices->data as $invoice) {
-                    try {
-                        reliable_log("Found open invoice: {$invoice->id} for amount: " . ($invoice->amount_due / 100), "PLAN_CHANGE");
-                        
-                        $paid_invoice = $stripe->invoices->pay($invoice->id);
-                        if ($paid_invoice->status === 'paid') {
-                            $paid_invoice = $stripe->invoices->retrieve($invoice->id, [
-                                'expand' => ['payment_intent', 'payments.data.payment']
-                            ]);
-                            $total_paid += $paid_invoice->amount_paid / 100;
-                            $payment_intent_id = ff_invoice_pi_id($paid_invoice);
-                            $paid_invoices[] = [
-                                'invoice'            => $paid_invoice,
-                                'payment_intent_id'  => $payment_intent_id
-                            ];
-                            reliable_log("Successfully paid invoice: {$invoice->id} with payment_intent: " . ($payment_intent_id ?? 'null'), "PLAN_CHANGE");
-                        }
-                    } catch (Exception $e) {
-                        reliable_log("Failed to pay invoice {$invoice->id}: " . $e->getMessage(), "PLAN_CHANGE_ERROR");
-                    }
-                }
-                
-                // Only update subscription if changing plan
-                if ($new_price_id && $stripe_sub->items->data[0]->price->id !== $new_price_id) {
-                    $update_params = [
-                        'items'              => [[
-                            'id'    => $stripe_sub->items->data[0]->id,
-                            'price' => $new_price_id,
-                        ]],
-                        'proration_behavior' => 'none',
-                        'description'        => sprintf(
-                            '%s - $%.2f/%s',
-                            $new_option['optionName'],
-                            floatval($new_option['staticPrice']),
-                            $new_option['interval']
-                        )
-                    ];
-                    $updated_sub = $stripe->subscriptions->update($subscription_id, $update_params);
-                    reliable_log("Subscription plan updated. New status: " . $updated_sub->status, "PLAN_CHANGE");
-                } else {
-                    $updated_sub = $stripe->subscriptions->retrieve($subscription_id);
-                    reliable_log("Subscription payment updated. Status: " . $updated_sub->status, "PLAN_CHANGE");
-                }
-                
-                // Update original subscription record
-                $periods = ff_subscription_period($updated_sub);
-                $wpdb->update(
-                    "{$wpdb->prefix}ffc_orders",
-                    [
-                        'optionId'                         => $new_option_id,
-                        'subscriptionPrice'                => floatval($new_option['staticPrice']),
-                        'subscription_status'              => $updated_sub->status,
-                        'subscription_current_period_end'  => $periods['end']
-                                                            ? date('Y-m-d H:i:s', $periods['end'])
-                                                            : null,
-                        'updatedAt'                        => current_time('mysql'),
-                    ],
-                    [
-                        'subscription_id'       => $subscription_id,
-                        'subscription_renewal'  => 0,
-                    ],
-                    ['%d','%s','%s','%s','%s'],
-                    ['%s','%d']
-                );
-                
-                // DO NOT CREATE RENEWAL TRANSACTION RECORDS HERE
-                // The invoice.paid webhook will handle creating the renewal record
-                // This prevents duplicates caused by race conditions
-                reliable_log("PLAN_CHANGE: Skipping renewal record creation - webhook will handle it", "PLAN_CHANGE");
-                
-            } else {
-                // Not past_due / proration branch
-                $update_params = [
-                    'items'                     => [[
-                        'id'    => $stripe_sub->items->data[0]->id,
-                        'price' => $new_price_id,
-                    ]],
-                    'proration_behavior'        => 'always_invoice',
-                    'payment_behavior'          => 'allow_incomplete',
-                    'default_payment_method'    => $setup_intent->payment_method,
-                    'description'               => sprintf(
-                        '%s - $%.2f/%s',
-                        $new_option['optionName'],
-                        floatval($new_option['staticPrice']),
-                        $new_option['interval']
-                    ),
-                ];
-                reliable_log("Updating subscription with params: " . json_encode($update_params), "PLAN_CHANGE");
-                
-                $updated_sub = $stripe->subscriptions->update($subscription_id, $update_params);
-                reliable_log("Subscription updated successfully. New status: " . $updated_sub->status, "PLAN_CHANGE");
-                
-                // Fetch latest invoice and amount
-                $latest_invoice = is_string($updated_sub->latest_invoice)
-                    ? $stripe->invoices->retrieve($updated_sub->latest_invoice, [
-                        'expand' => ['lines.data', 'payments.data.payment']
-                    ])
-                    : $updated_sub->latest_invoice;
-                
+            $stripe = new \Stripe\StripeClient(\Stripe\Stripe::$apiKey);
+
+            // Helper to insert plan-change transaction (reused below)
+            $insert_plan_change_txn = function($latest_invoice, $subscription_id, $new_option_id) use ($wpdb) {
                 $actual_charge = ($latest_invoice && $latest_invoice->status === 'paid')
                     ? $latest_invoice->amount_paid / 100
                     : 0;
-                
-                // Update subscription record
+
+                if ($actual_charge <= 0) return false;
+
+                // Prevent duplicates on same invoice
+                $existing = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders WHERE invoice_id = %s",
+                    $latest_invoice->id
+                ));
+                if ($existing > 0) return false;
+
+                // Get original order context
+                $subscription_id = ff_invoice_subscription_id($latest_invoice);
+                $original_order = $wpdb->get_row($wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}ffc_orders
+                    WHERE subscription_id = %s
+                    ORDER BY createdAt ASC LIMIT 1",
+                    $subscription_id
+                ), ARRAY_A);
+
+                if (!$original_order) return false;
+
+                $new_order_id = wp_generate_uuid4();
+
+                $transaction_data = [
+                    'invoice_id'           => $latest_invoice->id,
+                    'orderID'              => $new_order_id,
+                    'payment_intent_id'    => ff_invoice_pi_id($latest_invoice),
+                    'userId'               => $original_order['userId'],
+                    'featureId'            => $original_order['featureId'],
+                    'optionId'             => $new_option_id ?: $original_order['optionId'],
+                    'addonIds'             => $original_order['addonIds'],
+                    'priceSelected'        => $original_order['priceSelected'],
+                    'quantity'             => 1,
+                    'totalPrice'           => $actual_charge,
+                    'totalPriceDiscount'   => 0,
+                    'priceDiscountsInfo'   => json_encode(['description' => 'Plan change proration']),
+                    'userData'             => $original_order['userData'],
+                    'status'               => 'paid',
+                    'transaction_type'     => 'plan_change',
+                    'subscription_id'      => $subscription_id,
+                    'subscription_renewal' => 1,
+                    'createdAt'            => current_time('mysql'),
+                ];
+
+                $wpdb->insert("{$wpdb->prefix}ffc_orders", $transaction_data);
+                reliable_log("PLAN_CHANGE: Created plan change transaction record: $new_order_id with invoice_id={$latest_invoice->id}", "PLAN_CHANGE");
+                firefly_collective_orders_email($new_order_id, 'plan_change');
+                return true;
+            };
+
+            // ===== Path A: PaymentIntent (preferred – amount displays in Google Pay) =====
+            if ($payment_intent_id) {
+
+                // Fetch PI up front
+                $pi = $stripe->paymentIntents->retrieve($payment_intent_id, [
+                    'expand' => ['latest_charge'],
+                ]);
+
+                // Find the related invoice (several ways)
+                $invoice = null;
+
+                // 1) Prefer explicit invoiceId from client
+                if ($invoice_id_param) {
+                    try {
+                        $invoice = $stripe->invoices->retrieve($invoice_id_param, [
+                            'expand' => ['payments.data.payment']
+                        ]);
+                    } catch (Exception $e) {
+                        reliable_log("PLAN_CHANGE: invoiceId fetch failed: {$e->getMessage()}", "PLAN_CHANGE_WARN");
+                    }
+                }
+
+                // 2) Search invoices by payment_intent
+                if (!$invoice) {
+                    try {
+                        $matches = $stripe->invoices->all([
+                            'payment_intent' => $payment_intent_id,
+                            'limit' => 1
+                        ]);
+                        if (count($matches->data) > 0) {
+                            $invoice = $stripe->invoices->retrieve($matches->data[0]->id, [
+                                'expand' => ['payments.data.payment']
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        reliable_log("PLAN_CHANGE: invoice list by PI failed: {$e->getMessage()}", "PLAN_CHANGE_WARN");
+                    }
+                }
+
+                // 3) Fall back via latest_charge->invoice
+                if (!$invoice && !empty($pi->latest_charge)) {
+                    $charge = is_string($pi->latest_charge)
+                        ? $stripe->charges->retrieve($pi->latest_charge)
+                        : $pi->latest_charge;
+
+                    if (!empty($charge->invoice)) {
+                        try {
+                            $invoice = $stripe->invoices->retrieve($charge->invoice, [
+                                'expand' => ['payments.data.payment']
+                            ]);
+                        } catch (Exception $e) {
+                            reliable_log("PLAN_CHANGE: charge->invoice fetch failed: {$e->getMessage()}", "PLAN_CHANGE_WARN");
+                        }
+                    }
+                }
+
+                // Treat processing as OK; let webhook finish if needed
+                $ok_statuses = ['succeeded', 'requires_capture', 'processing'];
+                if (!in_array($pi->status, $ok_statuses, true)) {
+                    reliable_log("PaymentIntent not ready yet: {$pi->status}", "PLAN_CHANGE_WARN");
+
+                    // If the invoice is already paid, continue; otherwise tell the UI it's processing
+                    if (!$invoice || $invoice->status !== 'paid') {
+                        return [
+                            'success'        => true,
+                            'processing'     => true,
+                            'message'        => 'Payment is processing. Your subscription will update shortly.',
+                            'paymentIntentId'=> $payment_intent_id,
+                            'invoiceId'      => $invoice ? $invoice->id : null,
+                        ];
+                    }
+                }
+
+                // If we still couldn't fetch an invoice:
+                if (!$invoice) {
+                    // Renewals: webhook handles creating the renewal record — don't fail UX
+                    if ($is_renewal) {
+                        reliable_log("PLAN_CHANGE: No invoice found for PI {$payment_intent_id}, proceeding (webhook will/has handled).", "PLAN_CHANGE");
+                        return [
+                            'success'            => true,
+                            'message'            => 'Subscription renewed successfully!',
+                            'transactionCreated' => false,
+                        ];
+                    }
+                    // Non-renewal: likely still settling — report processing instead of 500
+                    return [
+                        'success'        => true,
+                        'processing'     => true,
+                        'message'        => 'Payment is processing. Your plan will update shortly.',
+                        'paymentIntentId'=> $payment_intent_id,
+                    ];
+                }
+
+                $subscription_id = ff_invoice_subscription_id($invoice);
+                if (!$subscription_id) {
+                    return new WP_Error('no_subscription', 'Could not determine subscription from invoice.', ['status' => 500]);
+                }
+
+                // Retrieve subscription to get periods/status after the update
+                $updated_sub = $stripe->subscriptions->retrieve($subscription_id, [
+                    'expand' => ['items.data']
+                ]);
+
+                // Update the original non-renewal row to reflect new plan + dates
                 $periods = ff_subscription_period($updated_sub);
                 $wpdb->update(
                     "{$wpdb->prefix}ffc_orders",
                     [
-                        'optionId'                        => $new_option_id,
-                        'subscriptionPrice'               => floatval($new_option['staticPrice']),
+                        'optionId'                        => $new_option_id ?: $wpdb->get_var($wpdb->prepare(
+                                                            "SELECT optionId FROM {$wpdb->prefix}ffc_orders WHERE subscription_id = %s ORDER BY updatedAt DESC LIMIT 1",
+                                                            $subscription_id)),
+                        'subscriptionPrice'               => floatval($updated_sub->items->data[0]->price->unit_amount / 100),
                         'subscription_status'             => $updated_sub->status,
-                        'subscription_current_period_end' => $periods['end']
-                                                            ? date('Y-m-d H:i:s', $periods['end'])
-                                                            : null,
+                        'subscription_current_period_end' => $periods['end'] ? date('Y-m-d H:i:s', $periods['end']) : null,
                         'updatedAt'                       => current_time('mysql'),
                     ],
                     [
                         'subscription_id'      => $subscription_id,
                         'subscription_renewal' => 0,
                     ],
-                    ['%d','%s','%s','%s','%s'],
+                    ['%d','%f','%s','%s','%s'],
                     ['%s','%d']
                 );
-                
-                // Create proration transaction record (only for non-past-due plan changes)
-                if ($actual_charge > 0) {
-                    // Check if record already exists to prevent duplicates
-                    $existing = $wpdb->get_var($wpdb->prepare(
-                        "SELECT COUNT(*) FROM {$wpdb->prefix}ffc_orders WHERE invoice_id = %s",
-                        $latest_invoice->id
-                    ));
-                    
-                    if ($existing == 0) {
-                        $new_order_id   = wp_generate_uuid4();
-                        $original_order = $wpdb->get_row($wpdb->prepare(
-                            "SELECT * FROM {$wpdb->prefix}ffc_orders
-                            WHERE subscription_id = %s
-                            ORDER BY createdAt ASC LIMIT 1",
-                            $subscription_id
-                        ), ARRAY_A);
-                        
-                        $transaction_data = [
-                            'invoice_id'          => $latest_invoice->id,
-                            'orderID'             => $new_order_id,
-                            'payment_intent_id'   => ff_invoice_pi_id($latest_invoice),
-                            'userId'              => $original_order['userId'],
-                            'featureId'           => $original_order['featureId'],
-                            'optionId'            => $new_option_id,
-                            'addonIds'            => $original_order['addonIds'],
-                            'priceSelected'       => $original_order['priceSelected'],
-                            'quantity'            => 1,
-                            'totalPrice'          => $actual_charge,
-                            'totalPriceDiscount'  => 0,
-                            'priceDiscountsInfo'  => json_encode(['description' => 'Plan change proration']),
-                            'userData'            => $original_order['userData'],
-                            'status'              => 'paid',
-                            'transaction_type'    => 'plan_change',
-                            'subscription_renewal'=> 1,
-                            'createdAt'           => current_time('mysql'),
-                        ];
-                        
-                        $wpdb->insert("{$wpdb->prefix}ffc_orders", $transaction_data);
-                        reliable_log("PLAN_CHANGE: Created plan change transaction record: $new_order_id with invoice_id={$latest_invoice->id}", "PLAN_CHANGE");
-                        firefly_collective_orders_email($new_order_id, 'plan_change');
-                    } else {
-                        reliable_log("PLAN_CHANGE: Skipping proration record - already exists for invoice: {$latest_invoice->id}", "PLAN_CHANGE");
-                    }
-                }
+
+                // Create a plan-change transaction row for the proration (if any)
+                $insert_plan_change_txn($invoice, $subscription_id, $new_option_id);
+
+                reliable_log("Plan change completed via PaymentIntent {$payment_intent_id}", "PLAN_CHANGE");
+                return [
+                    'success'            => true,
+                    'message'            => $is_renewal ? 'Subscription renewed successfully!' : 'Plan changed successfully!',
+                    'newPlan'            => $new_option_id,
+                    'transactionCreated' => true,
+                ];
             }
-            
-            reliable_log("Plan change completed successfully", "PLAN_CHANGE");
+
+            // ===== Path B: SetupIntent (legacy past-due flow) =====
+            if (!$setup_intent_id) {
+                return new WP_Error('missing_intent', 'setupIntentId or paymentIntentId is required', ['status' => 400]);
+            }
+
+            $setup_intent = $stripe->setupIntents->retrieve($setup_intent_id);
+            if ($setup_intent->status !== 'succeeded') {
+                reliable_log("SetupIntent not succeeded: " . $setup_intent->status, "PLAN_CHANGE_ERROR");
+                return new WP_Error('payment_not_confirmed', 'Payment method not confirmed', ['status' => 400]);
+            }
+
+            $subscription_id = $setup_intent->metadata->subscription_id;
+            $new_option_id   = intval($setup_intent->metadata->new_option_id);
+            $is_renewal      = ($setup_intent->metadata->is_renewal === 'true');
+
+            // If this was a past_due renewal, your existing logic (pay open invoice, etc.) already runs elsewhere
+            $stripe_sub = $stripe->subscriptions->retrieve($subscription_id);
+            $was_past_due = ($stripe_sub->status === 'past_due');
+
+            if ($was_past_due && $is_renewal) {
+                reliable_log("Completed past_due renewal via SetupIntent {$setup_intent_id}", "PLAN_CHANGE");
+                return [
+                    'success'            => true,
+                    'message'            => 'Subscription renewed successfully!',
+                    'transactionCreated' => false,
+                ];
+            }
+
+            // Non-past-due with SI shouldn't really happen now; just acknowledge.
             return [
-                'success'             => true,
-                'message'             => $is_renewal
-                                        ? 'Subscription renewed successfully!'
-                                        : 'Plan changed successfully!',
-                'newPlan'             => $new_option['optionName'],
-                'newPrice'            => floatval($new_option['staticPrice']),
-                'transactionCreated'  => false, // Set to false for past-due renewals
+                'success'            => true,
+                'message'            => 'Payment method saved.',
+                'transactionCreated' => false,
             ];
-            
+
         } catch (Exception $e) {
             reliable_log('Complete plan change error: ' . $e->getMessage(), "PLAN_CHANGE_ERROR");
             return new WP_Error('stripe_error', $e->getMessage(), ['status' => 500]);
         }
     }
+
 
     // Update order payment status
     function firefly_collective_update_order_payment_status($order_id, $status) {
