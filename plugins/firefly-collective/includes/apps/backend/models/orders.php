@@ -1069,20 +1069,46 @@
             
             $quantity = intval($item['quantity']);
             
-            // Get the selected price option details
-            $price_options = null;
-            $size_label = '';
-            $base_unit_price = 0;
-            
+            // Get the selected price option details (with robust fallbacks)
+            $price_options    = null;
+            $size_label       = '';
+            $base_unit_price  = null; // start as null so we can detect "not set"
+
+            // Try priceOptions first
             if (!empty($item['priceOptions'])) {
                 $price_options = json_decode($item['priceOptions'], true);
+                if ($price_options && isset($price_options['types']) && is_array($price_options['types'])) {
+                    $price_selected_index = intval($item['priceSelected']);
+                    if (isset($price_options['types'][$price_selected_index]) && is_array($price_options['types'][$price_selected_index])) {
+                        $size_label       = isset($price_options['types'][$price_selected_index]['label']) ? $price_options['types'][$price_selected_index]['label'] : '';
+                        $base_unit_price  = isset($price_options['types'][$price_selected_index]['price']) ? floatval($price_options['types'][$price_selected_index]['price']) : null;
+                    }
+                }
             }
-            
-            if ($price_options && isset($price_options['types']) && is_array($price_options['types'])) {
-                $price_selected_index = intval($item['priceSelected']);
-                if (isset($price_options['types'][$price_selected_index]) && is_array($price_options['types'][$price_selected_index])) {
-                    $size_label = isset($price_options['types'][$price_selected_index]['label']) ? $price_options['types'][$price_selected_index]['label'] : '';
-                    $base_unit_price = isset($price_options['types'][$price_selected_index]['price']) ? floatval($price_options['types'][$price_selected_index]['price']) : 0;
+
+            // Fallback #1: use staticPrice from options if present
+            if ($base_unit_price === null || $base_unit_price == 0) {
+                if (isset($item['staticPrice']) && is_numeric($item['staticPrice'])) {
+                    $base_unit_price = floatval($item['staticPrice']);
+                }
+            }
+
+            // Fallback #2: derive base price from stored totals by removing addons & reversing discounts
+            if ($base_unit_price === null || $base_unit_price == 0) {
+                // Use existing helper to compute a clean base-per-unit
+                $breakdown = get_itemized_pricing_breakdown($item, $wpdb);
+                if (!empty($breakdown['lines'])) {
+                    foreach ($breakdown['lines'] as $line) {
+                        if (!empty($line['is_base'])) {
+                            $base_unit_price = floatval($line['unit_price']);
+                            break;
+                        }
+                    }
+                }
+
+                // Last-resort guard
+                if ($base_unit_price === null) {
+                    $base_unit_price = 0;
                 }
             }
             
