@@ -1,5 +1,7 @@
 <?php
 
+    // theme/index.php
+
     // Get the post ID
     $postID = get_the_ID();
 

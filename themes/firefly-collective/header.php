@@ -1,52 +1,70 @@
 <?php
+    
+    // theme/header.php - Template Control File
 
-    // theme/header.php 
+    if (!defined('ABSPATH')) {
+        exit; // Exit if accessed directly
+    }
 
-?><!DOCTYPE html>
+    // Ensure customize model is loaded
+    if (!function_exists('firefly_collective_get_active_template')) {
+        require_once get_template_directory() . '/models/customize.php';
+    }
+
+    // Ensure $args is available and populated with proper data
+    if (!isset($args) || !is_array($args)) {
+        $args = array();
+    }
+
+    // Make sure args contains the data templates expect
+    if (!isset($args['page-title'])) {
+        $args['page-title'] = '';
+    }
+    if (!isset($args['theme-path'])) {
+        $args['theme-path'] = get_stylesheet_directory_uri();
+    }
+    if (!isset($args['page-slug'])) {
+        $args['page-slug'] = '';
+    }
+    if (!isset($args['is-single'])) {
+        $args['is-single'] = is_single();
+    }
+    if (!isset($args['is-user-logged-in'])) {
+        $args['is-user-logged-in'] = is_user_logged_in();
+    }
+
+    // Try to load the header from the active template
+    if (firefly_collective_load_template_file('header.php', $args)) {
+        // Template loaded successfully
+        return;
+    }
+    
+    // If we get here, the template failed to load
+    // Try to load the default template as fallback
+    $default_header_path = firefly_collective_get_template_file_path('header.php', FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+    if ($default_header_path) {
+        // Extract args for use in template
+        if (!empty($args)) {
+            extract($args, EXTR_SKIP);
+        }
+        include $default_header_path;
+        return;
+    }
+    
+    // Ultimate fallback: Basic header if even default template fails
+    ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
-
 <head>
+    <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?=get_bloginfo('name')?> - <?=$args['page-title']?></title>
-    <?php if ( function_exists('wp_site_icon') ) { ?>
-        <?php wp_site_icon(); ?>
-    <?php } ?>
+    <title><?php echo esc_html(get_bloginfo('name') . ' - ' . (isset($args['page-title']) ? $args['page-title'] : '')); ?></title>
     <?php wp_head(); ?>
 </head>
-
 <body <?php body_class(); ?>>
     <div id="backdrop"></div>
-
     <header>
-        <div id="nav-bar"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id'] && !function_exists('is_customize_preview')) {?> class="user-nav"<? } ?>></div>
-        <div id="logo-name" <? if ($args['is-user-logged-in'] && !$_COOKIE['auth_id'] && !function_exists('is_customize_preview')) {?> class="user-nav"<?}?>>
-            <div id="site-logo"><img src="<?php echo esc_url($args['theme-path'] . '/images/logo.webp'); ?>"></div>
-            <div id="site-name"><?=get_bloginfo('name')?></div>
-        </div>
-    </header>  
-
-    <div>
-        <img id="hamburger"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id'] && !function_exists('is_customize_preview')) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/hamburger.webp'); ?>" alt="<?php esc_attr_e('Menu'); ?>">
-    </div>
-    <div>
-        <img id="close-nav-btn"<? if($args['is-user-logged-in'] && !$_COOKIE['auth_id'] && !function_exists('is_customize_preview')) {?> class="user-nav"<? } ?> src="<?php echo esc_url($args['theme-path'] . '/images/close-nav.webp'); ?>" alt="<?php esc_attr_e('Close Menu'); ?>">
-    </div>
-    <nav>
-        <?php
-        wp_nav_menu(array(
-            'theme_location'  => 'website-menu',
-            'container_class' => 'website-menu',
-            'fallback_cb'     => false,
-        ));
-        ?>
-    </nav>
-
+        <h1><?php echo esc_html(get_bloginfo('name')); ?></h1>
+    </header>
     <main>
-        <div id="contact-sticky">
-            <h3>Looking to Connect?</h3>
-            <a href="/contact">Contact Us</a>
-        </div>
-        <div class="content <?php echo esc_attr($args['page-slug']); ?>">
-            <?php if ($args['is-single']) { ?>
-                <div id="back-to-blogs"><a href="<?php echo esc_url(home_url('/blog')); ?>"><?php esc_html_e('Back to blogs'); ?></a></div>
-            <?php } ?>
+        <div class="content">
+    <?php
