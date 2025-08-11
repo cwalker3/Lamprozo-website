@@ -2,8 +2,18 @@
 
 // Vue.js Campaign Management Component
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait for features data to be available
-    if (!window.campaignFeatures || !Array.isArray(window.campaignFeatures)) {
+    
+    // Handle both array and object with features property
+    let featuresArray = null;
+    if (window.campaignFeatures) {
+        if (Array.isArray(window.campaignFeatures)) {
+            featuresArray = window.campaignFeatures;
+        } else if (window.campaignFeatures.features && Array.isArray(window.campaignFeatures.features)) {
+            featuresArray = window.campaignFeatures.features;
+        }
+    }
+    
+    if (!featuresArray || featuresArray.length === 0) {
         console.error('Campaign features data not found');
         return;
     }
@@ -18,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 editingCampaign: null,
                 campaigns: [],
                 expandedCampaigns: [],
-                features: window.campaignFeatures || [],
+                features: featuresArray,
                 campaignForm: {
                     name: '',
                     start_date: '',
@@ -46,6 +56,48 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     return optionConfig.addons[addonId] || false;
                 };
+            },
+
+            allFeaturesSelected() {
+                if (!this.features || !this.campaignForm.features_config) return false;
+                
+                return this.features.every(feature => {
+                    const featureConfig = this.campaignForm.features_config[feature.id];
+                    if (!featureConfig || !featureConfig.show) return false;
+                    
+                    // Check if all options are selected
+                    return feature.options.every(option => {
+                        const optionConfig = featureConfig.options[option.id];
+                        if (!optionConfig || !optionConfig.show) return false;
+                        
+                        // Check if all addons are selected
+                        if (option.addons && option.addons.length > 0) {
+                            return option.addons.every(addon => optionConfig.addons[addon.id] === true);
+                        }
+                        return true;
+                    });
+                });
+            },
+            
+            someButNotAllFeaturesSelected() {
+                if (!this.features || !this.campaignForm.features_config) return false;
+                if (this.allFeaturesSelected) return false;
+                
+                // Check if any feature/option/addon is selected
+                return this.features.some(feature => {
+                    const featureConfig = this.campaignForm.features_config[feature.id];
+                    if (featureConfig && featureConfig.show) return true;
+                    
+                    return feature.options.some(option => {
+                        const optionConfig = featureConfig?.options[option.id];
+                        if (optionConfig && optionConfig.show) return true;
+                        
+                        if (option.addons && option.addons.length > 0) {
+                            return option.addons.some(addon => optionConfig?.addons[addon.id] === true);
+                        }
+                        return false;
+                    });
+                });
             }
         },
         
@@ -60,6 +112,17 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         methods: {
+            // Helper method to get fetch headers with nonce
+            getFetchHeaders(includeContentType = false) {
+                const headers = {};
+                
+                if (includeContentType) {
+                    headers['Content-Type'] = 'application/json';
+                }
+                
+                return headers;
+            },
+            
             initializeFormData() {
                 // Create completely new objects to avoid reactivity issues
                 const featuresConfig = {};
@@ -138,37 +201,60 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.body.removeChild(textArea);
                     }
                     
-                    // Visual feedback
-                    const button = event.target;
-                    const originalText = button.textContent;
+                    // Visual feedback - ensure we get the button element
+                    let button = event.target;
+                    
+                    // If clicked on a child element or text node, find the button parent
+                    while (button && button.tagName !== 'BUTTON') {
+                        button = button.parentElement;
+                    }
+                    
+                    if (!button) return; // Safety check
+                    
+                    // Store original state using innerHTML (not textContent) 
+                    const originalContent = button.innerHTML;
+                    const originalTitle = button.title;
                     
                     // Change appearance to show success
                     button.classList.add('copied');
-                    button.textContent = '✓';
+                    button.innerHTML = '✓';
                     button.title = 'Copied!';
                     
                     // Reset after 2 seconds
                     setTimeout(() => {
-                        button.classList.remove('copied');
-                        button.textContent = originalText;
-                        button.title = 'Copy URL to clipboard';
+                        if (button) { // Extra safety check
+                            button.classList.remove('copied');
+                            button.innerHTML = originalContent; // Restore original HTML content
+                            button.title = originalTitle;
+                        }
                     }, 2000);
                     
                 } catch (err) {
                     console.error('Failed to copy text: ', err);
-                    // Show error feedback
-                    const button = event.target;
-                    const originalText = button.textContent;
                     
-                    button.textContent = '✗';
+                    // Show error feedback with same button-finding logic
+                    let button = event.target;
+                    while (button && button.tagName !== 'BUTTON') {
+                        button = button.parentElement;
+                    }
+                    
+                    if (!button) return;
+                    
+                    const originalContent = button.innerHTML;
+                    const originalTitle = button.title;
+                    
+                    button.innerHTML = '✗';
                     button.title = 'Copy failed';
                     
                     setTimeout(() => {
-                        button.textContent = originalText;
-                        button.title = 'Copy URL to clipboard';
+                        if (button) {
+                            button.innerHTML = originalContent;
+                            button.title = originalTitle;
+                        }
                     }, 2000);
                 }
             },
+
             
             // Get available addons for a specific option (filtered by what's marked as show)
             getAvailableAddons(feature, option) {
@@ -204,17 +290,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             },
             
-            // Handle option selection change in preselect section
+            // Only clear other options within the same feature
             onPreselectOptionChange(featureId) {
-                // Clear selected addons when option changes
+                // Clear selected addons when option changes (do this first)
                 if (this.campaignForm.preselect_config[featureId]) {
                     this.campaignForm.preselect_config[featureId].selectedAddons = [];
                 }
+                
+                // Note: We do NOT clear other features anymore - each feature can have its own preselection
+                console.log(`Feature ${featureId} option changed`); // Debug log
+                
+                // Force Vue to detect the change
+                this.$forceUpdate();
             },
             
             // Toggle addon selection in preselect section
             togglePreselectAddon(featureId, addonId) {
-                
                 if (!this.campaignForm.preselect_config[featureId]) return;
                 
                 const selectedAddons = this.campaignForm.preselect_config[featureId].selectedAddons;
@@ -231,12 +322,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.loading = true;
                 try {
                     const response = await fetch(`${campaignData.api_url}get-campaigns`, {
-                        method: 'GET'
+                        method: 'GET',
+                        headers: this.getFetchHeaders()
                     });
                     
                     const data = await response.json();
                     if (data.success) {
-                        
                         // Convert unlimited from string/integer to boolean for proper display
                         this.campaigns = data.campaigns.map(campaign => {
                             const converted = {
@@ -245,12 +336,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             };
                             return converted;
                         });
-                        
                     } else {
                         console.error('Failed to load campaigns:', data);
+                        alert('Failed to load campaigns: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
+                    alert('Error loading campaigns: ' + error.message);
                 } finally {
                     this.loading = false;
                 }
@@ -259,7 +351,6 @@ document.addEventListener('DOMContentLoaded', function() {
             async saveCampaign() {
                 try {
                     const endpoint = this.editingCampaign ? 'update-campaign' : 'create-campaign';
-                    const method = 'POST';
                     
                     const payload = {
                         ...this.campaignForm
@@ -270,10 +361,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     const response = await fetch(`${campaignData.api_url}${endpoint}`, {
-                        method: method,
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        method: 'POST',
+                        headers: this.getFetchHeaders(true),
                         body: JSON.stringify(payload)
                     });
                     
@@ -281,12 +370,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         this.cancelForm();
                         this.loadCampaigns();
+                        alert('Campaign saved successfully!');
                     } else {
                         alert('Error saving campaign: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
                     console.error('Error saving campaign:', error);
-                    alert('Error saving campaign');
+                    alert('Error saving campaign: ' + error.message);
                 }
             },
             
@@ -337,6 +427,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     this.expandedCampaigns.push(campaignId);
                 }
+            },
+
+            toggleAllFeatures(event) {
+                const shouldSelectAll = event.target.checked;
+                
+                // Loop through all features
+                this.features.forEach(feature => {
+                    const featureConfig = this.campaignForm.features_config[feature.id];
+                    if (!featureConfig) return;
+                    
+                    // Set feature show state
+                    featureConfig.show = shouldSelectAll;
+                    
+                    // Loop through all options for this feature
+                    feature.options.forEach(option => {
+                        const optionConfig = featureConfig.options[option.id];
+                        if (!optionConfig) return;
+                        
+                        // Set option show state
+                        optionConfig.show = shouldSelectAll;
+                        
+                        // Loop through all addons for this option
+                        if (option.addons && option.addons.length > 0) {
+                            option.addons.forEach(addon => {
+                                // Set addon state
+                                optionConfig.addons[addon.id] = shouldSelectAll;
+                            });
+                        }
+                    });
+                });
             },
             
             formatDate(dateString) {
@@ -389,25 +509,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 return preselected.length ? preselected.join('<br>') : 'None';
             },
+            
             async deleteCampaign(campaignId) {
                 if (!confirm('Are you sure you want to delete this campaign?')) {
                     return;
                 }
+                
                 try {
                     const response = await fetch(`${campaignData.api_url}delete-campaign`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: this.getFetchHeaders(true),
                         body: JSON.stringify({ id: campaignId })
                     });
+                    
                     const data = await response.json();
                     if (data.success) {
                         this.campaigns = this.campaigns.filter(c => c.id !== campaignId);
+                        alert('Campaign deleted successfully!');
                     } else {
                         alert('Failed to delete campaign: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
                     console.error('Error deleting campaign:', error);
-                    alert('Error deleting campaign');
+                    alert('Error deleting campaign: ' + error.message);
                 }
             }
         }

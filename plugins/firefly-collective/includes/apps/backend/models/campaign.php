@@ -119,7 +119,6 @@
                         $result = file_put_contents($qr_path, $qr_image);
                         
                         if ($result !== false) {
-                            error_log('QR code generated successfully for token: ' . $token);
                             return $upload_dir['baseurl'] . '/campaigns/' . $token . '.png';
                         } else {
                             error_log('Failed to save QR code for token: ' . $token . ' - Check file permissions');
@@ -146,13 +145,20 @@
                 ARRAY_A
             );
             
-            // Add QR code URLs and decode JSON fields
+            // Add QR code URLs and decode JSON fields, convert dates to local timezone
             foreach ($campaigns as &$campaign) {
                 $upload_dir = wp_upload_dir();
                 $qr_file = $upload_dir['basedir'] . '/campaigns/' . $campaign['token'] . '.png';
                 if (file_exists($qr_file)) {
                     $campaign['qr_url'] = $upload_dir['baseurl'] . '/campaigns/' . $campaign['token'] . '.png';
                 }
+                
+                // Convert UTC dates to local timezone for display
+                $campaign['start_date'] = convert_utc_to_local($campaign['start_date']);
+                if (!empty($campaign['end_date'])) {
+                    $campaign['end_date'] = convert_utc_to_local($campaign['end_date']);
+                }
+                
                 $campaign['features_config'] = json_decode($campaign['features_config'], true);
                 $campaign['preselect_config'] = json_decode($campaign['preselect_config'], true);
                 $campaign['dashboard_url'] = home_url('/dashboard/' . $campaign['token']);
@@ -168,21 +174,25 @@
         global $wpdb;
         
         $name = sanitize_text_field($request->get_param('name'));
-        $start_date = sanitize_text_field($request->get_param('start_date'));
-        $end_date = $request->get_param('end_date') ? sanitize_text_field($request->get_param('end_date')) : null;
+        $start_date_local = sanitize_text_field($request->get_param('start_date'));
+        $end_date_local = $request->get_param('end_date') ? sanitize_text_field($request->get_param('end_date')) : null;
         $unlimited = $request->get_param('unlimited') ? 1 : 0;
         $features_config = $request->get_param('features_config');
         $preselect_config = $request->get_param('preselect_config');
         
         try {
+            // Convert local datetime to UTC for database storage
+            $start_date_utc = convert_local_to_utc($start_date_local);
+            $end_date_utc = $end_date_local ? convert_local_to_utc($end_date_local) : null;
+            
             // Insert campaign
             $result = $wpdb->insert(
                 $wpdb->prefix . 'ffc_campaigns',
                 array(
                     'name' => $name,
                     'token' => '', // Will update after getting ID
-                    'start_date' => $start_date,
-                    'end_date' => $end_date,
+                    'start_date' => $start_date_utc,
+                    'end_date' => $end_date_utc,
                     'unlimited' => $unlimited,
                     'features_config' => json_encode($features_config),
                     'preselect_config' => json_encode($preselect_config)
@@ -224,19 +234,23 @@
         
         $id = intval($request->get_param('id'));
         $name = sanitize_text_field($request->get_param('name'));
-        $start_date = sanitize_text_field($request->get_param('start_date'));
-        $end_date = $request->get_param('end_date') ? sanitize_text_field($request->get_param('end_date')) : null;
+        $start_date_local = sanitize_text_field($request->get_param('start_date'));
+        $end_date_local = $request->get_param('end_date') ? sanitize_text_field($request->get_param('end_date')) : null;
         $unlimited = $request->get_param('unlimited') ? 1 : 0;
         $features_config = $request->get_param('features_config');
         $preselect_config = $request->get_param('preselect_config');
         
         try {
+            // Convert local datetime to UTC for database storage
+            $start_date_utc = convert_local_to_utc($start_date_local);
+            $end_date_utc = $end_date_local ? convert_local_to_utc($end_date_local) : null;
+            
             $result = $wpdb->update(
                 $wpdb->prefix . 'ffc_campaigns',
                 array(
                     'name' => $name,
-                    'start_date' => $start_date,
-                    'end_date' => $end_date,
+                    'start_date' => $start_date_utc,
+                    'end_date' => $end_date_utc,
                     'unlimited' => $unlimited,
                     'features_config' => json_encode($features_config),
                     'preselect_config' => json_encode($preselect_config)
@@ -253,6 +267,56 @@
             return array('success' => true);
         } catch (Exception $e) {
             return array('success' => false, 'message' => $e->getMessage());
+        }
+    }
+
+    /**
+     * Convert local datetime to UTC for database storage
+     */
+    function convert_local_to_utc($local_datetime) {
+        if (empty($local_datetime)) {
+            return null;
+        }
+        
+        // Get WordPress timezone
+        $wp_timezone = wp_timezone();
+        
+        try {
+            // Create DateTime object in WordPress timezone
+            $local_dt = new DateTime($local_datetime, $wp_timezone);
+            
+            // Convert to UTC
+            $local_dt->setTimezone(new DateTimeZone('UTC'));
+            
+            return $local_dt->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            error_log('Error converting datetime to UTC: ' . $e->getMessage());
+            return $local_datetime; // Fallback to original value
+        }
+    }
+
+    /**
+     * Convert UTC datetime to local for display
+     */
+    function convert_utc_to_local($utc_datetime) {
+        if (empty($utc_datetime)) {
+            return null;
+        }
+        
+        // Get WordPress timezone
+        $wp_timezone = wp_timezone();
+        
+        try {
+            // Create DateTime object in UTC
+            $utc_dt = new DateTime($utc_datetime, new DateTimeZone('UTC'));
+            
+            // Convert to WordPress timezone
+            $utc_dt->setTimezone($wp_timezone);
+            
+            return $utc_dt->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            error_log('Error converting datetime to local: ' . $e->getMessage());
+            return $utc_datetime; // Fallback to original value
         }
     }
 

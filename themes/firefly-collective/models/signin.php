@@ -384,21 +384,41 @@
         if ( preg_match('#^dashboard/([A-Za-z0-9]+)$#', $path, $m) ) {
             global $wpdb;
             $token = $m[1];
-            $now = current_time('mysql'); // Full datetime, not just date
             
+            // Use consistent UTC time for comparison
+            $now_utc = gmdate('Y-m-d H:i:s');
+            
+            // First, let's get the campaign without date restrictions to debug
+            $campaign_debug = $wpdb->get_row( $wpdb->prepare(
+                "SELECT id, name, start_date, end_date, unlimited, token FROM {$wpdb->prefix}ffc_campaigns WHERE token = %s",
+                $token
+            ) );
+            
+            // Log for debugging (remove this after fixing)
+            error_log("Campaign Debug - Token: $token");
+            error_log("Campaign Debug - Current UTC: $now_utc");
+            if ($campaign_debug) {
+                error_log("Campaign Debug - Found campaign: " . print_r($campaign_debug, true));
+            } else {
+                error_log("Campaign Debug - No campaign found for token");
+            }
+            
+            // Now check with date validation
             $campaign = $wpdb->get_row( $wpdb->prepare(
                 "
                 SELECT id, name, start_date, end_date, unlimited
                 FROM {$wpdb->prefix}ffc_campaigns
                 WHERE token = %s
-                AND start_date <= %s
+                AND (
+                    start_date <= %s OR start_date IS NULL
+                )
                 AND (
                     unlimited = 1
                     OR end_date IS NULL
                     OR end_date >= %s
                 )
                 ",
-                $token, $now, $now
+                $token, $now_utc, $now_utc
             ) );
 
             if ( $campaign ) {
@@ -411,10 +431,14 @@
                     'samesite' => 'Lax',
                 ]);
                 $_COOKIE['campaign_token'] = $token;
+                
+                error_log("Campaign Debug - Valid campaign found, redirecting to dashboard");
                 wp_redirect( home_url('/dashboard') );
                 exit;
             } else {
                 // Invalid or expired campaign token
+                error_log("Campaign Debug - Campaign validation failed");
+                
                 // Clean up any existing campaign cookies
                 cleanup_expired_campaign_cookies();
                 
@@ -450,7 +474,7 @@
         
         global $wpdb;
         $token = sanitize_text_field($_COOKIE['campaign_token']);
-        $now = current_time('mysql');
+        $now_utc = gmdate('Y-m-d H:i:s');
         
         // Check if the current campaign token is still valid
         $valid_campaign = $wpdb->get_var( $wpdb->prepare(
@@ -458,14 +482,16 @@
             SELECT COUNT(*)
             FROM {$wpdb->prefix}ffc_campaigns
             WHERE token = %s
-            AND start_date <= %s
+            AND (
+                start_date <= %s OR start_date IS NULL
+            )
             AND (
                 unlimited = 1
                 OR end_date IS NULL
                 OR end_date >= %s
             )
             ",
-            $token, $now, $now
+            $token, $now_utc, $now_utc
         ) );
         
         // If campaign is expired or doesn't exist, remove the cookie

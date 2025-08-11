@@ -69,6 +69,19 @@
             <!-- Features Configuration -->
             <div class="config-section">
                 <h4>Features to Show</h4>
+
+                <!-- Master toggle -->
+                <div class="master-toggle" style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-left: 4px solid #2271b1;">
+                    <label style="font-weight: bold; display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" 
+                            :checked="allFeaturesSelected" 
+                            :indeterminate.prop="someButNotAllFeaturesSelected"
+                            @change="toggleAllFeatures" 
+                            style="margin-right: 8px;">
+                        Select/Deselect All Features, Options & Addons
+                    </label>
+                </div>
+
                 <div class="features-config">
                     <div v-for="(feature, fIndex) in features" :key="'feature-' + fIndex" class="feature-config">
                         <span class="feature-toggle">
@@ -100,6 +113,12 @@
             <!-- Preselect Configuration -->
             <div class="config-section">
                 <h4>Preselected Items</h4>
+                
+                <!-- Updated helper text -->
+                <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border-left: 4px solid #2271b1; font-size: 13px;">
+                    <strong>Note:</strong> You can preselect one option per feature. Users will see these items already selected when they visit the campaign.
+                </div>
+                
                 <div class="preselect-config">
                     <template v-for="(feature, fIndex) in features" :key="'preselect-' + fIndex">
                         <div v-if="campaignForm.features_config[feature.id] && campaignForm.features_config[feature.id].show" 
@@ -108,6 +127,7 @@
                                 <strong>{{ feature.featureName }}</strong>
                             </label>
                             
+                            <!-- Dropdown with NO disabled condition -->
                             <select v-model="campaignForm.preselect_config[feature.id].selectedOption" 
                                     @change="onPreselectOptionChange(feature.id)"
                                     class="option-select">
