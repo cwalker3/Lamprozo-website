@@ -1,24 +1,29 @@
-# 1. Ignore everything
+# Ignore everything
 *
 
-# 2. Whitelist root files
+# Whitelist root files
 !/.gitignore
 !/.htaccess
 !/LICENSE.md
 
-# 3. Plugins directory
+# Plugins directory
 !plugins/
 plugins/*
 !plugins/firefly-collective/
 !plugins/firefly-collective/**
 
-# 4. Themes directory
+# Themes directory
 !themes/
 themes/*
 !themes/firefly-collective/
 !themes/firefly-collective/**
 
-# 5. Uploads directory
+# Ignore everything in templates except "default"
+themes/firefly-collective/templates/*
+!themes/firefly-collective/templates/default/
+!themes/firefly-collective/templates/default/**
+
+# Uploads directory
 !uploads/
 uploads/**
 !uploads/campaigns/
