@@ -10,4 +10,4 @@ window.initializeDefaultJS = function() {
     console.log('DefaultJS initialized');
 };
 
-console.log(templateData);
+// console.log(templateData);
