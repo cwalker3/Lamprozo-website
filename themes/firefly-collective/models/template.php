@@ -6,17 +6,22 @@
         exit; // Exit if accessed directly
     }
 
+    // Load template globals if not present
+    if (!defined('FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE')) {
+        $plugin_template_file_path = WP_PLUGIN_DIR . '/firefly-collective/includes/apps/backend/models/template.php';
+        require $plugin_template_file_path;
+    }
+
+    // Load template core model  
+    $active_template = firefly_collective_get_active_template();
+    require get_template_directory() . '/templates/' . $active_template . '/models/_core.php';
+
     /**
      * Theme Template System Management
      * 
      * Handles template selection, activation, and switching functionality
      * following WordPress best practices for secure file inclusion.
      */
-
-    // Define template system constants
-    define('FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE', 'default');
-    define('FIREFLY_COLLECTIVE_TEMPLATE_OPTION', 'firefly_collective_active_template');
-    define('FIREFLY_COLLECTIVE_TEMPLATES_DIR', get_template_directory() . '/templates');
 
     /**
      * Theme activation hook - sets default template on theme activation
@@ -214,8 +219,9 @@
     }
     add_action('switch_theme', 'firefly_collective_theme_deactivation');
 
-    // Require enqueue.php from the default template directory
-    $enqueue_file = FIREFLY_COLLECTIVE_TEMPLATES_DIR . '/' . FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE . '/enqueue.php';
+    // Require enqueue.php from the active template directory
+    $active_template = firefly_collective_get_active_template();
+    $enqueue_file = FIREFLY_COLLECTIVE_TEMPLATES_DIR . '/' . $active_template . '/enqueue.php';
 
     if ( file_exists( $enqueue_file ) && firefly_collective_is_valid_template_path( $enqueue_file ) ) {
         require_once $enqueue_file;

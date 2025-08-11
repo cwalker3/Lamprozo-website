@@ -11,6 +11,68 @@
     // Add Theme Support for Post Thumbnails
     add_theme_support('post-thumbnails');
 
+    /**
+     * Enqueue core template assets (files starting with _core_)
+     */
+    function enqueue_core_assets($template_name, $theme_path, $version) {
+        $template_dir = get_template_directory() . '/templates/' . $template_name . '/assets';
+        $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
+        
+        // Scan and enqueue core CSS files
+        $css_dir = $template_dir . '/css';
+        if (is_dir($css_dir)) {
+            $css_files = glob($css_dir . '/_core_*.css');
+            foreach ($css_files as $file) {
+                $filename = basename($file);
+                $handle = 'core-' . str_replace(['_core_', '.css'], '', $filename) . '-css';
+                $url = $template_web_path . '/css/' . $filename;
+                wp_enqueue_style($handle, $url, array(), $version);
+            }
+        }
+
+        // Enqueue main theme js
+        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
+
+        // Localize main.js with the nonce and API URL for security
+        wp_localize_script('main-js', 'myApi', array(
+            'nonce'   => $nonce,
+            'api_url' => $api_url,
+            'themePath' => $theme_path,
+            'maxBlogs' => 15,
+            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+        ));
+        
+        // Scan and enqueue core JS files
+        $js_dir = $template_dir . '/js';
+        $nav_handle = '';
+        $template_handle = '';
+        if (is_dir($js_dir)) {
+            $js_files = glob($js_dir . '/_core_*.js');
+            foreach ($js_files as $file) {
+                $filename = basename($file);
+                $handle = 'core-' . str_replace(['_core_', '.js'], '', $filename) . '-js';
+                $url = $template_web_path . '/js/' . $filename;
+                wp_enqueue_script($handle, $url, array(), $version, true);
+                if ( preg_match('/^core-nav/', $handle) ) {
+                    $nav_handle = $handle;
+                }
+                if (preg_match('/'.$template_name.'/', $handle)) {
+                    $template_handle = $handle;
+                }
+            }
+        }
+
+        // Nav js data
+        wp_localize_script($nav_handle, 'navData', array(
+            'auth_id'   => $_COOKIE['auth_id']
+        ));
+
+        // Template main js data
+        wp_localize_script($template_handle, 'templateData', array(
+            'obj'   => core_test()
+        ));
+    }
+
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
@@ -25,25 +87,14 @@
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
         $current_view = determine_view();
 
-        // Enqueue Stylesheets
-        wp_enqueue_style('custom-properties-css', $theme_path . '/assets/css/custom-properties.css', array(), $unique_id);
-        wp_enqueue_style('main-css', $theme_path . '/assets/css/main.css', array(), $unique_id);
-        wp_enqueue_style('nav-css', $theme_path . '/assets/css/nav.css', array(), $unique_id);
-        wp_enqueue_style('animations-css', $theme_path . '/assets/css/animations.css', array(), $unique_id);
-        wp_enqueue_style('gutenberg-css', $theme_path . '/assets/css/gutenberg.css', array(), $unique_id);
-
-        // Enqueue Scripts
-        wp_enqueue_script('nav-js', $theme_path . '/assets/js/nav.js', array(), $unique_id, true);
-        wp_localize_script('nav-js', 'navData', array(
-            'auth_id'   => $auth_id
-        ));
+        // Get active template and enqueue core template assets
+        $active_template = firefly_collective_get_active_template();
+        enqueue_core_assets($active_template, $theme_path, $unique_id);
         
-        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-
         $nonce = wp_create_nonce('wp_rest');
 
         // Localize main.js with the nonce and API URL for security
-        wp_localize_script('main-js', 'myApi', array(
+        wp_localize_script('core-main-js', 'myApi', array(
             'nonce'   => $nonce,
             'api_url' => $api_url,
             'themePath' => $theme_path,
@@ -200,9 +251,12 @@
 
     add_action('login_init', function() {
         $theme_path = get_template_directory_uri();
+        $active_template = firefly_collective_get_active_template();
         $nonce = wp_create_nonce('wp_rest');
+        
+        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
         wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $nonce);
-        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $nonce, true);
+        wp_enqueue_script('template-main-js', $theme_path . '/templates/' . $active_template . '/assets/js/_core_main.js', array(), $nonce, true);
         wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
         wp_localize_script('auth-js', 'myApi', array(
             'nonce'     => $nonce,

@@ -226,7 +226,8 @@
             }
         }
     }
-        // Reset function to allow re-initialization if needed
+    
+    // Reset function to allow re-initialization if needed
     window.resetsignup = function() {
         isInitialized = false;
     };

@@ -9,14 +9,15 @@
         }
 
         $theme_path = get_template_directory_uri();
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
         $unique_id = uniqid(); // Adjust this for versioning or cache-busting
 
         // Enqueue Stylesheets
-        wp_enqueue_style('calendar-css', $theme_path . '/assets/css/calendar.css', array(), $unique_id);
+        wp_enqueue_style('calendar-css', $theme_path . '/templates/' . $template_name . '/assets/css/calendar.css', array(), $unique_id);
         wp_enqueue_style('bookings-css', PLUGIN_PATH_BACKEND . '/assets/css/bookings.css', array(), $unique_id);
 
         // Enqueue Scripts
-        wp_enqueue_script('cal-js', $theme_path . '/assets/js/calendar.js', array(), $unique_id, true);
+        wp_enqueue_script('cal-js', $theme_path . '/templates/' . $template_name . '/assets/js/calendar.js', array(), $unique_id, true);
         wp_enqueue_script('bookings-js', PLUGIN_PATH_BACKEND . '/assets/js/bookings.js', array(), $unique_id, true);
 
         // Admin access

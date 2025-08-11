@@ -16,9 +16,13 @@
         $assets['js'] = array();
         $assets['css'] = array();
 
+        // Get active template for template-specific assets
+        $active_template = firefly_collective_get_active_template();
+        $template_path = $theme_path . '/templates/' . $active_template;
+
         switch($view) {
             case 'blog':
-                $assets['js'][]     = $theme_path . '/assets/js/blog.js';
+                $assets['js'][]     = $template_path . '/assets/js/blog.js';
                 break;
             
             case 'app':
@@ -27,7 +31,7 @@
                 $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
                 $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
                 $assets['js'][]     = $theme_path . '/assets/js/main.js';
-                $assets['js'][]     = $theme_path . '/assets/js/signup.js';
+                $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 $assets['js'][]     = $theme_path . '/assets/js/auth.js';
                 $assets['js'][]     = $theme_path . '/assets/js/app.js';
                 $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';
@@ -37,18 +41,18 @@
                 break;
 
             case 'contact':
-                $assets['js'][]     = $theme_path . '/assets/js/contact.js';
+                $assets['js'][]     = $template_path . '/assets/js/contact.js';
                 break;
 
             case 'signup':
                 $assets['js'][]     = $theme_path . '/assets/js/auth.js';
-                $assets['js'][]     = $theme_path . '/assets/js/signup.js';
+                $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 break;
 
             case 'request-an-appointment':
                 $assets['css'][]    = $theme_path . '/assets/css/calendar.css';
-                $assets['js'][]     = $theme_path . '/assets/js/calendar.js';
-                $assets['js'][]     = $theme_path . '/assets/js/request-an-appointment.js';
+                $assets['js'][]     = $template_path . '/assets/js/calendar.js';
+                $assets['js'][]     = $template_path . '/assets/js/request-an-appointment.js';
                 break;
 
             case 'dashboard':

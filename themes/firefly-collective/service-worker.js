@@ -4,62 +4,114 @@
 const devMode = true;
 
 // Cache configuration
-const CACHE_PREFIX    = 'ffc-';
-const STATIC_CACHE    = `${CACHE_PREFIX}static`;
-const ASSETS_CACHE    = `${CACHE_PREFIX}assets`;
-const DYNAMIC_CACHE   = `${CACHE_PREFIX}dynamic`;
-const API_CACHE       = `${CACHE_PREFIX}api`;
-const METADATA_CACHE  = `${CACHE_PREFIX}metadata`;
-const theme_path      = '/wp-content/themes/firefly-collective';
-const plugin_path     = '/wp-content/plugins/firefly-collective/includes/apps/backend';
+const CACHE_PREFIX    =   'ffc-';
+const STATIC_CACHE    =   `${CACHE_PREFIX}static`;
+const ASSETS_CACHE    =   `${CACHE_PREFIX}assets`;
+const DYNAMIC_CACHE   =   `${CACHE_PREFIX}dynamic`;
+const API_CACHE       =   `${CACHE_PREFIX}api`;
+const METADATA_CACHE  =   `${CACHE_PREFIX}metadata`;
+const themePath       =   '/wp-content/themes/firefly-collective';
+const plugin_path     =   '/wp-content/plugins/firefly-collective/includes/apps/backend';
+let activeTemplate  =   'default';
+const templatePath    =   `${themePath}/templates/${activeTemplate}`;
 
 // Cache duration (1 hour in milliseconds)
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+let templateAssetsList = null;
 
 // API endpoints to cache separately
 const API_ROUTES = [
   '/wp-json/custom-api/v1/app-init'
 ];
 
-// List of assets to cache on install
-const CORE_ASSETS = [
-  theme_path + '/views/app.html',
-  theme_path + '/assets/css/main.css',
-  theme_path + '/assets/css/app.css',
-  theme_path + '/assets/css/dashboard.css',
-  theme_path + '/assets/css/animations.css',
-  theme_path + '/assets/css/nav.css',
-  plugin_path + '/assets/css/orders.css',
-  theme_path + '/assets/js/app.js',
-  theme_path + '/assets/js/nav.js',
-  theme_path + '/assets/js/main.js',
-  theme_path + '/assets/js/dashboard.js',
-  plugin_path + '/assets/js/orders.js',
-  theme_path + '/assets/js/manifest.json',
+// Core theme assets (these are now in the shell, so we only cache for offline access)
+const CORE_THEME_ASSETS = [
+  themePath    +   '/views/app.html',
+  themePath    +   '/assets/css/gutenberg.css',
+  themePath    +   '/assets/css/app.css',
+  themePath    +   '/assets/css/auth.css',
+  themePath    +   '/assets/css/dashboard.css',
+  themePath    +   '/assets/js/main.js',
+  themePath    +   '/assets/js/auth.js',
+  themePath    +   '/assets/js/dashboard.js',
+  themePath    +   '/assets/js/app.js',
+  themePath    +   '/manifest.json',
+
+  templatePath +   '/assets/css/nav.css',
+  templatePath +   '/assets/css/calendar.css',
+  templatePath +   '/assets/js/signup.js',
+  
+  plugin_path  +   '/assets/css/orders.css',
+  plugin_path  +   '/assets/js/orders.js',
 ];
+
+// Core template assets (files with _core_ prefix)
+function getCoreTemplateAssets() {
+  return [
+    `${templatePath}/assets/css/_core_custom-properties.css`,
+    `${templatePath}/assets/css/_core_main.css`,
+    `${templatePath}/assets/css/_core_animations.css`,
+    `${templatePath}/assets/css/_core_nav.css`,
+    `${templatePath}/assets/css/_core_default.css`,
+    `${templatePath}/assets/js/_core_default.js`,
+    `${templatePath}/assets/js/_core_main.js`,
+    `${templatePath}/assets/js/_core_nav.js`,
+  ];
+}
+
+// Template-specific assets (generated dynamically)
+function getTemplateAssets() {
+  // If we have a dynamic asset list from the server, use it
+  if (templateAssetsList && templateAssetsList.css && templateAssetsList.js) {
+    return [...templateAssetsList.css, ...templateAssetsList.js];
+  }
+  
+  // Fallback to common template asset patterns (excluding _core_ files)
+  const commonAssets = [
+    `${templatePath}/assets/js/blog.js`,
+    `${templatePath}/assets/js/contact.js`,
+    `${templatePath}/assets/js/signup.js`,
+    `${templatePath}/assets/js/calendar.js`,
+    `${templatePath}/assets/js/request-an-appointment.js`,
+    `${templatePath}/assets/css/default.css`,
+  ];
+  
+  return commonAssets;
+}
 
 // Audio assets (cached separately)
 const AUDIO_ASSETS = [];
 
 // Image assets (cached separately for efficient updates)
 const IMAGE_ASSETS = [
-  theme_path + '/images/ffc-logo.webp',
-  theme_path + '/images/ffc-logo-192.webp',
-  theme_path + '/images/logo.webp',
-  theme_path + '/images/hamburger.webp',
-  theme_path + '/images/close-nav.webp'
+  themePath + '/images/ffc-logo.webp',
+  themePath + '/images/ffc-logo-192.webp',
+  themePath + '/images/logo.webp',
+  themePath + '/images/hamburger.webp',
+  themePath + '/images/close-nav.webp',
+  themePath + '/images/loading.gif'
 ];
 
 // Font assets
 const FONT_ASSETS = [];
 
-// Combine all assets
-const ALL_ASSETS = [
-  ...CORE_ASSETS,
-  ...AUDIO_ASSETS,
-  ...IMAGE_ASSETS,
-  ...FONT_ASSETS
+// External assets
+const EXTERNAL_ASSETS = [
+  'https://js.stripe.com/v3/',
+  'https://unpkg.com/vue@3/dist/vue.global.js',
+  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg'
 ];
+
+// Combine all core assets
+function getAllAssets() {
+  return [
+    ...CORE_THEME_ASSETS,
+    ...getTemplateAssets(templateName),
+    ...AUDIO_ASSETS,
+    ...IMAGE_ASSETS,
+    ...FONT_ASSETS
+  ];
+}
 
 /**
  * Store cache metadata (timestamp) 
@@ -195,6 +247,42 @@ async function getCachedPostResponse(request) {
 }
 
 /**
+ * Cache assets for a specific template
+ */
+async function cacheTemplateAssets(templateName) {
+  console.log(`[SW] Caching assets for template: ${templateName}`);
+  const cache = await caches.open(STATIC_CACHE);
+  
+  // Cache core template assets
+  const coreTemplateAssets = getCoreTemplateAssets(templateName);
+  for (const asset of coreTemplateAssets) {
+    try {
+      const response = await fetch(asset);
+      if (response.ok) {
+        await cache.put(asset, response);
+        console.log(`[SW] Cached core template asset: ${asset}`);
+      }
+    } catch (error) {
+      console.log(`[SW] Failed to cache core template asset ${asset}:`, error);
+    }
+  }
+  
+  // Cache regular template assets
+  const templateAssets = getTemplateAssets(templateName);
+  for (const asset of templateAssets) {
+    try {
+      const response = await fetch(asset);
+      if (response.ok) {
+        await cache.put(asset, response);
+        console.log(`[SW] Cached template asset: ${asset}`);
+      }
+    } catch (error) {
+      console.log(`[SW] Failed to cache template asset ${asset}:`, error);
+    }
+  }
+}
+
+/**
  * Install event - cache initial assets
  */
 self.addEventListener('install', event => {
@@ -205,32 +293,11 @@ self.addEventListener('install', event => {
   
   // Critical files that should be cached even in dev mode for offline support
   const criticalFiles = [
-    theme_path + '/views/app.html',
-    theme_path + '/assets/css/main.css',
-    theme_path + '/assets/css/app.css',
-    theme_path + '/assets/css/dashboard.css',
-    theme_path + '/assets/css/animations.css',
-    theme_path + '/assets/css/nav.css',
-    theme_path + '/assets/css/custom-properties.css',
-    plugin_path + '/assets/css/orders.css',
-    theme_path + '/assets/js/app.js',
-    theme_path + '/assets/js/nav.js',
-    theme_path + '/assets/js/main.js',
-    theme_path + '/assets/js/dashboard.js',
-    theme_path + '/assets/js/auth.js',
-    theme_path + '/assets/js/signup.js',
-    plugin_path + '/assets/js/orders.js',
-    theme_path + '/images/ffc-logo.webp',
-    theme_path + '/images/ffc-logo-192.webp',
-    theme_path + '/images/logo.webp',
-    theme_path + '/images/hamburger.webp',
-    theme_path + '/images/close-nav.webp',
-    theme_path + '/images/loading.gif',
-    theme_path + '/manifest.json',
-    // External libraries
-    'https://js.stripe.com/v3/',
-    'https://unpkg.com/vue@3/dist/vue.global.js',
-    'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg'
+    ...CORE_THEME_ASSETS,
+    ...getCoreTemplateAssets('default'), // Cache core template assets for default template
+    ...getTemplateAssets('default'), // Always cache default template
+    ...IMAGE_ASSETS,
+    ...EXTERNAL_ASSETS
   ];
   
   event.waitUntil(
@@ -255,12 +322,15 @@ self.addEventListener('install', event => {
         return;
       }
       
-      // Production mode - cache all assets
-      console.log('[SW] Production mode - caching all assets');
+      // Production mode - cache all assets for all available templates
+      console.log('[SW] Production mode - caching all template assets');
       
-      return Promise.all([
-        // ... rest of production caching code (leave as is)
-      ]);
+      // Cache common templates
+      const commonTemplates = ['default', 'modern', 'classic']; // Add your template names here
+      for (const template of commonTemplates) {
+        await cacheTemplateAssets(template);
+      }
+      
     })().then(() => {
       console.log('[SW] Installation complete');
     })
@@ -372,8 +442,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Allow specific same-origin or whitelisted external domains (fallback check removed)
-
   // Development mode - check offline status first
   if (devMode) {
     console.log('[SW] Dev mode fetch:', request.url);
@@ -392,7 +460,7 @@ self.addEventListener('fetch', event => {
             });
           }
           if (request.mode === 'navigate' || request.headers.get('Accept')?.includes('text/html')) {
-            const appShellUrl = theme_path + '/views/app.html';
+            const appShellUrl = themePath + '/views/app.html';
             for (const cacheName of [STATIC_CACHE, DYNAMIC_CACHE]) {
               const cache = await caches.open(cacheName);
               const cachedResponse = await cache.match(appShellUrl);
@@ -598,9 +666,14 @@ self.addEventListener('fetch', event => {
         const response = await fetch(request);
         
         if (response.ok) {
-          // Determine cache name
+          // Determine cache name - check if it's a template asset
           let cacheName = DYNAMIC_CACHE;
-          if (CORE_ASSETS.some(asset => request.url.includes(asset))) {
+          const allCoreAssets = getAllAssets(activeTemplate);
+          
+          if (CORE_THEME_ASSETS.some(asset => request.url.includes(asset))) {
+            cacheName = STATIC_CACHE;
+          } else if (request.url.includes('/templates/')) {
+            // Template-specific asset
             cacheName = STATIC_CACHE;
           } else if ([...AUDIO_ASSETS, ...IMAGE_ASSETS, ...FONT_ASSETS].some(asset => request.url.includes(asset))) {
             cacheName = ASSETS_CACHE;
@@ -648,5 +721,15 @@ self.addEventListener('message', event => {
         Promise.all(cacheNames.map(name => caches.delete(name)))
       ).then(() => console.log('[SW] All caches cleared'))
     );
+  }
+
+  // Handle template change
+  if (message && message.action === 'setActiveTemplate') {
+    activeTemplate = message.template || 'default';
+    templateAssetsList = message.assets || null;
+    console.log(`[SW] Active template set to: ${activeTemplate}`);
+    
+    // Cache assets for the new template
+    event.waitUntil(cacheTemplateAssets(activeTemplate));
   }
 });

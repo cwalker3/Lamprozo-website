@@ -9,15 +9,15 @@
 
     // Load models - customize MUST be loaded first for template system
     $models = array(
+                'template',  
                 'init',         'rest',
                 'user',         'meta',
-                'template',     'contact',
-                'signup',       'signin',
-                'blogs',        'bookings',
-                'mail',         'view',
-                'pages',        'util',
-                'encrypt',      'profile',
-                'app');
+                'contact',      'signup',
+                'signin',       'blogs',
+                'bookings',     'mail',
+                'view',         'pages',
+                'util',         'encrypt',
+                'profile',      'app');
                 
     foreach($models as $model) {
         $model_path = get_template_directory() . "/models/$model.php";

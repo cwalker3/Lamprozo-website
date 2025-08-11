@@ -2,12 +2,56 @@
 
     // theme/models/app.php
 
+    /**
+     * Get available assets from template directory
+     */
+    function get_template_assets($template_name, $theme_path) {
+        $template_dir = get_template_directory() . '/templates/' . $template_name . '/assets';
+        $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
+        
+        $assets = array(
+            'css' => array(),
+            'js' => array()
+        );
+        
+        // Scan CSS directory for non-core files (exclude files starting with _core_)
+        $css_dir = $template_dir . '/css';
+        if (is_dir($css_dir)) {
+            $css_files = glob($css_dir . '/*.css');
+            foreach ($css_files as $file) {
+                $filename = basename($file);
+                // Skip core files (they are handled by the website system)
+                if (strpos($filename, '_core_') !== 0) {
+                    $assets['css'][] = $template_web_path . '/css/' . $filename;
+                }
+            }
+        }
+        
+        // Scan JS directory for non-core files (exclude files starting with _core_)
+        $js_dir = $template_dir . '/js';
+        if (is_dir($js_dir)) {
+            $js_files = glob($js_dir . '/*.js');
+            foreach ($js_files as $file) {
+                $filename = basename($file);
+                // Skip core files (they are handled by the website system)
+                if (strpos($filename, '_core_') !== 0) {
+                    $assets['js'][] = $template_web_path . '/js/' . $filename;
+                }
+            }
+        }
+        
+        return $assets;
+    }
+
     // App initialization - returns menu + front page
     function app_init($request) {
         $params = $request->get_params();
         $theme_path = get_template_directory_uri();
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
         $http_host = $_SERVER['HTTP_HOST'];
+
+        // Get active template name
+        $active_template = firefly_collective_get_active_template();
 
         // Get menu HTML
         ob_start();
@@ -27,6 +71,9 @@
         echo apply_filters( 'the_content', $page->post_content );
         $app_page_html = ob_get_clean();
 
+        // Get template assets dynamically
+        $template_assets = get_template_assets($active_template, $theme_path);
+
         return rest_ensure_response([
             'success'           => true,
             'menu_html'         => $menu_html,
@@ -37,7 +84,12 @@
             'theme_path'        => $theme_path,
             'api_url'           => $api_url,
             'auth_id'           => $_COOKIE['auth_id'],
-            'http_host'         => $http_host
+            'http_host'         => $http_host,
+            'active_template'   => $active_template,
+            'template_assets'   => $template_assets,
+            'templateData'      => array(
+                'obj' => core_test()
+            ),
         ]);
     }
 

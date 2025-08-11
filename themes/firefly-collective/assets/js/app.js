@@ -186,6 +186,81 @@ document.addEventListener('DOMContentLoaded', function () {
     window.app_page_title = data.app_page_title;
     window.app_page_html = data.app_page_html;
     window.subscription_status = data.subscription_status;
+    window.active_template = data.active_template;
+    window.template_assets = data.template_assets;
+    window.templateData = data.templateData;
+
+    // Notify service worker of active template
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller && data.active_template) {
+      navigator.serviceWorker.controller.postMessage({
+        action: 'setActiveTemplate',
+        template: data.active_template,
+        assets: data.template_assets
+      });
+    }
+  }
+
+  // Dynamic asset loading - ONLY template-specific assets
+  async function loadTemplateAssets() {
+    let templateAssets = window.template_assets;
+  
+    // If no template assets in memory, try to get from cache
+    if (!templateAssets) {
+      try {
+        const cachedData = await getFromIndexedDB('template-info', {});
+        templateAssets = cachedData.template_assets || { css: [], js: [] };
+      } catch (e) {
+        templateAssets = { css: [], js: [] }; // Fallback
+      }
+    }
+
+    // Set templateData globally BEFORE loading template scripts
+    if (window.templateData) {
+      window.templateData = window.templateData;
+    } else {
+      window.templateData = { success: '1' }; // Fallback
+    }
+
+    // Helper function to load CSS
+    function loadCSS(href) {
+      return new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = reject;
+        document.head.appendChild(link);
+      });
+    }
+
+    // Helper function to load JS
+    function loadJS(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.defer = true;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    try {
+      // Load template CSS
+      if (templateAssets.css && templateAssets.css.length > 0) {
+        await Promise.all(templateAssets.css.map(href => loadCSS(href)));
+        console.log('Template CSS loaded successfully');
+      }
+
+      // Load template JS
+      if (templateAssets.js && templateAssets.js.length > 0) {
+        await Promise.all(templateAssets.js.map(src => loadJS(src)));
+        console.log('Template JS loaded successfully');
+      }
+
+    } catch (error) {
+      console.warn('Some template assets failed to load:', error);
+    }
   }
 
   async function getView(view) {
@@ -670,6 +745,9 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
         
+        // Load template assets dynamically
+        await loadTemplateAssets();
+        
         // Insert menu into DOM
         const menuInserted = insertMenuIntoDOM(data.menu_html);
         
@@ -723,6 +801,9 @@ document.addEventListener('DOMContentLoaded', function () {
           const cachedMenu = await getFromIndexedDB('menu-html', {});
           const cachedAppData = await getFromIndexedDB('app-page-data', {});
           
+          // Load assets even when offline
+          await loadTemplateAssets();
+          
           if (cachedMenu && cachedMenu.menu_html) {
             insertMenuIntoDOM(cachedMenu.menu_html);
           }
@@ -745,6 +826,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         } catch (e) {
           console.error('No cached data available:', e);
+          await loadTemplateAssets(); // Still try to load assets
           insertFallbackMenu();
         }
       });
