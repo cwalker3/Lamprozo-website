@@ -62,14 +62,21 @@
             }
         }
 
-        // Nav js data
-        wp_localize_script($nav_handle, 'navData', array(
-            'auth_id'   => $_COOKIE['auth_id']
-        ));
+        // Nav js data (only if nav handle exists)
+        if (!empty($nav_handle)) {
+            wp_localize_script($nav_handle, 'navData', array(
+                'auth_id' => isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : ''
+            ));
+        }
 
-        // Load localize template model
-        $active_template = firefly_collective_get_active_template();
-        require get_template_directory() . '/templates/' . $active_template . '/models/_localize_init.php';
+        // Load localize template model (only if template handle exists)
+        if (!empty($template_handle)) {
+            $active_template = firefly_collective_get_active_template();
+            $localize_file = get_template_directory() . '/templates/' . $active_template . '/models/_localize_init.php';
+            if (file_exists($localize_file)) {
+                require $localize_file;
+            }
+        }
     }
 
     // Enqueue Styles and Scripts
