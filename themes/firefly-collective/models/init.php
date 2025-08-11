@@ -67,10 +67,9 @@
             'auth_id'   => $_COOKIE['auth_id']
         ));
 
-        // Template main js data
-        wp_localize_script($template_handle, 'templateData', array(
-            'obj'   => core_test()
-        ));
+        // Load localize template model
+        $active_template = firefly_collective_get_active_template();
+        require get_template_directory() . '/templates/' . $active_template . '/models/_localize_init.php';
     }
 
     // Enqueue Styles and Scripts
