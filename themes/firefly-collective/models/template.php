@@ -28,10 +28,11 @@
      * This runs only once when the theme is activated
      */
     function firefly_collective_theme_activation() {
-        // Set default template if no template is currently selected
-        if (!get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION)) {
-            update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-        }
+        // Always reset to default template on theme activation
+        update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+        
+        // Set temp template option for customizer preview
+        update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         
         // Optional: Set other default theme options here
         // update_option('firefly_collective_theme_version', wp_get_theme()->get('Version'));
@@ -47,12 +48,26 @@
      * @return string The active template name
      */
     function firefly_collective_get_active_template() {
-        $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+        $is_in_iframe = in_customizer_iframe();
+        
+        // Use temp template when in customizer iframe
+        if ($is_in_iframe) {
+            $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+            error_log('Customizer iframe detected. Using temp template: ' . $template);
+        } else {
+            $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+            error_log('Normal site load. Using live template: ' . $template);
+        }
         
         // Validate template exists, fallback to default if not
         if (!firefly_collective_template_exists($template)) {
+            error_log('Template ' . $template . ' does not exist. Falling back to default.');
             $template = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
-            update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $template);
+            if ($is_in_iframe) {
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template);
+            } else {
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $template);
+            }
         }
         
         return sanitize_file_name($template);
@@ -208,11 +223,81 @@
     }
 
     /**
+     * Reset temp template to live template when NOT in customizer
+     * This ensures fresh start when entering customizer
+     */
+    function firefly_collective_maybe_reset_temp_template() {
+        // Only reset if we're NOT in the customizer iframe
+        if (!in_customizer_iframe() && !is_customize_preview()) {
+            // Check if we need to reset (not in an active customizer session)
+            if (!isset($_GET['customize_changeset_uuid']) && !isset($_POST['customize_changeset_uuid'])) {
+                $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+                $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
+                
+                // Only update if different to avoid unnecessary database writes
+                if ($temp_template !== $current_live_template) {
+                    update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $current_live_template);
+                    error_log('Reset temp template to live: ' . $current_live_template);
+                }
+            }
+        }
+    }
+    add_action('init', 'firefly_collective_maybe_reset_temp_template', 1);
+
+    /**
+     * Add template selector to WordPress Customizer
+     */
+    function firefly_collective_customize_register($wp_customize) {
+        
+        $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+        
+        $wp_customize->add_setting('firefly_collective_template_selector', array(
+            'default' => $current_live_template,
+            'transport' => 'postMessage',
+            'sanitize_callback' => 'sanitize_file_name'
+        ));
+        
+        // Set the current value to always be the live template
+        $wp_customize->set_post_value('firefly_collective_template_selector', $current_live_template);
+        
+        // Get available templates for dropdown
+        $templates = firefly_collective_get_available_templates();
+        $template_choices = array();
+        
+        foreach ($templates as $template) {
+            $info = firefly_collective_get_template_info($template);
+            $template_choices[$template] = $info ? $info['name'] : ucfirst($template);
+        }
+        
+        // Add template selection control
+        $wp_customize->add_control('firefly_collective_template_selector', array(
+            'label' => __('Active Template'),
+            'section' => 'title_tagline',
+            'type' => 'select',
+            'choices' => $template_choices,
+            'priority' => 9
+        ));
+    }
+    add_action('customize_register', 'firefly_collective_customize_register');
+
+    /**
+     * Handle customizer publish - copy temp template to live template
+     */
+    function firefly_collective_customize_save_after($wp_customize) {
+        $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
+        if ($temp_template && firefly_collective_template_exists($temp_template)) {
+            update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $temp_template);
+        }
+    }
+    add_action('customize_save_after', 'firefly_collective_customize_save_after');
+
+    /**
      * Theme deactivation cleanup
      */
     function firefly_collective_theme_deactivation() {
         // Optional: Clean up theme-specific options
         // delete_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION);
+        // delete_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
         
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -225,6 +310,16 @@
 
     if ( file_exists( $enqueue_file ) && firefly_collective_is_valid_template_path( $enqueue_file ) ) {
         require_once $enqueue_file;
+    }
+
+    function in_customizer_iframe() {
+        $in_customizer  = (
+            isset($_GET['customize_messenger_channel']) ||
+            isset($_GET['customize_changeset_uuid']) ||
+            ( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' )
+        );
+
+        return $in_customizer;
     }
 
     // Hide admin bar when (a) user is auth_id-only OR (b) we're in the Customizer preview iframe.
