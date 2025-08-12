@@ -12,6 +12,10 @@
         require $plugin_template_file_path;
     }
 
+    // Define landing style system constants
+	define('FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE', 'default');
+	define('FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION', 'firefly_collective_landing_style');
+
     // Load template core model  
     $active_template = firefly_collective_get_active_template();
     require get_template_directory() . '/templates/' . $active_template . '/models/_core.php';
@@ -34,13 +38,35 @@
         // Set temp template option for customizer preview
         update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         
-        // Optional: Set other default theme options here
-        // update_option('firefly_collective_theme_version', wp_get_theme()->get('Version'));
+        // Set default landing style only if not already set
+        if (get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION) === false) {
+            update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
+        }
         
         // Flush rewrite rules if needed
         flush_rewrite_rules();
     }
     add_action('after_switch_theme', 'firefly_collective_theme_activation');
+
+    /**
+	 * Get the current landing style
+	 * 
+	 * @return string The current landing style
+	 */
+	function firefly_collective_get_landing_style() {
+		return get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
+	}
+
+	/**
+	 * Set the landing style
+	 * 
+	 * @param string $style The landing style to set
+	 * @return bool True on success, false on failure
+	 */
+	function firefly_collective_set_landing_style($style) {
+		$style = sanitize_text_field($style);
+		return update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, $style);
+	}
 
     /**
      * Get the currently active template
