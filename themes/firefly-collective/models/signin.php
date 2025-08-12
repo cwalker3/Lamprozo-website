@@ -87,31 +87,33 @@
     }
 
     /**
-     * Add JavaScript to show live preview of the login URL
+     * Store the old login slug before saving
      */
-    add_action('customize_preview_init', 'firefly_customizer_live_preview');
-    function firefly_customizer_live_preview() {
-        wp_enqueue_script(
-            'firefly-customizer-preview',
-            get_template_directory_uri() . '/assets/js/customizer-preview.js',
-            array('customize-preview'),
-            wp_get_theme()->get('Version'),
-            true
-        );
+    add_action('customize_save', 'firefly_before_customize_save');
+    function firefly_before_customize_save($wp_customize) {
+        // Store the current (old) value before it gets updated
+        $old_slug = get_theme_mod('custom_login_slug', 'ffc-login');
+        set_transient('firefly_old_login_slug', $old_slug, 60);
     }
 
     /**
-     * Add admin notice after login slug is changed
+     * Check if login slug changed after saving
      */
     add_action('customize_save_after', 'firefly_after_customize_save');
     function firefly_after_customize_save($wp_customize) {
-        $old_slug = get_theme_mod('custom_login_slug', 'ffc-login');
-        $new_slug = $wp_customize->get_setting('custom_login_slug')->post_value();
+        // Get the old value we stored before saving
+        $old_slug = get_transient('firefly_old_login_slug');
         
-        if ($old_slug !== $new_slug) {
-            // Set a transient to show admin notice
+        // Get the new saved value
+        $new_slug = get_theme_mod('custom_login_slug', 'ffc-login');
+        
+        // Only set notice if actually changed
+        if ($old_slug && $old_slug !== $new_slug) {
             set_transient('firefly_login_slug_changed', true, 60);
         }
+        
+        // Clean up
+        delete_transient('firefly_old_login_slug');
     }
 
     /**
