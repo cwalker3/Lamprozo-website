@@ -273,6 +273,81 @@
             'choices' => $template_choices,
             'priority' => 9
         ));
+        
+        // Add Landing section
+        $wp_customize->add_section('firefly_collective_landing', array(
+            'title' => __('Landing'),
+            'priority' => 121, // Right after Homepage Settings
+            'description' => __('Landing page configuration options.'),
+        ));
+        
+        // Landing section placeholder setting/control
+        $wp_customize->add_setting('firefly_collective_landing_placeholder', array(
+            'default' => '',
+            'transport' => 'refresh',
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+        
+        $wp_customize->add_control('firefly_collective_landing_placeholder', array(
+            'label' => __('Landing Options'),
+            'description' => __('Landing configuration options will be added here.'),
+            'section' => 'firefly_collective_landing',
+            'type' => 'text',
+            'input_attrs' => array(
+                'placeholder' => __('Coming soon...'),
+                'readonly' => 'readonly'
+            )
+        ));
+        
+        // Add Navigation section
+        $wp_customize->add_section('firefly_collective_navigation', array(
+            'title' => __('Navigation'),
+            'priority' => 122,
+            'description' => __('Navigation configuration options.'),
+        ));
+        
+        // Navigation section placeholder setting/control
+        $wp_customize->add_setting('firefly_collective_navigation_placeholder', array(
+            'default' => '',
+            'transport' => 'refresh',
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+        
+        $wp_customize->add_control('firefly_collective_navigation_placeholder', array(
+            'label' => __('Navigation Options'),
+            'description' => __('Navigation configuration options will be added here.'),
+            'section' => 'firefly_collective_navigation',
+            'type' => 'text',
+            'input_attrs' => array(
+                'placeholder' => __('Coming soon...'),
+                'readonly' => 'readonly'
+            )
+        ));
+        
+        // Add Layout section
+        $wp_customize->add_section('firefly_collective_layout', array(
+            'title' => __('Layout'),
+            'priority' => 123,
+            'description' => __('Layout configuration options.'),
+        ));
+        
+        // Layout section placeholder setting/control
+        $wp_customize->add_setting('firefly_collective_layout_placeholder', array(
+            'default' => '',
+            'transport' => 'refresh',
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+        
+        $wp_customize->add_control('firefly_collective_layout_placeholder', array(
+            'label' => __('Layout Options'),
+            'description' => __('Layout configuration options will be added here.'),
+            'section' => 'firefly_collective_layout',
+            'type' => 'text',
+            'input_attrs' => array(
+                'placeholder' => __('Coming soon...'),
+                'readonly' => 'readonly'
+            )
+        ));
     }
     add_action('customize_register', 'firefly_collective_customize_register');
 
