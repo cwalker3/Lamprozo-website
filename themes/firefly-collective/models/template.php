@@ -53,15 +53,12 @@
         // Use temp template when in customizer iframe
         if ($is_in_iframe) {
             $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-            error_log('Customizer iframe detected. Using temp template: ' . $template);
         } else {
             $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-            error_log('Normal site load. Using live template: ' . $template);
         }
         
         // Validate template exists, fallback to default if not
         if (!firefly_collective_template_exists($template)) {
-            error_log('Template ' . $template . ' does not exist. Falling back to default.');
             $template = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
             if ($is_in_iframe) {
                 update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template);
@@ -237,7 +234,6 @@
                 // Only update if different to avoid unnecessary database writes
                 if ($temp_template !== $current_live_template) {
                     update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $current_live_template);
-                    error_log('Reset temp template to live: ' . $current_live_template);
                 }
             }
         }
