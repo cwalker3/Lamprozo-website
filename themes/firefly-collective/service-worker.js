@@ -12,7 +12,7 @@ const API_CACHE       =   `${CACHE_PREFIX}api`;
 const METADATA_CACHE  =   `${CACHE_PREFIX}metadata`;
 const themePath       =   '/wp-content/themes/firefly-collective';
 const plugin_path     =   '/wp-content/plugins/firefly-collective/includes/apps/backend';
-let activeTemplate  =   'default';
+const activeTemplate    =   'default';
 const templatePath    =   `${themePath}/templates/${activeTemplate}`;
 
 // Cache duration (1 hour in milliseconds)
@@ -26,16 +26,16 @@ const API_ROUTES = [
 
 // Core theme assets (these are now in the shell, so we only cache for offline access)
 const CORE_THEME_ASSETS = [
-  themePath    +   '/views/app.html',
-  themePath    +   '/assets/css/gutenberg.css',
-  themePath    +   '/assets/css/app.css',
-  themePath    +   '/assets/css/auth.css',
-  themePath    +   '/assets/css/dashboard.css',
-  themePath    +   '/assets/js/main.js',
-  themePath    +   '/assets/js/auth.js',
-  themePath    +   '/assets/js/dashboard.js',
-  themePath    +   '/assets/js/app.js',
-  themePath    +   '/manifest.json',
+  templatePath    +   '/views/app.html',
+  templatePath    +   '/assets/css/gutenberg.css',
+  templatePath    +   '/assets/css/app.css',
+  templatePath    +   '/assets/css/auth.css',
+  templatePath    +   '/assets/css/dashboard.css',
+  templatePath    +   '/assets/js/main.js',
+  templatePath    +   '/assets/js/auth.js',
+  templatePath    +   '/assets/js/dashboard.js',
+  templatePath    +   '/assets/js/app.js',
+  templatePath    +   '/manifest.json',
 
   templatePath +   '/assets/css/nav.css',
   templatePath +   '/assets/css/calendar.css',
@@ -84,12 +84,12 @@ const AUDIO_ASSETS = [];
 
 // Image assets (cached separately for efficient updates)
 const IMAGE_ASSETS = [
-  themePath + '/images/ffc-logo.webp',
-  themePath + '/images/ffc-logo-192.webp',
-  themePath + '/images/logo.webp',
-  themePath + '/images/hamburger.webp',
-  themePath + '/images/close-nav.webp',
-  themePath + '/images/loading.gif'
+  templatePath + '/images/ffc-logo.webp',
+  templatePath + '/images/ffc-logo-192.webp',
+  templatePath + '/images/logo.webp',
+  templatePath + '/images/hamburger.webp',
+  templatePath + '/images/close-nav.webp',
+  templatePath + '/images/loading.gif'
 ];
 
 // Font assets

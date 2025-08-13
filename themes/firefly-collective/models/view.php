@@ -26,16 +26,15 @@
                 break;
             
             case 'app':
-                $assets['css'][]    = $theme_path . '/assets/css/app.css';
-                $assets['css'][]    = $theme_path . '/assets/css/auth.css';
-                $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
-                $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
-                $assets['js'][]     = $theme_path . '/assets/js/main.js';
+                $assets['css'][]    = $template_path . '/assets/css/app.css';
+                $assets['css'][]    = $template_path . '/assets/css/auth.css';
+                $assets['css'][]    = $template_path . '/assets/css/dashboard.css';
+                $assets['css'][]    = $plugin_path   . '/assets/css/orders.css';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
-                $assets['js'][]     = $theme_path . '/assets/js/auth.js';
-                $assets['js'][]     = $theme_path . '/assets/js/app.js';
-                $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';
-                $assets['js'][]     = $plugin_path . '/assets/js/orders.js';
+                $assets['js'][]     = $template_path . '/assets/js/auth.js';
+                $assets['js'][]     = $template_path . '/assets/js/app.js';
+                $assets['js'][]     = $template_path . '/assets/js/dashboard.js';
+                $assets['js'][]     = $plugin_path   . '/assets/js/orders.js';
                 $assets['js'][]     = 'https://js.stripe.com/v3/';
                 $assets['js'][]     = VUE_REMOTE_CORE;
                 break;
@@ -45,20 +44,20 @@
                 break;
 
             case 'signup':
-                $assets['js'][]     = $theme_path . '/assets/js/auth.js';
+                $assets['js'][]     = $template_path . '/assets/js/auth.js';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 break;
 
             case 'request-an-appointment':
-                $assets['css'][]    = $theme_path . '/assets/css/calendar.css';
+                $assets['css'][]    = $template_path . '/assets/css/calendar.css';
                 $assets['js'][]     = $template_path . '/assets/js/calendar.js';
                 $assets['js'][]     = $template_path . '/assets/js/request-an-appointment.js';
                 break;
 
             case 'dashboard':
-                $assets['css'][]    = $theme_path . '/assets/css/auth.css';
-                $assets['css'][]    = $theme_path . '/assets/css/dashboard.css';
-                $assets['js'][]     = $theme_path . '/assets/js/dashboard.js';
+                $assets['css'][]    = $template_path . '/assets/css/auth.css';
+                $assets['css'][]    = $template_path . '/assets/css/dashboard.css';
+                $assets['js'][]     = $template_path . '/assets/js/dashboard.js';
                 $assets['js'][]     = 'https://js.stripe.com/v3/';
                 break;
             

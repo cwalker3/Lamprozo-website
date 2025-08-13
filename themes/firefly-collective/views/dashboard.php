@@ -3,7 +3,7 @@
     // theme/views/dashboard.php
 
     global $current_user;
-    global $theme_path_web;
+    global $template_path;
     global $is_campaign_mode;
 
 ?>
@@ -50,7 +50,7 @@
         <h2>Manage Subscriptions</h2>
         
         <div id="subscriptions-loading" class="loading-spinner">
-            <img src="<?=$theme_path_web?>/images/loading.gif" alt="Loading..." id="subs-loader">
+            <img src="<?=$template_path?>/images/loading.gif" alt="Loading..." id="subs-loader">
             <p>Loading your subscriptions...</p>
         </div>
         
@@ -75,7 +75,7 @@
                 <button class="button" id="cancel-update-payment">Cancel</button>
                 <button class="button button-primary" id="update-payment-submit">Update</button>
             </div>
-            <img id="update-modal-loader" src="<?=$theme_path_web?>/images/loading-dark.gif">
+            <img id="update-modal-loader" src="<?=$template_path?>/images/loading-dark.gif">
         </div>
     </div>
 
@@ -90,7 +90,7 @@
                 <button class="button button-danger" id="confirm-cancel-subscription">Confirm Cancel</button>
             </div>
         </div>
-        <img id="cancel-modal-loader" src="<?=$theme_path_web?>/images/loading.gif" style="display: none;">
+        <img id="cancel-modal-loader" src="<?=$template_path?>/images/loading.gif" style="display: none;">
     </div>
 <?php endif; ?>
 

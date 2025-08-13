@@ -17,6 +17,7 @@
     function enqueue_core_assets($template_name, $theme_path, $version) {
         $template_dir = get_template_directory() . '/templates/' . $template_name . '/assets';
         $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
+        $template_path = get_template_directory_uri() . '/templates/' . $template_name;
         
         // Scan and enqueue core CSS files
         $css_dir = $template_dir . '/css';
@@ -29,23 +30,12 @@
                 wp_enqueue_style($handle, $url, array(), $version);
             }
         }
-
-        // Enqueue main theme js
-        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-
-        // Localize main.js with the nonce and API URL for security
-        wp_localize_script('main-js', 'myApi', array(
-            'nonce'   => $nonce,
-            'api_url' => $api_url,
-            'themePath' => $theme_path,
-            'maxBlogs' => 15,
-            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
-        ));
         
         // Scan and enqueue core JS files
         $js_dir = $template_dir . '/js';
         $nav_handle = '';
         $template_handle = '';
+        $main_js_handle = '';
         if (is_dir($js_dir)) {
             $js_files = glob($js_dir . '/_core_*.js');
             foreach ($js_files as $file) {
@@ -59,8 +49,20 @@
                 if (preg_match('/'.$template_name.'/', $handle)) {
                     $template_handle = $handle;
                 }
+                if (preg_match('/^core-main/', $handle)) {
+                    $main_js_handle = $handle;
+                }
             }
         }
+
+        // Localize main.js with the nonce and API URL for security
+        wp_localize_script($main_js_handle, 'myApi', array(
+            'nonce'   => $nonce,
+            'api_url' => $api_url,
+            'themePath' => $theme_path,
+            'maxBlogs' => 15,
+            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+        ));
 
         // Nav js data (only if nav handle exists)
         if (!empty($nav_handle)) {
@@ -82,19 +84,20 @@
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
-        global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web;
+        global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web, $template_path;
         $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
         $theme_path_web = get_template_directory_uri();
+        $active_template = firefly_collective_get_active_template();
+        $template_path = $theme_path_web . '/templates/' . $active_template;
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
         $auth_id = isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : '';
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
         $current_view = determine_view();
 
-        // Get active template and enqueue core template assets
-        $active_template = firefly_collective_get_active_template();
+        // Enqueue core template assets
         enqueue_core_assets($active_template, $theme_path, $unique_id);
         
         $nonce = wp_create_nonce('wp_rest');
@@ -260,8 +263,8 @@
         $active_template = firefly_collective_get_active_template();
         $nonce = wp_create_nonce('wp_rest');
         
-        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-        wp_enqueue_style('auth-css', $theme_path . '/assets/css/auth.css', array(), $nonce);
+        wp_enqueue_script('main-js', $theme_path . '/templates/' . $active_template . array(), $unique_id, true);
+        wp_enqueue_style('auth-css', $theme_path . '/templates/' . $active_template . array(), $nonce);
         wp_enqueue_script('template-main-js', $theme_path . '/templates/' . $active_template . '/assets/js/_core_main.js', array(), $nonce, true);
         wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
         wp_localize_script('auth-js', 'myApi', array(
