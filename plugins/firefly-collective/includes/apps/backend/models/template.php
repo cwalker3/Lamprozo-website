@@ -21,9 +21,6 @@
 
     /**
      * Check if a template exists (plugin version)
-     * 
-     * @param string $template_name The template name to check
-     * @return bool True if template exists, false otherwise
      */
     function firefly_collective_plugin_template_exists($template_name) {
         $template_name = sanitize_file_name($template_name);

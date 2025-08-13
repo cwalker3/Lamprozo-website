@@ -33,24 +33,21 @@
      * This runs only once when the theme is activated
      */
     function firefly_collective_theme_activation() {
-        // Always reset to default template on theme activation
-        update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-        
-        // Set temp template option for customizer preview
-        update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-        
-        // Set default landing style only if not already set
-        if (get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION) === false) {
-            update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
-        }
-        
-        // Initialize landing style preview to match current landing style
-        $current_landing_style = firefly_collective_get_landing_style();
-        update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, $current_landing_style);
-        
-        // Flush rewrite rules if needed
-        flush_rewrite_rules();
-    }
+		// Always reset to default template on theme activation
+		update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+		
+		// Set temp template option for customizer preview
+		update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+		
+		// Always reset landing style to default on theme activation
+		update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
+		
+		// Initialize landing style preview to match current landing style
+		update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
+		
+		// Flush rewrite rules if needed
+		flush_rewrite_rules();
+	}
     add_action('after_switch_theme', 'firefly_collective_theme_activation');
 
     /**
@@ -526,7 +523,17 @@
 			$rendered_html .= render_block($block);
 		}
 		
-		return trim($rendered_html);
+		$rendered_html = trim($rendered_html);
+		
+		// Wrap with HTML comments for easy identification and replacement
+		if (!empty($rendered_html)) {
+			$wrapped_html = "<!-- FIREFLY_LANDING_START:" . esc_attr($style) . " -->\n";
+			$wrapped_html .= $rendered_html;
+			$wrapped_html .= "\n<!-- FIREFLY_LANDING_END:" . esc_attr($style) . " -->";
+			return $wrapped_html;
+		}
+		
+		return $rendered_html;
 	}
 
     // Add this handler function to your theme/models/rest.php
@@ -556,81 +563,233 @@
 	 * Filter content to replace landing HTML in customizer iframe preview
 	 */
 	function firefly_collective_filter_landing_content($content) {
+		error_log('Filter called - Current: ' . firefly_collective_get_landing_style() . ' Preview: ' . firefly_collective_get_landing_style_preview());
+		
 		// Only apply filter in customizer iframe
 		if (!in_customizer_iframe()) {
 			return $content;
 		}
 		
+		// Skip if content is empty or very short (likely not the main content)
+		if (empty($content) || strlen($content) < 100) {
+			return $content;
+		}
+		
+		static $processed_content = array();
+		
 		$current_landing_style = firefly_collective_get_landing_style();
 		$preview_landing_style = firefly_collective_get_landing_style_preview();
-		
-        error_log($current_landing_style);
-        error_log($preview_landing_style);
 
 		// Only apply filter if preview differs from current
 		if ($current_landing_style === $preview_landing_style) {
 			return $content;
 		}
 		
-		// Get the rendered HTML content for both styles
-		$current_landing_html = firefly_collective_get_landing_style_rendered_html($current_landing_style);
-		$preview_landing_html = firefly_collective_get_landing_style_rendered_html($preview_landing_style);
+		// Create a cache key based on content hash and styles
+		$cache_key = md5($content . $current_landing_style . $preview_landing_style);
 		
-		// If we can't get either HTML, return original content
-		if ($current_landing_html === false || $preview_landing_html === false) {
+		// Return cached result if we've already processed this exact content
+		if (isset($processed_content[$cache_key])) {
+			return $processed_content[$cache_key];
+		}
+		
+		// Look for current landing style wrapped in HTML comments
+		$current_pattern = '/<!-- FIREFLY_LANDING_START:' . preg_quote($current_landing_style, '/') . ' -->.*?<!-- FIREFLY_LANDING_END:' . preg_quote($current_landing_style, '/') . ' -->/s';
+		
+		if (preg_match($current_pattern, $content)) {
+			// Get the preview landing style content (already wrapped with comments)
+			// Prefer saved content over template content
+			$preview_landing_html = firefly_collective_get_saved_landing_style_rendered_html($preview_landing_style);
+			if ($preview_landing_html === false) {
+				$preview_landing_html = firefly_collective_get_landing_style_rendered_html($preview_landing_style);
+			}
+			
+			// DEBUG: Log what we found
+			error_log("REGEX MATCHED! Current: $current_landing_style, Preview: $preview_landing_style");
+			error_log("Preview content found: " . ($preview_landing_html !== false ? 'YES' : 'NO'));
+			if ($preview_landing_style === 'default') {
+				error_log("DEBUG DEFAULT: Checking saved content...");
+				$saved_default = firefly_collective_get_saved_landing_style_rendered_html('default');
+				error_log("Saved default content: " . ($saved_default !== false ? 'FOUND' : 'NOT FOUND'));
+				
+				error_log("DEBUG DEFAULT: Checking template content...");
+				$template_default = firefly_collective_get_landing_style_rendered_html('default');
+				error_log("Template default content: " . ($template_default !== false ? 'FOUND' : 'NOT FOUND'));
+				
+				if ($template_default !== false) {
+					error_log("Template default content length: " . strlen($template_default));
+					error_log("First 100 chars: " . substr($template_default, 0, 100));
+				}
+			}
+			if ($preview_landing_html !== false) {
+				error_log("Preview content length: " . strlen($preview_landing_html));
+			}
+			
+			if ($preview_landing_html !== false) {
+				// Replace the current wrapped content with preview wrapped content
+				$filtered_content = preg_replace($current_pattern, $preview_landing_html, $content);
+				$processed_content[$cache_key] = $filtered_content;
+				return $filtered_content;
+			} else {
+				error_log("ERROR: Preview content is FALSE for style: $preview_landing_style");
+			}
+		}
+		
+		// Fallback: If no comment markers found, try to add them and then replace
+		// This handles content that might not have been wrapped yet
+		// Prefer saved content over template content for current style
+		$current_landing_html = firefly_collective_get_saved_landing_style_rendered_html($current_landing_style);
+		if ($current_landing_html === false) {
+			$current_landing_html = firefly_collective_get_landing_style_rendered_html($current_landing_style);
+		}
+		
+		// For preview, prefer saved content if available, otherwise use template
+		$preview_landing_html = firefly_collective_get_saved_landing_style_rendered_html($preview_landing_style);
+		if ($preview_landing_html === false) {
+			$preview_landing_html = firefly_collective_get_landing_style_rendered_html($preview_landing_style);
+		}
+		
+		if ($current_landing_html !== false && $preview_landing_html !== false) {
+			// Remove the comment wrappers to get raw HTML for fallback matching
+			$current_raw_html = preg_replace('/<!-- FIREFLY_LANDING_START:.*? -->|<!-- FIREFLY_LANDING_END:.*? -->/', '', $current_landing_html);
+			$current_raw_html = trim($current_raw_html);
+			
+			// Try exact match on the raw HTML
+			if (strpos($content, $current_raw_html) !== false) {
+				$filtered_content = str_replace($current_raw_html, $preview_landing_html, $content);
+				$processed_content[$cache_key] = $filtered_content;
+				return $filtered_content;
+			}
+		}
+		
+		$processed_content[$cache_key] = $content;
+		return $content;
+	}
+
+    /**
+	 * Get rendered HTML from saved landing style content with proper wrapping
+	 */
+	function firefly_collective_get_saved_landing_style_rendered_html($style) {
+		$block_markup = firefly_collective_get_saved_landing_style_content($style);
+		
+		if ($block_markup === false) {
+			return false;
+		}
+		
+		// Parse blocks and render to HTML
+		$blocks = parse_blocks($block_markup);
+		$rendered_html = '';
+		
+		foreach ($blocks as $block) {
+			$rendered_html .= render_block($block);
+		}
+		
+		$rendered_html = trim($rendered_html);
+		
+		// Wrap with HTML comments for easy identification and replacement
+		if (!empty($rendered_html)) {
+			$wrapped_html = "<!-- FIREFLY_LANDING_START:" . esc_attr($style) . " -->\n";
+			$wrapped_html .= $rendered_html;
+			$wrapped_html .= "\n<!-- FIREFLY_LANDING_END:" . esc_attr($style) . " -->";
+			return $wrapped_html;
+		}
+		
+		return $rendered_html;
+	}
+
+    /**
+	 * Always wrap landing content with HTML comments when in customizer iframe
+	 */
+	function firefly_collective_wrap_landing_content($content) {
+		// Only wrap when in customizer iframe
+		if (!in_customizer_iframe()) {
 			return $content;
 		}
 		
-		// Try exact match first
-		if (strpos($content, $current_landing_html) !== false) {
-			$filtered_content = str_replace($current_landing_html, $preview_landing_html, $content);
-			return $filtered_content;
+		// Only process on the home page
+		$home_page_id = firefly_collective_get_home_page_id();
+		if (!$home_page_id || get_the_ID() != $home_page_id) {
+			return $content;
 		}
 		
-		// If exact match fails, try block-level replacement as fallback
+		// Skip if already wrapped or too short
+		if (empty($content) || strlen($content) < 100 || strpos($content, '<!-- FIREFLY_LANDING_START:') !== false) {
+			return $content;
+		}
+		
+		$current_landing_style = firefly_collective_get_landing_style();
+		
+		// Extract landing block from content
 		$extracted = firefly_collective_extract_landing_block($content);
 		if (!empty($extracted['block'])) {
-			// Get the preview style RAW BLOCK content
-			$preview_block_content = firefly_collective_get_saved_landing_style_content($preview_landing_style);
+			// Render the block to HTML and wrap it
+			$blocks = parse_blocks($extracted['block']);
+			$rendered_html = '';
 			
-			// If no saved content, fall back to template file
-			if ($preview_block_content === false) {
-				$preview_block_content = firefly_collective_get_landing_style_html($preview_landing_style);
+			foreach ($blocks as $block) {
+				$rendered_html .= render_block($block);
 			}
 			
-			if ($preview_block_content) {
-				$filtered_content = $preview_block_content . $extracted['remaining'];
-				return $filtered_content;
+			$rendered_html = trim($rendered_html);
+			
+			if (!empty($rendered_html)) {
+				// Wrap with HTML comments using the CURRENT active style
+				$wrapped_html = "<!-- FIREFLY_LANDING_START:" . esc_attr($current_landing_style) . " -->\n";
+				$wrapped_html .= $rendered_html;
+				$wrapped_html .= "\n<!-- FIREFLY_LANDING_END:" . esc_attr($current_landing_style) . " -->";
+				
+				// Replace the original content with wrapped version plus remaining content
+				return $wrapped_html . $extracted['remaining'];
 			}
 		}
 		
 		return $content;
 	}
+	add_filter('the_content', 'firefly_collective_wrap_landing_content', 1);
 
 	/**
 	 * Initialize landing content filtering
 	 * Only hook the filter when in customizer iframe and when preview differs from current
 	 */
 	function firefly_collective_init_landing_content_filter() {
+		error_log('HOOKING: Checking if we should hook the filter...');
+		
 		// Only initialize in customizer iframe
 		if (!in_customizer_iframe()) {
+			error_log('HOOKING: Not in customizer iframe - skipping');
 			return;
 		}
 		
 		$current_landing_style = firefly_collective_get_landing_style();
 		$preview_landing_style = firefly_collective_get_landing_style_preview();
 		
+		error_log("HOOKING: Current style: '$current_landing_style'");
+		error_log("HOOKING: Preview style: '$preview_landing_style'");
+		error_log("HOOKING: Styles differ: " . ($current_landing_style !== $preview_landing_style ? 'YES' : 'NO'));
+		
 		// Only hook filter if preview differs from current
 		if ($current_landing_style !== $preview_landing_style) {
+			error_log('HOOKING: Adding filters!');
 			// Hook into various content filters where landing content might appear
 			add_filter('the_content', 'firefly_collective_filter_landing_content', 10);
 			add_filter('get_the_excerpt', 'firefly_collective_filter_landing_content', 10);
 			
 			// Hook into output buffer for full page content replacement if needed
 			add_action('wp_loaded', 'firefly_collective_start_landing_output_buffer');
+		} else {
+			error_log('HOOKING: Styles are the same - NOT adding filters');
 		}
 	}
 	add_action('init', 'firefly_collective_init_landing_content_filter', 20);
+
+    
+    // Debug: Log ALL page saves to see what's happening
+    function firefly_collective_debug_all_saves($post_id, $post, $update) {
+        error_log("ALL SAVES: Post $post_id saved");
+        error_log("ALL SAVES: URL parameters: " . print_r($_GET, true));
+        error_log("ALL SAVES: Has landing_preview param: " . (isset($_GET['landing_preview']) ? 'YES (' . $_GET['landing_preview'] . ')' : 'NO'));
+    }
+    add_action('save_post', 'firefly_collective_debug_all_saves', 5, 3);
 
 	/**
 	 * Start output buffering for full page landing content replacement
@@ -892,44 +1051,102 @@
     }
 
     /**
-     * Update active landing style when page is saved with preview parameter
-     */
-    function firefly_collective_save_landing_style_on_page_save($post_id, $post, $update) {
+	 * Save landing style when home page is saved - use URL parameter as primary source
+	 */
+	function firefly_collective_save_landing_style_on_page_save($post_id, $post, $update) {
+		error_log("SAVE: Post save triggered for post $post_id");
+		
 		// Only process for the home page
 		$home_page_id = firefly_collective_get_home_page_id();
 		if (!$home_page_id || $post_id != $home_page_id) {
-			return;
-		}
-		
-		// Only process if we have a landing preview parameter
-		$preview_style = firefly_collective_get_current_landing_preview_param();
-		if (!$preview_style) {
+			error_log("SAVE: Not home page ($home_page_id) - skipping");
 			return;
 		}
 		
 		// Avoid infinite loops
 		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+			error_log("SAVE: Doing autosave - skipping");
 			return;
 		}
 		
 		// Check user permissions
 		if (!current_user_can('edit_page', $post_id)) {
+			error_log("SAVE: No permission - skipping");
 			return;
 		}
 		
-		// Extract and save the landing block content for the preview style
+		// Extract landing block from content
 		$extracted = firefly_collective_extract_landing_block($post->post_content);
-		if (!empty($extracted['block'])) {
-			firefly_collective_save_landing_style_content($preview_style, $extracted['block']);
+		if (empty($extracted['block'])) {
+			error_log("SAVE: No landing block found in content");
+			return;
 		}
 		
-		// Update the active landing style to match the preview
-		firefly_collective_set_landing_style($preview_style);
+		// Primary: Use URL parameter if available (user's explicit intent)
+		$intended_style = null;
 		
-		// Sync the preview style to match
-		firefly_collective_set_landing_style_preview($preview_style);
+		// Check URL parameter directly (don't rely on is_admin() check)
+		if (isset($_GET['landing_preview']) && !empty($_GET['landing_preview'])) {
+			$intended_style = sanitize_text_field($_GET['landing_preview']);
+			error_log("SAVE: Using intended style from URL: '$intended_style'");
+		} else {
+			// Fallback: Try to auto-detect the style
+			error_log("SAVE: No URL parameter, attempting auto-detection...");
+			$intended_style = firefly_collective_detect_landing_style($extracted['block']);
+		}
+		
+		if ($intended_style) {
+			error_log("SAVE: Final landing style: '$intended_style'");
+			
+			// Save the content for this style
+			firefly_collective_save_landing_style_content($intended_style, $extracted['block']);
+			
+			// Update the active landing style
+			$result = firefly_collective_set_landing_style($intended_style);
+			error_log("SAVE: Set active landing style result: " . ($result ? 'SUCCESS' : 'FAILED'));
+			
+			// Sync preview style to match
+			firefly_collective_set_landing_style_preview($intended_style);
+		} else {
+			error_log("SAVE: Could not determine landing style");
+		}
 	}
     add_action('save_post', 'firefly_collective_save_landing_style_on_page_save', 10, 3);
+
+    /**
+	 * Generic fallback detection - works with any style names
+	 * Since style names are arbitrary, we use simpler heuristics
+	 */
+	function firefly_collective_detect_landing_style($block_content) {
+		error_log("DETECTION: Fallback detection for arbitrary style names...");
+		
+		// Try to match against existing saved content for known styles
+		$available_styles = array_keys(firefly_collective_get_landing_style_choices());
+		$current_style = firefly_collective_get_landing_style();
+		
+		// First, try to see if content matches the current active style
+		$saved_content_for_current = firefly_collective_get_saved_landing_style_content($current_style);
+		if ($saved_content_for_current) {
+			// If content is similar to existing saved content, keep current style
+			if (firefly_collective_content_roughly_matches($block_content, $saved_content_for_current)) {
+				error_log("DETECTION: Content matches existing saved content for '$current_style'");
+				return $current_style;
+			}
+		}
+		
+		// If no match with current style, default to 'default'
+		error_log("DETECTION: No clear match found, defaulting to 'default'");
+		return 'default';
+	}
+	
+	/**
+	 * Generic content comparison - checks rough similarity without assumptions
+	 */
+	function firefly_collective_content_roughly_matches($content1, $content2) {
+		// Simple similarity check - if content is very different, they don't match
+		$similarity = similar_text($content1, $content2, $percent);
+		return $percent > 80; // 80% similarity threshold
+	}
 
     // Add a notice in the editor when editing with preview parameter
     function firefly_collective_add_landing_preview_notice() {
@@ -965,6 +1182,16 @@
         <?php
     }
     add_action('admin_notices', 'firefly_collective_add_landing_preview_notice');
+
+    // Debug: Check current landing style on admin load
+	function firefly_collective_debug_current_style() {
+		if (is_admin() && isset($_GET['customize_messenger_channel'])) {
+			$current = firefly_collective_get_landing_style();
+			$preview = firefly_collective_get_landing_style_preview();
+			error_log("CUSTOMIZER LOAD: Current style: '$current', Preview style: '$preview'");
+		}
+	}
+	add_action('admin_init', 'firefly_collective_debug_current_style');
 
     // Add this function to provide a "clean" edit URL after saving
     function firefly_collective_get_clean_edit_url($post_id) {
