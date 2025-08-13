@@ -2,6 +2,8 @@
 
     // Open Graph/Twitter Meta Tags
     function set_open_graph_meta_data() {
+        global $template_path;
+
         $theme_path = get_template_directory_uri();
         if (is_singular()) {
             global $post;
@@ -19,7 +21,7 @@
             $type = 'website';
         }
 
-        $image = $image ? $image : $theme_path.'/images/default-og.webp';
+        $image = $image ? $image : $template_path . '/images/default-og.webp';
         $description = $description ? $description : 'Firecly Collective website development framework';
 
         // Output meta tags

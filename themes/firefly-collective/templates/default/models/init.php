@@ -57,11 +57,11 @@
 
         // Localize main.js with the nonce and API URL for security
         wp_localize_script($main_js_handle, 'myApi', array(
-            'nonce'   => $nonce,
-            'api_url' => $api_url,
-            'themePath' => $theme_path,
-            'maxBlogs' => 15,
-            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+            'nonce'         => $nonce,
+            'api_url'       => $api_url,
+            'themePath'     => $theme_path,
+            'maxBlogs'      => 15,
+            'gapiDomain'    => 'https://' . GOOGLE_API_DOMAIN
         ));
 
         // Nav js data (only if nav handle exists)
@@ -76,6 +76,7 @@
     function enqueue_my_styles_and_scripts() {
 
         global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web, $template_path, $template_web_path;
+
         $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
@@ -96,11 +97,12 @@
 
         // Localize main.js with the nonce and API URL for security
         wp_localize_script('core-main-js', 'myApi', array(
-            'nonce'   => $nonce,
-            'api_url' => $api_url,
-            'themePath' => $theme_path,
-            'maxBlogs' => 15,
-            'gapiDomain' => 'https://' . GOOGLE_API_DOMAIN
+            'nonce'         => $nonce,
+            'api_url'       => $api_url,
+            'themePath'     => $theme_path,
+            'template_path' => $template_path_web,
+            'maxBlogs'      => 15,
+            'gapiDomain'    => 'https://' . GOOGLE_API_DOMAIN
         ));
 
         // Get dynamic asset paths

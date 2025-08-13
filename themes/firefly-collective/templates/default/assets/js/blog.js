@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
 
+    console.log(myApi);
     const maxBlogsPerPage = parseInt(myApi.maxBlogs);
     let blogPageNum = 2;
     let blogFilterOptions = {
@@ -33,55 +34,55 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             fetch(`${myApi.api_url}get-more-blogs?${params.toString()}`, {
                                 method: 'GET',
-                                headers: {
-                                    'X-WP-Nonce': myApi.nonce
-                                }
-                            })
-                                .then(response => response.json())
-                                .then(function (data) {
-                                    data.forEach(blog => {
-                                        prependBlogHTML(blog);
-                                    });
-                                    loader.style.display = 'none';
-                                    blogPageNum++;
-                                    if (data.length === maxBlogsPerPage) observer.observe(target);
-                                })
-                                .catch(function (error) {
-                                    console.error('Error:', error);
-                                    loader.style.display = 'none';
+                            headers: {
+                                'X-WP-Nonce': myApi.nonce
+                            }
+                        })
+                            .then(response => response.json())
+                            .then(function (data) {
+                                data.forEach(blog => {
+                                    prependBlogHTML(blog);
                                 });
-                        }
+                                loader.style.display = 'none';
+                                blogPageNum++;
+                                if (data.length === maxBlogsPerPage) observer.observe(target);
+                            })
+                            .catch(function (error) {
+                                console.error('Error:', error);
+                                loader.style.display = 'none';
+                            });
                     }
-                });
-            }, {
-                root: null,
-                rootMargin: '0px',
-                threshold: 0.1
+                }
             });
+        }, {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        });
 
-            observer.observe(target);
+        observer.observe(target);
 
-            if (blogKeywordsInput) {
-                blogKeywordsInput.addEventListener('keyup', (event) => {
-                    if (event.key === 'Enter' || event.keyCode === 13) {
-                        applyBlogFilter(target, observer);
-                        blogKeywordsInput.blur();
-                    }
-                });
-            }            
-
-            if (blogFilterBtn) {
-                blogFilterBtn.addEventListener('click', function () {
-                    expandContent('#blog-filter-options');
-                });
-            }
-
-            if (blogFilterSubmitBtn) {
-                blogFilterSubmitBtn.addEventListener('click', function () {
+        if (blogKeywordsInput) {
+            blogKeywordsInput.addEventListener('keyup', (event) => {
+                if (event.key === 'Enter' || event.keyCode === 13) {
                     applyBlogFilter(target, observer);
-                });
-            }
+                    blogKeywordsInput.blur();
+                }
+            });
+        }            
+
+        if (blogFilterBtn) {
+            blogFilterBtn.addEventListener('click', function () {
+                expandContent('#blog-filter-options');
+            });
         }
+
+        if (blogFilterSubmitBtn) {
+            blogFilterSubmitBtn.addEventListener('click', function () {
+                applyBlogFilter(target, observer);
+            });
+        }
+    }
     
     function prependBlogHTML(blog) {
         let blogsContainer = document.querySelector('.blogs');
@@ -173,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
             blogFilterHead.innerHTML = `<img src="${themePath}/images/filter.webp" alt="Filter">`;
         } else {
             element.style.maxHeight = element.scrollHeight + 'px';
-            blogFilterHead.innerHTML = `<img src="${themePath}/images/close-filter.webp" alt="Close Filter">`;
+            blogFilterHead.innerHTML = `<img src="${myApi.template_path}/images/close-filter.webp" alt="Close Filter">`;
         }
     }
 });

@@ -42,7 +42,7 @@
 
 <div id="blog-filter">
     <div id="blog-filter-head">
-        <img src="<?php echo esc_url($themePath . '/images/filter.webp'); ?>" alt="<?php esc_attr_e('Filter'); ?>">
+        <img src="<?php echo esc_url($template_path . '/images/filter.webp'); ?>" alt="<?php esc_attr_e('Filter'); ?>">
     </div>
     <div id="blog-filter-options">
         <div>

@@ -6,6 +6,8 @@
         exit; // Exit if accessed directly
     }
 
+    global $template_path_web;
+
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -42,7 +44,7 @@
 
         <div id="logo-name"<?php echo $user_nav_attr; ?>>
             <div id="site-logo">
-                <img src="<?php echo esc_url( $theme_path . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>">
+                <img src="<?php echo esc_url( $template_path_web . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>">
             </div>
             <div id="site-name"><?php echo esc_html( get_bloginfo('name') ); ?></div>
         </div>
@@ -50,13 +52,13 @@
 
     <div>
         <img id="hamburger"<?php echo $user_nav_attr; ?>
-             src="<?php echo esc_url( $theme_path . '/images/hamburger.webp' ); ?>"
+             src="<?php echo esc_url( $template_path_web . '/images/hamburger.webp' ); ?>"
              alt="<?php esc_attr_e('Menu'); ?>">
     </div>
 
     <div>
         <img id="close-nav-btn"<?php echo $user_nav_attr; ?>
-             src="<?php echo esc_url( $theme_path . '/images/close-nav.webp' ); ?>"
+             src="<?php echo esc_url( $template_path_web . '/images/close-nav.webp' ); ?>"
              alt="<?php esc_attr_e('Close Menu'); ?>">
     </div>
 
