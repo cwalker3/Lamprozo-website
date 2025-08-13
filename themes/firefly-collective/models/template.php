@@ -564,6 +564,9 @@
 		$current_landing_style = firefly_collective_get_landing_style();
 		$preview_landing_style = firefly_collective_get_landing_style_preview();
 		
+        error_log($current_landing_style);
+        error_log($preview_landing_style);
+
 		// Only apply filter if preview differs from current
 		if ($current_landing_style === $preview_landing_style) {
 			return $content;
@@ -760,9 +763,6 @@
 		// If no saved content, fall back to RAW template file content (not rendered)
 		if ($preview_content === false) {
 			$preview_content = firefly_collective_get_landing_style_html($preview_style); // This gets raw block markup
-			error_log("LANDING DEBUG - Using RAW template file for preview: " . $preview_style);
-		} else {
-			error_log("LANDING DEBUG - Using saved RAW content for preview: " . $preview_style);
 		}
 		
 		if ($preview_content) {
@@ -770,9 +770,6 @@
 			$new_content = $preview_content . $extracted['remaining'];
 			$response->data['content']['raw'] = $new_content;
 			$response->data['content']['rendered'] = apply_filters('the_content', $new_content);
-			
-			error_log("LANDING DEBUG - Content swapped successfully with RAW blocks");
-			error_log("LANDING DEBUG - New content preview: " . substr($new_content, 0, 200));
 		}
 		
 		return $response;
@@ -791,8 +788,6 @@
         $has_blocks = strpos($content, '<!-- wp:') !== false;
         
         if (!$has_blocks) {
-            error_log("LANDING DEBUG - WARNING: Landing file for '$style' does not contain block markup!");
-            error_log("LANDING DEBUG - Content: " . substr($content, 0, 200));
             return false;
         }
         
@@ -806,7 +801,6 @@
             }
         }
         
-        error_log("LANDING DEBUG - Landing file '$style' has $valid_blocks valid blocks");
         return $valid_blocks > 0;
     }
 
@@ -853,8 +847,6 @@
         $preview_style = sanitize_text_field( $request->get_param( 'preview_style' ) );
         $current_style = firefly_collective_get_landing_style();
         
-        error_log("LANDING DEBUG - Edit request - Preview: $preview_style, Current: $current_style");
-        
         // Validate the preview style file
         if (!firefly_collective_validate_landing_file($preview_style)) {
             return new WP_Error( 'invalid_landing_file', 'Landing style file is not properly formatted', array( 'status' => 400 ) );
@@ -871,7 +863,6 @@
         // If preview style differs from current, add parameter
         if ($preview_style !== $current_style) {
             $edit_url .= '&landing_preview=' . urlencode($preview_style);
-            error_log("LANDING DEBUG - Added preview parameter to URL: $edit_url");
         }
         
         return rest_ensure_response( array(
@@ -926,13 +917,10 @@
 			return;
 		}
 		
-		error_log("LANDING DEBUG - Page saved with preview parameter: $preview_style");
-		
 		// Extract and save the landing block content for the preview style
 		$extracted = firefly_collective_extract_landing_block($post->post_content);
 		if (!empty($extracted['block'])) {
 			firefly_collective_save_landing_style_content($preview_style, $extracted['block']);
-			error_log("LANDING DEBUG - Saved edited content for style: $preview_style");
 		}
 		
 		// Update the active landing style to match the preview
@@ -940,8 +928,6 @@
 		
 		// Sync the preview style to match
 		firefly_collective_set_landing_style_preview($preview_style);
-		
-		error_log("LANDING DEBUG - Updated active landing style to: $preview_style");
 	}
     add_action('save_post', 'firefly_collective_save_landing_style_on_page_save', 10, 3);
 
@@ -993,7 +979,6 @@
             if ($home_page_id && $post_id == $home_page_id) {
                 // Remove the landing_preview parameter from redirect URL
                 $clean_url = firefly_collective_get_clean_edit_url($post_id);
-                error_log("LANDING DEBUG - Redirecting to clean URL after save: $clean_url");
                 return $clean_url;
             }
         }
