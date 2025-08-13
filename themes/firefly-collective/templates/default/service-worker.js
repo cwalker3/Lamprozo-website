@@ -31,7 +31,6 @@ const CORE_THEME_ASSETS = [
   templatePath    +   '/assets/css/app.css',
   templatePath    +   '/assets/css/auth.css',
   templatePath    +   '/assets/css/dashboard.css',
-  templatePath    +   '/assets/js/main.js',
   templatePath    +   '/assets/js/auth.js',
   templatePath    +   '/assets/js/dashboard.js',
   templatePath    +   '/assets/js/app.js',
@@ -53,7 +52,6 @@ function getCoreTemplateAssets() {
     `${templatePath}/assets/css/_core_animations.css`,
     `${templatePath}/assets/css/_core_nav.css`,
     `${templatePath}/assets/css/_core_default.css`,
-    `${templatePath}/assets/js/_core_default.js`,
     `${templatePath}/assets/js/_core_main.js`,
     `${templatePath}/assets/js/_core_nav.js`,
   ];

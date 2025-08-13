@@ -310,9 +310,11 @@
     }
 
     add_action('init', function() {
+        global $template_path;
+
         // Check if this is a request for the service worker
         $request_uri = $_SERVER['REQUEST_URI'];
-        $sw_path = '/wp-content/themes/firefly-collective/service-worker.js';
+        $sw_path = $template_path . '/service-worker.js';
         
         // Only intercept exact service worker requests
         if (parse_url($request_uri, PHP_URL_PATH) === $sw_path) {
@@ -323,7 +325,7 @@
             header('Content-Type: application/javascript');
             
             // Read and output the service worker file
-            $file_path = get_template_directory() . '/service-worker.js';
+            $file_path = $template_path . '/service-worker.js';
             if (file_exists($file_path)) {
                 readfile($file_path);
                 exit;

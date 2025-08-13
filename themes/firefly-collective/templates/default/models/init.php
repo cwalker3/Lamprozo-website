@@ -199,9 +199,11 @@
     add_action('wp_enqueue_scripts', 'enqueue_my_styles_and_scripts');
 
     function add_pwa_manifest() {
+        global $template_path;
+
         if (determine_view() !== 'app') return;
 
-        $manifest_url = get_stylesheet_directory_uri() . '/manifest.json';
+        $manifest_url = $template_path . '/manifest.json';
 
         // Output the link tag
         echo '<link crossorigin="use-credentials" rel="manifest" href="' . esc_url( $manifest_url ) . '">';

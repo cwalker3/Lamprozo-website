@@ -354,8 +354,6 @@ document.addEventListener('DOMContentLoaded', function () {
             window.data = dataResponse.data;
             break;
         }
-        
-        console.log(dataResponse.response_html);
 
         // Insert HTML
         appRoot.innerHTML = '';
@@ -871,8 +869,8 @@ document.addEventListener('DOMContentLoaded', function () {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker
-        .register('/wp-content/themes/firefly-collective/service-worker.js',
-          { scope: '/wp-content/themes/firefly-collective/' }
+        .register('/wp-content/themes/firefly-collective/templates/default/service-worker.js',
+          { scope: '/wp-content/themes/firefly-collective/templates/default/' }
         )
         .then(function(registration) {
           console.log('Service worker registration succeeded:', registration);
