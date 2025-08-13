@@ -75,6 +75,10 @@
     function determine_view() {
         $aCmd = parse_request_uri();
 
+        // Get template path 
+        $active_template = firefly_collective_get_active_template();
+        $template_path = $theme_path . '/templates/' . $active_template;
+
         // For single blog posts
         if ( is_single() ) return 'blog-post';
         if ( is_home() ) return 'blog';
@@ -94,7 +98,7 @@
             
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists
-                $view_path = get_template_directory() . '/views/' . $view . '.php';
+                $view_path = get_template_directory() . $template_path . '/views/' . $view . '.php';
                 if (file_exists($view_path)) {
                     return $view;
                 }

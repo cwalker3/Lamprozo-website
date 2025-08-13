@@ -84,13 +84,14 @@
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
-        global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web, $template_path;
+        global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web, $template_path, $template_web_path;
         $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
         $theme_path_web = get_template_directory_uri();
         $active_template = firefly_collective_get_active_template();
         $template_path = $theme_path_web . '/templates/' . $active_template;
+        $template_path_web = $template_path;
         $version = wp_get_theme()->get('Version');
         $unique_id = uniqid();
         $auth_id = isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : '';
@@ -179,6 +180,7 @@
                 'nonce'                 => $nonce,
                 'features'              => $features_options_addons,
                 'theme_path'            => $theme_path,
+                'template_path'         => $template_path,
                 'stripeKey'             => $publishable_key,
                 'subscription_status'   => $subscription_status,
                 'campaign_config'       => $campaign_config
@@ -263,10 +265,18 @@
         $active_template = firefly_collective_get_active_template();
         $nonce = wp_create_nonce('wp_rest');
         
-        wp_enqueue_script('main-js', $theme_path . '/templates/' . $active_template . array(), $unique_id, true);
-        wp_enqueue_style('auth-css', $theme_path . '/templates/' . $active_template . array(), $nonce);
-        wp_enqueue_script('template-main-js', $theme_path . '/templates/' . $active_template . '/assets/js/_core_main.js', array(), $nonce, true);
-        wp_enqueue_script('auth-js', $theme_path . '/assets/js/auth.js', array(), $nonce, true);
+        $template_path =  get_template_directory_uri() . '/templates/' . $active_template;
+        
+        // CSS: handle, src, deps(array), ver, media
+        wp_enqueue_style(
+            'auth-css',
+            $template_path . '/assets/css/auth.css',
+            array(),
+            $nonce,
+            'all'
+        );
+        wp_enqueue_script('template-main-js', $template_path . '/assets/js/_core_main.js', array(), $nonce, true);
+        wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $nonce, true);
         wp_localize_script('auth-js', 'myApi', array(
             'nonce'     => $nonce,
             'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN

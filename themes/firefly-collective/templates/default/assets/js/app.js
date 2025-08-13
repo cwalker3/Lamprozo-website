@@ -183,6 +183,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.nonce    = data.nonce;
     window.http_host = data.http_host;
     window.theme_path = data.theme_path;
+    window.template_path = data.template_path;
     window.app_page_title = data.app_page_title;
     window.app_page_html = data.app_page_html;
     window.subscription_status = data.subscription_status;

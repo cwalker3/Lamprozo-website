@@ -33,6 +33,8 @@
         $nonce   = wp_create_nonce('wp_rest');
         $api_url = get_rest_url(null, 'custom-api/v1/');
         $theme_path = get_template_directory_uri();
+        $active_template = firefly_collective_get_active_template();
+        $template_path = $theme_path . '/templates/' . $active_template;
         $auth_id = $_COOKIE['auth_id'];
 
         // Admin only
@@ -40,7 +42,7 @@
         $currentUserIdAdmin = current_user_can('manage_options');
 
         // Main JS
-        wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
+        wp_enqueue_script('main-js', $template_path . '/assets/js/_core_main.js', array(), $unique_id, true);
         wp_localize_script('main-js', 'myApi', array(
             'themePath' => $theme_path
         ));

@@ -157,12 +157,13 @@
     add_filter('login_headertitle', 'custom_login_logo_url_title');
 
     function enqueue_custom_login_style() {
-    wp_enqueue_style(
-        'custom-login',
-        get_template_directory_uri() . '/assets/css/login.css',
-        array(),
-        wp_get_theme()->get('Version')
-    );
+        $active_template = firefly_collective_get_active_template();
+        wp_enqueue_style(
+            'custom-login',
+            get_template_directory_uri() . '/templates/' . $active_template . '/assets/css/login.css',
+            array(),
+            wp_get_theme()->get('Version')
+        );
     }
     add_action('login_enqueue_scripts', 'enqueue_custom_login_style');
 

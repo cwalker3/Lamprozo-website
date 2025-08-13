@@ -27,6 +27,7 @@
             dashboardData = { 
                 nonce: window.nonce,
                 theme_path: window.theme_path,
+                template_path: window.template_path,
                 features: window.features,
                 stripeKey: window.stripeKey,
                 subscription_status: window.subscription_status
@@ -532,7 +533,7 @@
             const overlay = document.createElement('div');
             overlay.className = 'loading-overlay';
             overlay.innerHTML = `<div class="loading-spinner">
-                <img src="${dashboardData.theme_path}/images/loading.gif" alt="Loading">
+                <img src="${dashboardData.template_path}/images/loading.gif" alt="Loading">
             </div>`;
             document.body.appendChild(overlay);
             
@@ -2941,7 +2942,7 @@
 
             // Clear prior messages and show loader
             profileMessage.textContent = '';
-            updateProfileBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading…" style="max-width: 15px;">`;
+            updateProfileBtn.innerHTML = `<img class="loader" src="${window.template_path}/images/loading.gif" alt="Loading…" style="max-width: 15px;">`;
 
             try {
                 const response = await fetch(url, options);
@@ -2997,7 +2998,7 @@
 
                 // Clear prior messages and show loader
                 profileMessage.textContent = '';
-                resetPasswordBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading…" style="max-width: 15px;">`
+                resetPasswordBtn.innerHTML = `<img class="loader" src="${window.template_path}/images/loading.gif" alt="Loading…" style="max-width: 15px;">`
 
                 try {
                     const response = await fetch(url, options);
@@ -4196,7 +4197,7 @@
             addSubscriptionsTab();
             if (isPWA) {
                 const manageSubsLoader = document.querySelector('#subs-loader');
-                manageSubsLoader.src = `${window.theme_path}/images/loading.gif`;
+                manageSubsLoader.src = `${window.template_path}/images/loading.gif`;
             }
         }
 
