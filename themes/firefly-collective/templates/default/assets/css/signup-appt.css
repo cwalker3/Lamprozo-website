@@ -1,0 +1,141 @@
+/* Signup/Bookings */
+.signup-form,
+.signup-form > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+}
+
+.book-an-appointment-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    justify-content: center;
+    gap: 2vw;
+}
+
+.book-an-appointment-form > div:first-of-type {
+    justify-self: center;
+    align-self: end;
+    width: 90%;
+}
+
+.book-an-appointment-form > div:nth-of-type(2) {
+    position: relative;
+    width: 65vh;
+    height: 65vh;
+}
+
+.book-an-appointment-form h2 {
+    text-align: center;
+}
+
+.signup-form {
+  padding-bottom: 10vh;
+}
+
+.book-an-appointment-form input,
+.book-an-appointment-form textarea,
+.book-an-appointment-form select {
+    display: block;
+}
+
+.book-an-appointment-form input[type=text],
+.book-an-appointment-form textarea,
+.book-an-appointment-form select,
+.signup-form input[type=text],
+.signup-form input[type=password],
+.signup-form input[type=email],
+.signup-form input[type=tel],
+.signup-form select,
+.signup-form textarea {
+  width: 90%;
+  font-family: 'verdana';
+  font-size: 1rem;
+  padding: 0.5rem;
+  margin-bottom: 1vh;
+}
+
+.book-an-appointment-form select {
+    width: 93%;
+}
+
+.signup-form textarea,
+.book-an-appointment-form textarea {
+  min-height: 20vh;
+}
+
+.party-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+#signup-btn {
+  position: absolute;
+  bottom: -5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  text-align: center;
+}
+
+#signup-btn button,
+#book-an-appointment-btn button {
+  cursor: pointer;
+  font-family: 'cinzel-bold';
+  font-size: 1.25rem;
+}
+
+#book-an-appointment-btn {
+  opacity: 0.3;
+  pointer-events: none;
+  width: 100%;
+  text-align: center;
+  margin-top: 3vh;
+}
+
+.password-field {
+  position: relative;
+}
+
+.toggle-password {
+  cursor: pointer;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+input.error {
+  border: 2px solid red;
+}
+
+@media (max-width: 600px) {
+    #book-an-appointment-btn {
+        bottom: -75px;
+    }
+}
+
+@media(max-width: 1300px) {
+    .book-an-appointment-form > div:nth-of-type(2) {
+        width: 50vh;
+    }
+}
+
+@media(max-width: 1000px) {
+    .book-an-appointment-form {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .book-an-appointment-form > div:nth-of-type(2) {
+        width: 90vw;
+        height: auto;
+        justify-self: center;
+    }
+
+    #book-an-appointment-btn {
+        margin-bottom: 5vh;
+    }
+}

@@ -1,0 +1,36 @@
+/* Contact page */
+
+.contact-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: center;
+    gap: 1rem;
+    position: relative;
+    padding-bottom: 3.5rem;
+}
+
+.contact-form input[type=text],
+.contact-form input[type=email],
+.contact-form textarea,
+#send-message-btn,
+#send-message-btn > button {
+    width: 70%;
+    font-family: 'cinzel-bold';
+    font-size: 1rem;
+    margin: 0 auto;
+    padding: 0.5rem;
+}
+
+.contact-form textarea {
+    height: 150px;
+}
+
+#send-message-btn {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: pointer;
+    width: 40%;
+    text-align: center;
+}

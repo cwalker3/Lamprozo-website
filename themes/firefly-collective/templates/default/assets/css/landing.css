@@ -1,0 +1,430 @@
+/* template/assets/css/landing.css */
+
+/* =============================================================================
+   COMPATIBILITY WITH CORE STYLES
+   ============================================================================= */
+
+	/* Ensure landing pages work with existing core CSS */
+	.wp-block-cover {
+		/* Override any inherited styles from core */
+		box-sizing: border-box !important;
+	}
+
+	/* Reset any potential conflicts for landing page containers */
+	.wp-block-cover,
+	.wp-block-cover * {
+		box-sizing: border-box;
+	}
+
+	/* Specific overrides for WordPress block editor styles */
+	.wp-block-cover.wp-block-cover {
+		/* Ensure WordPress block styles don't interfere */
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	/* Cover blocks should be full width */
+	/* Since .content no longer has padding, ensure clean full-width coverage */
+	.content .wp-block-cover {
+		/* Reset any margins and ensure full width */
+		margin: 0 !important;
+		width: 100% !important;
+	}
+
+	/* Ensure body can scroll when there are cover blocks */
+	body:has(.wp-block-cover) {
+		overflow-y: auto !important;
+	}
+	
+	/* Fallback for browsers without :has() support */
+	@supports not (selector(:has(*))) {
+		body {
+			overflow-y: auto !important;
+		}
+	}
+
+/* =============================================================================
+   FULL VIEWPORT HERO SECTION
+   ============================================================================= */
+
+	/* Main cover container - Full viewport height */
+	.wp-block-cover {
+		/* Use modern viewport units for better mobile support */
+		min-height: 100vh;
+		min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+		height: 100vh;
+		height: 100dvh;
+		width: 100vw;
+		position: relative;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		overflow: hidden;
+		/* Override any inherited margins/padding */
+		margin: 0 !important;
+		padding: 0 !important;
+		/* Ensure it takes precedence over core styles */
+		z-index: 1;
+		/* Smooth performance */
+		transform: translateZ(0);
+		will-change: transform;
+	}
+
+	/* Background image optimization */
+	.wp-block-cover .wp-block-cover__image-background {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: center;
+		z-index: 1;
+		/* Performance optimization */
+		transform: translateZ(0);
+		backface-visibility: hidden;
+	}
+
+	/* Enhanced overlay with modern gradient */
+	.wp-block-cover .wp-block-cover__background {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 2;
+		/* Modern gradient overlay instead of flat color */
+		background: linear-gradient(
+			135deg,
+			rgba(166, 184, 201, 0.85) 0%,
+			rgba(166, 184, 201, 0.65) 50%,
+			rgba(166, 184, 201, 0.85) 100%
+		);
+		/* Subtle backdrop blur for modern effect */
+		backdrop-filter: blur(0.5px);
+		-webkit-backdrop-filter: blur(0.5px);
+	}
+
+	/* Content container */
+	.wp-block-cover .wp-block-cover__inner-container {
+		position: relative;
+		z-index: 3;
+		width: 100%;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 2rem;
+		text-align: center;
+		/* Ensure content is perfectly centered */
+		display: flex !important;
+		flex-direction: column !important;
+		justify-content: center !important;
+		align-items: center !important;
+		min-height: 100vh;
+		min-height: 100dvh;
+		/* Override WordPress default positioning */
+		top: auto !important;
+		left: auto !important;
+		right: auto !important;
+		bottom: auto !important;
+		transform: none !important;
+	}
+
+/* =============================================================================
+   TYPOGRAPHY - BOLD & MODERN
+   ============================================================================= */
+
+	/* Main heading - Bold and impactful */
+	.wp-block-cover .has-large-font-size,
+	.wp-block-cover h1,
+	.wp-block-cover .wp-block-cover__inner-container > p:first-child {
+		font-size: clamp(2.5rem, 8vw, 5rem);
+		font-weight: 800;
+		line-height: 1.1;
+		margin: 0 0 2rem 0;
+		color: #ffffff;
+		text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		/* Modern font stack */
+		font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 
+					'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+		letter-spacing: -0.02em;
+		/* Prevent text from being too wide */
+		max-width: 50vw;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	/* Subheadings and body text */
+	.wp-block-cover p:not(.has-large-font-size):not(.wp-block-button__link) {
+		font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+		font-weight: 500;
+		line-height: 1.5;
+		color: #ffffff;
+		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+		margin: 0 0 1.5rem 0;
+		/* Optimal reading width */
+		max-width: 50ch;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+/* =============================================================================
+   COLUMN LAYOUTS - SLEEK & PROFESSIONAL
+   ============================================================================= */
+
+	/* Columns container */
+	.wp-block-cover .wp-block-columns {
+		width: 100%;
+		max-width: 1000px;
+		margin: 3rem auto 0;
+		display: grid;
+		gap: 2rem;
+		/* Dynamic grid based on number of columns */
+		grid-template-columns: 1fr;
+	}
+
+	/* Two column layout */
+	.wp-block-cover .wp-block-columns:has(.wp-block-column:nth-child(2):last-child) {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	/* Three column layout */
+	.wp-block-cover .wp-block-columns:has(.wp-block-column:nth-child(3)) {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	/* Individual column styling */
+	.wp-block-cover .wp-block-column {
+		background: rgba(255, 255, 255, 0.1);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 16px;
+		padding: 2rem 1.5rem;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		/* Modern glass effect */
+		box-shadow: 
+			0 8px 32px rgba(0, 0, 0, 0.1),
+			inset 0 1px 0 rgba(255, 255, 255, 0.2);
+	}
+
+	/* Column hover effects */
+	.wp-block-cover .wp-block-column:hover {
+		transform: translateY(-4px);
+		background: rgba(255, 255, 255, 0.15);
+		box-shadow: 
+			0 16px 48px rgba(0, 0, 0, 0.15),
+			inset 0 1px 0 rgba(255, 255, 255, 0.3);
+	}
+
+	/* Column text */
+	.wp-block-cover .wp-block-column p {
+		font-size: clamp(1rem, 2vw, 1.25rem);
+		font-weight: 500;
+		margin-bottom: 1.5rem;
+		color: #ffffff;
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	}
+
+/* =============================================================================
+   BUTTONS - MODERN CTA DESIGN
+   ============================================================================= */
+
+	/* Button container */
+	.wp-block-cover .wp-block-buttons {
+		margin: 1.5rem 0 0 0;
+		display: flex;
+		justify-content: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	/* Button wrapper */
+	.wp-block-cover .wp-block-button {
+		margin: 0;
+	}
+
+	/* Button styling */
+	.wp-block-cover .wp-block-button__link {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		color: #ffffff !important;
+		border: none;
+		border-radius: 50px;
+		padding: 1rem 2.5rem;
+		font-size: clamp(1rem, 2vw, 1.125rem);
+		font-weight: 600;
+		text-decoration: none;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		position: relative;
+		overflow: hidden;
+		/* Modern shadow */
+		box-shadow: 
+			0 4px 16px rgba(102, 126, 234, 0.4),
+			0 1px 3px rgba(0, 0, 0, 0.1);
+		/* Remove default WordPress button styles */
+		border-radius: 50px !important;
+	}
+
+	/* Button hover effect */
+	.wp-block-cover .wp-block-button__link:hover {
+		transform: translateY(-2px);
+		background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+		box-shadow: 
+			0 8px 25px rgba(102, 126, 234, 0.6),
+			0 3px 10px rgba(0, 0, 0, 0.15);
+	}
+
+	/* Button active state */
+	.wp-block-cover .wp-block-button__link:active {
+		transform: translateY(0);
+	}
+
+	/* Shine effect on buttons */
+	.wp-block-cover .wp-block-button__link::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: -100%;
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(
+			90deg,
+			transparent,
+			rgba(255, 255, 255, 0.2),
+			transparent
+		);
+		transition: left 0.5s;
+	}
+
+	.wp-block-cover .wp-block-button__link:hover::before {
+		left: 100%;
+	}
+
+/* =============================================================================
+   RESPONSIVE DESIGN - MOBILE FIRST
+   ============================================================================= */
+
+	/* Tablet and larger screens */
+	@media (min-width: 768px) {
+		/* Columns always stay in row on tablet+ */
+		.wp-block-cover .wp-block-columns {
+			gap: 2.5rem;
+		}
+		
+		.wp-block-cover .wp-block-column {
+			padding: 2.5rem 2rem;
+		}
+		
+		.wp-block-cover .wp-block-cover__inner-container {
+			padding: 3rem;
+		}
+	}
+
+	/* Mobile adjustments */
+	@media (max-width: 767px) {
+		/* Single column on mobile */
+		.wp-block-cover .wp-block-columns {
+			grid-template-columns: 1fr !important;
+			gap: 1.5rem;
+			margin-top: 2rem;
+		}
+		
+		.wp-block-cover .wp-block-column {
+			padding: 1.5rem 1.25rem;
+		}
+		
+		.wp-block-cover .wp-block-cover__inner-container {
+			padding: 1.5rem;
+		}
+		
+		/* Adjust button sizes for mobile */
+		.wp-block-cover .wp-block-button__link {
+			padding: 0.875rem 2rem;
+			font-size: 1rem;
+		}
+		
+		/* Adjust main heading for mobile */
+		.wp-block-cover .has-large-font-size,
+		.wp-block-cover h1,
+		.wp-block-cover .wp-block-cover__inner-container > p:first-child {
+			margin-bottom: 1.5rem;
+		}
+	}
+
+	/* Small mobile adjustments */
+	@media (max-width: 480px) {
+		.wp-block-cover .wp-block-cover__inner-container {
+			padding: 1rem;
+		}
+		
+		.wp-block-cover .wp-block-column {
+			padding: 1.25rem 1rem;
+		}
+	}
+
+/* =============================================================================
+   ACCESSIBILITY & PERFORMANCE
+   ============================================================================= */
+
+	/* Focus styles for accessibility */
+	.wp-block-cover .wp-block-button__link:focus {
+		outline: 3px solid #fbbf24;
+		outline-offset: 2px;
+	}
+
+	/* Reduced motion support */
+	@media (prefers-reduced-motion: reduce) {
+		.wp-block-cover * {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
+
+	/* High contrast mode support */
+	@media (prefers-contrast: high) {
+		.wp-block-cover .wp-block-cover__background {
+			background: rgba(0, 0, 0, 0.8);
+		}
+		
+		.wp-block-cover .wp-block-column {
+			background: rgba(0, 0, 0, 0.9);
+			border-color: #ffffff;
+		}
+	}
+
+/* =============================================================================
+	CLEANUP EMPTY ELEMENTS
+	============================================================================= */
+
+	/* Hide empty paragraph tags to prevent layout shifting */
+	p:empty {
+		display: none !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		height: 0 !important;
+	}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+	@media print {
+		.wp-block-cover {
+			height: auto;
+			min-height: auto;
+			background: #f8f9fa !important;
+			color: #000000 !important;
+		}
+		
+		.wp-block-cover .wp-block-cover__background {
+			display: none;
+		}
+		
+		.wp-block-cover * {
+			color: #000000 !important;
+			text-shadow: none !important;
+		}
+	}

@@ -21,7 +21,12 @@
         $template_path = $theme_path . '/templates/' . $active_template;
 
         switch($view) {
+            case '':
+                $assets['css'][]    = $template_path . '/assets/css/landing.css';
+                break;
+
             case 'blog':
+                $assets['css'][]    = $template_path . '/assets/css/blog.css';
                 $assets['js'][]     = $template_path . '/assets/js/blog.js';
                 break;
             
@@ -40,15 +45,18 @@
                 break;
 
             case 'contact':
+                $assets['css'][]    = $template_path . '/assets/css/contact.css';
                 $assets['js'][]     = $template_path . '/assets/js/contact.js';
                 break;
 
             case 'signup':
+                $assets['css'][]    = $template_path . '/assets/css/signup-appt.css';
                 $assets['js'][]     = $template_path . '/assets/js/auth.js';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 break;
 
             case 'request-an-appointment':
+                $assets['css'][]    = $template_path . '/assets/css/signup-appt.css';
                 $assets['css'][]    = $template_path . '/assets/css/calendar.css';
                 $assets['js'][]     = $template_path . '/assets/js/calendar.js';
                 $assets['js'][]     = $template_path . '/assets/js/request-an-appointment.js';

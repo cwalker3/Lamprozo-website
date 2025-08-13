@@ -288,6 +288,16 @@
         }
     });
 
+    /**
+	 * Remove default WordPress block library CSS
+	 */
+	function remove_wp_css() {
+		wp_dequeue_style('wp-block-library-theme');
+		wp_dequeue_style('wc-blocks-style'); // Remove WooCommerce block CSS if present
+		wp_dequeue_style('classic-theme-styles'); // Remove classic theme styles
+	}
+	add_action('wp_enqueue_scripts', 'remove_wp_css', 100);
+
     // If any plugin enqueues it explicitly, dequeue as a fallback
     add_action('wp_print_scripts', function () {
         wp_dequeue_script('jquery-migrate');
