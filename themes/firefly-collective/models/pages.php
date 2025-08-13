@@ -2,13 +2,14 @@
 
     // theme/models/pages.php
 
-	function custom_theme_setup_pages() {
+	// Define the page structure that both pages.php and nav.php will use
+	function get_theme_pages_structure() {
 
-        $active_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION);
+		$active_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION);
         $landing_page_style = firefly_collective_get_landing_style();
         $landing_page_contents = file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/landing.html');
 
-		$pages = array(
+		return array(
 			'home'              => array('title' => 'Home',             'content' => $landing_page_contents . 'This is the homepage.'),
 			'app'               => array('title' => 'App',              'content' => 'This is the PWA front end page.'),
 			'blog'              => array('title' => 'Blog',             'content' => 'This is the blog.'),
@@ -17,6 +18,10 @@
 			'order-history'     => array('title' => 'Order History',    'content' => 'This is the order history page.'),
 			'dashboard'         => array('title' => 'Dashboard',        'content' => 'This is the dashboard page.'),
 		);
+	}
+
+	function custom_theme_setup_pages() {
+		$pages = get_theme_pages_structure();
 
 		// Create pages if they don't exist
 		$page_ids = array();

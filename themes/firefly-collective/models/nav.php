@@ -3,12 +3,12 @@
     // theme/models/nav.php
 
 	function custom_theme_setup_navigation() {
-		// Get the pages that should be in navigation (excluding dashboard)
-		$nav_page_slugs = array('home', 'app', 'blog', 'contact', 'signup', 'order-history');
+		// Dynamically get all pages that were created in pages.php (excluding dashboard)
+		$all_pages = get_theme_pages_structure();
 		$page_ids = array();
 		$pages = array();
 
-		foreach ($nav_page_slugs as $slug) {
+		foreach ($all_pages as $slug => $data) {
 			$page = get_page_by_path($slug);
 			if ($page) {
 				$page_ids[$slug] = $page->ID;
