@@ -15,6 +15,7 @@
     // Define landing style system constants
 	define('FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE', 'default');
 	define('FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION', 'firefly_collective_landing_style');
+    define('FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION', 'firefly_collective_landing_style_preview');
 
     // Load template core model  
     $active_template = firefly_collective_get_active_template();
@@ -43,30 +44,14 @@
             update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
         }
         
+        // Initialize landing style preview to match current landing style
+        $current_landing_style = firefly_collective_get_landing_style();
+        update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, $current_landing_style);
+        
         // Flush rewrite rules if needed
         flush_rewrite_rules();
     }
     add_action('after_switch_theme', 'firefly_collective_theme_activation');
-
-    /**
-	 * Get the current landing style
-	 * 
-	 * @return string The current landing style
-	 */
-	function firefly_collective_get_landing_style() {
-		return get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
-	}
-
-	/**
-	 * Set the landing style
-	 * 
-	 * @param string $style The landing style to set
-	 * @return bool True on success, false on failure
-	 */
-	function firefly_collective_set_landing_style($style) {
-		$style = sanitize_text_field($style);
-		return update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, $style);
-	}
 
     /**
      * Get the currently active template
@@ -274,13 +259,13 @@
         $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         
         $wp_customize->add_setting('firefly_collective_template_selector', array(
-            'default' => $current_live_template,
+            'default' => firefly_collective_get_landing_style_preview(),
             'transport' => 'postMessage',
             'sanitize_callback' => 'sanitize_file_name'
         ));
         
         // Set the current value to always be the live template
-        $wp_customize->set_post_value('firefly_collective_template_selector', $current_live_template);
+        $wp_customize->set_post_value('firefly_collective_template_selector', firefly_collective_get_landing_style_preview());
         
         // Get available templates for dropdown
         $templates = firefly_collective_get_available_templates();
@@ -431,9 +416,6 @@
 
 	/**
 	 * Format landing style name for display
-	 * 
-	 * @param string $style_name The raw style name from filename
-	 * @return string Formatted display name
 	 */
 	function firefly_collective_format_landing_style_name($style_name) {
 		// Replace dashes with spaces
@@ -444,6 +426,189 @@
 		
 		return $formatted;
 	}
+
+    /**
+	 * Get the current landing style
+	 */
+	function firefly_collective_get_landing_style() {
+		return get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
+	}
+
+	/**
+	 * Set the landing style
+	 */
+	function firefly_collective_set_landing_style($style) {
+		$style = sanitize_text_field($style);
+		return update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION, $style);
+	}
+
+    /**
+	 * Get the current landing style preview value
+	 */
+	function firefly_collective_get_landing_style_preview() {
+		return get_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, firefly_collective_get_landing_style());
+	}
+
+	/**
+	 * Set the landing style preview value
+	 */
+	function firefly_collective_set_landing_style_preview($style) {
+		$style = sanitize_text_field($style);
+		return update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, $style);
+	}
+
+	/**
+	 * Get landing style HTML content from snippets
+	 */
+	function firefly_collective_get_landing_style_html($style) {
+		$active_template = firefly_collective_get_active_template();
+		$snippets_dir = FIREFLY_COLLECTIVE_TEMPLATES_DIR . '/' . $active_template . '/snippets';
+		
+		// Determine the filename based on style
+		if ($style === 'default') {
+			$filename = 'landing.html';
+		} else {
+			$filename = 'landing-' . $style . '.html';
+		}
+		
+		$file_path = $snippets_dir . '/' . $filename;
+		
+		if (file_exists($file_path) && firefly_collective_is_valid_template_path($file_path)) {
+			return file_get_contents($file_path);
+		}
+		
+		return false;
+	}
+
+    /**
+	 * Get rendered HTML from landing style block markup
+	 */
+	function firefly_collective_get_landing_style_rendered_html($style) {
+		$block_markup = firefly_collective_get_landing_style_html($style);
+		
+		if ($block_markup === false) {
+			return false;
+		}
+		
+		// Parse blocks and render to HTML
+		$blocks = parse_blocks($block_markup);
+		$rendered_html = '';
+		
+		foreach ($blocks as $block) {
+			$rendered_html .= render_block($block);
+		}
+		
+		return trim($rendered_html);
+	}
+
+    // Add this handler function to your theme/models/rest.php
+	function handle_change_landing_style_preview( WP_REST_Request $request ) {
+		$landing_style = sanitize_text_field( $request->get_param( 'landing_style' ) );
+		
+		if ( empty( $landing_style ) ) {
+			return new WP_Error( 'missing_landing_style', 'Landing style is required', array( 'status' => 400 ) );
+		}
+		
+		// Validate landing style exists by checking if we can get its rendered HTML
+		$landing_html = firefly_collective_get_landing_style_rendered_html( $landing_style );
+		if ( $landing_html === false ) {
+			return new WP_Error( 'invalid_landing_style', 'Landing style does not exist', array( 'status' => 400 ) );
+		}
+		
+		// Update preview option
+		firefly_collective_set_landing_style_preview( $landing_style );
+		
+		return rest_ensure_response( array(
+			'success' => true,
+			'landing_style' => $landing_style
+		) );
+	}
+
+    /**
+	 * Filter content to replace landing HTML in customizer iframe preview
+	 */
+	function firefly_collective_filter_landing_content($content) {
+		// Only apply filter in customizer iframe
+		if (!in_customizer_iframe()) {
+			return $content;
+		}
+		
+		$current_landing_style = firefly_collective_get_landing_style();
+		$preview_landing_style = firefly_collective_get_landing_style_preview();
+		
+		// Only apply filter if preview differs from current
+		if ($current_landing_style === $preview_landing_style) {
+			return $content;
+		}
+		
+		// Get the rendered HTML content for both styles
+		$current_landing_html = firefly_collective_get_landing_style_rendered_html($current_landing_style);
+		$preview_landing_html = firefly_collective_get_landing_style_rendered_html($preview_landing_style);
+		
+		// If we can't get either HTML, return original content
+		if ($current_landing_html === false || $preview_landing_html === false) {
+			return $content;
+		}
+		
+		// Check if current HTML exists in content
+		if (strpos($content, $current_landing_html) !== false) {
+			$filtered_content = str_replace($current_landing_html, $preview_landing_html, $content);
+			return $filtered_content;
+		} else {
+			return $content;
+		}
+	}
+
+	/**
+	 * Initialize landing content filtering
+	 * Only hook the filter when in customizer iframe and when preview differs from current
+	 */
+	function firefly_collective_init_landing_content_filter() {
+		// Only initialize in customizer iframe
+		if (!in_customizer_iframe()) {
+			return;
+		}
+		
+		$current_landing_style = firefly_collective_get_landing_style();
+		$preview_landing_style = firefly_collective_get_landing_style_preview();
+		
+		// Only hook filter if preview differs from current
+		if ($current_landing_style !== $preview_landing_style) {
+			// Hook into various content filters where landing content might appear
+			add_filter('the_content', 'firefly_collective_filter_landing_content', 10);
+			add_filter('get_the_excerpt', 'firefly_collective_filter_landing_content', 10);
+			
+			// Hook into output buffer for full page content replacement if needed
+			add_action('wp_loaded', 'firefly_collective_start_landing_output_buffer');
+		}
+	}
+	add_action('init', 'firefly_collective_init_landing_content_filter', 20);
+
+	/**
+	 * Start output buffering for full page landing content replacement
+	 * This catches content that might not go through the_content filter
+	 */
+	function firefly_collective_start_landing_output_buffer() {
+		if (in_customizer_iframe()) {
+			ob_start('firefly_collective_filter_full_page_landing_content');
+		}
+	}
+
+	/**
+	 * Filter full page output for landing content replacement
+	 */
+	function firefly_collective_filter_full_page_landing_content($buffer) {
+		return firefly_collective_filter_landing_content($buffer);
+	}
+
+    function handle_get_landing_style_preview( WP_REST_Request $request ) {
+        $preview_style = firefly_collective_get_landing_style_preview();
+        
+        return rest_ensure_response( array(
+            'success' => true,
+            'preview_style' => $preview_style
+        ) );
+    }
 
     /**
      * Handle customizer publish - copy temp template to live template and save landing style

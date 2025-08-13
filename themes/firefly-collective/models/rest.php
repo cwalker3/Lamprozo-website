@@ -96,7 +96,19 @@
         register_rest_route('custom-api/v1', '/change-template-temp', array(
             'methods'             => 'POST',
             'callback'            => 'handle_change_template_temp',
-            'permission_callback' => '__return_true'
+            'permission_callback' => 'verify_rest_request'
+        ));
+
+        register_rest_route('custom-api/v1', '/change-landing-style-preview', array(
+            'methods'             => 'POST',
+            'callback'            => 'handle_change_landing_style_preview',
+            'permission_callback' => 'verify_rest_request'
+        ));
+
+        register_rest_route('custom-api/v1', '/get-landing-style-preview', array(
+            'methods'             => 'GET',
+            'callback'            => 'handle_get_landing_style_preview',
+            'permission_callback' => 'verify_rest_request'
         ));
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');

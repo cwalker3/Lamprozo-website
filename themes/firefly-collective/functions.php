@@ -16,8 +16,9 @@
                 'signin',       'blogs',
                 'bookings',     'mail',
                 'view',         'pages',
-                'util',         'encrypt',
-                'profile',      'app');
+                'nav',          'util',
+                'encrypt',      'profile',
+                'app');
                 
     foreach($models as $model) {
         $model_path = get_template_directory() . "/models/$model.php";
