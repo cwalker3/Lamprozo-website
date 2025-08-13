@@ -152,6 +152,100 @@
                 });
             }
         }, 500);
+
+        // Handle Edit in Gutenberg button
+        var editButton = document.querySelector('#edit-landing-gutenberg');
+        if (editButton) {
+            editButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
+                
+                fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        preview_style: currentPreviewStyle
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Temporarily disable beforeunload warning
+                        window.onbeforeunload = null;
+                        // Also try to disable WordPress customizer's beforeunload
+                        if (wp.customize && wp.customize.state) {
+                            wp.customize.state('saved').set(true);
+                        }
+                        // Redirect to Gutenberg in current window
+                        window.location.href = data.edit_url;
+                    } else {
+                        console.error('Failed to get edit URL:', data);
+                        alert('Unable to open editor. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Unable to open editor. Please try again.');
+                });
+            });
+        }
+
+        // Create and inject Edit in Gutenberg button
+        setTimeout(function() {
+            var editControl = wp.customize.control('firefly_collective_edit_landing_button');
+            if (editControl) {
+                // Create button element
+                var button = document.createElement('button');
+                button.textContent = 'Edit in Gutenberg';
+                button.className = 'button button-secondary';
+                button.style.width = '100%';
+                button.style.marginTop = '10px';
+                
+                // Insert button after the control
+                var controlElement = editControl.container[0];
+                controlElement.appendChild(button);
+                
+                // Add click handler
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
+                    
+                    fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            preview_style: currentPreviewStyle
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Temporarily disable beforeunload warning
+                            window.onbeforeunload = null;
+                            // Also try to disable WordPress customizer's beforeunload
+                            if (wp.customize && wp.customize.state) {
+                                wp.customize.state('saved').set(true);
+                            }
+                            // Redirect to Gutenberg in current window
+                            window.location.href = data.edit_url;
+                        } else {
+                            console.error('Failed to get edit URL:', data);
+                            alert('Unable to open editor. Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Unable to open editor. Please try again.');
+                    });
+                });
+            }
+        }, 500);
         
     });
     

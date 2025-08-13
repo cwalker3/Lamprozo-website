@@ -310,6 +310,34 @@
             'type' => 'select',
             'choices' => $landing_style_choices,
         ));
+
+        // Landing Style control with button
+        $wp_customize->add_control('firefly_collective_landing_style', array(
+            'label' => __('Landing Style'),
+            'description' => __('Choose the landing page layout style.'),
+            'section' => 'firefly_collective_landing',
+            'type' => 'select',
+            'choices' => $landing_style_choices,
+        ));
+
+        // Add Edit in Gutenberg button setting (hidden, just for the control)
+        $wp_customize->add_setting('firefly_collective_edit_landing_button', array(
+            'default' => '',
+            'transport' => 'postMessage',
+            'sanitize_callback' => 'sanitize_text_field'
+        ));
+
+        // Use a text control but style it as a button
+        $wp_customize->add_control('firefly_collective_edit_landing_button', array(
+            'label' => __('Edit Landing Content'),
+            'description' => __('Click the button below to edit landing content in Gutenberg.'),
+            'section' => 'firefly_collective_landing',
+            'type' => 'text',
+            'input_attrs' => array(
+                'style' => 'display: none;', // Hide the input
+                'readonly' => 'readonly'
+            )
+        ));
         
         // Add Navigation section
         $wp_customize->add_section('firefly_collective_navigation', array(
@@ -550,13 +578,30 @@
 			return $content;
 		}
 		
-		// Check if current HTML exists in content
+		// Try exact match first
 		if (strpos($content, $current_landing_html) !== false) {
 			$filtered_content = str_replace($current_landing_html, $preview_landing_html, $content);
 			return $filtered_content;
-		} else {
-			return $content;
 		}
+		
+		// If exact match fails, try block-level replacement as fallback
+		$extracted = firefly_collective_extract_landing_block($content);
+		if (!empty($extracted['block'])) {
+			// Get the preview style RAW BLOCK content
+			$preview_block_content = firefly_collective_get_saved_landing_style_content($preview_landing_style);
+			
+			// If no saved content, fall back to template file
+			if ($preview_block_content === false) {
+				$preview_block_content = firefly_collective_get_landing_style_html($preview_landing_style);
+			}
+			
+			if ($preview_block_content) {
+				$filtered_content = $preview_block_content . $extracted['remaining'];
+				return $filtered_content;
+			}
+		}
+		
+		return $content;
 	}
 
 	/**
@@ -609,6 +654,352 @@
             'preview_style' => $preview_style
         ) );
     }
+
+    /**
+     * Get the home page ID
+     */
+    function firefly_collective_get_home_page_id() {
+        return get_option('page_on_front');
+    }
+
+    /**
+     * Save landing style content to post meta
+     */
+    function firefly_collective_save_landing_style_content($style, $content) {
+        $home_page_id = firefly_collective_get_home_page_id();
+        if (!$home_page_id) {
+            return false;
+        }
+        
+        $meta_key = '_landing_style_' . sanitize_key($style);
+        return update_post_meta($home_page_id, $meta_key, $content);
+    }
+
+    /**
+     * Get saved landing style content from post meta
+     */
+    function firefly_collective_get_saved_landing_style_content($style) {
+        $home_page_id = firefly_collective_get_home_page_id();
+        if (!$home_page_id) {
+            return false;
+        }
+        
+        $meta_key = '_landing_style_' . sanitize_key($style);
+        $content = get_post_meta($home_page_id, $meta_key, true);
+        
+        return !empty($content) ? $content : false;
+    }
+
+    /**
+     * Extract the first wp:cover block from content
+     */
+    function firefly_collective_extract_landing_block($content) {
+        $blocks = parse_blocks($content);
+        
+        if (empty($blocks)) {
+            return array('block' => '', 'remaining' => $content);
+        }
+        
+        // Find first wp:cover block
+        $landing_block = null;
+        $landing_index = null;
+        
+        foreach ($blocks as $index => $block) {
+            if ($block['blockName'] === 'core/cover') {
+                $landing_block = $block;
+                $landing_index = $index;
+                break;
+            }
+        }
+        
+        if ($landing_block === null) {
+            return array('block' => '', 'remaining' => $content);
+        }
+        
+        // Remove the landing block from blocks array
+        array_splice($blocks, $landing_index, 1);
+        
+        // Convert back to content
+        $remaining_content = '';
+        foreach ($blocks as $block) {
+            $remaining_content .= serialize_block($block);
+        }
+        
+        return array(
+            'block' => serialize_block($landing_block),
+            'remaining' => $remaining_content
+        );
+    }
+
+    /**
+     * Filter REST API response for Gutenberg content loading
+     */
+    function firefly_collective_filter_rest_post_content($response, $post, $request) {
+		// Only filter if landing_preview parameter is present
+		if (!isset($_GET['landing_preview'])) {
+			return $response;
+		}
+		
+		$home_page_id = firefly_collective_get_home_page_id();
+		if (!$home_page_id || $post->ID != $home_page_id) {
+			return $response;
+		}
+		
+		$preview_style = sanitize_text_field($_GET['landing_preview']);
+		$current_style = firefly_collective_get_landing_style();
+		
+		// Get the current content
+		$current_content = $response->data['content']['raw'];
+		
+		// Extract current landing block for structure, but DON'T save it yet
+		$extracted = firefly_collective_extract_landing_block($current_content);
+		
+		// Get the preview style content (RAW BLOCK MARKUP, not rendered HTML)
+		$preview_content = firefly_collective_get_saved_landing_style_content($preview_style);
+		
+		// If no saved content, fall back to RAW template file content (not rendered)
+		if ($preview_content === false) {
+			$preview_content = firefly_collective_get_landing_style_html($preview_style); // This gets raw block markup
+			error_log("LANDING DEBUG - Using RAW template file for preview: " . $preview_style);
+		} else {
+			error_log("LANDING DEBUG - Using saved RAW content for preview: " . $preview_style);
+		}
+		
+		if ($preview_content) {
+			// Combine preview landing content with remaining content
+			$new_content = $preview_content . $extracted['remaining'];
+			$response->data['content']['raw'] = $new_content;
+			$response->data['content']['rendered'] = apply_filters('the_content', $new_content);
+			
+			error_log("LANDING DEBUG - Content swapped successfully with RAW blocks");
+			error_log("LANDING DEBUG - New content preview: " . substr($new_content, 0, 200));
+		}
+		
+		return $response;
+	}
+    add_filter('rest_prepare_page', 'firefly_collective_filter_rest_post_content', 10, 3);
+
+    // Check if our template files are properly formatted
+    function firefly_collective_validate_landing_file($style) {
+        $content = firefly_collective_get_landing_style_html($style);
+        
+        if ($content === false) {
+            return false;
+        }
+        
+        // Check if content has block comments
+        $has_blocks = strpos($content, '<!-- wp:') !== false;
+        
+        if (!$has_blocks) {
+            error_log("LANDING DEBUG - WARNING: Landing file for '$style' does not contain block markup!");
+            error_log("LANDING DEBUG - Content: " . substr($content, 0, 200));
+            return false;
+        }
+        
+        // Parse blocks to validate structure
+        $blocks = parse_blocks($content);
+        $valid_blocks = 0;
+        
+        foreach ($blocks as $block) {
+            if (!empty($block['blockName'])) {
+                $valid_blocks++;
+            }
+        }
+        
+        error_log("LANDING DEBUG - Landing file '$style' has $valid_blocks valid blocks");
+        return $valid_blocks > 0;
+    }
+
+    /**
+     * Add landing_preview parameter to allowed query vars
+     */
+    function firefly_collective_add_landing_preview_query_var($vars) {
+        $vars[] = 'landing_preview';
+        return $vars;
+    }
+    add_filter('query_vars', 'firefly_collective_add_landing_preview_query_var');
+
+    /**
+     * Ensure the landing_preview parameter persists in admin
+     */
+    function firefly_collective_preserve_landing_preview_param() {
+        if (is_admin() && isset($_GET['landing_preview'])) {
+            // Add JavaScript to maintain the parameter in AJAX requests
+            add_action('admin_footer', function() {
+                $preview_style = sanitize_text_field($_GET['landing_preview']);
+                ?>
+                <script>
+                // Intercept WordPress REST API calls to add our parameter
+                (function() {
+                    var originalFetch = window.fetch;
+                    window.fetch = function(url, options) {
+                        if (typeof url === 'string' && url.includes('/wp/v2/pages/')) {
+                            var urlObj = new URL(url, window.location.origin);
+                            urlObj.searchParams.set('landing_preview', '<?php echo esc_js($preview_style); ?>');
+                            url = urlObj.toString();
+                        }
+                        return originalFetch(url, options);
+                    };
+                })();
+                </script>
+                <?php
+            });
+        }
+    }
+    add_action('init', 'firefly_collective_preserve_landing_preview_param');
+
+    // Update the handle_edit_landing_in_gutenberg function to add debugging:
+    function handle_edit_landing_in_gutenberg( WP_REST_Request $request ) {
+        $preview_style = sanitize_text_field( $request->get_param( 'preview_style' ) );
+        $current_style = firefly_collective_get_landing_style();
+        
+        error_log("LANDING DEBUG - Edit request - Preview: $preview_style, Current: $current_style");
+        
+        // Validate the preview style file
+        if (!firefly_collective_validate_landing_file($preview_style)) {
+            return new WP_Error( 'invalid_landing_file', 'Landing style file is not properly formatted', array( 'status' => 400 ) );
+        }
+        
+        $home_page_id = firefly_collective_get_home_page_id();
+        if (!$home_page_id) {
+            return new WP_Error( 'no_home_page', 'No home page found', array( 'status' => 400 ) );
+        }
+        
+        // Build the edit URL
+        $edit_url = admin_url('post.php?post=' . $home_page_id . '&action=edit');
+        
+        // If preview style differs from current, add parameter
+        if ($preview_style !== $current_style) {
+            $edit_url .= '&landing_preview=' . urlencode($preview_style);
+            error_log("LANDING DEBUG - Added preview parameter to URL: $edit_url");
+        }
+        
+        return rest_ensure_response( array(
+            'success' => true,
+            'edit_url' => $edit_url,
+            'needs_preview' => ($preview_style !== $current_style)
+        ) );
+    }
+
+    // Add these functions to theme/models/template.php
+
+    /**
+     * Detect if we're editing with a landing preview parameter
+     */
+    function firefly_collective_is_editing_with_landing_preview() {
+        return is_admin() && isset($_GET['landing_preview']);
+    }
+
+    /**
+     * Get the current landing preview parameter from URL
+     */
+    function firefly_collective_get_current_landing_preview_param() {
+        if (firefly_collective_is_editing_with_landing_preview()) {
+            return sanitize_text_field($_GET['landing_preview']);
+        }
+        return false;
+    }
+
+    /**
+     * Update active landing style when page is saved with preview parameter
+     */
+    function firefly_collective_save_landing_style_on_page_save($post_id, $post, $update) {
+		// Only process for the home page
+		$home_page_id = firefly_collective_get_home_page_id();
+		if (!$home_page_id || $post_id != $home_page_id) {
+			return;
+		}
+		
+		// Only process if we have a landing preview parameter
+		$preview_style = firefly_collective_get_current_landing_preview_param();
+		if (!$preview_style) {
+			return;
+		}
+		
+		// Avoid infinite loops
+		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+			return;
+		}
+		
+		// Check user permissions
+		if (!current_user_can('edit_page', $post_id)) {
+			return;
+		}
+		
+		error_log("LANDING DEBUG - Page saved with preview parameter: $preview_style");
+		
+		// Extract and save the landing block content for the preview style
+		$extracted = firefly_collective_extract_landing_block($post->post_content);
+		if (!empty($extracted['block'])) {
+			firefly_collective_save_landing_style_content($preview_style, $extracted['block']);
+			error_log("LANDING DEBUG - Saved edited content for style: $preview_style");
+		}
+		
+		// Update the active landing style to match the preview
+		firefly_collective_set_landing_style($preview_style);
+		
+		// Sync the preview style to match
+		firefly_collective_set_landing_style_preview($preview_style);
+		
+		error_log("LANDING DEBUG - Updated active landing style to: $preview_style");
+	}
+    add_action('save_post', 'firefly_collective_save_landing_style_on_page_save', 10, 3);
+
+    // Add a notice in the editor when editing with preview parameter
+    function firefly_collective_add_landing_preview_notice() {
+        if (!firefly_collective_is_editing_with_landing_preview()) {
+            return;
+        }
+        
+        $preview_style = firefly_collective_get_current_landing_preview_param();
+        $formatted_style = firefly_collective_format_landing_style_name($preview_style);
+        
+        ?>
+        <div class="notice notice-info" style="margin: 10px 0;">
+            <p><strong>Landing Style Preview:</strong> You are editing with the "<?php echo esc_html($formatted_style); ?>" landing style. When you save this page, it will become the active landing style.</p>
+        </div>
+        <script>
+        // Add the notice to the Gutenberg editor
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.wp && window.wp.data) {
+                // Wait for editor to be ready
+                var checkEditor = setInterval(function() {
+                    var editorHeader = document.querySelector('.editor-header') || document.querySelector('.edit-post-header');
+                    var notice = document.querySelector('.notice.notice-info');
+                    
+                    if (editorHeader && notice) {
+                        var clonedNotice = notice.cloneNode(true);
+                        editorHeader.parentNode.insertBefore(clonedNotice, editorHeader.nextSibling);
+                        clearInterval(checkEditor);
+                    }
+                }, 500);
+            }
+        });
+        </script>
+        <?php
+    }
+    add_action('admin_notices', 'firefly_collective_add_landing_preview_notice');
+
+    // Add this function to provide a "clean" edit URL after saving
+    function firefly_collective_get_clean_edit_url($post_id) {
+        return admin_url('post.php?post=' . $post_id . '&action=edit');
+    }
+
+    // Add a redirect after save to clean URL (optional)
+    function firefly_collective_redirect_after_landing_save($location, $post_id) {
+        // Only redirect if we saved with a landing preview parameter
+        if (firefly_collective_is_editing_with_landing_preview()) {
+            $home_page_id = firefly_collective_get_home_page_id();
+            if ($home_page_id && $post_id == $home_page_id) {
+                // Remove the landing_preview parameter from redirect URL
+                $clean_url = firefly_collective_get_clean_edit_url($post_id);
+                error_log("LANDING DEBUG - Redirecting to clean URL after save: $clean_url");
+                return $clean_url;
+            }
+        }
+        return $location;
+    }
+    add_filter('redirect_post_location', 'firefly_collective_redirect_after_landing_save', 10, 2);
 
     /**
      * Handle customizer publish - copy temp template to live template and save landing style
