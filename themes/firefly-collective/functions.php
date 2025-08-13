@@ -7,22 +7,14 @@
         exit; // Exit if accessed directly
     }
 
-    // Load models - customize MUST be loaded first for template system
-    $models = array(
-                'template',  
-                'init',         'rest',
-                'user',         'meta',
-                'contact',      'signup',
-                'signin',       'blogs',
-                'bookings',     'mail',
-                'view',         'pages',
-                'nav',          'util',
-                'encrypt',      'profile',
-                'app');
-                
-    foreach($models as $model) {
-        $model_path = get_template_directory() . "/models/$model.php";
-        if (file_exists($model_path)) {
-            require_once $model_path;
-        }
-    }
+    // Load template model
+    require_once get_template_directory() . '/template.php';
+
+    // Get active template
+    global $active_template, $template_path, $template_path_web;
+    $active_template    = firefly_collective_get_active_template();
+    $template_path      = get_template_directory() . '/templates/' . $active_template;
+    $template_path_web  = get_template_directory_uri() . '/templates/' . $active_template;
+
+    // Load template functions
+    require_once $template_path . '/functions.php';

@@ -355,6 +355,8 @@ document.addEventListener('DOMContentLoaded', function () {
             break;
         }
         
+        console.log(dataResponse.response_html);
+
         // Insert HTML
         appRoot.innerHTML = '';
         appRoot.innerHTML = dataResponse.response_html;

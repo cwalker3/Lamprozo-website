@@ -70,15 +70,6 @@
                 'auth_id' => isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : ''
             ));
         }
-
-        // Load localize template model (only if template handle exists)
-        if (!empty($template_handle)) {
-            $active_template = firefly_collective_get_active_template();
-            $localize_file = get_template_directory() . '/templates/' . $active_template . '/models/_localize_init.php';
-            if (file_exists($localize_file)) {
-                require $localize_file;
-            }
-        }
     }
 
     // Enqueue Styles and Scripts

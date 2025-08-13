@@ -2,6 +2,8 @@
 
     // theme/index.php
 
+    global $active_template;
+
     // Get the post ID
     $postID = get_the_ID();
 
@@ -10,9 +12,6 @@
 
     // Get theme path
     $themePath = get_template_directory_uri();
-
-    // Get active template
-    $active_template = firefly_collective_get_active_template();
 
     $pageFound = false;
     

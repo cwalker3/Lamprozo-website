@@ -17,10 +17,6 @@
 	define('FIREFLY_COLLECTIVE_LANDING_STYLE_OPTION', 'firefly_collective_landing_style');
     define('FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION', 'firefly_collective_landing_style_preview');
 
-    // Load template core model  
-    $active_template = firefly_collective_get_active_template();
-    require get_template_directory() . '/templates/' . $active_template . '/models/_core.php';
-
     /**
      * Theme Template System Management
      * 

@@ -1,36 +1,39 @@
 <?php
-// Get Query Parameters for Filters
-$category_id = get_query_var('cat') ? intval(get_query_var('cat')) : '';
-$tag_id      = get_query_var('tag_id') ? intval(get_query_var('tag_id')) : '';
-$month       = get_query_var('monthnum') ? intval(get_query_var('monthnum')) : '';
-$year        = get_query_var('year') ? intval(get_query_var('year')) : '';
-$keywords    = get_query_var('s') ? sanitize_text_field(get_query_var('s')) : '';
 
-$args = array(
-    'post_type'      => 'post',
-    'posts_per_page' => 15,
-    'paged'          => max(1, get_query_var('paged')),
-    'orderby'        => 'date',
-    'order'          => 'DESC',
-    'cat'            => $category_id,
-    'tag_id'         => $tag_id,
-    'monthnum'       => $month,
-    'year'           => $year,
-    's'              => $keywords,
-);
+    global $template_path;
 
-$the_query = new WP_Query($args);
+    // Get Query Parameters for Filters
+    $category_id = get_query_var('cat') ? intval(get_query_var('cat')) : '';
+    $tag_id      = get_query_var('tag_id') ? intval(get_query_var('tag_id')) : '';
+    $month       = get_query_var('monthnum') ? intval(get_query_var('monthnum')) : '';
+    $year        = get_query_var('year') ? intval(get_query_var('year')) : '';
+    $keywords    = get_query_var('s') ? sanitize_text_field(get_query_var('s')) : '';
 
-// Get Categories and Tags
-$categories = get_categories(array(
-    'orderby' => 'name',
-    'order'   => 'ASC',
-));
+    $args = array(
+        'post_type'      => 'post',
+        'posts_per_page' => 15,
+        'paged'          => max(1, get_query_var('paged')),
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'cat'            => $category_id,
+        'tag_id'         => $tag_id,
+        'monthnum'       => $month,
+        'year'           => $year,
+        's'              => $keywords,
+    );
 
-$tags = get_tags(array(
-    'orderby' => 'name',
-    'order'   => 'ASC',
-));
+    $the_query = new WP_Query($args);
+
+    // Get Categories and Tags
+    $categories = get_categories(array(
+        'orderby' => 'name',
+        'order'   => 'ASC',
+    ));
+
+    $tags = get_tags(array(
+        'orderby' => 'name',
+        'order'   => 'ASC',
+    ));
 ?>
 
 <h1><?php echo esc_html($pageTitle); ?></h1>
@@ -115,6 +118,6 @@ $tags = get_tags(array(
     }
     ?>
 
-    <img id="more-blogs-loader" class="loader" src="<?php echo esc_url($themePath . '/images/loading.gif'); ?>" alt="<?php esc_attr_e('Loading'); ?>">
+    <img id="more-blogs-loader" class="loader" src="<?php echo esc_url($template_path . '/images/loading.gif'); ?>" alt="<?php esc_attr_e('Loading'); ?>">
     <a id="blogs-end" name="blogs-end"></a>
 </div>

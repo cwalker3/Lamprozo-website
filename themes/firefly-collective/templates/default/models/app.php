@@ -89,10 +89,7 @@
             'auth_id'           => $_COOKIE['auth_id'],
             'http_host'         => $http_host,
             'active_template'   => $active_template,
-            'template_assets'   => $template_assets,
-            'templateData'      => array(
-                'obj' => core_test()
-            ),
+            'template_assets'   => $template_assets
         ]);
     }
 
@@ -136,14 +133,13 @@
 	add_action('after_switch_theme', 'app_setup_nav');
 
     function app_get_view($request) {
-        global $theme_path_web, $template_path_web;
+        global $template_path;
+        
         $params = $request->get_params();
         $view = $params['view'];
         $theme_path = get_template_directory();
         $theme_path_web = get_template_directory_uri();
         $active_template = firefly_collective_get_active_template();
-        $template_path = $theme_path . '/templates/' . $active_template;
-        $template_path_web = $theme_path_web . '/templates/' . $active_template;
         $plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $nonce = wp_create_nonce('wp_rest');
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
