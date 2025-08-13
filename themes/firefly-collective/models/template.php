@@ -307,22 +307,23 @@
             'description' => __('Landing page configuration options.'),
         ));
         
-        // Landing section placeholder setting/control
-        $wp_customize->add_setting('firefly_collective_landing_placeholder', array(
-            'default' => '',
-            'transport' => 'refresh',
+        // Landing Style setting
+        $wp_customize->add_setting('firefly_collective_landing_style', array(
+            'default' => firefly_collective_get_landing_style(),
+            'transport' => 'postMessage',
             'sanitize_callback' => 'sanitize_text_field'
         ));
         
-        $wp_customize->add_control('firefly_collective_landing_placeholder', array(
-            'label' => __('Landing Options'),
-            'description' => __('Landing configuration options will be added here.'),
+        // Get available landing styles
+        $landing_style_choices = firefly_collective_get_landing_style_choices();
+        
+        // Landing Style control
+        $wp_customize->add_control('firefly_collective_landing_style', array(
+            'label' => __('Landing Style'),
+            'description' => __('Choose the landing page layout style.'),
             'section' => 'firefly_collective_landing',
-            'type' => 'text',
-            'input_attrs' => array(
-                'placeholder' => __('Coming soon...'),
-                'readonly' => 'readonly'
-            )
+            'type' => 'select',
+            'choices' => $landing_style_choices,
         ));
         
         // Add Navigation section
@@ -378,12 +379,89 @@
     add_action('customize_register', 'firefly_collective_customize_register');
 
     /**
-     * Handle customizer publish - copy temp template to live template
+	 * Get available landing styles from snippets directory
+	 * 
+	 * @return array Array of landing style choices for customizer
+	 */
+	function firefly_collective_get_landing_style_choices() {
+		$choices = array();
+		$active_template = firefly_collective_get_active_template();
+		$snippets_dir = FIREFLY_COLLECTIVE_TEMPLATES_DIR . '/' . $active_template . '/snippets';
+		
+		if (!is_dir($snippets_dir)) {
+			return array('default' => 'Default');
+		}
+		
+		$files = scandir($snippets_dir);
+		$landing_files = array();
+		
+		// Find all files that start with "landing"
+		foreach ($files as $file) {
+			if ($file !== '.' && $file !== '..' && strpos($file, 'landing') === 0) {
+				$landing_files[] = $file;
+			}
+		}
+		
+		// Sort files to ensure consistent order
+		sort($landing_files);
+		
+		foreach ($landing_files as $file) {
+			$filename_without_ext = pathinfo($file, PATHINFO_FILENAME);
+			
+			if ($filename_without_ext === 'landing') {
+				// The base "landing" file becomes "Default"
+				$choices['default'] = 'Default';
+			} else {
+				// Extract the part after "landing-" and format it
+				$style_name = substr($filename_without_ext, 8); // Remove "landing-" (8 characters)
+				$formatted_name = firefly_collective_format_landing_style_name($style_name);
+				$choices[$style_name] = $formatted_name;
+			}
+		}
+		
+		// Ensure "Default" is first if it exists
+		if (isset($choices['default'])) {
+			$default = array('default' => $choices['default']);
+			unset($choices['default']);
+			$choices = $default + $choices;
+		}
+		
+		return !empty($choices) ? $choices : array('default' => 'Default');
+	}
+
+	/**
+	 * Format landing style name for display
+	 * 
+	 * @param string $style_name The raw style name from filename
+	 * @return string Formatted display name
+	 */
+	function firefly_collective_format_landing_style_name($style_name) {
+		// Replace dashes with spaces
+		$formatted = str_replace('-', ' ', $style_name);
+		
+		// Capitalize first letter of each word
+		$formatted = ucwords($formatted);
+		
+		return $formatted;
+	}
+
+    /**
+     * Handle customizer publish - copy temp template to live template and save landing style
      */
     function firefly_collective_customize_save_after($wp_customize) {
+        // Save template changes
         $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
         if ($temp_template && firefly_collective_template_exists($temp_template)) {
             update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $temp_template);
+        }
+        
+        // Save landing style changes
+        $landing_style = $wp_customize->get_setting('firefly_collective_landing_style');
+        if ($landing_style) {
+            $landing_style_value = $landing_style->post_value();
+            if ($landing_style_value !== null) {
+                firefly_collective_set_landing_style($landing_style_value);
+            }
         }
     }
     add_action('customize_save_after', 'firefly_collective_customize_save_after');
