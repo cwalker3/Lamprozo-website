@@ -1,6 +1,24 @@
 /* template/assets/css/landing.css */
 
 /* =============================================================================
+   PROFESSIONAL LANDING PAGE STYLES - 2025
+   ============================================================================= */
+
+/* CSS Reset for Landing Components - handled in compatibility section */
+
+/* =============================================================================
+   CLEANUP EMPTY ELEMENTS
+   ============================================================================= */
+
+	/* Hide empty paragraph tags to prevent layout shifting */
+	p:empty {
+		display: none !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		height: 0 !important;
+	}
+
+/* =============================================================================
    COMPATIBILITY WITH CORE STYLES
    ============================================================================= */
 
@@ -48,13 +66,11 @@
    FULL VIEWPORT HERO SECTION
    ============================================================================= */
 
-	/* Main cover container - Full viewport height */
+	/* Main cover container - Static height approach for mobile stability */
 	.wp-block-cover {
-		/* Use modern viewport units for better mobile support */
+		/* Use stable viewport units */
 		min-height: 100vh;
-		min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
 		height: 100vh;
-		height: 100dvh;
 		width: 100vw;
 		position: relative;
 		display: flex !important;
@@ -66,9 +82,47 @@
 		padding: 0 !important;
 		/* Ensure it takes precedence over core styles */
 		z-index: 1;
-		/* Smooth performance */
+		/* Smooth performance and prevent mobile jumping */
 		transform: translateZ(0);
 		will-change: transform;
+		/* Lock height on mobile to prevent address bar issues */
+		contain: layout style;
+	}
+
+	/* Mobile-specific stability fixes */
+	@media (max-width: 768px) {
+		.wp-block-cover {
+			/* Lock the height to initial calculation */
+			height: calc(100vh) !important;
+			min-height: calc(100vh) !important;
+			/* Prevent reflow during scroll */
+			contain: strict;
+			/* Optimize for mobile performance */
+			transform: translate3d(0, 0, 0);
+			-webkit-transform: translate3d(0, 0, 0);
+			backface-visibility: hidden;
+			-webkit-backface-visibility: hidden;
+			/* Prevent viewport unit recalculation */
+			position: relative;
+			isolation: isolate;
+		}
+	}
+
+	/* Use most stable viewport units when available */
+	@supports (height: 100svh) {
+		.wp-block-cover {
+			/* Small viewport height - doesn't change with mobile UI */
+			height: 100svh !important;
+			min-height: 100svh !important;
+		}
+	}
+
+	/* Alternative for browsers with large viewport height support */
+	@supports (height: 100lvh) and (not (height: 100svh)) {
+		.wp-block-cover {
+			height: 100lvh !important;
+			min-height: 100lvh !important;
+		}
 	}
 
 	/* Background image optimization */
@@ -149,7 +203,7 @@
 					'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 		letter-spacing: -0.02em;
 		/* Prevent text from being too wide */
-		max-width: 50vw;
+		max-width: 50%;
 		margin-left: auto;
 		margin-right: auto;
 	}
@@ -206,6 +260,11 @@
 		box-shadow: 
 			0 8px 32px rgba(0, 0, 0, 0.1),
 			inset 0 1px 0 rgba(255, 255, 255, 0.2);
+		/* Flex layout to push buttons to bottom */
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		min-height: 280px; /* Ensure consistent minimum height */
 	}
 
 	/* Column hover effects */
@@ -224,6 +283,13 @@
 		margin-bottom: 1.5rem;
 		color: #ffffff;
 		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+		/* Allow text area to grow and center content vertically */
+		flex: 1;
+		display: flex;
+		align-items: center; /* Center text vertically */
+		justify-content: center; /* Center text horizontally */
+		text-align: center;
+		margin: 0; /* Remove bottom margin since we're using flex */
 	}
 
 /* =============================================================================
@@ -237,6 +303,12 @@
 		justify-content: center;
 		gap: 1rem;
 		flex-wrap: wrap;
+	}
+
+	/* Button container within columns - override for consistent positioning */
+	.wp-block-cover .wp-block-column .wp-block-buttons {
+		margin: auto 0 0 0; /* Push to bottom with auto top margin */
+		flex-shrink: 0; /* Prevent shrinking */
 	}
 
 	/* Button wrapper */
@@ -306,9 +378,24 @@
    RESPONSIVE DESIGN - MOBILE FIRST
    ============================================================================= */
 
-	/* Tablet and larger screens */
-	@media (min-width: 768px) {
-		/* Columns always stay in row on tablet+ */
+	/* Large screens - 3 columns (1024px+) */
+	/* Default 3-column layout from earlier CSS grid rules */
+
+	/* Medium screens - 2 columns max (768px to 1023px) */
+	@media (max-width: 1023px) and (min-width: 768px) {
+		/* Override 3-column layout to use 2 columns */
+		.wp-block-cover .wp-block-columns {
+			grid-template-columns: repeat(2, 1fr) !important;
+			gap: 2rem;
+		}
+		
+		.wp-block-cover .wp-block-column {
+			min-height: 240px;
+		}
+	}
+
+	/* Tablet spacing adjustments */
+	@media (min-width: 1024px) {
 		.wp-block-cover .wp-block-columns {
 			gap: 2.5rem;
 		}
@@ -322,8 +409,21 @@
 		}
 	}
 
-	/* Mobile adjustments */
-	@media (max-width: 767px) {
+	/* Small tablet - ensure 2 columns (600px to 899px) */
+	@media (max-width: 899px) and (min-width: 600px) {
+		.wp-block-cover .wp-block-columns {
+			grid-template-columns: repeat(2, 1fr) !important;
+			gap: 2rem;
+		}
+		
+		.wp-block-cover .wp-block-column {
+			min-height: 220px;
+			padding: 2rem 1.5rem;
+		}
+	}
+
+	/* Mobile - 1 column (below 600px) */
+	@media (max-width: 599px) {
 		/* Single column on mobile */
 		.wp-block-cover .wp-block-columns {
 			grid-template-columns: 1fr !important;
@@ -333,6 +433,7 @@
 		
 		.wp-block-cover .wp-block-column {
 			padding: 1.5rem 1.25rem;
+			min-height: 180px;
 		}
 		
 		.wp-block-cover .wp-block-cover__inner-container {
@@ -361,6 +462,13 @@
 		
 		.wp-block-cover .wp-block-column {
 			padding: 1.25rem 1rem;
+			min-height: 160px;
+		}
+		
+		/* Even smaller buttons on very small screens */
+		.wp-block-cover .wp-block-button__link {
+			padding: 0.75rem 1.5rem;
+			font-size: 0.9rem;
 		}
 	}
 
@@ -393,18 +501,6 @@
 			background: rgba(0, 0, 0, 0.9);
 			border-color: #ffffff;
 		}
-	}
-
-/* =============================================================================
-	CLEANUP EMPTY ELEMENTS
-	============================================================================= */
-
-	/* Hide empty paragraph tags to prevent layout shifting */
-	p:empty {
-		display: none !important;
-		margin: 0 !important;
-		padding: 0 !important;
-		height: 0 !important;
 	}
 
 /* =============================================================================
