@@ -1,7 +1,7 @@
 /* template/assets/css/landing.css */
 
 /* =============================================================================
-   PROFESSIONAL LANDING PAGE STYLES - 2025
+   PROFESSIONAL LANDING PAGE STYLES - 2025 (FIRST COVER BLOCK ONLY)
    ============================================================================= */
 
 /* CSS Reset for Landing Components - handled in compatibility section */
@@ -23,19 +23,19 @@
    ============================================================================= */
 
 	/* Ensure landing pages work with existing core CSS */
-	.wp-block-cover {
+	.wp-block-cover:first-of-type {
 		/* Override any inherited styles from core */
 		box-sizing: border-box !important;
 	}
 
 	/* Reset any potential conflicts for landing page containers */
-	.wp-block-cover,
-	.wp-block-cover * {
+	.wp-block-cover:first-of-type,
+	.wp-block-cover:first-of-type * {
 		box-sizing: border-box;
 	}
 
 	/* Specific overrides for WordPress block editor styles */
-	.wp-block-cover.wp-block-cover {
+	.wp-block-cover:first-of-type.wp-block-cover {
 		/* Ensure WordPress block styles don't interfere */
 		display: flex !important;
 		align-items: center !important;
@@ -44,14 +44,14 @@
 
 	/* Cover blocks should be full width */
 	/* Since .content no longer has padding, ensure clean full-width coverage */
-	.content .wp-block-cover {
+	.content .wp-block-cover:first-of-type {
 		/* Reset any margins and ensure full width */
 		margin: 0 !important;
 		width: 100% !important;
 	}
 
 	/* Ensure body can scroll when there are cover blocks */
-	body:has(.wp-block-cover) {
+	body:has(.wp-block-cover:first-of-type) {
 		overflow-y: auto !important;
 	}
 	
@@ -67,7 +67,7 @@
    ============================================================================= */
 
 	/* Main cover container - Static height approach for mobile stability */
-	.wp-block-cover {
+	.wp-block-cover:first-of-type {
 		/* Use stable viewport units */
 		min-height: 100vh;
 		height: 100vh;
@@ -91,7 +91,7 @@
 
 	/* Mobile-specific stability fixes */
 	@media (max-width: 768px) {
-		.wp-block-cover {
+		.wp-block-cover:first-of-type {
 			/* Lock the height to initial calculation */
 			height: calc(100vh) !important;
 			min-height: calc(100vh) !important;
@@ -110,7 +110,7 @@
 
 	/* Use most stable viewport units when available */
 	@supports (height: 100svh) {
-		.wp-block-cover {
+		.wp-block-cover:first-of-type {
 			/* Small viewport height - doesn't change with mobile UI */
 			height: 100svh !important;
 			min-height: 100svh !important;
@@ -119,14 +119,14 @@
 
 	/* Alternative for browsers with large viewport height support */
 	@supports (height: 100lvh) and (not (height: 100svh)) {
-		.wp-block-cover {
+		.wp-block-cover:first-of-type {
 			height: 100lvh !important;
 			min-height: 100lvh !important;
 		}
 	}
 
 	/* Background image optimization */
-	.wp-block-cover .wp-block-cover__image-background {
+	.wp-block-cover:first-of-type .wp-block-cover__image-background {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -141,7 +141,7 @@
 	}
 
 	/* Enhanced overlay with modern gradient */
-	.wp-block-cover .wp-block-cover__background {
+	.wp-block-cover:first-of-type .wp-block-cover__background {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -161,7 +161,7 @@
 	}
 
 	/* Content container */
-	.wp-block-cover .wp-block-cover__inner-container {
+	.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 		position: relative;
 		z-index: 3;
 		width: 100%;
@@ -189,9 +189,9 @@
    ============================================================================= */
 
 	/* Main heading - Bold and impactful */
-	.wp-block-cover .has-large-font-size,
-	.wp-block-cover h1,
-	.wp-block-cover .wp-block-cover__inner-container > p:first-child {
+	.wp-block-cover:first-of-type .has-large-font-size,
+	.wp-block-cover:first-of-type h1,
+	.wp-block-cover:first-of-type .wp-block-cover__inner-container > p:first-child {
 		font-size: clamp(2.5rem, 8vw, 5rem);
 		font-weight: 800;
 		line-height: 1.1;
@@ -209,7 +209,7 @@
 	}
 
 	/* Subheadings and body text */
-	.wp-block-cover p:not(.has-large-font-size):not(.wp-block-button__link) {
+	.wp-block-cover:first-of-type p:not(.has-large-font-size):not(.wp-block-button__link) {
 		font-size: clamp(1.125rem, 2.5vw, 1.5rem);
 		font-weight: 500;
 		line-height: 1.5;
@@ -227,7 +227,7 @@
    ============================================================================= */
 
 	/* Columns container */
-	.wp-block-cover .wp-block-columns {
+	.wp-block-cover:first-of-type .wp-block-columns {
 		width: 100%;
 		max-width: 1000px;
 		margin: 3rem auto 0;
@@ -238,17 +238,17 @@
 	}
 
 	/* Two column layout */
-	.wp-block-cover .wp-block-columns:has(.wp-block-column:nth-child(2):last-child) {
+	.wp-block-cover:first-of-type .wp-block-columns:has(.wp-block-column:nth-child(2):last-child) {
 		grid-template-columns: repeat(2, 1fr);
 	}
 
 	/* Three column layout */
-	.wp-block-cover .wp-block-columns:has(.wp-block-column:nth-child(3)) {
+	.wp-block-cover:first-of-type .wp-block-columns:has(.wp-block-column:nth-child(3)) {
 		grid-template-columns: repeat(3, 1fr);
 	}
 
 	/* Individual column styling */
-	.wp-block-cover .wp-block-column {
+	.wp-block-cover:first-of-type .wp-block-column {
 		background: rgba(255, 255, 255, 0.1);
 		backdrop-filter: blur(10px);
 		-webkit-backdrop-filter: blur(10px);
@@ -268,7 +268,7 @@
 	}
 
 	/* Column hover effects */
-	.wp-block-cover .wp-block-column:hover {
+	.wp-block-cover:first-of-type .wp-block-column:hover {
 		transform: translateY(-4px);
 		background: rgba(255, 255, 255, 0.15);
 		box-shadow: 
@@ -277,7 +277,7 @@
 	}
 
 	/* Column text */
-	.wp-block-cover .wp-block-column p {
+	.wp-block-cover:first-of-type .wp-block-column p {
 		font-size: clamp(1rem, 2vw, 1.25rem);
 		font-weight: 500;
 		margin-bottom: 1.5rem;
@@ -297,7 +297,7 @@
    ============================================================================= */
 
 	/* Button container */
-	.wp-block-cover .wp-block-buttons {
+	.wp-block-cover:first-of-type .wp-block-buttons {
 		margin: 1.5rem 0 0 0;
 		display: flex;
 		justify-content: center;
@@ -306,18 +306,18 @@
 	}
 
 	/* Button container within columns - override for consistent positioning */
-	.wp-block-cover .wp-block-column .wp-block-buttons {
+	.wp-block-cover:first-of-type .wp-block-column .wp-block-buttons {
 		margin: auto 0 0 0; /* Push to bottom with auto top margin */
 		flex-shrink: 0; /* Prevent shrinking */
 	}
 
 	/* Button wrapper */
-	.wp-block-cover .wp-block-button {
+	.wp-block-cover:first-of-type .wp-block-button {
 		margin: 0;
 	}
 
 	/* Button styling */
-	.wp-block-cover .wp-block-button__link {
+	.wp-block-cover:first-of-type .wp-block-button__link {
 		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 		color: #ffffff !important;
 		border: none;
@@ -340,7 +340,7 @@
 	}
 
 	/* Button hover effect */
-	.wp-block-cover .wp-block-button__link:hover {
+	.wp-block-cover:first-of-type .wp-block-button__link:hover {
 		transform: translateY(-2px);
 		background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
 		box-shadow: 
@@ -349,12 +349,12 @@
 	}
 
 	/* Button active state */
-	.wp-block-cover .wp-block-button__link:active {
+	.wp-block-cover:first-of-type .wp-block-button__link:active {
 		transform: translateY(0);
 	}
 
 	/* Shine effect on buttons */
-	.wp-block-cover .wp-block-button__link::before {
+	.wp-block-cover:first-of-type .wp-block-button__link::before {
 		content: '';
 		position: absolute;
 		top: 0;
@@ -370,7 +370,7 @@
 		transition: left 0.5s;
 	}
 
-	.wp-block-cover .wp-block-button__link:hover::before {
+	.wp-block-cover:first-of-type .wp-block-button__link:hover::before {
 		left: 100%;
 	}
 
@@ -384,39 +384,39 @@
 	/* Medium screens - 2 columns max (768px to 1023px) */
 	@media (max-width: 1023px) and (min-width: 768px) {
 		/* Override 3-column layout to use 2 columns */
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover:first-of-type .wp-block-columns {
 			grid-template-columns: repeat(2, 1fr) !important;
 			gap: 2rem;
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			min-height: 240px;
 		}
 	}
 
 	/* Tablet spacing adjustments */
 	@media (min-width: 1024px) {
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover:first-of-type .wp-block-columns {
 			gap: 2.5rem;
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			padding: 2.5rem 2rem;
 		}
 		
-		.wp-block-cover .wp-block-cover__inner-container {
+		.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 			padding: 3rem;
 		}
 	}
 
 	/* Small tablet - ensure 2 columns (600px to 899px) */
 	@media (max-width: 899px) and (min-width: 600px) {
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover:first-of-type .wp-block-columns {
 			grid-template-columns: repeat(2, 1fr) !important;
 			gap: 2rem;
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			min-height: 220px;
 			padding: 2rem 1.5rem;
 		}
@@ -425,48 +425,48 @@
 	/* Mobile - 1 column (below 600px) */
 	@media (max-width: 599px) {
 		/* Single column on mobile */
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover:first-of-type .wp-block-columns {
 			grid-template-columns: 1fr !important;
 			gap: 1.5rem;
 			margin-top: 2rem;
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			padding: 1.5rem 1.25rem;
 			min-height: 180px;
 		}
 		
-		.wp-block-cover .wp-block-cover__inner-container {
+		.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 			padding: 1.5rem;
 		}
 		
 		/* Adjust button sizes for mobile */
-		.wp-block-cover .wp-block-button__link {
+		.wp-block-cover:first-of-type .wp-block-button__link {
 			padding: 0.875rem 2rem;
 			font-size: 1rem;
 		}
 		
 		/* Adjust main heading for mobile */
-		.wp-block-cover .has-large-font-size,
-		.wp-block-cover h1,
-		.wp-block-cover .wp-block-cover__inner-container > p:first-child {
+		.wp-block-cover:first-of-type .has-large-font-size,
+		.wp-block-cover:first-of-type h1,
+		.wp-block-cover:first-of-type .wp-block-cover__inner-container > p:first-child {
 			margin-bottom: 1.5rem;
 		}
 	}
 
 	/* Small mobile adjustments */
 	@media (max-width: 480px) {
-		.wp-block-cover .wp-block-cover__inner-container {
+		.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 			padding: 1rem;
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			padding: 1.25rem 1rem;
 			min-height: 160px;
 		}
 		
 		/* Even smaller buttons on very small screens */
-		.wp-block-cover .wp-block-button__link {
+		.wp-block-cover:first-of-type .wp-block-button__link {
 			padding: 0.75rem 1.5rem;
 			font-size: 0.9rem;
 		}
@@ -477,14 +477,14 @@
    ============================================================================= */
 
 	/* Focus styles for accessibility */
-	.wp-block-cover .wp-block-button__link:focus {
+	.wp-block-cover:first-of-type .wp-block-button__link:focus {
 		outline: 3px solid #fbbf24;
 		outline-offset: 2px;
 	}
 
 	/* Reduced motion support */
 	@media (prefers-reduced-motion: reduce) {
-		.wp-block-cover * {
+		.wp-block-cover:first-of-type * {
 			animation-duration: 0.01ms !important;
 			animation-iteration-count: 1 !important;
 			transition-duration: 0.01ms !important;
@@ -493,11 +493,11 @@
 
 	/* High contrast mode support */
 	@media (prefers-contrast: high) {
-		.wp-block-cover .wp-block-cover__background {
+		.wp-block-cover:first-of-type .wp-block-cover__background {
 			background: rgba(0, 0, 0, 0.8);
 		}
 		
-		.wp-block-cover .wp-block-column {
+		.wp-block-cover:first-of-type .wp-block-column {
 			background: rgba(0, 0, 0, 0.9);
 			border-color: #ffffff;
 		}
@@ -508,18 +508,18 @@
    ============================================================================= */
 
 	@media print {
-		.wp-block-cover {
+		.wp-block-cover:first-of-type {
 			height: auto;
 			min-height: auto;
 			background: #f8f9fa !important;
 			color: #000000 !important;
 		}
 		
-		.wp-block-cover .wp-block-cover__background {
+		.wp-block-cover:first-of-type .wp-block-cover__background {
 			display: none;
 		}
 		
-		.wp-block-cover * {
+		.wp-block-cover:first-of-type * {
 			color: #000000 !important;
 			text-shadow: none !important;
 		}
