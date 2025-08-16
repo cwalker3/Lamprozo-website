@@ -1,0 +1,107 @@
+html, body {
+  overflow-x: hidden;
+}
+
+h1.wp-block {
+  margin-left: 2vw !important; 
+}
+
+.wp-block {
+  max-width: 100vw !important;
+  padding-inline: 0 !important;
+}
+
+/* Top-level covers only - use direct child selector */
+.editor-styles-wrapper > .wp-block-cover {
+  min-width: 99vw !important;
+  padding-inline: 0 !important;
+}
+
+/* Nested covers - constrained to their container */
+.wp-block-cover .wp-block-cover {
+  min-width: 100% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.wp-block-column {
+  padding: 0 !important;
+}
+
+/* Top-level cover inner containers */
+.wp-block-cover {
+  min-height: 100vh;
+}
+
+.editor-styles-wrapper > .wp-block-cover .wp-block-cover__inner-container {
+  min-height: 100vh !important;
+  display: grid !important;
+  place-content: center !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Nested cover inner containers - viewport height but constrained width */
+.wp-block-cover .wp-block-cover .wp-block-cover__inner-container {
+  min-height: 100vh !important;
+  display: grid !important;
+  place-content: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Force columns inside top-level cover to use full width */
+.editor-styles-wrapper > .wp-block-cover .wp-block-columns,
+.editor-styles-wrapper > .wp-block-cover .wp-block-cover__inner-container .wp-block-columns {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Ensure individual columns can expand properly in top-level covers */
+.editor-styles-wrapper > .wp-block-cover .wp-block-column,
+.editor-styles-wrapper > .wp-block-cover .wp-block-cover__inner-container .wp-block-column {
+  max-width: none !important;
+}
+
+/* Override constrained layout inside top-level cover blocks */
+.editor-styles-wrapper > .wp-block-cover .is-layout-constrained,
+.editor-styles-wrapper > .wp-block-cover .wp-block-cover__inner-container .is-layout-constrained {
+  max-width: none !important;
+}
+
+/* Nested cover columns - constrained behavior */
+.wp-block-cover .wp-block-cover .wp-block-columns {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.wp-block-cover .wp-block-cover .wp-block-column {
+  max-width: 100% !important;
+}
+
+/* Use individual margin properties instead of margin-inline shorthand */
+p.wp-block {
+  margin-left: 5vw !important;
+  margin-right: 5vw !important;
+}
+
+/* But override for paragraphs inside columns within cover blocks */
+.wp-block-cover .wp-block-columns p.wp-block,
+.wp-block-cover__inner-container .wp-block-columns p.wp-block {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Alternative: More specific selector to override WordPress core styles */
+.editor-styles-wrapper p.wp-block {
+  margin-left: 5vw !important;
+  margin-right: 5vw !important;
+}
+
+/* Override for columns inside cover */
+.editor-styles-wrapper .wp-block-cover .wp-block-columns p.wp-block {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}

@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "settings": {
+    "layout": {
+      "contentSize": "720px",
+      "wideSize": "1200px"
+    },
+    "useRootPaddingAwareAlignments": true
+  }
+}

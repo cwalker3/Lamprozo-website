@@ -298,6 +298,13 @@
 	}
 	add_action('wp_enqueue_scripts', 'remove_wp_css', 100);
 
+    // Add custom editor style css
+    add_action('after_setup_theme', function () {
+        add_theme_support('editor-styles');
+        add_theme_support('align-wide');
+        add_editor_style('editor-style.css');
+    });
+
     // If any plugin enqueues it explicitly, dequeue as a fallback
     add_action('wp_print_scripts', function () {
         wp_dequeue_script('jquery-migrate');
