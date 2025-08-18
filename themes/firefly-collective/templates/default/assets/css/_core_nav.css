@@ -19,7 +19,7 @@ body > header {
 	left: 0;
 	height: 10vh;
 	width: 100vw;
-	background-color: rgba(0, 0, 0, 0.9);
+	background-color: var(--mainColorTransparent);
 	z-index: 2;
 }
 
@@ -62,7 +62,7 @@ body > nav {
 	width: 40vw;
 	height: 100vh;
 	animation: 0.5s slideInFromLeft forwards;
-	background-color: black;
+	background-color: var(--navBgColor);
 	color: white;
     z-index: 4;
 }
@@ -79,10 +79,12 @@ body > nav .website-menu {
 
 body > nav a {
 	color: white;
+	text-decoration: none;
 }
 
 body > nav a:hover {
-	color: rgb(48, 50, 173);
+	color: black;
+	text-shadow: 1px 1px 5px hsla(0, 0%, 100%, 0.3);
 }
 
 .menu {

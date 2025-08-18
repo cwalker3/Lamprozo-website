@@ -4,13 +4,14 @@
 
 	// Define the page structure that both pages.php and nav.php will use
 	function get_theme_pages_structure() {
+		global $active_template;
 
-		$active_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION);
         $landing_page_style = firefly_collective_get_landing_style();
         $landing_page_contents = file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/landing.html');
+		$landing_page_contents .= file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/landing-secondary.html');
 
 		return array(
-			'home'              => array('title' => 'Home',             'content' => $landing_page_contents . 'This is the homepage.'),
+			'home'              => array('title' => 'Home',             'content' => $landing_page_contents),
 			'app'               => array('title' => 'App',              'content' => 'This is the PWA front end page.'),
 			'blog'              => array('title' => 'Blog',             'content' => 'This is the blog.'),
 			'contact'           => array('title' => 'Contact',          'content' => 'This is the contact page.'),

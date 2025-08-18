@@ -305,6 +305,14 @@
         add_editor_style('editor-style.css');
     });
 
+    function remove_constrained_layout_from_covers($block_content, $block) {
+		if ($block['blockName'] === 'core/cover' && strpos($block_content, 'wp-block-column') !== false) {
+			$block_content = str_replace('is-layout-constrained', 'is-layout-unconstrained', $block_content);
+		}
+		return $block_content;
+	}
+	add_filter('render_block', 'remove_constrained_layout_from_covers', 10, 2);
+
     // If any plugin enqueues it explicitly, dequeue as a fallback
     add_action('wp_print_scripts', function () {
         wp_dequeue_script('jquery-migrate');
