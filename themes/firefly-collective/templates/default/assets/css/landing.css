@@ -226,6 +226,70 @@
 	}
 
 /* =============================================================================
+   COLUMN LAYOUTS - ADAPTIVE & RESPONSIVE
+   ============================================================================= */
+
+	/* Columns container - Use auto-fit for intelligent responsiveness */
+	.wp-block-cover .wp-block-columns {
+		width: 100%;
+		margin: 0;
+		display: grid !important; /* Override WordPress flex layout */
+		gap: 2rem;
+		/* Single minmax value for consistent stepping behavior */
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+		justify-content: center;
+		/* Override WordPress flex styles */
+		flex-wrap: unset !important;
+	}
+
+	.wp-block-cover:has(.wp-block-cover__inner-container:only-of-type) {
+		min-height: 100vh;
+	}
+
+	/* Reduce gaps at smaller screens but keep same minmax */
+	@media (max-width: 800px) {
+		.wp-block-cover .wp-block-columns {
+			gap: 1.5rem;
+		}
+	}
+
+	/* Mobile - force single column */
+	@media (max-width: 600px) {
+		.wp-block-cover .wp-block-columns {
+			grid-template-columns: 1fr !important;
+			gap: 1.5rem;
+		}
+	}
+
+	/* Individual column styling - minimal interference */
+	.wp-block-cover .wp-block-column {
+		/* Remove WordPress flex constraints */
+		flex: unset !important;
+		/* Ensure proper grid behavior */
+		width: 100%;
+		min-width: 0;
+	}
+
+	/* Center odd columns ONLY when they naturally wrap to next row */
+	/* For 3-column layouts that break to 2+1 */
+	@media (max-width: 844px) and (min-width: 601px) {
+		.wp-block-cover .wp-block-columns .wp-block-column:nth-child(3):last-child {
+			grid-column: 1 / -1;
+			justify-self: center;
+			max-width: 50%; /* 50% of the full row width */
+		}
+	}
+
+	/* For 5-column layouts that break to 4+1 or 2+2+1 */
+	@media (max-width: 1380px) and (min-width: 845px) {
+		.wp-block-cover .wp-block-columns .wp-block-column:nth-child(5):last-child {
+			grid-column: 1 / -1;
+			justify-self: center;
+			max-width: 50%;
+		}
+	}
+
+/* =============================================================================
    COLUMN LAYOUTS - SLEEK & PROFESSIONAL
    ============================================================================= */
 
@@ -378,52 +442,11 @@
 	}
 
 /* =============================================================================
-   RESPONSIVE DESIGN - MOBILE FIRST
+   RESPONSIVE DESIGN - NON-COLUMN ELEMENTS
    ============================================================================= */
 
-	/* Large screens - 3 columns (1024px+) */
-	/* Default 3-column layout from earlier CSS grid rules */
-
-	/* Medium screens - 2 columns max (768px to 1023px) */
-	@media (max-width: 1023px) and (min-width: 768px) {
-		/* Override 3-column layout to use 2 columns */
-		.wp-block-cover:first-of-type .wp-block-columns {
-			grid-template-columns: repeat(2, 1fr) !important;
-			/* gap: 2rem; */
-		}
-		
-		.wp-block-cover:first-of-type .wp-block-column {
-			min-height: 240px;
-		}
-	}
-
-	/* Small tablet - ensure 2 columns (600px to 899px) */
-	@media (max-width: 899px) and (min-width: 600px) {
-		.wp-block-cover:first-of-type .wp-block-columns {
-			grid-template-columns: repeat(2, 1fr) !important;
-			/* gap: 2rem; */
-		}
-		
-		.wp-block-cover:first-of-type .wp-block-column {
-			min-height: 220px;
-			padding: 2rem 1.5rem;
-		}
-	}
-
-	/* Mobile - 1 column (below 600px) */
-	@media (max-width: 599px) {
-		/* Single column on mobile */
-		.wp-block-cover:first-of-type .wp-block-columns {
-			grid-template-columns: 1fr !important;
-			/* gap: 1.5rem; */
-			margin-top: 2rem;
-		}
-		
-		.wp-block-cover:first-of-type .wp-block-column {
-			padding: 1.5rem 1.25rem;
-			min-height: 180px;
-		}
-		
+	/* Mobile layout adjustments */
+	@media (max-width: 600px) {
 		.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 			padding: 1.5rem;
 		}
@@ -446,11 +469,6 @@
 	@media (max-width: 480px) {
 		.wp-block-cover:first-of-type .wp-block-cover__inner-container {
 			padding: 1rem;
-		}
-		
-		.wp-block-cover:first-of-type .wp-block-column {
-			padding: 1.25rem 1rem;
-			min-height: 160px;
 		}
 		
 		/* Even smaller buttons on very small screens */
