@@ -305,6 +305,53 @@
         add_editor_style('editor-style.css');
     });
 
+    /**
+     * Extend Cover Block with Height Presets
+     * Adds a dropdown with Full/Half height options to the Dimensions panel
+     * All styles are handled in editor-style.css
+     */
+
+    // Enqueue the block editor script
+    function enqueue_cover_block_extension() {
+        wp_enqueue_script(
+            'cover-height-preset-extension',
+            get_template_directory_uri() . '/assets/js/cover-height-extension.js',
+            array( 'wp-blocks', 'wp-block-editor', 'wp-components', 'wp-compose', 'wp-element' ),
+            '1.0.0',
+            true
+        );
+    }
+    add_action( 'enqueue_block_editor_assets', 'enqueue_cover_block_extension' );
+
+    // Add custom attribute to Cover block via filter
+    function add_cover_height_preset_attribute( $settings, $name ) {
+        if ( 'core/cover' === $name ) {
+            $settings['attributes']['heightPreset'] = array(
+                'type'    => 'string',
+                'default' => 'full'
+            );
+        }
+        return $settings;
+    }
+    add_filter( 'blocks_register_block_type_args', 'add_cover_height_preset_attribute', 10, 2 );
+
+    // Add custom CSS class based on height preset
+    function add_cover_height_preset_class( $extra_props, $block_type, $attributes ) {
+        if ( 'core/cover' === $block_type->name && ! empty( $attributes['heightPreset'] ) ) {
+            if ( 'full' === $attributes['heightPreset'] ) {
+                $extra_props['className'] = isset( $extra_props['className'] ) 
+                    ? $extra_props['className'] . ' height-preset-full' 
+                    : 'height-preset-full';
+            } elseif ( 'half' === $attributes['heightPreset'] ) {
+                $extra_props['className'] = isset( $extra_props['className'] ) 
+                    ? $extra_props['className'] . ' height-preset-half' 
+                    : 'height-preset-half';
+            }
+        }
+        return $extra_props;
+    }
+    add_filter( 'blocks_get_save_content_extra_props', 'add_cover_height_preset_class', 10, 3 );
+
     function remove_constrained_layout_from_covers($block_content, $block) {
 		if ($block['blockName'] === 'core/cover' && strpos($block_content, 'wp-block-column') !== false) {
 			$block_content = str_replace('is-layout-constrained', 'is-layout-unconstrained', $block_content);

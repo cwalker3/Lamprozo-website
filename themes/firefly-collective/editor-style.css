@@ -1,3 +1,5 @@
+/* theme/editor-style.css */
+
 html, body {
   overflow-x: hidden;
 }
@@ -28,24 +30,20 @@ h1.wp-block {
   padding: 0 !important;
 }
 
-/* Top-level cover inner containers */
-.wp-block-cover {
+/* Default height for covers without a preset class */
+.wp-block-cover:not(.height-preset-half):not(.height-preset-full) {
   min-height: 100vh;
 }
 
+/* Remove the forced grid display and centering - let Cover block handle its own layout */
+/* Only set width constraints, not height or display properties */
 .editor-styles-wrapper > .wp-block-cover .wp-block-cover__inner-container {
-  min-height: 100vh !important;
-  display: grid !important;
-  place-content: center !important;
   width: 100% !important;
   max-width: none !important;
 }
 
-/* Nested cover inner containers - viewport height but constrained width */
+/* Nested cover inner containers - only width constraints */
 .wp-block-cover .wp-block-cover .wp-block-cover__inner-container {
-  min-height: 100vh !important;
-  display: grid !important;
-  place-content: center !important;
   width: 100% !important;
   max-width: 100% !important;
 }
@@ -104,4 +102,26 @@ p.wp-block {
 .editor-styles-wrapper .wp-block-cover .wp-block-columns p.wp-block {
   margin-left: 0 !important;
   margin-right: 0 !important;
+}
+
+/* Height preset styles - Full height */
+.wp-block-cover.height-preset-full {
+	min-height: 100vh !important;
+	max-height: 100vh !important;
+	overflow: hidden; /* Allow scrolling if content is taller */
+}
+
+/* Height preset styles - Half height */
+.wp-block-cover.height-preset-half {
+	min-height: 50vh !important;
+	max-height: 50vh !important;
+	overflow: hidden; /* Allow scrolling if content is taller */
+}
+
+/* Ensure the inner container doesn't force any specific height */
+.wp-block-cover.height-preset-full .wp-block-cover__inner-container,
+.wp-block-cover.height-preset-half .wp-block-cover__inner-container {
+	min-height: auto !important;
+	height: auto !important;
+	max-height: none !important;
 }
