@@ -194,7 +194,8 @@
 	/* Main heading - Bold and impactful */
 	.wp-block-cover:first-of-type .has-large-font-size,
 	.wp-block-cover:first-of-type h1,
-	.wp-block-cover:first-of-type .wp-block-cover__inner-container > p:first-child {
+	.wp-block-cover:first-of-type .wp-block-cover__inner-container > p:first-child,
+	.wp-block-cover:has(.wp-block-cover__inner-container:only-of-type) p:first-child {
 		font-size: clamp(2.5rem, 8vw, 5rem);
 		font-weight: 800;
 		line-height: 1.1;
