@@ -135,9 +135,11 @@
     }
 
     function change_login_logo() {
+        global $active_template;
+
         echo '<style type="text/css">
         .login h1 a { 
-            background-image: url(' . get_template_directory_uri() . '/images/logo.webp) !important;
+            background-image: url(' . get_template_directory_uri() . '/templates/'.$active_template.'/images/logo.webp) !important;
             background-size: contain;
             width: 200px;
             height: 100px;
