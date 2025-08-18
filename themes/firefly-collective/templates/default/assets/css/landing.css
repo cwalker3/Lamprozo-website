@@ -227,11 +227,11 @@
 	}
 
 /* =============================================================================
-   COLUMN LAYOUTS - ADAPTIVE & RESPONSIVE
+   COLUMN LAYOUTS - ADAPTIVE & RESPONSIVE (SMART DETECTION)
    ============================================================================= */
 
-	/* Columns container - Use auto-fit for intelligent responsiveness */
-	.wp-block-cover .wp-block-columns {
+	/* ONLY apply grid system to equal-width columns (no custom flex-basis) */
+	.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) {
 		width: 100%;
 		margin: 0;
 		display: grid !important; /* Override WordPress flex layout */
@@ -243,38 +243,45 @@
 		flex-wrap: unset !important;
 	}
 
-	.wp-block-cover:has(.wp-block-cover__inner-container:only-of-type) {
-		min-height: 100vh;
-	}
-
-	/* Reduce gaps at smaller screens but keep same minmax */
+	/* Reduce gaps at smaller screens for grid layouts */
 	@media (max-width: 800px) {
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) {
 			gap: 1.5rem;
 		}
 	}
 
-	/* Mobile - force single column */
+	/* Mobile - force single column for grid layouts */
 	@media (max-width: 600px) {
-		.wp-block-cover .wp-block-columns {
+		.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) {
 			grid-template-columns: 1fr !important;
 			gap: 1.5rem;
 		}
 	}
 
-	/* Individual column styling - minimal interference */
-	.wp-block-cover .wp-block-column {
-		/* Remove WordPress flex constraints */
+	/* Mobile - force flex columns to stack */
+	@media (max-width: 600px) {
+		.wp-block-cover .wp-block-columns:has([style*="flex-basis"]) {
+			flex-direction: column !important;
+		}
+		
+		.wp-block-cover .wp-block-columns:has([style*="flex-basis"]) .wp-block-column {
+			flex-basis: auto !important;
+		}
+	}
+
+	/* Individual column styling for grid layouts only */
+	.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) .wp-block-column {
+		/* Remove WordPress flex constraints for grid layouts */
 		flex: unset !important;
 		/* Ensure proper grid behavior */
 		width: 100%;
 		min-width: 0;
 	}
 
-	/* Center odd columns ONLY when they naturally wrap to next row */
+	/* Center odd columns ONLY for equal-width grid layouts */
 	/* For 3-column layouts that break to 2+1 */
 	@media (max-width: 844px) and (min-width: 601px) {
-		.wp-block-cover .wp-block-columns .wp-block-column:nth-child(3):last-child {
+		.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) .wp-block-column:nth-child(3):last-child {
 			grid-column: 1 / -1;
 			justify-self: center;
 			max-width: 50%; /* 50% of the full row width */
@@ -283,10 +290,53 @@
 
 	/* For 5-column layouts that break to 4+1 or 2+2+1 */
 	@media (max-width: 1380px) and (min-width: 845px) {
-		.wp-block-cover .wp-block-columns .wp-block-column:nth-child(5):last-child {
+		.wp-block-cover .wp-block-columns:not(:has([style*="flex-basis"])) .wp-block-column:nth-child(5):last-child {
 			grid-column: 1 / -1;
 			justify-self: center;
 			max-width: 50%;
+		}
+	}
+
+/* =============================================================================
+   FULL-WIDTH BANNER HEIGHT FIX (SPECIFIC TARGETING)
+   ============================================================================= */
+
+	/* Only target covers that are truly single banners (no columns inside) */
+	.wp-block-cover:has(.wp-block-cover__inner-container:only-of-type):not(:has(.wp-block-columns)) {
+		min-height: 100vh !important;
+		height: 100vh !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	.wp-block-cover:not(:first-of-type):not(:has(.wp-block-columns)) {
+		min-height: 100vh !important;
+		height: 100vh !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	/* Explicitly preserve gaps for column layouts */
+	.wp-block-cover:has(.wp-block-columns) {
+		height: auto !important; /* Don't force height on column containers */
+		min-height: auto !important;
+	}
+
+	/* Mobile optimization for banners only */
+	@media (max-width: 768px) {
+		.wp-block-cover:not(:first-of-type):not(:has(.wp-block-columns)) {
+			height: calc(100vh) !important;
+			min-height: calc(100vh) !important;
+		}
+	}
+
+	/* Use most stable viewport units when available for banners only */
+	@supports (height: 100svh) {
+		.wp-block-cover:not(:first-of-type):not(:has(.wp-block-columns)) {
+			height: 100svh !important;
+			min-height: 100svh !important;
 		}
 	}
 
