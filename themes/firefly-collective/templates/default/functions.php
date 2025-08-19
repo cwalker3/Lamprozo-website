@@ -19,7 +19,7 @@
                 'view',         'pages',
                 'nav',          'util',
                 'encrypt',      'profile',
-                'app');
+                'app',          'customize');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";

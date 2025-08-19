@@ -12,6 +12,9 @@
     define('FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION', 'firefly_collective_active_template_temp');
     define('FIREFLY_COLLECTIVE_TEMPLATES_DIR', get_template_directory() . '/templates');
 
+    global $main_nonce;
+    $main_nonce = wp_create_nonce('main_nonce');
+
     // Customizer admin only
     function init_customizer($hook) {
         $target_dir_url = plugin_dir_url( dirname( __FILE__, 1 ) );
