@@ -11,7 +11,6 @@
 
     // Load backend models
     $models = array(
-                'template',
                 'init',         'rest',     
                 'db',           'admin-nav',    
                 'bookings',     'util',
