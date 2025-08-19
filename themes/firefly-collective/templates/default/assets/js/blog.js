@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
 
-    console.log(myApi);
     const maxBlogsPerPage = parseInt(myApi.maxBlogs);
     let blogPageNum = 2;
     let blogFilterOptions = {
