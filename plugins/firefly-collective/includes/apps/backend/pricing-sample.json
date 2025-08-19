@@ -6,7 +6,7 @@
                 "text": "This is the non-recurring feature"
             },
             "normalText": {
-                "level": "user",
+                "level": "admin",
                 "ui_type": "normal-text",
                 "value": "This is normal text that only the user sees."
             },
@@ -16,7 +16,7 @@
                 "value": "This is long text only the user sees."
             },
             "intFloat": {
-                "level": "user",
+                "level": "user-display",
                 "ui_type": "int-float",
                 "value": 100
             },
@@ -26,7 +26,7 @@
                 "value": ""
             },
             "multiple": {
-                "level": "user",
+                "level": "admin",
                 "ui_type": "array",
                 "value": {
                     "types": [
