@@ -407,19 +407,25 @@ function cascadeUpdateContainers(element) {
 
 // Function to update all open containers with smoother transitions
 function updateAllOpenContainers() {
-  // Update all open feature contents
-  document.querySelectorAll('.feature-content.open').forEach(content => {
-    content.style.maxHeight = (content.scrollHeight * 1.2) + 'px';
-  });
+  // Force a reflow first
+  document.body.offsetHeight;
   
-  // Update all open option contents
-  document.querySelectorAll('.option > .content.open').forEach(content => {
-    content.style.maxHeight = (content.scrollHeight * 1.3) + 'px';
-  });
-  
-  // Update all open addon contents
+  // Update all open addon contents first (innermost containers)
   document.querySelectorAll('.addon > .content.open').forEach(content => {
-    content.style.maxHeight = (content.scrollHeight * 1.5) + 'px';
+    const newHeight = Math.max(content.scrollHeight * 1.5, 300) + 'px';
+    content.style.maxHeight = newHeight;
+  });
+  
+  // Then update all open option contents (middle containers)
+  document.querySelectorAll('.option > .content.open').forEach(content => {
+    const newHeight = Math.max(content.scrollHeight * 1.3, 500) + 'px';
+    content.style.maxHeight = newHeight;
+  });
+  
+  // Finally update all open feature contents (outermost containers)
+  document.querySelectorAll('.feature-content.open').forEach(content => {
+    const newHeight = Math.max(content.scrollHeight * 1.2, 800) + 'px';
+    content.style.maxHeight = newHeight;
   });
 }
 
@@ -814,6 +820,37 @@ function createPriceOptionsUI(optionsData, onChange) {
   rightColumn.style.flexDirection = 'column';
   container.appendChild(rightColumn);
   
+// Helper function to update parent container heights
+function updateContainerHeights() {
+    // Use a small delay to ensure DOM has updated
+    setTimeout(() => {
+      // Find the closest option and feature containers
+      const optionEl = container.closest('.option');
+      const featureEl = container.closest('.feature');
+      
+      if (optionEl) {
+        const optionContent = optionEl.querySelector('.content');
+        if (optionContent && optionContent.classList.contains('open')) {
+          // Set a generous height that accounts for the new content
+          optionContent.style.maxHeight = Math.max(optionContent.scrollHeight * 1.2, 1000) + 'px';
+        }
+      }
+      
+      if (featureEl) {
+        const featureContent = featureEl.querySelector('.feature-content');
+        if (featureContent && featureContent.classList.contains('open')) {
+          // Set a generous height that accounts for the new content
+          featureContent.style.maxHeight = Math.max(featureContent.scrollHeight * 1.2, 1500) + 'px';
+        }
+      }
+    }, 10);
+    
+    // Also call the global update function as a backup
+    setTimeout(() => {
+      updateAllOpenContainers();
+    }, 50);
+  }
+  
   function renderOptions() {
     rightColumn.innerHTML = '';
     
@@ -854,6 +891,8 @@ function createPriceOptionsUI(optionsData, onChange) {
         workingData.splice(idx, 1);
         onChange(workingData);
         renderOptions();
+        // Update container heights after deletion
+        updateContainerHeights();
       });
       
       // Up arrow button
@@ -868,6 +907,8 @@ function createPriceOptionsUI(optionsData, onChange) {
           [workingData[idx], workingData[idx-1]];
           onChange(workingData);
           renderOptions();
+          // Update container heights after reordering
+          updateContainerHeights();
         }
       });
       
@@ -883,6 +924,8 @@ function createPriceOptionsUI(optionsData, onChange) {
           [workingData[idx+1], workingData[idx]];
           onChange(workingData);
           renderOptions();
+          // Update container heights after reordering
+          updateContainerHeights();
         }
       });
       
@@ -911,6 +954,8 @@ function createPriceOptionsUI(optionsData, onChange) {
       workingData.push({ label: '', price: 0 });
       onChange(workingData);
       renderOptions();
+      // Update container heights after addition
+      updateContainerHeights();
     });
     
     addBtnRow.appendChild(addBtn);
@@ -1406,6 +1451,42 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
   rightColumn.style.flexDirection = 'column';
   container.appendChild(rightColumn);
   
+// Helper function to update parent container heights
+function updateContainerHeights() {
+    setTimeout(() => {
+      // Find the closest option and feature containers
+      const addonEl = container.closest('.addon');
+      const optionEl = container.closest('.option');
+      const featureEl = container.closest('.feature');
+      
+      if (addonEl) {
+        const addonContent = addonEl.querySelector('.content');
+        if (addonContent && addonContent.classList.contains('open')) {
+          addonContent.style.maxHeight = Math.max(addonContent.scrollHeight * 1.3, 400) + 'px';
+        }
+      }
+      
+      if (optionEl) {
+        const optionContent = optionEl.querySelector('.content');
+        if (optionContent && optionContent.classList.contains('open')) {
+          optionContent.style.maxHeight = Math.max(optionContent.scrollHeight * 1.2, 600) + 'px';
+        }
+      }
+      
+      if (featureEl) {
+        const featureContent = featureEl.querySelector('.feature-content');
+        if (featureContent && featureContent.classList.contains('open')) {
+          featureContent.style.maxHeight = Math.max(featureContent.scrollHeight * 1.2, 1000) + 'px';
+        }
+      }
+    }, 10);
+    
+    // Also call the global update function
+    setTimeout(() => {
+      updateAllOpenContainers();
+    }, 50);
+  }
+  
   // This flag prevents endless sync loop
   let preventSync = false;
   
@@ -1452,51 +1533,42 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       countInput.value = threshold.itemCount !== '' ? threshold.itemCount : '';
       countInput.placeholder = 'Quantity';
       
-      // Create stable ID for this input that won't change during re-renders
-      // Add scope prefix to avoid ID collisions between option and addon levels
+      // Create stable ID for this input
       const scopePrefix = groupInfo ? 'addon-' : 'option-';
       const uniqueGroupId = groupInfo ? 
         `${groupInfo.groupName || 'local'}-${groupInfo.featureIdx || '0'}-${groupInfo.optionIdx || '0'}-${groupInfo.addonIdx || '0'}` : 
         'local';
       const countId = `${scopePrefix}count-input-${uniqueGroupId}-${idx}`;
-      const discountId = `${scopePrefix}discount-input-${uniqueGroupId}-${idx}`;
+      countInput.id = countId;
       
-      // Use the improved debounce function with proper options
+      // Debounced update function
       const debouncedCountUpdate = debounce((e) => {
         if (preventSync) return;
         
         const val = e.target.value.trim() !== '' ? parseInt(e.target.value, 10) : '';
         workingData[idx].itemCount = val;
         
-        // If part of a group, trigger synchronization
+        // Update container heights after change
+        updateContainerHeights();
+        
+        // Handle group synchronization if needed
         if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
           onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
           preventSync = true;
-          
-          // Then trigger synchronization across the group
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
             groupInfo.addonIdx,
             groupInfo.groupName,
             workingData,
-            countId // Pass the ID to preserve focus
+            countId
           );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
+          setTimeout(() => { preventSync = false; }, 10);
         } else {
-          // Otherwise just update this addon
           onChange(workingData);
         }
-      }, 300, { leading: false, trailing: true }); // Only trigger on trailing edge
+      }, 300, { leading: false, trailing: true });
       
-      // Use the debounced function for input events
       countInput.addEventListener('input', debouncedCountUpdate);
       
       // Discount percentage input
@@ -1506,43 +1578,35 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       discountInput.max = '100';
       discountInput.value = threshold.discount !== '' ? threshold.discount : '';
       discountInput.placeholder = '%';
+      discountInput.id = `${scopePrefix}discount-input-${uniqueGroupId}-${idx}`;
       
-      // Use the improved debounce function with proper options
       const debouncedDiscountUpdate = debounce((e) => {
         if (preventSync) return;
         
         const val = e.target.value.trim() !== '' ? parseFloat(e.target.value) : '';
         workingData[idx].discount = val;
         
-        // If part of a group, trigger synchronization
+        // Update container heights after change
+        updateContainerHeights();
+        
+        // Handle group synchronization if needed
         if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
           onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
           preventSync = true;
-          
-          // Then trigger synchronization across the group
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
             groupInfo.addonIdx,
             groupInfo.groupName,
             workingData,
-            discountId // Pass the ID to preserve focus
+            discountInput.id
           );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
+          setTimeout(() => { preventSync = false; }, 10);
         } else {
-          // Otherwise just update this addon
           onChange(workingData);
         }
-      }, 300, { leading: false, trailing: true }); // Only trigger on trailing edge
+      }, 300, { leading: false, trailing: true });
       
-      // Use the debounced function for input events
       discountInput.addEventListener('input', debouncedDiscountUpdate);
       
       // Controls container
@@ -1558,38 +1622,30 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
         
         workingData.splice(idx, 1);
         
-        // If part of a group, trigger synchronization
+        // Handle group synchronization if needed
         if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
           onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
           preventSync = true;
-          
-          // Then trigger synchronization across the group
-          // Pass true for forceUpdateCurrent to make sure the current addon is updated too
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
             groupInfo.addonIdx,
             groupInfo.groupName,
             workingData,
-            null,  // No need to preserve focus
-            true   // Force update current addon too
+            null,
+            true
           );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
+          setTimeout(() => { preventSync = false; }, 10);
         } else {
-          // Otherwise just update this addon
           onChange(workingData);
           renderThresholds();
         }
+        
+        // Update container heights after deletion
+        updateContainerHeights();
       });
       
-      // Up arrow
+      // Up/Down arrow buttons with similar logic
       const upBtn = document.createElement('button');
       upBtn.innerHTML = '&#9650;';
       upBtn.className = 'price-option-arrow';
@@ -1599,16 +1655,9 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
         
         [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
         
-        // If part of a group, trigger synchronization
         if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
           onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
           preventSync = true;
-          
-          // Then trigger synchronization across the group
-          // Use forceUpdateCurrent = true for UI consistency
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
@@ -1616,21 +1665,17 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
             groupInfo.groupName,
             workingData,
             null,
-            true  // Force update current addon too
+            true
           );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
+          setTimeout(() => { preventSync = false; }, 10);
         } else {
-          // Otherwise just update this addon
           onChange(workingData);
           renderThresholds();
         }
+        
+        updateContainerHeights();
       });
       
-      // Down arrow
       const downBtn = document.createElement('button');
       downBtn.innerHTML = '&#9660;';
       downBtn.className = 'price-option-arrow';
@@ -1640,16 +1685,9 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
         
         [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
         
-        // If part of a group, trigger synchronization
         if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-          // Call onChange first to update the local data
           onChange(workingData);
-          
-          // Set the flag to prevent recursive syncing
           preventSync = true;
-          
-          // Then trigger synchronization across the group
-          // Use forceUpdateCurrent = true for UI consistency  
           synchronizeGroupThresholdDiscounts(
             groupInfo.featureIdx,
             groupInfo.optionIdx,
@@ -1657,18 +1695,15 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
             groupInfo.groupName,
             workingData,
             null,
-            true  // Force update current addon too
+            true
           );
-          
-          // Reset the flag after a short delay
-          setTimeout(() => {
-            preventSync = false;
-          }, 10);
+          setTimeout(() => { preventSync = false; }, 10);
         } else {
-          // Otherwise just update this addon
           onChange(workingData);
           renderThresholds();
         }
+        
+        updateContainerHeights();
       });
       
       // Add buttons to controls
@@ -1697,35 +1732,26 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
       
       workingData.push({ itemCount: '', discount: '' });
       
-      // If part of a group, trigger synchronization
       if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-        // Call onChange first to update the local data
         onChange(workingData);
-        
-        // Set the flag to prevent recursive syncing
         preventSync = true;
-        
-        // Then trigger synchronization across the group
-        // Pass true for forceUpdateCurrent to make sure the current addon is updated too
         synchronizeGroupThresholdDiscounts(
           groupInfo.featureIdx,
           groupInfo.optionIdx,
           groupInfo.addonIdx,
           groupInfo.groupName,
           workingData,
-          null,  // No need to preserve focus
-          true   // Force update current addon too
+          null,
+          true
         );
-        
-        // Reset the flag after a short delay
-        setTimeout(() => {
-          preventSync = false;
-        }, 10);
+        setTimeout(() => { preventSync = false; }, 10);
       } else {
-        // Otherwise just update this addon
         onChange(workingData);
         renderThresholds();
       }
+      
+      // Update container heights after addition
+      updateContainerHeights();
     });
     
     addBtnRow.appendChild(addBtn);
@@ -1761,7 +1787,6 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
   
   // Register in global registry if this is part of a group
   if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-    // Initialize the group if needed
     if (!window.groupThresholdUIRegistry[groupInfo.groupName]) {
       window.groupThresholdUIRegistry[groupInfo.groupName] = [];
     }
@@ -1770,8 +1795,8 @@ function createThresholdDiscountsUI(discountsData, onChange, groupInfo = null) {
     window.groupThresholdUIRegistry[groupInfo.groupName] = 
       window.groupThresholdUIRegistry[groupInfo.groupName].filter(ui => 
         !(ui.featureIdx === groupInfo.featureIdx && 
-          ui.optionIdx === groupInfo.optionIdx && 
-          ui.addonIdx === groupInfo.addonIdx));
+        ui.optionIdx === groupInfo.optionIdx && 
+        ui.addonIdx === groupInfo.addonIdx));
     
     // Add this UI to the registry
     window.groupThresholdUIRegistry[groupInfo.groupName].push({
