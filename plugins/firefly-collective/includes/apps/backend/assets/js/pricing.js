@@ -1934,18 +1934,12 @@ function modifyCreateOptionElement() {
     
     const thresholdCheckbox = document.createElement('input');
     thresholdCheckbox.type = 'checkbox';
-    thresholdCheckbox.checked = opt.enableThresholdDiscounts || 
-      (opt.thresholdDiscounts && 
-      opt.thresholdDiscounts.value && 
-      opt.thresholdDiscounts.value.types && 
-      opt.thresholdDiscounts.value.types.length > 0 && 
-      opt.thresholdDiscounts.value.types.some(t => t.itemCount && t.discount));
-    thresholdCheckboxGroup.appendChild(thresholdCheckbox);
     
-    // If checkbox is checked due to data existing, make sure the flag is updated
-    if (thresholdCheckbox.checked && !opt.enableThresholdDiscounts) {
-      opt.enableThresholdDiscounts = true;
-    }
+    // ONLY check the checkbox if enableThresholdDiscounts is explicitly true
+    // Don't auto-check based on data existence - this was the key change
+    thresholdCheckbox.checked = opt.enableThresholdDiscounts === true;
+    
+    thresholdCheckboxGroup.appendChild(thresholdCheckbox);
     
     // Initialize thresholdDiscounts data if not present
     if (!opt.thresholdDiscounts) {
@@ -1953,7 +1947,7 @@ function modifyCreateOptionElement() {
         level: 'admin',
         ui_type: 'array-obj',
         value: {
-          types: [{ itemCount: "", discount: "" }]
+          types: [{ itemCount: "", discount: "" }]  // Empty defaults
         }
       };
     }
@@ -1964,8 +1958,8 @@ function modifyCreateOptionElement() {
         typeof opt.thresholdDiscounts === 'string' ? 
         JSON.parse(opt.thresholdDiscounts) : 
         (Array.isArray(opt.thresholdDiscounts) ? opt.thresholdDiscounts : 
-        (opt.thresholdDiscounts.value?.types || [{ itemCount: 10, discount: 5 }]))
-      ) : [{ itemCount: 10, discount: 5 }],
+        (opt.thresholdDiscounts.value?.types || [{ itemCount: "", discount: "" }]))  // Empty defaults
+      ) : [{ itemCount: "", discount: "" }],  // Empty defaults
       v => {
         if (!opt.thresholdDiscounts) {
           opt.thresholdDiscounts = {
@@ -2067,14 +2061,14 @@ document.addEventListener('DOMContentLoaded', function() {
           thresholdsArray = JSON.parse(discountsData);
         } catch(e) {
           console.error('Failed to parse threshold discounts:', e);
-          thresholdsArray = [{ itemCount: 10, discount: 5 }];
+          thresholdsArray = [{ itemCount: "", discount: "" }];
         }
       } else if (Array.isArray(discountsData)) {
         thresholdsArray = discountsData;
       } else if (discountsData && discountsData.types) {
         thresholdsArray = discountsData.types;
       } else {
-        thresholdsArray = [{ itemCount: 10, discount: 5 }];
+        thresholdsArray = [{ itemCount: "", discount: "" }];
       }
       
       // Create the working data structure - just the array, no selected property
@@ -2609,7 +2603,7 @@ function showNewOptionForm(fIdx) {
           level: 'admin',
           ui_type: 'array-obj',
           value: {
-            types: [{ itemCount: 10, discount: 5 }]
+            types: [{ itemCount: "", discount: "" }]
           }
         },
         maxAddons: -1, // -1 means unlimited
