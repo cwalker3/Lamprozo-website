@@ -310,6 +310,13 @@
 		justify-content: center !important;
 	}
 
+	/* If cover has .height-preset-half, override with 50vh */
+	.wp-block-cover.height-preset-half:has(.wp-block-cover__inner-container:only-of-type):not(:has(.wp-block-columns)) {
+		min-height: 50vh !important;
+		height: 50vh !important;
+	}
+
+	/* Other single covers, not first-of-type */
 	.wp-block-cover:not(:first-of-type):not(:has(.wp-block-columns)) {
 		min-height: 100vh !important;
 		height: 100vh !important;
@@ -318,10 +325,21 @@
 		justify-content: center !important;
 	}
 
+	/* Override for .height-preset-half on non-first-of-type covers */
+	.wp-block-cover.height-preset-half:not(:first-of-type):not(:has(.wp-block-columns)) {
+		min-height: 50vh !important;
+		height: 50vh !important;
+	}
+
 	/* Explicitly preserve gaps for column layouts */
 	.wp-block-cover:has(.wp-block-columns) {
 		height: auto !important; /* Don't force height on column containers */
 		min-height: auto !important;
+	}
+
+	.height-preset-half {
+		max-height: 50vh !important;
+		margin-block: 1rem;
 	}
 
 	/* Mobile optimization for banners only */

@@ -1,4 +1,4 @@
-/* theme/editor-style.css */
+/* theme/editor-style.css */ 
 
 html, body {
   overflow-x: hidden;
@@ -104,24 +104,72 @@ p.wp-block {
   margin-right: 0 !important;
 }
 
-/* Height preset styles - Full height */
+/* Height preset styles – Full height */
 .wp-block-cover.height-preset-full {
-	min-height: 100vh !important;
-	max-height: 100vh !important;
-	overflow: hidden; /* Allow scrolling if content is taller */
+	height: 100vh !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: hidden !important;
 }
 
-/* Height preset styles - Half height */
+/* Height preset styles – Half height */
 .wp-block-cover.height-preset-half {
-	min-height: 50vh !important;
-	max-height: 50vh !important;
-	overflow: hidden; /* Allow scrolling if content is taller */
+	height: 50vh !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: hidden !important;
 }
 
-/* Ensure the inner container doesn't force any specific height */
+/* Make inner container a flex column filling the cover */
 .wp-block-cover.height-preset-full .wp-block-cover__inner-container,
 .wp-block-cover.height-preset-half .wp-block-cover__inner-container {
-	min-height: auto !important;
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+	min-height: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+	box-sizing: border-box !important;
+	justify-content: center !important;  /* Center vertically */
+	align-items: center !important;      /* Center horizontally */
+	text-align: center;                  /* Center text inside blocks */
+}
+
+/* Un-constrain layout if WordPress applies limited widths */
+.wp-block-cover.height-preset-full .is-layout-constrained,
+.wp-block-cover.height-preset-half .is-layout-constrained {
+	max-width: none !important;
+}
+
+/* Columns fill full inner width and stretch vertically */
+.wp-block-cover.height-preset-full .wp-block-columns,
+.wp-block-cover.height-preset-half .wp-block-columns {
+	width: 100% !important;
+	flex: 1 1 auto !important;
+	align-items: stretch !important;
+	min-height: 0 !important;
+}
+
+/* Make each column a vertical flex container (in case content needs more control) */
+.wp-block-cover.height-preset-full .wp-block-column,
+.wp-block-cover.height-preset-half .wp-block-column {
+	display: flex !important;
+	flex-direction: column !important;
+	min-height: 0 !important;
+	justify-content: center !important;  /* Center column content vertically */
+	align-items: center !important;      /* And horizontally */
+}
+
+/* If there's a nested Cover in a column, let it fill and center its content */
+.wp-block-cover.height-preset-full .wp-block-column > .wp-block-cover,
+.wp-block-cover.height-preset-half .wp-block-column > .wp-block-cover {
+	flex: 1 1 auto !important;
 	height: auto !important;
-	max-height: none !important;
+	min-height: 0 !important;
+	display: flex !important;
+	flex-direction: column !important;
+	justify-content: center !important;
+	align-items: center !important;
 }
