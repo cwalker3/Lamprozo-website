@@ -6,13 +6,59 @@
 	// Import required WordPress dependencies
 	const { createHigherOrderComponent } = wp.compose;
 	const { Fragment } = wp.element;
-	const { InspectorControls } = wp.blockEditor;
+	const { InspectorControls } = wp.blockEditor || wp.editor;
 	const { SelectControl } = wp.components;
 	const { addFilter } = wp.hooks;
 	const { useSelect } = wp.data;
 
 	/**
-	 * Add height preset dropdown to Cover block inspector controls
+	 * 1) Register the custom attribute on the client, BUT with **no default**
+	 *    to avoid invalidating or altering markup for existing content.
+	 */
+	addFilter(
+		'blocks.registerBlockType',
+		'cover-height-preset/register-attr',
+		(settings, name) => {
+			if (name !== 'core/cover') {
+				return settings;
+			}
+			return {
+				...settings,
+				attributes: {
+					...settings.attributes,
+					heightPreset: {
+						type: 'string',
+						enum: ['full', 'half'],
+						// IMPORTANT: no default value
+					},
+				},
+			};
+		}
+	);
+
+	/**
+	 * 2) Rehydrate the attribute from existing classes when loading content
+	 *    Keeps the editor UI (dropdown) in sync with what’s already in markup.
+	 */
+	addFilter(
+		'blocks.getBlockAttributes',
+		'cover-height-preset/rehydrate-from-class',
+		(blockAttributes, blockType /*, innerHTML, knownAttrs */) => {
+			if (!blockType || blockType.name !== 'core/cover') {
+				return blockAttributes;
+			}
+			const cls = blockAttributes?.className || '';
+			if (cls.includes('height-preset-half')) {
+				blockAttributes.heightPreset = 'half';
+			} else if (cls.includes('height-preset-full')) {
+				blockAttributes.heightPreset = 'full';
+			}
+			return blockAttributes;
+		}
+	);
+
+	/**
+	 * 3) Add height preset dropdown to Cover block inspector controls
 	 */
 	const withCoverHeightPreset = createHigherOrderComponent((BlockEdit) => {
 		return (props) => {
@@ -33,8 +79,8 @@
 				if (parents.length === 0) {
 					return true;
 				}
-				
-				// Check if this Cover is directly inside a Column that's inside a top-level Columns block
+
+				// Allow if: Cover → Column → Columns at root level
 				if (parents.length <= 2) {
 					const parentBlockNames = parents.map(parentId => getBlockName(parentId));
 					
@@ -110,33 +156,34 @@
 		};
 	}, 'withCoverHeightPreset');
 
-	// Apply the higher-order component to all blocks
+	// Apply the inspector control filter
 	addFilter(
 		'editor.BlockEdit',
 		'cover-height-preset/with-inspector-controls',
 		withCoverHeightPreset
 	);
 
-	// Add classes to the block wrapper in the editor
+	/**
+	 * 4) Add the appropriate class name in the editor,
+	 *    so you see the effect live when toggling.
+	 */
 	const withCoverHeightPresetClassName = createHigherOrderComponent((BlockListBlock) => {
 		return (props) => {
 			const { name, attributes } = props;
-			
-			// Only apply to cover blocks
+
 			if (name !== 'core/cover') {
 				return wp.element.createElement(BlockListBlock, props);
 			}
-			
+
 			const { heightPreset } = attributes;
 			let className = props.className || '';
-			
-			// Add the appropriate class based on heightPreset
+
 			if (heightPreset === 'full') {
 				className = className + ' height-preset-full';
 			} else if (heightPreset === 'half') {
 				className = className + ' height-preset-half';
 			}
-			
+
 			return wp.element.createElement(BlockListBlock, {
 				...props,
 				className: className
@@ -144,35 +191,36 @@
 		};
 	}, 'withCoverHeightPresetClassName');
 
-	// Apply the className filter for the editor
 	addFilter(
 		'editor.BlockListBlock',
 		'cover-height-preset/with-class-name',
 		withCoverHeightPresetClassName
 	);
 
-	// Also add classes to saved content (this works with your PHP filter)
+	/**
+	 * 5) Add classes to the saved content (only if heightPreset is set),
+	 *    preserving validation for legacy blocks.
+	 */
 	addFilter(
 		'blocks.getSaveContent.extraProps',
 		'cover-height-preset/add-save-props',
 		function(extraProps, blockType, attributes) {
-			// Only apply to cover blocks
 			if (blockType.name !== 'core/cover') {
 				return extraProps;
 			}
-			
+
 			const { heightPreset } = attributes;
-			
-			if (heightPreset === 'full') {
-				extraProps.className = extraProps.className 
-					? extraProps.className + ' height-preset-full'
-					: 'height-preset-full';
-			} else if (heightPreset === 'half') {
-				extraProps.className = extraProps.className 
-					? extraProps.className + ' height-preset-half'
-					: 'height-preset-half';
+			if (!heightPreset) {
+				return extraProps;
 			}
-			
+
+			const cls = extraProps.className ? extraProps.className + ' ' : '';
+			if (heightPreset === 'full') {
+				extraProps.className = cls + 'height-preset-full';
+			} else if (heightPreset === 'half') {
+				extraProps.className = cls + 'height-preset-half';
+			}
+
 			return extraProps;
 		}
 	);
