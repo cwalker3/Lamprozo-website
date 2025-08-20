@@ -158,15 +158,12 @@
 		foreach ($options_config as $option_key => $config) {
 			$setting_id = 'template_' . $option_key;
 			
-			// Add setting - use LIVE value as default so checkbox shows current state
+			// Add setting - use LIVE value as default
 			$wp_customize->add_setting($setting_id, array(
 				'default' => template_get_option($option_key),
 				'transport' => 'postMessage',
 				'sanitize_callback' => isset($config['sanitize_callback']) ? $config['sanitize_callback'] : 'sanitize_text_field'
 			));
-
-			// Set the current value to LIVE value (not preview)
-			$wp_customize->set_post_value($setting_id, template_get_option($option_key));
 
 			// Prepare control args
 			$control_args = array(
@@ -209,8 +206,18 @@
 			
 			if ($setting) {
 				$option_value = $setting->post_value();
+				
 				if ($option_value !== null) {
+					// Apply sanitization if defined
+					if (isset($config['sanitize_callback']) && is_callable($config['sanitize_callback'])) {
+						$option_value = call_user_func($config['sanitize_callback'], $option_value);
+					}
+					
+					// Save the live value
 					template_set_option($option_key, $option_value);
+					
+					// Sync preview value to match live value
+					template_set_option_preview($option_key, $option_value);
 				}
 			}
 		}

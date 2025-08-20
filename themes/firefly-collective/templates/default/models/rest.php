@@ -96,31 +96,31 @@
         register_rest_route('custom-api/v1', '/change-template-temp', array(
             'methods'             => 'POST',
             'callback'            => 'handle_change_template_temp',
-            'permission_callback' => 'verify_rest_request'
+            'permission_callback' => 'verify_customizer_request'
         ));
 
         register_rest_route('custom-api/v1', '/change-landing-style-preview', array(
             'methods'             => 'POST',
             'callback'            => 'handle_change_landing_style_preview',
-            'permission_callback' => 'verify_rest_request'
+            'permission_callback' => 'verify_customizer_request'
         ));
 
         register_rest_route('custom-api/v1', '/get-landing-style-preview', array(
             'methods'             => 'GET',
             'callback'            => 'handle_get_landing_style_preview',
-            'permission_callback' => 'verify_rest_request'
+            'permission_callback' => 'verify_customizer_request'
         ));
 
         register_rest_route('custom-api/v1', '/edit-landing-in-gutenberg', array(
             'methods'             => 'POST',
             'callback'            => 'handle_edit_landing_in_gutenberg',
-            'permission_callback' => 'verify_rest_request'
+            'permission_callback' => 'verify_customizer_request'
         ));
 
         register_rest_route('custom-api/v1', '/change-template-option-preview', array(
 			'methods'             => 'POST',
 			'callback'            => 'handle_change_option_preview',
-			'permission_callback' => 'verify_rest_request'
+			'permission_callback' => 'verify_customizer_request'
 		));
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');
@@ -161,6 +161,70 @@
             if ( $uid && $user ) {
                 wp_set_current_user( $uid );
                 wp_set_auth_cookie( $uid, true, is_ssl() );
+                return true;
+            }
+        }
+
+        // 4. Check campaign token for anonymous access
+        if ( ! empty( $_COOKIE['campaign_token'] ) ) {
+            $token = sanitize_text_field( $_COOKIE['campaign_token'] );
+            
+            // Validate campaign token using same logic as signin model
+            global $wpdb;
+            $today = current_time('Y-m-d');
+            
+            $campaign = $wpdb->get_row( $wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}ffc_campaigns
+                WHERE token = %s
+                AND DATE(start_date) <= %s
+                AND (unlimited = 1 OR end_date IS NULL OR DATE(end_date) >= %s)",
+                $token, $today, $today
+            ) );
+            
+            if ( $campaign ) {
+                return true; // Allow anonymous access for valid campaigns
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Customizer-safe authentication that doesn't reset cookies
+     * Use this for customizer-related endpoints to avoid breaking publish functionality
+     */
+    function verify_customizer_request( WP_REST_Request $request ) {
+        // 1. Check if user is already authenticated via WordPress cookies
+        if ( is_user_logged_in() && current_user_can( 'customize' ) ) {
+            return true;
+        }
+        
+        // 2. Use WordPress's logged-in cookie authentication WITHOUT resetting cookies
+        if ( ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
+            $cookie_value = sanitize_text_field( $_COOKIE[ LOGGED_IN_COOKIE ] );
+            $user_id      = wp_validate_auth_cookie( $cookie_value, 'logged_in' );
+
+            if ( $user_id ) {
+                // Set current user but DON'T reset auth cookies
+                wp_set_current_user( $user_id );
+                
+                // Grant admin users immediately
+                if ( user_can( $user_id, 'customize' ) ) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Check custom auth_id cookie WITHOUT resetting cookies
+        if ( ! empty( $_COOKIE['auth_id'] ) ) {
+            $raw       = sanitize_text_field( $_COOKIE['auth_id'] );
+            $decrypted = decrypt_with_auth_key( $raw );
+            $uid       = intval( $decrypted );
+            $user      = get_user_by( 'id', $uid );
+
+            if ( $uid && $user ) {
+                // Set current user but DON'T reset auth cookies
+                wp_set_current_user( $uid );
                 return true;
             }
         }
