@@ -1,8 +1,11 @@
-// theme/assets/js/nav.js
+// theme/assets/js/_core_nav.js
 
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize navigation system - this function can be called from app.js
     initNavigation();
+    
+    // Initialize overlay menu if it exists
+    initOverlayMenu();
 });
 
 // Extract initialization into a function that can be called after dynamic menu insertion
@@ -19,7 +22,7 @@ function initNavigation() {
         return;
     }
 
-    // Handle Submenus
+    // Handle Submenus ONLY for hamburger menu (not overlay menu)
     const menuItems = nav.querySelectorAll('.menu-item-has-children');
     menuItems.forEach(function (menuItem) {
         const submenu = menuItem.querySelector('.sub-menu');
@@ -48,21 +51,8 @@ function initNavigation() {
         closeWebsiteMenu();
     });
 
-    // Make sure navData exists before using it
-    if (typeof navData !== 'undefined' && navData.auth_id) {
-        const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
-        const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
-        const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
-        const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
-        const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
-        
-        // Check that the elements exist before modifying them
-        if (signupBtn) signupBtn.style.display = 'none';
-        if (loginBtn) loginBtn.style.display = 'none';
-        if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
-        if (dashboardBtn) dashboardBtn.style.display = 'block';
-        if (logoutBtn) logoutBtn.style.display = 'block';
-    }
+    // Handle authentication-based menu visibility for hamburger menu
+    handleAuthMenuVisibility('body > nav ul > li');
 
     function openWebsiteMenu() {
         nav.style.display = 'grid';
@@ -92,3 +82,68 @@ function initNavigation() {
         }
     }
 }
+
+// Initialize overlay menu functionality
+function initOverlayMenu() {
+    const overlayMenuContainer = document.getElementById('overlay-menu-container');
+    
+    if (!overlayMenuContainer) {
+        return; // Overlay menu not enabled
+    }
+    
+    console.log('Initializing overlay menu');
+    
+    // Handle authentication-based menu visibility for overlay menu
+    handleAuthMenuVisibility('.overlay-menu > li');
+    
+    // Overlay menu uses pure CSS - no JavaScript needed for dropdowns!
+}
+
+// Shared function to handle authentication-based menu item visibility
+function handleAuthMenuVisibility(selector) {
+    // Make sure navData exists before using it
+    if (typeof navData !== 'undefined' && navData.auth_id) {
+        // User is logged IN
+        const signupBtn = document.querySelector(selector + ':nth-last-of-type(5)');
+        const orderHistoryBtn = document.querySelector(selector + ':nth-last-of-type(4)');
+        const dashboardBtn = document.querySelector(selector + ':nth-last-of-type(3)');
+        const logoutBtn = document.querySelector(selector + ':nth-last-of-type(2)');
+        const loginBtn = document.querySelector(selector + ':last-of-type');
+        
+        // Hide signup and login, show authenticated user items
+        if (signupBtn) signupBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'list-item';
+        if (dashboardBtn) dashboardBtn.style.display = 'list-item';
+        if (logoutBtn) logoutBtn.style.display = 'list-item';
+    } else {
+        // User is logged OUT
+        const signupBtn = document.querySelector(selector + ':nth-last-of-type(5)');
+        const orderHistoryBtn = document.querySelector(selector + ':nth-last-of-type(4)');
+        const dashboardBtn = document.querySelector(selector + ':nth-last-of-type(3)');
+        const logoutBtn = document.querySelector(selector + ':nth-last-of-type(2)');
+        const loginBtn = document.querySelector(selector + ':last-of-type');
+        
+        // Show signup and login, hide authenticated user items
+        if (signupBtn) signupBtn.style.display = 'list-item';
+        if (loginBtn) loginBtn.style.display = 'list-item';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
+        if (dashboardBtn) dashboardBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+    }
+}
+
+// Close overlay submenus when clicking outside (optional enhancement)
+document.addEventListener('click', function(e) {
+    const overlayMenu = document.querySelector('.overlay-menu');
+    if (overlayMenu && !overlayMenu.contains(e.target)) {
+        // Pure CSS handles all hover states - no manual hiding needed
+    }
+});
+
+// Handle keyboard navigation for accessibility
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // Pure CSS handles all hover states - no manual hiding needed  
+    }
+});

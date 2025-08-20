@@ -23,6 +23,7 @@
         switch($view) {
             case '':
                 $assets['css'][]    = $template_path . '/assets/css/landing.css';
+                $assets['css'][]    = $template_path . '/assets/css/overlay-menu.css';
                 break;
 
             case 'blog':

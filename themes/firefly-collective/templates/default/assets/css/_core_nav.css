@@ -1,4 +1,4 @@
-/* theme/assets/css/nav.css */
+/* theme/assets/css/_core_nav.css */
 
 body > header,
 #nav-bar {
@@ -179,5 +179,33 @@ body > nav ul > li:nth-last-of-type(2) {
 
 	#wpadminbar {
 		position: fixed;
+	}
+	
+	/* Critical: Re-enable ONLY hamburger menu at mobile breakpoint even with .element-disable */
+	.element-disable #hamburger {
+		display: block !important;
+	}
+	
+	/* Ensure the parent container of hamburger element is shown */
+	.element-disable:has(#hamburger) {
+		display: block !important;
+	}
+	
+	/* Close button should remain hidden initially (shown by JS when menu opens) */
+	.element-disable #close-nav-btn {
+		display: none !important;
+	}
+	
+	/* Make sure nav functionality works normally at mobile */
+	body > nav {
+		display: none; /* Still hidden by default, shown by JS */
+	}
+}
+
+/* Ensure overlay menu elements are properly hidden on desktop when not using overlay */
+@media (min-width: 801px) {
+	/* When overlay menu is not active, these should remain hidden */
+	.element-disable:not(:has(#overlay-menu-container)) {
+		display: none;
 	}
 }

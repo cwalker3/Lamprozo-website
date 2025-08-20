@@ -39,6 +39,7 @@
         $theme_path    = isset($args['theme-path']) ? $args['theme-path'] : get_stylesheet_directory_uri();
 
         $use_menu_overlay = (bool) template_get_option('menu_overlay', $in_customizer);
+        if ( !is_front_page() ) $use_menu_overlay = false;
     ?>
 
     <header <?php if ($use_menu_overlay):?>
@@ -53,6 +54,22 @@
             <div id="site-name"><?php echo esc_html( get_bloginfo('name') ); ?></div>
         </div>
     </header>
+
+    <!-- Overlay Menu System -->
+    <?php if ($use_menu_overlay): ?>
+        <div id="overlay-menu-container">
+            <nav id="overlay-nav">
+                <?php
+                    wp_nav_menu( array(
+                        'theme_location'  => 'website-menu',
+                        'container_class' => 'overlay-menu-wrapper',
+                        'menu_class'      => 'overlay-menu',
+                        'fallback_cb'     => false,
+                    ) );
+                ?>
+            </nav>
+        </div>
+    <?php endif; ?>
 
     <div <?php if ($use_menu_overlay):?>
             class="element-disable"
