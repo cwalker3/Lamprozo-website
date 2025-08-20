@@ -21,25 +21,29 @@
     <div id="backdrop"></div>
 
     <?php
-    // Compute whether to add "user-nav".
-    // We NEVER add it while previewing in the Customizer.
-    $is_logged_in   = ! empty( $args['is-user-logged-in'] );
-    $no_auth_cookie = empty( $_COOKIE['auth_id'] );
+        // Compute whether to add "user-nav".
+        // We NEVER add it while previewing in the Customizer.
+        $is_logged_in   = ! empty( $args['is-user-logged-in'] );
+        $no_auth_cookie = empty( $_COOKIE['auth_id'] );
 
-    // Reliable Customizer preview (iframe) detection across navigations:
-    $in_customizer  = (
-        isset($_GET['customize_messenger_channel']) ||
-        isset($_GET['customize_changeset_uuid']) ||
-        ( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' )
-    );
+        // Reliable Customizer preview (iframe) detection across navigations:
+        $in_customizer  = (
+            isset($_GET['customize_messenger_channel']) ||
+            isset($_GET['customize_changeset_uuid']) ||
+            ( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' )
+        );
 
-    $add_user_nav   = $is_logged_in && $no_auth_cookie && ! $in_customizer;
+        $add_user_nav   = $is_logged_in && $no_auth_cookie && ! $in_customizer;
 
-    $user_nav_attr = $add_user_nav ? ' class="user-nav"' : '';
-    $theme_path    = isset($args['theme-path']) ? $args['theme-path'] : get_stylesheet_directory_uri();
+        $user_nav_attr = $add_user_nav ? ' class="user-nav"' : '';
+        $theme_path    = isset($args['theme-path']) ? $args['theme-path'] : get_stylesheet_directory_uri();
+
+        $use_menu_overlay = (bool) template_get_option('menu_overlay', $in_customizer);
     ?>
 
-    <header>
+    <header <?php if ($use_menu_overlay):?>
+                class="element-disable"
+            <?php endif; ?>>
         <div id="nav-bar"<?php echo $user_nav_attr; ?>></div>
 
         <div id="logo-name"<?php echo $user_nav_attr; ?>>
@@ -50,13 +54,17 @@
         </div>
     </header>
 
-    <div>
+    <div <?php if ($use_menu_overlay):?>
+            class="element-disable"
+         <?php endif; ?>>
         <img id="hamburger"<?php echo $user_nav_attr; ?>
              src="<?php echo esc_url( $template_path_web . '/images/hamburger.webp' ); ?>"
              alt="<?php esc_attr_e('Menu'); ?>">
     </div>
 
-    <div>
+    <div <?php if ($use_menu_overlay):?>
+            class="element-disable"
+         <?php endif; ?>>
         <img id="close-nav-btn"<?php echo $user_nav_attr; ?>
              src="<?php echo esc_url( $template_path_web . '/images/close-nav.webp' ); ?>"
              alt="<?php esc_attr_e('Close Menu'); ?>">
@@ -64,11 +72,11 @@
 
     <nav>
         <?php
-        wp_nav_menu( array(
-            'theme_location'  => 'website-menu',
-            'container_class' => 'website-menu',
-            'fallback_cb'     => false,
-        ) );
+            wp_nav_menu( array(
+                'theme_location'  => 'website-menu',
+                'container_class' => 'website-menu',
+                'fallback_cb'     => false,
+            ) );
         ?>
     </nav>
 

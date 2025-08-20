@@ -141,3 +141,7 @@ footer {
     z-index: 1;
     width: 100%;
 }
+
+.element-disable {
+    display: none;
+}

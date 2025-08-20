@@ -64,11 +64,11 @@
 	add_action('after_switch_theme', 'template_set_defaults');
 
 	/**
-	 * Get current option value (live)
+	 * Get current option value (live or preview)
 	 */
-	function template_get_option($option_key) {
+	function template_get_option($option_key, $preview = false) {
 		$options_config = template_get_options_config();
-		$option_name = template_get_option_name($option_key, false);
+		$option_name = template_get_option_name($option_key, $preview);
 		$default = isset($options_config[$option_key]['default']) ? $options_config[$option_key]['default'] : '';
 		return get_option($option_name, $default);
 	}
@@ -238,6 +238,23 @@
 		}
 		
 		return $options;
+	}
+
+	function template_reset_preview_values_on_customizer_load() {
+		// Only run in customizer
+		if (!(isset($_GET['customize_messenger_channel']) ||
+			isset($_GET['customize_changeset_uuid']) ||
+			( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' ))) {
+			return; // EXIT when NOT in customizer
+		}
+		
+		// Reset happens when IN customizer
+		$options_config = template_get_options_config();
+		
+		foreach ($options_config as $option_key => $config) {
+			$live_value = template_get_option($option_key, false);
+			template_set_option_preview($option_key, $live_value);
+		}
 	}
 
 	// Customizer from template
