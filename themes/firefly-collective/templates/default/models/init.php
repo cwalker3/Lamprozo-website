@@ -76,6 +76,7 @@
     function enqueue_my_styles_and_scripts() {
 
         global $backend_plugin_path, $backend_plugin_path_web, $theme_path_web, $template_path, $template_web_path;
+        global $nonce;
 
         $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
         $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
@@ -92,8 +93,6 @@
 
         // Enqueue core template assets
         enqueue_core_assets($active_template, $theme_path, $unique_id);
-        
-        $nonce = wp_create_nonce('wp_rest');
 
         // Localize main.js with the nonce and API URL for security
         wp_localize_script('core-main-js', 'myApi', array(

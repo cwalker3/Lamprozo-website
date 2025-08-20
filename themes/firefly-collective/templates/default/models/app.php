@@ -45,6 +45,8 @@
 
     // App initialization - returns menu + front page
     function app_init($request) {
+        global $nonce;
+
         $params = $request->get_params();
         $theme_path = get_template_directory_uri();
         $active_template = firefly_collective_get_active_template();
@@ -81,7 +83,7 @@
             'menu_html'         => $menu_html,
             'app_page_html'     => $app_page_html,
             'app_page_title'    => $app_page_title,
-            'nonce'             => wp_create_nonce('wp_rest'),
+            'nonce'             => $nonce,
             'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
             'theme_path'        => $theme_path,
             'template_path'     => $template_path,

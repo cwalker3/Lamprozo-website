@@ -11,9 +11,9 @@
     define('FIREFLY_COLLECTIVE_TEMPLATE_OPTION', 'firefly_collective_active_template');
     define('FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION', 'firefly_collective_active_template_temp');
     define('FIREFLY_COLLECTIVE_TEMPLATES_DIR', get_template_directory() . '/templates');
-
-    global $main_nonce;
-    $main_nonce = wp_create_nonce('main_nonce');
+    
+    global $nonce;
+    $nonce = wp_create_nonce('wp_rest');
 
     // Customizer admin only
     function init_customizer($hook) {
