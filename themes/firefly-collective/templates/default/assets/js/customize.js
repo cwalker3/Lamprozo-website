@@ -1,7 +1,5 @@
 // template/assets/js/customize.js
 
-console.log(customizeData);
-
 (function() {
 	'use strict';
 	
@@ -69,6 +67,20 @@ console.log(customizeData);
 		}
 	}
 	
+	// Function to refresh preview while preserving current URL
+	function refreshPreviewSafely() {
+		// Use the theme-level function if available, otherwise fallback to standard refresh
+		if (window.fireflyTemplateRefresh && typeof window.fireflyTemplateRefresh === 'function') {
+			window.fireflyTemplateRefresh();
+		} else {
+			// Fallback - but this might cause the URL issue
+			console.warn('Theme-level refresh function not available, using fallback');
+			setTimeout(function() {
+				wp.customize.previewer.refresh();
+			}, 100);
+		}
+	}
+	
 	// Wait for customizer to be ready
 	wp.customize.bind('ready', function() {
 		
@@ -83,7 +95,6 @@ console.log(customizeData);
 				
 				if (setting) {
 					originalValues[optionKey] = setting.get();
-					console.log('Template option initialized:', optionKey, setting.get());
 				}
 			});
 		}, 100);
@@ -95,8 +106,6 @@ console.log(customizeData);
 			// Listen for changes to this template option
 			wp.customize(settingId, function(setting) {
 				setting.bind(function(newValue) {
-					
-					console.log('Template option changed:', optionKey, newValue);
 					
 					// Make API call to update option preview
 					fetch('/wp-json/custom-api/v1/change-template-option-preview', {
@@ -114,15 +123,12 @@ console.log(customizeData);
 					})
 					.then(data => {
 						if (data.success) {
-							console.log('Template option preview updated:', data.option_key, data.option_value);
 							
 							// Check if template options have changed and update publish button
 							checkTemplateOptionsChanged();
 							
-							// Add a small delay before refreshing to ensure the option is saved
-							setTimeout(function() {
-								wp.customize.previewer.refresh();
-							}, 100);
+							// Use safe refresh that preserves current URL
+							refreshPreviewSafely();
 						} else {
 							console.error('Failed to update template option preview:', data);
 						}

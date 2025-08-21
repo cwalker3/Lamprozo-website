@@ -387,22 +387,11 @@
             'description' => __('Navigation configuration options.'),
         ));
         
-        // Navigation section placeholder setting/control
-        $wp_customize->add_setting('firefly_collective_navigation_placeholder', array(
-            'default' => '',
-            'transport' => 'refresh',
-            'sanitize_callback' => 'sanitize_text_field'
-        ));
-        
-        $wp_customize->add_control('firefly_collective_navigation_placeholder', array(
-            'label' => __('Navigation Options'),
-            'description' => __('Navigation configuration options will be added here.'),
-            'section' => 'firefly_collective_navigation',
-            'type' => 'text',
-            'input_attrs' => array(
-                'placeholder' => __('Coming soon...'),
-                'readonly' => 'readonly'
-            )
+        // Navigation section
+        $wp_customize->add_section('firefly_collective_navigation', array(
+            'title' => __('Navigation'),
+            'priority' => 122,
+            'description' => __('Navigation configuration options.'),
         ));
         
         // Add Layout section

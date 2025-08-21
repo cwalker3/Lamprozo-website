@@ -37,6 +37,7 @@ body > header {
 	justify-content: center;
 	align-items: center;
 	cursor: pointer;
+	transition: all 0.3s ease; /* Smooth transition for position changes */
 }
 
 #logo-name img {
@@ -200,12 +201,22 @@ body > nav ul > li:nth-last-of-type(2) {
 	body > nav {
 		display: none; /* Still hidden by default, shown by JS */
 	}
+	
+	/* Ensure logo returns to center on mobile regardless of .logo-left class */
+	#logo-name.logo-left {
+		position: fixed;
+		top: 28px;
+		left: 50% !important;
+		transform: translateX(-50%) !important;
+		justify-content: center !important;
+		min-width: 75vw !important;
+	}
 }
 
 /* Ensure overlay menu elements are properly hidden on desktop when not using overlay */
 @media (min-width: 801px) {
 	/* When overlay menu is not active, these should remain hidden */
-	.element-disable:not(:has(#overlay-menu-container)) {
+	.element-disable:not(:has(#overlay-menu-container)):not(:has(#nav-overlay-container)) {
 		display: none;
 	}
 }

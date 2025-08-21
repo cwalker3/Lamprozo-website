@@ -1,0 +1,281 @@
+/* theme/assets/css/_core_nav_overlay.css */
+
+/* Navigation Overlay Container for Non-Front Pages */
+#nav-overlay-container {
+    position: fixed;
+    width: 100vw;
+    top: 0;
+    height: 10vh;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    animation: fadeInDown 0.5s ease-out;
+}
+
+#nav-overlay-nav {
+    position: relative;
+    z-index: 3;
+}
+
+.nav-overlay-wrapper {
+    position: relative;
+    margin-right: 5vw;
+}
+
+/* Logo Left Positioning - Override element-disable and centered positioning */
+#logo-name.logo-left {
+    position: fixed !important;
+    display: flex !important; /* Override element-disable display: none */
+    top: 0 !important; /* Start from top of nav container */
+    left: 12vw !important; /* Increased from 25px to give more breathing room */
+    height: 10vh !important; /* Match nav container height */
+    align-items: center !important; /* Center vertically like nav items */
+    justify-content: flex-start !important;
+    min-width: auto !important;
+    cursor: pointer;
+    z-index: 5 !important; /* Higher than nav bar (z-index: 2) */
+    color: white; /* Ensure text is visible on blue background */
+}
+
+/* Nav Overlay Menu Styling */
+.nav-overlay-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 90vw;
+}
+
+.nav-overlay-menu > li {
+    position: relative;
+}
+
+/* Top Level Menu Items */
+.nav-overlay-menu > li > a {
+    font-weight: bold;
+    color: rgb(255, 255, 255);
+    text-decoration: none;
+    padding: 1rem 1.5rem;
+    display: block;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+}
+
+.nav-overlay-menu > li > a:hover,
+.nav-overlay-menu > li > a:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateY(-1px);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------------------------
+   Dropdown indicators (same as overlay menu)
+   --------------------------- */
+
+/* Reset: remove any text arrows and unify approach */
+.nav-overlay-menu .menu-item-has-children > a::after {
+    /* one triangle caret via borders */
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    transition: transform 200ms ease;
+    /* base: down-pointing triangle (top-level) */
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid currentColor;
+    transform-origin: 50% 45%;
+}
+
+/* Rotate the top-level caret when its submenu is open (hover or keyboard) */
+.nav-overlay-menu > li.menu-item-has-children:hover > a::after,
+.nav-overlay-menu > li.menu-item-has-children:focus-within > a::after {
+    transform: rotate(180deg);
+}
+
+/* Nested menus use right-pointing triangle */
+.nav-overlay-menu ul li.menu-item-has-children > a::after {
+    border: none;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid currentColor;
+    margin-left: 0.5rem;
+    transform: translateY(-1px); /* visually centers with line-height */
+}
+
+/* ---------------------------
+   Dropdowns (same structure as overlay menu)
+   --------------------------- */
+
+/* Hide all sub-menus by default */
+.nav-overlay-menu ul {
+    display: none;
+    position: absolute;
+    min-width: 220px;
+    background: white;
+    border-radius: 8px;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.15),
+        0 4px 12px rgba(0, 0, 0, 0.1);
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    z-index: 1000;
+    transition: opacity 0.15s ease-in-out;
+    opacity: 1;
+}
+
+/* First Level Dropdowns - show below parent */
+.nav-overlay-menu > li:hover > ul,
+.nav-overlay-menu > li:focus-within > ul {
+    display: block;
+    top: 100%;
+    left: 0;
+}
+
+/* Second Level and Beyond - show to the right with NO GAP */
+.nav-overlay-menu ul li:hover > ul,
+.nav-overlay-menu ul li:focus-within > ul {
+    display: block;
+    top: 0;
+    left: 100%;
+    margin-left: -1px; /* Overlap by 1px to eliminate gap */
+    z-index: 1001;
+}
+
+/* Sub-menu item styling */
+.nav-overlay-menu ul li {
+    position: relative;
+}
+
+.nav-overlay-menu ul li a {
+    color: var(--mainTextColor);
+    text-decoration: none;
+    padding: 0.75rem 1.25rem;
+    display: block;
+    transition: all 0.2s ease;
+    font-weight: 400;
+    font-size: 0.95rem;
+}
+
+.nav-overlay-menu ul li a:hover,
+.nav-overlay-menu ul li a:focus {
+    background-color: var(--mainColor);
+    color: white;
+    padding-left: 1.5rem;
+}
+
+/* Create invisible bridges to help with navigation */
+.nav-overlay-menu ul li.menu-item-has-children::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -10px;
+    width: 10px;
+    height: 100%;
+    background: transparent;
+    z-index: 999;
+}
+
+/* User Navigation Adjustments */
+.user-nav.nav-overlay-wrapper,
+#nav-overlay-container.user-nav {
+    margin-top: 32px;
+}
+
+.user-nav.logo-left {
+    margin-top: 32px;
+}
+
+/* Authentication-based Menu Items (same logic as other menus) */
+.nav-overlay-menu > li:nth-last-of-type(4),
+.nav-overlay-menu > li:nth-last-of-type(3),
+.nav-overlay-menu > li:nth-last-of-type(2) {
+    display: none;
+}
+
+/* Accessibility Enhancements */
+.nav-overlay-menu a:focus {
+    outline: 2px solid #fbbf24;
+    outline-offset: 2px;
+}
+
+/* Animation for menu appearance */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 1200px) {
+
+    .nav-overlay-menu > li > a {
+        font-size: 1rem;
+    }
+
+    .nav-overlay-menu {
+        gap: .2rem;
+    }
+
+    #logo-name.logo-left {
+        scale: 0.8;
+        left: 9vw !important;
+    }
+}
+
+/* Mobile Breakpoint - Revert to Normal Behavior */
+@media (max-width: 1000px) {
+    header.element-disable {
+        display: block;
+    }
+    
+    /* Hide navigation overlay completely */
+    #nav-overlay-container {
+        display: none !important;
+    }
+    
+    /* Reset logo to center positioning - Override desktop !important rules */
+    #logo-name.logo-left {
+        scale: 1.0;
+        position: fixed !important;
+        top: 0 !important; /* Match nav container top */
+        left: 50% !important; /* Override desktop left: 25px !important */
+        height: 10vh !important; /* Match nav container height */
+        transform: translateX(-50%) !important; /* Center horizontally only */
+        align-items: center !important; /* Center vertically */
+        justify-content: center !important;
+        min-width: 75vw !important;
+    }
+    
+    /* Ensure hamburger menu works normally */
+    .element-disable #hamburger {
+        display: block !important;
+    }
+    
+    /* Ensure the parent container of hamburger element is shown */
+    .element-disable:has(#hamburger) {
+        display: block !important;
+    }
+    
+    /* Close button should remain hidden initially */
+    .element-disable #close-nav-btn {
+        display: none !important;
+    }
+}

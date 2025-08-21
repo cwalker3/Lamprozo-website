@@ -3,6 +3,45 @@
 (function() {
     'use strict';
     
+    // URL preservation variables
+    var currentPreviewUrl = null;
+    var refreshTimeout = null;
+    
+    // Function to store and refresh to current URL
+    function refreshPreviewToCurrentUrl() {
+        // Clear any existing timeout
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+        }
+        
+        // Get the ACTUAL current URL from the preview iframe
+        try {
+            var previewFrame = document.querySelector('#customize-preview iframe');
+            if (previewFrame && previewFrame.contentWindow) {
+                currentPreviewUrl = previewFrame.contentWindow.location.href;
+            } else {
+                // Fallback to WordPress customizer URL
+                currentPreviewUrl = wp.customize.previewer.previewUrl.get();
+            }
+        } catch (e) {
+            // Cross-origin access might be blocked, fallback
+            console.warn('Could not access iframe URL, using fallback:', e);
+            currentPreviewUrl = wp.customize.previewer.previewUrl.get();
+        }
+        
+        // Set a timeout to ensure the API call has completed
+        refreshTimeout = setTimeout(function() {
+            // Refresh to the stored URL to maintain current page
+            wp.customize.previewer.previewUrl.set(currentPreviewUrl);
+            wp.customize.previewer.refresh();
+        }, 150);
+    }
+    
+    // Function to handle template option refreshes (for template-level use)
+    function handleTemplateOptionRefresh() {
+        refreshPreviewToCurrentUrl();
+    }
+    
     // Function to disable/enable publish button
         function togglePublishButton(disable) {
         var publishButton = document.querySelector('#save');
@@ -39,6 +78,17 @@
     // Wait for customizer to be ready
     wp.customize.bind('ready', function() {
         
+        // Store initial preview URL and listen for changes
+        currentPreviewUrl = wp.customize.previewer.previewUrl.get();
+        
+        // Listen for preview URL changes to keep our stored URL current
+        wp.customize.previewer.previewUrl.bind(function(newUrl) {
+            currentPreviewUrl = newUrl
+        });
+        
+        // Expose the global function for template-level customize.js
+        window.fireflyTemplateRefresh = handleTemplateOptionRefresh;
+        
         // Listen for template selector changes
         wp.customize('firefly_collective_template_selector', function(setting) {
             setting.bind(function(newTemplate) {
@@ -59,10 +109,8 @@
                 .then(data => {
                     if (data.success) {
                         
-                        // Add a small delay before refreshing to ensure the option is saved
-                        setTimeout(function() {
-                            wp.customize.previewer.refresh();
-                        }, 100);
+                        // Use URL-preserving refresh instead of direct refresh
+                        refreshPreviewToCurrentUrl();
                     } else {
                         console.error('Failed to update template temp:', data);
                     }
@@ -93,10 +141,8 @@
                 .then(data => {
                     if (data.success) {
                         
-                        // Add a small delay before refreshing to ensure the option is saved
-                        setTimeout(function() {
-                            wp.customize.previewer.refresh();
-                        }, 100);
+                        // Use URL-preserving refresh instead of direct refresh
+                        refreshPreviewToCurrentUrl();
                     } else {
                         console.error('Failed to update landing style preview:', data);
                     }

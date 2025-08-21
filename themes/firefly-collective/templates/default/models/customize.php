@@ -16,9 +16,20 @@
 				'default' => 0,
 				'type' => 'checkbox',
 				'label' => __('Menu Overlay'),
-				'description' => __('Enable overlay menu display.'),
+				'description' => __('Enable overlay menu display on front page.'),
 				'section' => 'firefly_collective_landing',
 				'priority' => 15,
+				'sanitize_callback' => function($value) {
+					return $value ? 1 : 0;
+				}
+			),
+			'nav_overlay_menu' => array(
+				'default' => 0,
+				'type' => 'checkbox',
+				'label' => __('Overlay Navigation'),
+				'description' => __('Enable overlay navigation menu on non-front pages with left-positioned logo.'),
+				'section' => 'firefly_collective_navigation',
+				'priority' => 10,
 				'sanitize_callback' => function($value) {
 					return $value ? 1 : 0;
 				}

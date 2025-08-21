@@ -91,8 +91,6 @@ function initOverlayMenu() {
         return; // Overlay menu not enabled
     }
     
-    console.log('Initializing overlay menu');
-    
     // Handle authentication-based menu visibility for overlay menu
     handleAuthMenuVisibility('.overlay-menu > li');
     
