@@ -3,7 +3,7 @@
 :root {
 	--mainColor: hsl(214, 100%, 33%);
 	--mainColorTransparent: hsla(214, 100%, 33%, 0.7);
-    --navBgColor: hsla(214, 100%, 21%, 0.7);
+    --navBgColor: hsla(214, 100%, 21%, 0.99);
     --secondaryColor: rgb(194, 194, 194);
     --mainTextColor: rgb(46, 46, 46);
 }

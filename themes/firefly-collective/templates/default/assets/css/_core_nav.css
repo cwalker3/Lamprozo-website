@@ -105,21 +105,37 @@ body > nav a {
     text-align: right;
 }
 
-body > nav .menu-item {
+body > nav ul .menu-item {
 	position: relative;
 }
 
-body > nav .expand-icon {
+/* Position the link for top-level items */
+body > nav .menu-item > a {
+	display: block;
+	padding-right: 2rem;
+}
+
+/* Position the link for nested items */
+body > nav .sub-menu .menu-item > a {
+	display: block;
+	padding-right: 2rem;
+}
+
+/* Position expand icon for all menu levels */
+body > nav .menu-item .expand-icon {
 	position: absolute;
 	left: 0;
 	top: 0;
 	pointer-events: none;
+	color: white;
+	font-weight: bold;
+	z-index: 1;
 }
 
 body > nav .sub-menu {
 	max-height: 0;
 	transition: max-height 0.4s ease-out;
-	overflow: hidden;
+	overflow-y: hidden; /* Keep vertical clipping for animation */
 	padding-left: 1rem;
 }
 
@@ -143,6 +159,59 @@ body > nav ul > li:nth-last-of-type(4),
 body > nav ul > li:nth-last-of-type(3),
 body > nav ul > li:nth-last-of-type(2) {
     display: none;
+}
+
+/* Generic Submenu Fixes - Handles Unlimited Nesting Levels */
+
+/* Ensure nested submenus are properly displayed */
+body > nav .website-menu .sub-menu {
+    display: block !important;
+    position: static !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    min-width: auto !important;
+    max-width: none !important;
+    overflow: hidden !important;
+    transition: max-height 0.4s ease-out;
+}
+
+/* Ensure all nested submenu items are visible when parent is expanded */
+body > nav .website-menu .sub-menu li {
+    display: list-item !important;
+    position: relative !important;
+    float: none !important;
+    clear: both !important;
+    width: 100% !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    overflow: visible !important;
+    margin-top: 0.25rem !important;
+}
+
+/* Ensure all nested submenu links are visible */
+body > nav .website-menu .sub-menu a {
+    display: block !important;
+    color: white !important;
+    text-decoration: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    position: static !important;
+    width: 100% !important;
+    text-align: right;
+}
+
+/* Force visibility for any authentication-hidden submenu items */
+body > nav .sub-menu li[style*="display: none"] {
+    display: list-item !important;
+}
+
+body > nav .sub-menu li[style*="visibility: hidden"] {
+    visibility: visible !important;
 }
 
 #hamburger, #close-nav-btn {

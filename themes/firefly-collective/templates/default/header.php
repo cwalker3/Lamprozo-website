@@ -38,29 +38,27 @@
         $user_nav_attr = $add_user_nav ? ' class="user-nav"' : '';
         $theme_path    = isset($args['theme-path']) ? $args['theme-path'] : get_stylesheet_directory_uri();
 
-        // Front page menu overlay (original functionality)
-        $use_menu_overlay = (bool) template_get_option('menu_overlay', $in_customizer);
-        if ( !is_front_page() ) $use_menu_overlay = false;
+        // Determine which overlay system to use
+        $use_front_overlay = is_front_page() && (bool) template_get_option('menu_overlay', $in_customizer);
+        $use_inner_overlay = !is_front_page() && (bool) template_get_option('nav_overlay_menu', $in_customizer);
+        $use_any_overlay = $use_front_overlay || $use_inner_overlay;
 
-        // Non-front page navigation overlay (new functionality)  
-        $use_nav_overlay = (bool) template_get_option('nav_overlay_menu', $in_customizer);
-        if ( is_front_page() ) $use_nav_overlay = false;
-
-        // Logo positioning classes
+        // Logo positioning classes - always add logo-left when any overlay is active
         $logo_classes = array();
         if ($add_user_nav) {
             $logo_classes[] = 'user-nav';
         }
-        if ($use_nav_overlay) {
+        if ($use_any_overlay) {
             $logo_classes[] = 'logo-left';
         }
         $logo_class_attr = !empty($logo_classes) ? ' class="' . implode(' ', $logo_classes) . '"' : '';
     ?>
 
-    <header <?php if ($use_menu_overlay):?>
+    <header>
+        <div id="nav-bar"<?php echo $user_nav_attr; ?>
+            <?php if ($use_any_overlay):?>
                 class="element-disable"
-            <?php endif; ?>>
-        <div id="nav-bar"<?php echo $user_nav_attr; ?>></div>
+            <?php endif; ?>></div>
 
         <div id="logo-name"<?php echo $logo_class_attr; ?>>
             <div id="site-logo">
@@ -70,9 +68,9 @@
         </div>
     </header>
 
-    <!-- Front Page Overlay Menu System -->
-    <?php if ($use_menu_overlay): ?>
-        <div id="overlay-menu-container">
+    <!-- Consolidated Overlay Menu System -->
+    <?php if ($use_any_overlay): ?>
+        <div id="overlay-menu-container" class="<?php echo $use_front_overlay ? 'front-page' : 'inner-page'; ?><?php echo $add_user_nav ? ' user-nav' : ''; ?>">
             <nav id="overlay-nav">
                 <?php
                     wp_nav_menu( array(
@@ -86,23 +84,7 @@
         </div>
     <?php endif; ?>
 
-    <!-- Non-Front Page Navigation Overlay System -->
-    <?php if ($use_nav_overlay): ?>
-        <div id="nav-overlay-container">
-            <nav id="nav-overlay-nav">
-                <?php
-                    wp_nav_menu( array(
-                        'theme_location'  => 'website-menu',
-                        'container_class' => 'nav-overlay-wrapper',
-                        'menu_class'      => 'nav-overlay-menu',
-                        'fallback_cb'     => false,
-                    ) );
-                ?>
-            </nav>
-        </div>
-    <?php endif; ?>
-
-    <div <?php if ($use_menu_overlay || $use_nav_overlay):?>
+    <div <?php if ($use_any_overlay):?>
             class="element-disable"
          <?php endif; ?>>
         <img id="hamburger"<?php echo $user_nav_attr; ?>
@@ -110,7 +92,7 @@
              alt="<?php esc_attr_e('Menu'); ?>">
     </div>
 
-    <div <?php if ($use_menu_overlay || $use_nav_overlay):?>
+    <div <?php if ($use_any_overlay):?>
             class="element-disable"
          <?php endif; ?>>
         <img id="close-nav-btn"<?php echo $user_nav_attr; ?>
