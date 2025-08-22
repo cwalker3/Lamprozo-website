@@ -334,7 +334,6 @@
 	/* Explicitly preserve gaps for column layouts */
 	.wp-block-cover:has(.wp-block-columns) {
 		height: auto !important; /* Don't force height on column containers */
-		min-height: auto !important;
 	}
 
 	.height-preset-half {
