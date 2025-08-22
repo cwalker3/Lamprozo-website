@@ -68,11 +68,79 @@
 			$live_option = template_get_option_name($option_key, false);
 			$preview_option = template_get_option_name($option_key, true);
 			
-			add_option($live_option, $config['default']);
-			add_option($preview_option, $config['default']);
+			update_option($live_option, $config['default']);
+			update_option($preview_option, $config['default']);
 		}
 	}
 	add_action('after_switch_theme', 'template_set_defaults');
+
+	/**
+	 * Reset preview values to match live values when customizer loads
+	 */
+	function template_reset_preview_values_on_customizer_load() {
+		// Only run in customizer
+		if (!(isset($_GET['customize_messenger_channel']) ||
+			isset($_GET['customize_changeset_uuid']) ||
+			( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' ))) {
+			return;
+		}
+		
+		// Reset preview values to match live values
+		$options_config = template_get_options_config();
+		
+		foreach ($options_config as $option_key => $config) {
+			$live_value = template_get_option($option_key, false);
+			template_set_option_preview($option_key, $live_value);
+		}
+	}
+	add_action('customize_controls_init', 'template_reset_preview_values_on_customizer_load');
+
+	/**
+	 * Add template-specific customizer controls
+	 */
+	function template_customize_register($wp_customize) {
+		$options_config = template_get_options_config();
+		
+		foreach ($options_config as $option_key => $config) {
+			$setting_id = 'template_' . $option_key;
+			
+			// Get the current LIVE value (not preview)
+			$current_live_value = template_get_option($option_key, false);
+			
+			// Add setting
+			$wp_customize->add_setting($setting_id, array(
+				'default' => $current_live_value,
+				'transport' => 'postMessage',
+				'sanitize_callback' => isset($config['sanitize_callback']) ? $config['sanitize_callback'] : 'sanitize_text_field'
+			));
+
+			// Force the customizer to use the live value, not any cached preview
+			$wp_customize->set_post_value($setting_id, $current_live_value);
+
+			// Prepare control args
+			$control_args = array(
+				'label' => $config['label'],
+				'section' => $config['section'],
+				'type' => $config['type'],
+				'priority' => isset($config['priority']) ? $config['priority'] : 10
+			);
+			
+			if (isset($config['description'])) {
+				$control_args['description'] = $config['description'];
+			}
+			
+			if (isset($config['choices'])) {
+				$control_args['choices'] = $config['choices'];
+			}
+			
+			if (isset($config['input_attrs'])) {
+				$control_args['input_attrs'] = $config['input_attrs'];
+			}
+
+			$wp_customize->add_control($setting_id, $control_args);
+		}
+	}
+	add_action('customize_register', 'template_customize_register', 20);
 
 	/**
 	 * Get current option value (live or preview)
@@ -161,51 +229,6 @@
 	}
 
 	/**
-	 * Add template-specific customizer controls
-	 */
-	function template_customize_register($wp_customize) {
-		$options_config = template_get_options_config();
-		
-		foreach ($options_config as $option_key => $config) {
-			$setting_id = 'template_' . $option_key;
-			
-			// Add setting - use LIVE value as default
-			$wp_customize->add_setting($setting_id, array(
-				'default' => template_get_option($option_key),
-				'transport' => 'postMessage',
-				'sanitize_callback' => isset($config['sanitize_callback']) ? $config['sanitize_callback'] : 'sanitize_text_field'
-			));
-
-			// Prepare control args
-			$control_args = array(
-				'label' => $config['label'],
-				'section' => $config['section'],
-				'type' => $config['type'],
-				'priority' => isset($config['priority']) ? $config['priority'] : 10
-			);
-			
-			// Add description if provided
-			if (isset($config['description'])) {
-				$control_args['description'] = $config['description'];
-			}
-			
-			// Add choices for select/radio types
-			if (isset($config['choices'])) {
-				$control_args['choices'] = $config['choices'];
-			}
-			
-			// Add input_attrs if provided
-			if (isset($config['input_attrs'])) {
-				$control_args['input_attrs'] = $config['input_attrs'];
-			}
-
-			// Add control
-			$wp_customize->add_control($setting_id, $control_args);
-		}
-	}
-	add_action('customize_register', 'template_customize_register', 20); // Later priority to ensure theme sections exist
-
-	/**
 	 * Handle customizer publish - save all template option changes
 	 */
 	function template_customize_save_after($wp_customize) {
@@ -249,23 +272,6 @@
 		}
 		
 		return $options;
-	}
-
-	function template_reset_preview_values_on_customizer_load() {
-		// Only run in customizer
-		if (!(isset($_GET['customize_messenger_channel']) ||
-			isset($_GET['customize_changeset_uuid']) ||
-			( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' ))) {
-			return; // EXIT when NOT in customizer
-		}
-		
-		// Reset happens when IN customizer
-		$options_config = template_get_options_config();
-		
-		foreach ($options_config as $option_key => $config) {
-			$live_value = template_get_option($option_key, false);
-			template_set_option_preview($option_key, $live_value);
-		}
 	}
 
 	// Customizer from template
