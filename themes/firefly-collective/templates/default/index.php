@@ -62,15 +62,20 @@
     get_header(null, $template_vars);
 
     if ($postID && is_null($view)) {
-        $title = !is_front_page() ? '<h1>' . esc_html($pageTitle) . '</h1>' : '';
-        echo $title . $featuredImgHTML . apply_filters('the_content', $content);
+        echo apply_filters('the_content', $content);
     } else {
         $view = sanitize_file_name($view ?: '404');
         $view_path = get_template_directory() . '/templates/' . '/' . $active_template . '/views/' . $view . '.php';
         if (!file_exists($view_path)) {
             $view_path = $template_path . '/views/404.php';
         }
-        include $view_path;
+        ?>
+        <div id="view-content">
+            <?php
+                include $view_path;
+            ?>
+        </div>
+        <?php
     }
 
     get_footer(null, $template_vars);

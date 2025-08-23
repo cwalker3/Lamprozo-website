@@ -35,6 +35,7 @@
 		// If newly created, add all pages
 		if ($new_menu) {
 			foreach ($page_ids as $slug => $page_id) {
+				if ($slug === 'template') continue; // Skip template
 				wp_update_nav_menu_item($menu_id, 0, array(
 					'menu-item-title'     => $pages[$slug]['title'],
 					'menu-item-object'    => 'page',

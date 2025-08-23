@@ -6,9 +6,10 @@
 	function get_theme_pages_structure() {
 		global $active_template;
 
-        $landing_page_style = firefly_collective_get_landing_style();
-        $landing_page_contents = file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/landing.html');
-		$landing_page_contents .= file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/landing-secondary.html');
+        $landing_page_style 	 =  firefly_collective_get_landing_style();
+        $landing_page_contents   =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing.html');
+		$landing_page_contents   .= file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing-secondary.html');
+		$template_page_contents  =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/template.html');
 
 		return array(
 			'home'              => array('title' => 'Home',             'content' => $landing_page_contents),
@@ -18,6 +19,7 @@
 			'signup'            => array('title' => 'Signup',           'content' => 'This is the signup page.'),
 			'order-history'     => array('title' => 'Order History',    'content' => 'This is the order history page.'),
 			'dashboard'         => array('title' => 'Dashboard',        'content' => 'This is the dashboard page.'),
+			'template'          => array('title' => 'Template',        	'content' => $template_page_contents),
 		);
 	}
 

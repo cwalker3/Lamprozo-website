@@ -22,7 +22,7 @@
 
         switch($view) {
             case '':
-                $assets['css'][]    = $template_path . '/assets/css/landing.css';
+                // Front page only
                 break;
 
             case 'blog':

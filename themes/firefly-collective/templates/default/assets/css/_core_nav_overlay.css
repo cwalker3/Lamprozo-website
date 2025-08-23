@@ -1,7 +1,6 @@
 /* theme/assets/css/_core_nav_overlay.css */
 
 body > header {
-    z-index: 3;
     pointer-events: none;
 }
 
