@@ -87,6 +87,20 @@
 		// Get template options from localized data
 		var templateOptions = customizeData.template_options || [];
 		
+		// Set initial values for CSS options from server
+		if (customizeData.css_option_values) {
+			Object.keys(customizeData.css_option_values).forEach(function(optionKey) {
+				var settingId = 'template_' + optionKey;
+				var setting = wp.customize(settingId);
+				var serverValue = customizeData.css_option_values[optionKey];
+				
+				if (setting && serverValue) {
+					// Set the customizer setting to match the server preview value
+					setting.set(serverValue);
+				}
+			});
+		}
+		
 		// Store original live values
 		setTimeout(function() {
 			templateOptions.forEach(function(optionKey) {
@@ -123,6 +137,12 @@
 					})
 					.then(data => {
 						if (data.success) {
+							// CRITICAL: Ensure the customizer setting is synced with the value
+							// This prevents the publish issue where post_value was wrong
+							if (setting.get() !== newValue) {
+								console.log('Syncing customizer setting:', settingId, 'to value:', newValue);
+								setting.set(newValue);
+							}
 							
 							// Check if template options have changed and update publish button
 							checkTemplateOptionsChanged();

@@ -17,7 +17,7 @@ html,
 body {
     position: relative;
     overflow-x: hidden;
-    background-color: white;
+    background-color: var(--backgroundColor);
     color: var(--mainTextColor);
     min-height: 100vh;
 }
