@@ -300,13 +300,13 @@
         $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         
         $wp_customize->add_setting('firefly_collective_template_selector', array(
-            'default' => firefly_collective_get_landing_style_preview(),
+            'default' => $current_live_template,
             'transport' => 'postMessage',
             'sanitize_callback' => 'sanitize_file_name'
         ));
         
         // Set the current value to always be the live template
-        $wp_customize->set_post_value('firefly_collective_template_selector', firefly_collective_get_landing_style_preview());
+        $wp_customize->set_post_value('firefly_collective_template_selector', $current_live_template);
         
         // Get available templates for dropdown
         $templates = firefly_collective_get_available_templates();
