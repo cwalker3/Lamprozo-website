@@ -7,10 +7,10 @@ body > header,
 }
 
 body > header {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
-    z-index: 2;
+    z-index: 3;
 }
 
 #nav-bar {
@@ -40,6 +40,10 @@ body > header {
 	transition: all 0.3s ease; /* Smooth transition for position changes */
 }
 
+#logo-name.logo-left.front-page {
+	position: absolute !important;
+}
+
 #logo-name img {
 	max-height: 5vh;
 	width: auto;
@@ -50,7 +54,6 @@ body > header {
 	align-self: center;
 }
 
-body > header,
 .user-nav,
 #nav-bar.user-nav {
 	margin-top: 32px;
@@ -230,7 +233,7 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.9);
 	position: fixed;
-	z-index: 3;
+	z-index: 4;
 	animation: 0.5s fadeIn forwards;
 }
 

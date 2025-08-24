@@ -33,15 +33,19 @@
             ( isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' )
         );
 
-        $add_user_nav   = $is_logged_in && $no_auth_cookie && ! $in_customizer;
-
-        $user_nav_attr = $add_user_nav ? ' class="user-nav"' : '';
         $theme_path    = isset($args['theme-path']) ? $args['theme-path'] : get_stylesheet_directory_uri();
 
         // Determine which overlay system to use
         $use_front_overlay = is_front_page() && (bool) template_get_option('menu_overlay', $in_customizer);
         $use_inner_overlay = !is_front_page() && (bool) template_get_option('nav_overlay_menu', $in_customizer);
         $use_any_overlay = $use_front_overlay || $use_inner_overlay;
+
+        $element_disabled_class = '';
+        $navbar_attr = 'class="';
+        if ( $use_any_overlay || !is_front_page() ) $navbar_attr .= ' element-disable';
+        $add_user_nav   = $is_logged_in && $no_auth_cookie && ! $in_customizer;
+        if ($add_user_nav) $navbar_attr .= ' user-nav';
+        $navbar_attr .= '"';
 
         // Logo positioning classes - always add logo-left when any overlay is active
         $logo_classes = array();
@@ -51,14 +55,14 @@
         if ($use_any_overlay) {
             $logo_classes[] = 'logo-left';
         }
+        if ( is_front_page() ) {
+            $logo_classes[] = 'front-page';
+        }
         $logo_class_attr = !empty($logo_classes) ? ' class="' . implode(' ', $logo_classes) . '"' : '';
     ?>
 
     <header>
-        <div id="nav-bar"<?php echo $user_nav_attr; ?>
-            <?php if ($use_any_overlay):?>
-                class="element-disable"
-            <?php endif; ?>></div>
+        <div id="nav-bar"<?php echo $navbar_attr; ?>></div>
 
         <div id="logo-name"<?php echo $logo_class_attr; ?>>
             <div id="site-logo">
