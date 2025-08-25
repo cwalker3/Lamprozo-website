@@ -385,18 +385,68 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const formUnlimited = campaign.unlimited === true || campaign.unlimited === 1 || campaign.unlimited === "1";
                 
-                // Create completely new form object
-                const newForm = {
-                    name: campaign.name || '',
-                    start_date: campaign.start_date || '',
-                    end_date: campaign.end_date || '',
-                    unlimited: formUnlimited,
-                    features_config: JSON.parse(JSON.stringify(campaign.features_config || {})),
-                    preselect_config: JSON.parse(JSON.stringify(campaign.preselect_config || {}))
-                };
+                // First initialize a clean form structure
+                this.initializeFormData();
                 
-                // Assign the new form and show it
-                this.campaignForm = newForm;
+                // Then overlay the campaign data on top of the initialized structure
+                this.campaignForm.name = campaign.name || '';
+                this.campaignForm.start_date = campaign.start_date || '';
+                this.campaignForm.end_date = campaign.end_date || '';
+                this.campaignForm.unlimited = formUnlimited;
+                
+                // Merge features_config - overlay campaign data onto initialized structure
+                if (campaign.features_config) {
+                    Object.keys(campaign.features_config).forEach(featureId => {
+                        const campaignFeatureConfig = campaign.features_config[featureId];
+                        if (this.campaignForm.features_config[featureId] && campaignFeatureConfig) {
+                            // Set feature show state
+                            if (typeof campaignFeatureConfig.show !== 'undefined') {
+                                this.campaignForm.features_config[featureId].show = campaignFeatureConfig.show;
+                            }
+                            
+                            // Merge options
+                            if (campaignFeatureConfig.options) {
+                                Object.keys(campaignFeatureConfig.options).forEach(optionId => {
+                                    const campaignOptionConfig = campaignFeatureConfig.options[optionId];
+                                    if (this.campaignForm.features_config[featureId].options[optionId] && campaignOptionConfig) {
+                                        // Set option show state
+                                        if (typeof campaignOptionConfig.show !== 'undefined') {
+                                            this.campaignForm.features_config[featureId].options[optionId].show = campaignOptionConfig.show;
+                                        }
+                                        
+                                        // Merge addons
+                                        if (campaignOptionConfig.addons) {
+                                            Object.keys(campaignOptionConfig.addons).forEach(addonId => {
+                                                if (typeof this.campaignForm.features_config[featureId].options[optionId].addons[addonId] !== 'undefined') {
+                                                    this.campaignForm.features_config[featureId].options[optionId].addons[addonId] = campaignOptionConfig.addons[addonId];
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                // Merge preselect_config - overlay campaign data onto initialized structure  
+                if (campaign.preselect_config) {
+                    Object.keys(campaign.preselect_config).forEach(featureId => {
+                        const campaignPreselectConfig = campaign.preselect_config[featureId];
+                        if (this.campaignForm.preselect_config[featureId] && campaignPreselectConfig) {
+                            if (campaignPreselectConfig.selectedOption) {
+                                this.campaignForm.preselect_config[featureId].selectedOption = campaignPreselectConfig.selectedOption;
+                            }
+                            if (Array.isArray(campaignPreselectConfig.selectedAddons)) {
+                                this.campaignForm.preselect_config[featureId].selectedAddons = [...campaignPreselectConfig.selectedAddons];
+                            }
+                            if (campaignPreselectConfig.quantity) {
+                                this.campaignForm.preselect_config[featureId].quantity = campaignPreselectConfig.quantity;
+                            }
+                        }
+                    });
+                }
+                
                 this.showCreateForm = true;
                 
                 // Scroll after Vue renders the form
