@@ -1324,7 +1324,171 @@ td .feature-fields-list {
     opacity: 0.7;
 }
 
+.account-creation-options {
+    margin-top: 15px;
+}
+
+.google-signin-option {
+    margin-bottom: 20px;
+}
+
+.google-signin-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.google-signin-button:hover {
+    background-color: #3367d6;
+}
+
+.google-signin-button:active {
+    background-color: #2d5aa0;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #ddd;
+}
+
+.auth-divider span {
+    padding: 0 15px;
+    color: #666;
+    font-size: 14px;
+    background: white;
+}
+
+.account-fields {
+    transition: all 0.3s ease;
+}
+
+.account-fields.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.google-account-status {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background-color: #e8f5e8;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.google-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background-color: #4caf50;
+    color: white;
+    border-radius: 50%;
+    margin-right: 12px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.google-account-status strong {
+    color: #2e7d32;
+}
+
+/* Account required notice styling */
+.account-required-notice {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 20px;
+    color: #856404;
+    font-size: 14px;
+}
+
+/* Ensure consistent spacing for anonymous form fields */
+.anon-field {
+    margin-bottom: 15px;
+}
+
+.anon-field input,
+.anon-field select,
+.anon-field textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.anon-field input:focus,
+.anon-field select:focus,
+.anon-field textarea:focus {
+    outline: none;
+    border-color: #4285f4;
+    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 16px;
+}
+
+.password-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
 /* Responsive adjustments */
+@media (max-width: 768px) {
+    .auth-divider span {
+        padding: 0 10px;
+        font-size: 13px;
+    }
+    
+    .google-signin-button {
+        font-size: 15px;
+        padding: 11px 14px;
+    }
+    
+    .account-required-notice {
+        font-size: 13px;
+        padding: 10px;
+    }
+}
+
 @media (min-width: 800px) {
     #profile-container,
     #price-calculator,

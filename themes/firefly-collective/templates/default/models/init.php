@@ -168,6 +168,9 @@
                         'preselect_config' => json_decode($campaign->preselect_config, true)
                     );
                 }
+
+                // Enqueue auth.js
+                wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $unique_id, true);
             }
 
             $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
@@ -258,29 +261,6 @@
         add_filter('comments_open', 'disable_all_comments', 10, 2);
     }
     add_action('init', 'disable_comments');
-
-    add_action('login_init', function() {
-        $theme_path = get_template_directory_uri();
-        $active_template = firefly_collective_get_active_template();
-        $nonce = wp_create_nonce('wp_rest');
-        
-        $template_path =  get_template_directory_uri() . '/templates/' . $active_template;
-        
-        // CSS: handle, src, deps(array), ver, media
-        wp_enqueue_style(
-            'auth-css',
-            $template_path . '/assets/css/auth.css',
-            array(),
-            $nonce,
-            'all'
-        );
-        wp_enqueue_script('template-main-js', $template_path . '/assets/js/_core_main.js', array(), $nonce, true);
-        wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $nonce, true);
-        wp_localize_script('auth-js', 'myApi', array(
-            'nonce'     => $nonce,
-            'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
-        ));
-    });
 
     // Remove 'jquery-migrate' as a dependency of WordPress' jQuery
     add_action('wp_default_scripts', function ($scripts) {

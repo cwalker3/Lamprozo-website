@@ -1,4 +1,4 @@
-// theme/assets/js/main.js
+// theme/assets/js/_core_main.js
 
 const appRoot = document.querySelector('#app-root');
 const websiteApp = document.querySelector('#website-app');

@@ -141,16 +141,37 @@
                                 <strong>Account Required:</strong> Subscription services require an account for management and billing.
                             </div>
                             
-                            <div class="account-fields">
-                                <div class="anon-field">
-                                    <input type="text" id="anon-username" placeholder="Username (required)" autocomplete="username">
-                                    <div id="username-error" style="color: red; display: none; margin-top: 3px; font-size: 12px;"></div>
-                                </div>
-                                <div class="anon-field password-field">
-                                    <input type="password" id="anon-password" placeholder="Password (required)" autocomplete="new-password">
-                                    <button type="button" class="password-toggle" id="password-toggle">
-                                        <span class="password-eye">👁️</span>
+                            <!-- Google Sign-in Option -->
+                            <div class="account-creation-options">
+                                <div class="google-signin-option">
+                                    <button type="button" id="campaign-google-signin" class="google-signin-button">
+                                        Sign in with Google
                                     </button>
+                                    <div class="auth-divider">
+                                        <span>or</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Username/Password Fields -->
+                                <div class="account-fields" id="manual-account-fields">
+                                    <div class="anon-field">
+                                        <input type="text" id="anon-username" placeholder="Username (required)" autocomplete="username">
+                                        <div id="username-error" style="color: red; display: none; margin-top: 3px; font-size: 12px;"></div>
+                                    </div>
+                                    <div class="anon-field password-field">
+                                        <input type="password" id="anon-password" placeholder="Password (required)" autocomplete="new-password">
+                                        <button type="button" class="password-toggle" id="password-toggle">
+                                            <span class="password-eye">👁️</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Google Account Linked Status (hidden initially) -->
+                                <div id="google-account-linked" style="display: none;">
+                                    <div class="google-account-status">
+                                        <span class="google-icon">✓</span>
+                                        <span>Google account linked: <strong id="linked-email"></strong></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -159,7 +180,7 @@
                 
                 // Insert the form after the campaign notice
                 campaignHead.insertAdjacentHTML('afterend', anonFormHTML);
-                
+
                 // Form interaction handlers
                 const emailInput = document.getElementById('anon-email');
                 const emailError = document.getElementById('anon-email-error');
@@ -168,7 +189,11 @@
                 const passwordToggle = document.getElementById('password-toggle');
                 const usernameError = document.getElementById('username-error');
                 const accountSection = document.getElementById('account-required-section');
-                
+                const googleSigninBtn = document.getElementById('campaign-google-signin');
+                const manualAccountFields = document.getElementById('manual-account-fields');
+                const googleLinkedSection = document.getElementById('google-account-linked');
+                const linkedEmailSpan = document.getElementById('linked-email');
+
                 // Function to check if current selections have recurring features
                 function hasRecurringFeatures() {
                     for (const [fIdx, instances] of Object.entries(selections)) {
@@ -198,8 +223,82 @@
                     
                     updateOrderButton();
                 }
+
+                // Google Sign-in handler
+                googleSigninBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Set campaign mode flag for auth.js
+                    window.campaignMode = true;
+                    
+                    // Trigger existing Google auth
+                    const width = 500;
+                    const height = 600;
+                    const left = (screen.width - width) / 2;
+                    const top = (screen.height - height) / 2;
+                    
+                    const gapiEndpoint = myApi.gapiDomain || 'https://' + window.location.hostname;
+                    window.open(
+                        `${gapiEndpoint}/wp-json/custom-api/v1/google-auth-init`,
+                        'google-signin',
+                        `width=${width},height=${height},left=${left},top=${top}`
+                    );
+                });
+
+                // Function to handle successful Google authentication
+                window.handleCampaignGoogleSuccess = function(authData) {
+                    googleAuthData = authData;
+                    
+                    // Update UI to show linked account
+                    manualAccountFields.style.display = 'none';
+                    googleLinkedSection.style.display = 'block';
+                    linkedEmailSpan.textContent = authData.email || 'Unknown email';
+                    
+                    // Disable the Google sign-in button
+                    googleSigninBtn.disabled = true;
+                    googleSigninBtn.style.opacity = '0.6';
+                    googleSigninBtn.style.cursor = 'not-allowed';
+                    googleSigninBtn.textContent = 'Google Account Linked';
+                    
+                    // Disable contact form fields since info comes from Google
+                    const contactFields = ['anon-firstName', 'anon-lastName', 'anon-email', 'anon-phone'];
+                    contactFields.forEach(fieldId => {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            field.disabled = true;
+                            field.style.opacity = '0.6';
+                            field.style.backgroundColor = '#f5f5f5';
+                        }
+                    });
+                    
+                    // Add a note about disabled fields
+                    const contactNote = document.createElement('div');
+                    contactNote.id = 'contact-fields-note';
+                    contactNote.style.cssText = `
+                        background: #e8f5e8;
+                        border: 1px solid #4caf50;
+                        border-radius: 4px;
+                        padding: 10px;
+                        margin-bottom: 15px;
+                        color: #2e7d32;
+                        font-size: 14px;
+                    `;
+                    contactNote.innerHTML = '<strong>Note:</strong> Contact information will be automatically filled from your Google account.';
+                    
+                    // Insert after the contact information heading
+                    const contactHeading = document.querySelector('#anonymous-user-form h3');
+                    if (contactHeading && contactHeading.nextSibling) {
+                        contactHeading.parentNode.insertBefore(contactNote, contactHeading.nextSibling);
+                    }
+                    
+                    // Set the auth_id for order processing
+                    window.auth_id = authData.auth_id;
+                    
+                    // Update order button
+                    updateOrderButton();
+                };
                 
-                // Email validation (enhanced for account creation)
+                // Email validation
                 async function validateEmail() {
                     const email = emailInput.value.trim();
                     const isValidFormat = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -211,8 +310,8 @@
                         return false;
                     }
                     
-                    // Check if email exists only when account creation is required
-                    if (isValidFormat && hasRecurringFeatures()) {
+                    // Only check email exists if we need manual account creation and Google isn't linked
+                    if (isValidFormat && hasRecurringFeatures() && !googleAuthData) {
                         try {
                             const response = await fetch(`${myApi.api_url}check-email?email=${encodeURIComponent(email)}`);
                             const data = await response.json();
@@ -235,6 +334,11 @@
                 
                 // Username validation
                 async function validateUsername() {
+                    // Skip validation if Google is linked
+                    if (googleAuthData) {
+                        return true;
+                    }
+                    
                     const username = usernameField.value.trim();
                     if (!username) {
                         usernameError.style.display = 'none';
@@ -309,6 +413,9 @@
 
         // Keeps track of mode
         let estimateMode = false;
+
+        // Store Google auth state
+        let googleAuthData = null;
 
         // Check for corrupt or invalid session data and clean it
         try {
@@ -652,28 +759,40 @@
                 }
                 
                 if (hasRecurringFeatures) {
-                    const username = document.getElementById('anon-username')?.value.trim() || '';
-                    const password = document.getElementById('anon-password')?.value.trim() || '';
-                    
-                    if (!username || !password) {
-                        hideLoadingOverlay(overlay);
-                        alert('Username and password are required for subscription services.');
-                        const btn = document.getElementById('pay-now');
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.textContent = 'Place Order';
+                    // Check if we have Google authentication
+                    if (googleAuthData && googleAuthData.auth_id) {
+                        // Use Google authentication
+                        anonUser.createAccount = true;
+                        anonUser.signupMethod = 'google';
+                        anonUser.googleAuthId = googleAuthData.auth_id;
+                        
+                        // Override auth_id for this order
+                        window.auth_id = googleAuthData.auth_id;
+                    } else {
+                        // Use username/password authentication (existing logic)
+                        const username = document.getElementById('anon-username')?.value.trim() || '';
+                        const password = document.getElementById('anon-password')?.value.trim() || '';
+                        
+                        if (!username || !password) {
+                            hideLoadingOverlay(overlay);
+                            alert('Username and password are required for subscription services.');
+                            const btn = document.getElementById('pay-now');
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.textContent = 'Place Order';
+                            }
+                            return;
                         }
-                        return;
+                        
+                        anonUser.createAccount = true;
+                        anonUser.signupMethod = 'username';
+                        anonUser.username = username;
+                        anonUser.password = password;
                     }
-                    
-                    anonUser.createAccount = true;
-                    anonUser.signupMethod = 'username';
-                    anonUser.username = username;
-                    anonUser.password = password;
                 }
             }
 
-            // Build payload
+            // Build payload (rest remains the same)
             const orderData = { items: orderItems };
             if (window.auth_id) {
                 orderData.auth_id = window.auth_id;
@@ -777,7 +896,7 @@
                 return;
             }
 
-            // PRIORITY 0: Check if there are any valid selections - ADD THIS BLOCK
+            // Check if there are any valid selections
             if (!hasValidSelections()) {
                 btn.textContent = 'Select Items to Continue';
                 btn.disabled = true;
@@ -792,24 +911,9 @@
                 const email = emailInput?.value.trim() || '';
                 const isValidEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
                 
-                // Function to check if current selections have recurring features
-                function hasRecurringFeatures() {
-                    for (const [fIdx, instances] of Object.entries(selections)) {
-                        for (const instance of instances) {
-                            if (instance.optionIndex !== undefined) {
-                                const feature = dashboardData.features[fIdx];
-                                if (feature && feature.recurring) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                    return false;
-                }
-                
                 const hasRecurring = hasRecurringFeatures();
                 
-                // PRIORITY 1: If has recurring features, focus on account setup
+                // PRIORITY 1: If has recurring features, check account setup
                 if (hasRecurring) {
                     // First check if email is provided and valid
                     if (!isValidEmail) {
@@ -819,24 +923,36 @@
                         return;
                     }
                     
-                    // Then check username and password
-                    const username = document.getElementById('anon-username')?.value.trim() || '';
-                    const password = document.getElementById('anon-password')?.value.trim() || '';
-                    const usernameError = document.getElementById('username-error');
-                    const emailError = document.getElementById('anon-email-error');
-                    
-                    if (!username || !password) {
-                        btn.textContent = 'Complete Account Setup';
-                        btn.disabled = true;
-                        btn.style.opacity = '0.5';
-                        return;
-                    }
-                    
-                    if (usernameError?.style.display === 'block' || emailError?.style.display === 'block') {
-                        btn.textContent = 'Fix Validation Errors';
-                        btn.disabled = true;
-                        btn.style.opacity = '0.5';
-                        return;
+                    // Check if we have either Google auth OR username/password
+                    if (googleAuthData) {
+                        // Google authentication is complete
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                    } else {
+                        // Check username and password for manual creation
+                        const username = document.getElementById('anon-username')?.value.trim() || '';
+                        const password = document.getElementById('anon-password')?.value.trim() || '';
+                        const usernameError = document.getElementById('username-error');
+                        const emailError = document.getElementById('anon-email-error');
+                        
+                        if (!username || !password) {
+                            btn.textContent = 'Complete Account Setup';
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            return;
+                        }
+                        
+                        if (usernameError?.style.display === 'block' || emailError?.style.display === 'block') {
+                            btn.textContent = 'Fix Validation Errors';
+                            btn.disabled = true;
+                            btn.style.opacity = '0.5';
+                            return;
+                        }
+                        
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
                     }
                 }
                 // PRIORITY 2: No recurring features, just need email
@@ -847,45 +963,42 @@
                         btn.style.opacity = '0.5';
                         return;
                     }
+                    
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
                 }
-                
-                // All validations passed
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer'; // ADD THIS LINE
             }
 
-            // Rest of existing logic...
+            // Rest of existing logic for order states...
             if (hasValidOrder() && !isOrderPaid()) {
                 btn.textContent = 'Pay Now';
-                btn.disabled = false; // ADD THIS LINE
-                btn.style.opacity = '1'; // ADD THIS LINE
-                btn.style.cursor = 'pointer'; // ADD THIS LINE
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
                 btn.onclick = function(e) {
                     e.preventDefault();
                     initializeStripePayment();
                 };
             } else if (estimateMode) {
                 btn.textContent = 'Request Estimate';
-                btn.disabled = false; // ADD THIS LINE
-                btn.style.opacity = '1'; // ADD THIS LINE
-                btn.style.cursor = 'pointer'; // ADD THIS LINE
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
                 btn.onclick = function(e) {
                     e.preventDefault();
                     alert('Estimate request functionality coming soon!');
                 };
             } else {
                 btn.textContent = 'Place Order';
-                btn.disabled = false; // ADD THIS LINE
-                btn.style.opacity = '1'; // ADD THIS LINE
-                btn.style.cursor = 'pointer'; // ADD THIS LINE
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
                 btn.onclick = function(e) {
                     e.preventDefault();
-                    // Prevent double submission
                     if (btn.disabled) return;
                     btn.disabled = true;
                     btn.textContent = 'Processing...';
-                    
                     showOrderConfirmation();
                 };
             }
@@ -3315,7 +3428,7 @@
                 payNowBtn.textContent = 'Pay Now';
             }
         }
-        
+
         // Update order status after successful payment
         async function updateOrderAfterPayment(paymentIntent) {
             const orderData = sessionStorage.getItem('placedOrder');
@@ -3374,7 +3487,36 @@
                     orderInfo.paidAt = new Date().toISOString();
                     sessionStorage.setItem('placedOrder', JSON.stringify(orderInfo));
                     
-                    // Show success UI - ADD THIS LINE
+                    // If this was a campaign order with account creation, show account message
+                    if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
+                        setTimeout(() => {
+                            const accountMessage = document.createElement('div');
+                            accountMessage.style.cssText = `
+                                position: fixed;
+                                top: 80px;
+                                right: 20px;
+                                background: #2196F3;
+                                color: white;
+                                padding: 15px 20px;
+                                border-radius: 4px;
+                                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                                z-index: 10000;
+                                max-width: 300px;
+                            `;
+                            accountMessage.innerHTML = `
+                                <strong>Account Created!</strong><br>
+                                Your account is now set up. You can access your full dashboard anytime by logging in with Google.
+                            `;
+                            document.body.appendChild(accountMessage);
+                            
+                            // Remove message after 8 seconds
+                            setTimeout(() => {
+                                accountMessage.remove();
+                            }, 8000);
+                        }, 2000);
+                    }
+
+                    // Show success UI
                     showPaymentSuccess();
                 } else {
                     console.error('Failed to update order status:', data);
@@ -3430,11 +3572,44 @@
             const successContainer = document.createElement('div');
             successContainer.id = 'payment-success-container';
             successContainer.style.marginBottom = '20px';
-            successContainer.innerHTML = `
+            
+            // Different messages for campaign vs regular orders
+            let successMessage = `
                 <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
                     <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
                     <p style="margin: 0;">Your order has been paid. Thank you for your purchase!</p>
                 </div>
+            `;
+            
+            let buttonText = 'Start a New Order';
+            let buttonAction = () => {
+                // Clear the session storage
+                sessionStorage.removeItem('placedOrder');
+                sessionStorage.removeItem('priceCalcSelections');
+                
+                // If this was a campaign order, redirect to login page so they can access full dashboard
+                if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
+                    window.location.href = '/ffc-login'; // Use your custom login slug
+                } else {
+                    // Regular flow - reload page
+                    window.location.reload();
+                }
+            };
+            
+            // If this was a campaign order with account creation
+            if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
+                successMessage = `
+                    <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
+                        <p style="margin: 0 0 10px 0;">Your order has been paid and your account has been created!</p>
+                        <p style="margin: 0; font-size: 14px;">You can now access your full dashboard anytime by logging in with Google.</p>
+                    </div>
+                `;
+                buttonText = 'Go to Login Page';
+            }
+            
+            successContainer.innerHTML = `
+                ${successMessage}
                 <button id="start-new-order" style="
                     display: block;
                     width: 100%;
@@ -3447,7 +3622,7 @@
                     font-weight: bold;
                     cursor: pointer;
                 ">
-                    Start a New Order
+                    ${buttonText}
                 </button>
             `;
             
@@ -3457,14 +3632,7 @@
                 payNowBtn.style.display = 'none';
                 
                 // Add event listener to new order button
-                document.getElementById('start-new-order').addEventListener('click', function() {
-                    // Clear the session storage
-                    sessionStorage.removeItem('placedOrder');
-                    sessionStorage.removeItem('priceCalcSelections');
-                    
-                    // Reload the page to start fresh
-                    window.location.reload();
-                });
+                document.getElementById('start-new-order').addEventListener('click', buttonAction);
             }
         }
 

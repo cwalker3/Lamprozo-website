@@ -454,7 +454,7 @@
     }, 5 );
 
     /**
-     * Clean up expired campaign cookies
+     * Clean up expired campaign cookies and tokens used for successful account creation
      */
     function cleanup_expired_campaign_cookies() {
         if ( empty($_COOKIE['campaign_token']) ) {
@@ -483,8 +483,36 @@
             $token, $now_utc, $now_utc
         ) );
         
-        // If campaign is expired or doesn't exist, remove the cookie
+        $should_remove_cookie = false;
+
+        // Remove if campaign is expired or doesn't exist
         if ( !$valid_campaign ) {
+            $should_remove_cookie = true;
+        } else {
+            // Also check if user has an order tied to this campaign token
+            // Match on userId and campaignToken using the cookie value
+            if (is_user_logged_in()) {
+                $current_user_id = get_current_user_id();
+
+                $account_creation_order = $wpdb->get_var( $wpdb->prepare(
+                    "
+                    SELECT COUNT(*)
+                    FROM {$wpdb->prefix}ffc_orders o
+                    WHERE o.userId = %d
+                    AND o.campaignToken = %s
+                    ",
+                    $current_user_id,
+                    $token
+                ) );
+                
+                if ( $account_creation_order > 0 ) {
+                    $should_remove_cookie = true;
+                }
+            }
+        }
+        
+        // Remove the cookie if needed
+        if ( $should_remove_cookie ) {
             setcookie('campaign_token', '', [
                 'expires'  => time() - 3600,
                 'path'     => '/',
@@ -495,6 +523,7 @@
             unset($_COOKIE['campaign_token']);
         }
     }
+
 
     /**
      * Show campaign error messages on login page
@@ -942,3 +971,26 @@
         }
         return $user_id;
     }, 20 );
+
+    add_action('login_init', function() {
+        $theme_path = get_template_directory_uri();
+        $active_template = firefly_collective_get_active_template();
+        $nonce = wp_create_nonce('wp_rest');
+        
+        $template_path =  get_template_directory_uri() . '/templates/' . $active_template;
+        
+        // CSS: handle, src, deps(array), ver, media
+        wp_enqueue_style(
+            'auth-css',
+            $template_path . '/assets/css/auth.css',
+            array(),
+            $nonce,
+            'all'
+        );
+        wp_enqueue_script('template-main-js', $template_path . '/assets/js/_core_main.js', array(), $nonce, true);
+        wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $nonce, true);
+        wp_localize_script('auth-js', 'myApi', array(
+            'nonce'     => $nonce,
+            'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
+        ));
+    });

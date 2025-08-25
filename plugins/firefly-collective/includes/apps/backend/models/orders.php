@@ -130,6 +130,7 @@
             priceDiscountsInfo                  JSON               DEFAULT NULL,
             refundAmount                        DECIMAL(10,2)      DEFAULT 0.00,
             userData                            JSON               NOT NULL,
+            campaignToken                       VARCHAR(50)        DEFAULT NULL,
             anonUserFirstName                   VARCHAR(255)       DEFAULT NULL,
             anonUserLastName                    VARCHAR(255)       DEFAULT NULL,
             anonUserEmail                       VARCHAR(255)       DEFAULT NULL,
@@ -264,6 +265,9 @@
                 $insert_data['anonUserEmail'] = $anon_data['email'];
                 $insert_data['anonUserPhone'] = $anon_data['phone'];
             }
+
+            // Add campaign token if exists
+            if ($_COOKIE['campaign_token']) $insert_data['campaignToken'] = $_COOKIE['campaign_token'];
             
             $result = $wpdb->insert($wpdb->prefix . 'ffc_orders', $insert_data);
             
