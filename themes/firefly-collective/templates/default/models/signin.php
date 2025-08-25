@@ -393,21 +393,6 @@
             // Use consistent UTC time for comparison
             $now_utc = gmdate('Y-m-d H:i:s');
             
-            // First, let's get the campaign without date restrictions to debug
-            $campaign_debug = $wpdb->get_row( $wpdb->prepare(
-                "SELECT id, name, start_date, end_date, unlimited, token FROM {$wpdb->prefix}ffc_campaigns WHERE token = %s",
-                $token
-            ) );
-            
-            // Log for debugging (remove this after fixing)
-            error_log("Campaign Debug - Token: $token");
-            error_log("Campaign Debug - Current UTC: $now_utc");
-            if ($campaign_debug) {
-                error_log("Campaign Debug - Found campaign: " . print_r($campaign_debug, true));
-            } else {
-                error_log("Campaign Debug - No campaign found for token");
-            }
-            
             // Now check with date validation
             $campaign = $wpdb->get_row( $wpdb->prepare(
                 "
@@ -437,7 +422,6 @@
                 ]);
                 $_COOKIE['campaign_token'] = $token;
                 
-                error_log("Campaign Debug - Valid campaign found, redirecting to dashboard");
                 wp_redirect( home_url('/dashboard') );
                 exit;
             } else {
