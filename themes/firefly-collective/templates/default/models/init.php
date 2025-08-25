@@ -130,6 +130,8 @@
             global $theme_path, $is_campaign_mode;
             $theme_path = get_template_directory_uri();
 
+            $user_id = decrypt_with_auth_key($auth_id);
+
             $is_campaign_mode = !empty($_COOKIE['campaign_token']);
             
             // Get Stripe configuration
@@ -168,6 +170,8 @@
                 }
             }
 
+            $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
+
             wp_localize_script('dashboard-js', 'dashboardData', array(
                 'nonce'                 => $nonce,
                 'features'              => $features_options_addons,
@@ -175,7 +179,8 @@
                 'template_path'         => $template_path,
                 'stripeKey'             => $publishable_key,
                 'subscription_status'   => $subscription_status,
-                'campaign_config'       => $campaign_config
+                'campaign_config'       => $campaign_config,
+                'third_party'           => $third_party
             ));
         }
 

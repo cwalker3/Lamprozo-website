@@ -179,17 +179,18 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function setAppData(data) {
-    window.api_url  = data.api_url;
-    window.nonce    = data.nonce;
-    window.http_host = data.http_host;
-    window.theme_path = data.theme_path;
-    window.template_path = data.template_path;
-    window.app_page_title = data.app_page_title;
-    window.app_page_html = data.app_page_html;
-    window.subscription_status = data.subscription_status;
-    window.active_template = data.active_template;
-    window.template_assets = data.template_assets;
-    window.templateData = data.templateData;
+    window.api_url              = data.api_url;
+    window.nonce                = data.nonce;
+    window.http_host            = data.http_host;
+    window.theme_path           = data.theme_path;
+    window.template_path        = data.template_path;
+    window.app_page_title       = data.app_page_title;
+    window.app_page_html        = data.app_page_html;
+    window.subscription_status  = data.subscription_status;
+    window.active_template      = data.active_template;
+    window.template_assets      = data.template_assets;
+    window.templateData         = data.templateData;
+    window.third_party          = data.templateData;
 
     // Notify service worker of active template
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller && data.active_template) {

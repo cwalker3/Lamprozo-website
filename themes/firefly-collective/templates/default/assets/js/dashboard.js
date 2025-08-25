@@ -30,7 +30,8 @@
                 template_path: window.template_path,
                 features: window.features,
                 stripeKey: window.stripeKey,
-                subscription_status: window.subscription_status
+                subscription_status: window.subscription_status,
+                third_party: window.third_party
             }
         }
 
@@ -4211,6 +4212,14 @@
 
     };
     
+    // Disable password reset if from third party login
+    if (dashboardData.third_party) {
+        const passwordReset = document.querySelector('#reset-password-btn');
+        passwordReset.style.opacity = '0.3';
+        passwordReset.style.pointerEvents = 'none';
+        passwordReset.disabled = true;
+    }
+
     // Reset function to allow re-initialization if needed
     window.resetDashboard = function() {
         isInitialized = false;

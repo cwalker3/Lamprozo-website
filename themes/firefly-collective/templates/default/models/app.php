@@ -78,6 +78,9 @@
         // Get template assets dynamically
         $template_assets = get_template_assets($active_template, $theme_path);
 
+        // Get third party login status
+        $third_party = get_user_meta( $current_user->ID, 'third_party', true ) ?: null;
+
         return rest_ensure_response([
             'success'           => true,
             'menu_html'         => $menu_html,
@@ -91,7 +94,8 @@
             'auth_id'           => $_COOKIE['auth_id'],
             'http_host'         => $http_host,
             'active_template'   => $active_template,
-            'template_assets'   => $template_assets
+            'template_assets'   => $template_assets,
+            'third_party'       => $third_party
         ]);
     }
 
