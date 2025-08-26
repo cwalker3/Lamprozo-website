@@ -2140,7 +2140,30 @@
                 }
             }
 
-            if (!selectedOption.priceOptions) detailsHTML += `<p><strong>Price:</strong> ${optionPriceText}</p>`;
+            // Check if pricingType is set to "price options" before showing dropdown
+            let showPriceOptions = false;
+            if (selectedOption.pricingType) {
+                try {
+                    // Handle both simple string values and complex objects
+                    if (typeof selectedOption.pricingType === 'string') {
+                        // If it's a plain string (from database), use it directly
+                        showPriceOptions = (selectedOption.pricingType === 'price options');
+                    } else if (typeof selectedOption.pricingType === 'object') {
+                        // If it's a complex object (from JSON), parse the structure
+                        const pricingTypeData = selectedOption.pricingType;
+                        if (pricingTypeData.value && pricingTypeData.value.types && pricingTypeData.value.selected !== undefined) {
+                            const selectedType = pricingTypeData.value.types[pricingTypeData.value.selected];
+                            showPriceOptions = (selectedType === 'price options');
+                        }
+                    }
+                } catch(e) {
+                    console.error("Error parsing pricingType:", e);
+                    // Fallback: if there's an error, don't show price options
+                    showPriceOptions = false;
+                }
+            }
+
+            if (!showPriceOptions) detailsHTML += `<p><strong>Price:</strong> ${optionPriceText}</p>`;
             optionDetailsDiv.innerHTML = detailsHTML;
             
             let priceOptionsArray = [];
@@ -2156,9 +2179,9 @@
                     priceOptionsArray = [];
                 }
             }
-            
-            // If we have price options, create a dropdown
-            if (priceOptionsArray && priceOptionsArray.length > 0) {
+
+            // Only show price options dropdown if pricing type is "price options" AND we have options data
+            if (showPriceOptions && priceOptionsArray && priceOptionsArray.length > 0) {
                 const priceOptionDiv = document.createElement('div');
                 priceOptionDiv.classList.add('price-option-selector');
                 priceOptionDiv.style.marginTop = '10px';
@@ -2203,54 +2226,54 @@
                 label.appendChild(select);
                 priceOptionDiv.appendChild(label);
                 optionDetailsDiv.appendChild(priceOptionDiv);
+            }
 
-                // Check for threshold discounts
-                if (selectedOption.thresholdDiscounts) {
-                    try {
-                        let thresholds = [];
-                        if (typeof selectedOption.thresholdDiscounts === 'string') {
-                            thresholds = JSON.parse(selectedOption.thresholdDiscounts);
-                        } else if (selectedOption.thresholdDiscounts.types) {
-                            thresholds = selectedOption.thresholdDiscounts.types;
-                        } else if (Array.isArray(selectedOption.thresholdDiscounts)) {
-                            thresholds = selectedOption.thresholdDiscounts;
-                        }
-                        
-                        if (Array.isArray(thresholds) && thresholds.length > 0 && thresholds.some(t => t.itemCount && t.discount)) {
-                            const discountDiv = document.createElement('div');
-                            discountDiv.className = 'quantity-discounts';
-                            discountDiv.style.marginTop = '(--fontSizeSmallest)';
-                            discountDiv.style.padding = '8px';
-                            discountDiv.style.backgroundColor = '#f8f8f8';
-                            discountDiv.style.borderRadius = '4px';
-                            discountDiv.style.border = '1px solid #e0e0e0';
-                            
-                            const discountTitle = document.createElement('div');
-                            discountTitle.style.fontWeight = 'bold';
-                            discountTitle.style.marginBottom = '6px';
-                            discountTitle.textContent = 'Quantity Discounts Available:';
-                            discountDiv.appendChild(discountTitle);
-                            
-                            const discountList = document.createElement('ul');
-                            discountList.style.margin = '0';
-                            discountList.style.paddingLeft = '20px';
-                            discountList.style.fontSize = '(--fontSizeSmallest)';
-                            
-                            // Sort by item count
-                            thresholds.sort((a, b) => parseInt(a.itemCount) - parseInt(b.itemCount))
-                                    .filter(t => t.itemCount && t.discount)
-                                    .forEach(threshold => {
-                                const item = document.createElement('li');
-                                item.textContent = `${threshold.discount}% off when you order ${threshold.itemCount} or more`;
-                                discountList.appendChild(item);
-                            });
-                            
-                            discountDiv.appendChild(discountList);
-                            optionDetailsDiv.appendChild(discountDiv);
-                        }
-                    } catch (e) {
-                        console.error("Error displaying threshold discounts:", e);
+            // Check for threshold discounts (this should always show regardless of pricing type)
+            if (selectedOption.thresholdDiscounts) {
+                try {
+                    let thresholds = [];
+                    if (typeof selectedOption.thresholdDiscounts === 'string') {
+                        thresholds = JSON.parse(selectedOption.thresholdDiscounts);
+                    } else if (selectedOption.thresholdDiscounts.types) {
+                        thresholds = selectedOption.thresholdDiscounts.types;
+                    } else if (Array.isArray(selectedOption.thresholdDiscounts)) {
+                        thresholds = selectedOption.thresholdDiscounts;
                     }
+                    
+                    if (Array.isArray(thresholds) && thresholds.length > 0 && thresholds.some(t => t.itemCount && t.discount)) {
+                        const discountDiv = document.createElement('div');
+                        discountDiv.className = 'quantity-discounts';
+                        discountDiv.style.marginTop = '(--fontSizeSmallest)';
+                        discountDiv.style.padding = '8px';
+                        discountDiv.style.backgroundColor = '#f8f8f8';
+                        discountDiv.style.borderRadius = '4px';
+                        discountDiv.style.border = '1px solid #e0e0e0';
+                        
+                        const discountTitle = document.createElement('div');
+                        discountTitle.style.fontWeight = 'bold';
+                        discountTitle.style.marginBottom = '6px';
+                        discountTitle.textContent = 'Quantity Discounts Available:';
+                        discountDiv.appendChild(discountTitle);
+                        
+                        const discountList = document.createElement('ul');
+                        discountList.style.margin = '0';
+                        discountList.style.paddingLeft = '20px';
+                        discountList.style.fontSize = '(--fontSizeSmallest)';
+                        
+                        // Sort by item count
+                        thresholds.sort((a, b) => parseInt(a.itemCount) - parseInt(b.itemCount))
+                                .filter(t => t.itemCount && t.discount)
+                                .forEach(threshold => {
+                            const item = document.createElement('li');
+                            item.textContent = `${threshold.discount}% off when you order ${threshold.itemCount} or more`;
+                            discountList.appendChild(item);
+                        });
+                        
+                        discountDiv.appendChild(discountList);
+                        optionDetailsDiv.appendChild(discountDiv);
+                    }
+                } catch (e) {
+                    console.error("Error displaying threshold discounts:", e);
                 }
             }
 
