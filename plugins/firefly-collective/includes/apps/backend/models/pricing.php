@@ -800,36 +800,47 @@
             }
         }
 
-        // --- CLEANUP DELETIONS ---
-        // features
+        // --- CLEANUP DELETIONS (JSON is source of truth) ---
+        // Delete features not in JSON
         $allF = $wpdb->get_col("SELECT id FROM {$ft}");
         $delF = array_diff($allF, $processed_features);
         foreach ($delF as $fid) {
+            // Get all options for this feature
             $optIDs = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$ot} WHERE featureId = %d", $fid));
             if ($optIDs) {
+                // Delete all addons for these options
                 $in = implode(',', array_map('intval',$optIDs));
                 $wpdb->query("DELETE FROM {$at} WHERE optionId IN ($in)");
+                // Delete all options for this feature
                 $wpdb->query("DELETE FROM {$ot} WHERE id IN ($in)");
             }
+            // Delete the feature
             $wpdb->query($wpdb->prepare("DELETE FROM {$ft} WHERE id = %d", $fid));
         }
-        // options
+        
+        // Delete options not in JSON (per feature)
         foreach ($processed_options as $fid => $oIDs) {
             $allO = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$ot} WHERE featureId = %d", $fid));
             $delO = array_diff($allO, $oIDs);
             if ($delO) {
+                // Delete all addons for these options first
                 $in = implode(',', array_map('intval',$delO));
                 $wpdb->query("DELETE FROM {$at} WHERE optionId IN ($in)");
+                // Delete the options
                 $wpdb->query("DELETE FROM {$ot} WHERE id IN ($in)");
             }
         }
-        // addons
-        foreach ($processed_addons as $oid => $aIDs) {
-            $allA = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$at} WHERE optionId = %d", $oid));
-            $delA = array_diff($allA, $aIDs);
-            if ($delA) {
-                $in = implode(',', array_map('intval',$delA));
-                $wpdb->query("DELETE FROM {$at} WHERE id IN ($in)");
+        
+        // Delete addons not in JSON (check ALL processed options, not just ones with addons)
+        foreach ($processed_options as $fid => $optionIDs) {
+            foreach ($optionIDs as $oid) {
+                $allA = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$at} WHERE optionId = %d", $oid));
+                $aIDs = isset($processed_addons[$oid]) ? $processed_addons[$oid] : array();
+                $delA = array_diff($allA, $aIDs);
+                if ($delA) {
+                    $in = implode(',', array_map('intval',$delA));
+                    $wpdb->query("DELETE FROM {$at} WHERE id IN ($in)");
+                }
             }
         }
     }
@@ -1223,14 +1234,10 @@
                                         }
                                     }
                                 }
-                                
-                                // We don't need to add a _groupDisabled flag here anymore
-                                // We'll handle the enableGrouping logic directly in the upsert function
                             }
                         }
                         
-                        // CRITICAL FIX: Check and properly handle enableThresholdDiscounts
-                        // If enableThresholdDiscounts is false, null, 'false', 0, or '0', remove thresholdDiscounts
+                        // Handle enableThresholdDiscounts
                         if (isset($option['enableThresholdDiscounts'])) {
                             $is_disabled = false;
                             
@@ -1260,16 +1267,16 @@
         // Filter out _stored temporary fields before saving
         $filtered_data = filter_stored_fields($data);
 
-        // 1) Persist FILTERED JSON (not the original data)
+        // 1) Save JSON first (source of truth)
         file_put_contents(
             $pricing_json_path,
             json_encode($filtered_data['pricingData'], JSON_PRETTY_PRINT)
         );
 
-        // 2) Upsert FILTERED data into MySQL (not the original data)
+        // 2) Sync MySQL to match JSON exactly (deletes anything not in JSON)
         upsert_pricing_data($filtered_data);
 
-        return array('success' => true, 'message' => 'Pricing data saved.');
+        return array('success' => true, 'message' => 'Pricing data saved. MySQL synchronized to match JSON.');
     }
 
     // Register REST endpoint
