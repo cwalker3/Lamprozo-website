@@ -22,17 +22,17 @@
         return;
     }
 
-?>
+    ?>
 
-<div class="wrap" id="ffc-campaign-app" v-cloak>
+    <div class="wrap" id="ffc-campaign-app" v-cloak>
     <h1>Campaign Management</h1>
-    
+
     <!-- Loading State -->
     <div v-if="loading" class="ffc-loading">
         <div class="spinner is-active"></div>
         <p>Loading campaigns...</p>
     </div>
-    
+
     <!-- Create Campaign Form -->
     <div class="ffc-campaign-form-container">
         <button v-if="!showCreateForm" @click="showCreateForm = true" class="button button-primary">
@@ -42,20 +42,18 @@
         <div v-if="showCreateForm" class="ffc-campaign-form">
             <h3>{{ editingCampaign ? 'Edit Campaign' : 'Create New Campaign' }}</h3>
             
+            <!-- Validation Errors -->
+            <div v-if="validationErrors.length > 0" class="notice notice-error" style="margin: 10px 0;">
+                <p><strong>Please correct the following errors:</strong></p>
+                <ul>
+                    <li v-for="error in validationErrors" :key="error">{{ error }}</li>
+                </ul>
+            </div>
+            
             <div class="form-grid">
                 <div class="form-field">
-                    <label>Campaign Name</label>
+                    <label>Campaign Name <span style="color: red;">*</span></label>
                     <input type="text" v-model="campaignForm.name" placeholder="Summer Sale 2024">
-                </div>
-                
-                <div class="form-field">
-                    <label>Start Date</label>
-                    <input type="datetime-local" v-model="campaignForm.start_date">
-                </div>
-                
-                <div class="form-field">
-                    <label>End Date</label>
-                    <input type="datetime-local" v-model="campaignForm.end_date" :disabled="campaignForm.unlimited">
                 </div>
                 
                 <div class="form-field checkbox-field">
@@ -63,6 +61,16 @@
                         <input type="checkbox" v-model="campaignForm.unlimited">
                         Unlimited Campaign
                     </span>
+                </div>
+                
+                <div class="form-field">
+                    <label>Start Date <span v-if="!campaignForm.unlimited" style="color: red;">*</span></label>
+                    <input type="datetime-local" v-model="campaignForm.start_date" :disabled="campaignForm.unlimited">
+                </div>
+                
+                <div class="form-field">
+                    <label>End Date <span v-if="!campaignForm.unlimited" style="color: red;">*</span></label>
+                    <input type="datetime-local" v-model="campaignForm.end_date" :disabled="campaignForm.unlimited">
                 </div>
             </div>
             
@@ -72,14 +80,14 @@
 
                 <!-- Master toggle -->
                 <div class="master-toggle" style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-left: 4px solid #2271b1;">
-                    <label style="font-weight: bold; display: flex; align-items: center; cursor: pointer;">
+                    <span style="font-weight: bold; display: flex; align-items: center;">
                         <input type="checkbox" 
                             :checked="allFeaturesSelected" 
                             :indeterminate.prop="someButNotAllFeaturesSelected"
                             @change="toggleAllFeatures" 
                             style="margin-right: 8px;">
                         Select/Deselect All Features, Options & Addons
-                    </label>
+                    </span>
                 </div>
 
                 <div class="features-config">
@@ -177,7 +185,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Campaigns List -->
     <div v-if="!loading && campaigns.length > 0" class="ffc-campaigns-list">
         <h3>Active Campaigns</h3>
@@ -223,7 +231,7 @@
                     </div>
                 </div>
                 
-               <div class="campaign-detail-actions">
+                <div class="campaign-detail-actions">
                     <button type="button" @click="editCampaign(campaign)" class="button">Edit</button>
                     <button type="button" @click="deleteCampaign(campaign.id)" class="button button-link-delete">
                         Delete
@@ -232,7 +240,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- No Campaigns Message -->
     <div v-if="!loading && campaigns.length === 0" class="ffc-no-campaigns">
         <p>No campaigns found. Create your first campaign to get started!</p>
@@ -240,5 +248,5 @@
 </div>
 
 <script>
-    window.campaignFeatures = <?php echo json_encode($features_options_addons); ?>;
+	window.campaignFeatures = <?php echo json_encode($features_options_addons); ?>;
 </script>

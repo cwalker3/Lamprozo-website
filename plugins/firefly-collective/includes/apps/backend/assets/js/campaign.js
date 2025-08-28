@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 campaigns: [],
                 expandedCampaigns: [],
                 features: featuresArray,
+                validationErrors: [],
                 campaignForm: {
                     name: '',
                     start_date: '',
@@ -101,6 +102,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         
+        watch: {
+            // Watch the unlimited checkbox and clear dates when checked
+            'campaignForm.unlimited'(newValue) {
+                if (newValue) {
+                    // Clear dates when unlimited is checked
+                    this.campaignForm.start_date = '';
+                    this.campaignForm.end_date = '';
+                }
+                // Clear any validation errors when changing unlimited status
+                this.clearValidationErrors();
+            },
+            
+            // Clear validation errors when form values change
+            'campaignForm.name'() {
+                this.clearValidationErrors();
+            },
+            'campaignForm.start_date'() {
+                this.clearValidationErrors();
+            },
+            'campaignForm.end_date'() {
+                this.clearValidationErrors();
+            }
+        },
+        
         mounted() {
             if (this.features && this.features.length > 0) {
                 this.initializeFormData();
@@ -112,6 +137,52 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         methods: {
+            // Clear validation errors
+            clearValidationErrors() {
+                this.validationErrors = [];
+            },
+            
+            // Validate form before submission
+            validateForm() {
+                this.validationErrors = [];
+                
+                // Validate campaign name
+                if (!this.campaignForm.name || this.campaignForm.name.trim() === '') {
+                    this.validationErrors.push('Campaign name is required');
+                }
+                
+                // Validate dates only if not unlimited
+                if (!this.campaignForm.unlimited) {
+                    if (!this.campaignForm.start_date || this.campaignForm.start_date.trim() === '') {
+                        this.validationErrors.push('Start date is required when campaign is not unlimited');
+                    }
+                    
+                    if (!this.campaignForm.end_date || this.campaignForm.end_date.trim() === '') {
+                        this.validationErrors.push('End date is required when campaign is not unlimited');
+                    }
+                    
+                    // If both dates are present, validate that end date is after start date
+                    if (this.campaignForm.start_date && this.campaignForm.end_date) {
+                        const startDate = new Date(this.campaignForm.start_date);
+                        const endDate = new Date(this.campaignForm.end_date);
+                        
+                        if (endDate <= startDate) {
+                            this.validationErrors.push('End date must be after start date');
+                        }
+                    }
+                }
+                
+                // Validate that at least one feature is selected
+                const hasSelectedFeatures = Object.values(this.campaignForm.features_config || {})
+                    .some(config => config.show === true);
+                
+                if (!hasSelectedFeatures) {
+                    this.validationErrors.push('At least one feature must be selected');
+                }
+                
+                return this.validationErrors.length === 0;
+            },
+            
             // Helper method to get fetch headers with nonce
             getFetchHeaders(includeContentType = false) {
                 const headers = {};
@@ -349,6 +420,33 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             async saveCampaign() {
+                // Clear previous validation errors
+                this.clearValidationErrors();
+                
+                // Validate form before sending
+                if (!this.validateForm()) {
+                    // Smooth scroll to validation errors with better positioning
+                    this.$nextTick(() => {
+                        const errorContainer = document.querySelector('.notice-error');
+                        if (errorContainer) {
+                            // Add a slight delay to ensure DOM is updated
+                            setTimeout(() => {
+                                errorContainer.scrollIntoView({ 
+                                    behavior: 'smooth', 
+                                    block: 'start',
+                                    inline: 'nearest'
+                                });
+                                // Add a subtle highlight effect
+                                errorContainer.style.boxShadow = '0 0 10px rgba(220, 53, 69, 0.3)';
+                                setTimeout(() => {
+                                    errorContainer.style.boxShadow = '';
+                                }, 2000);
+                            }, 100);
+                        }
+                    });
+                    return;
+                }
+                
                 try {
                     const endpoint = this.editingCampaign ? 'update-campaign' : 'create-campaign';
                     
@@ -372,7 +470,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.loadCampaigns();
                         alert('Campaign saved successfully!');
                     } else {
-                        alert('Error saving campaign: ' + (data.message || 'Unknown error'));
+                        // Show specific error message from server or validation error
+                        const errorMessage = data.message || 'Unknown error occurred';
+                        
+                        // Check if it's a database/server error and show specific message
+                        if (errorMessage.includes('start_date') || errorMessage.includes('end_date')) {
+                            this.validationErrors = ['Please ensure all date fields are properly filled out'];
+                        } else if (errorMessage.includes('name')) {
+                            this.validationErrors = ['Campaign name is invalid or missing'];
+                        } else {
+                            alert('Error saving campaign: ' + errorMessage);
+                        }
                     }
                 } catch (error) {
                     console.error('Error saving campaign:', error);
@@ -387,6 +495,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // First initialize a clean form structure
                 this.initializeFormData();
+                
+                // Clear validation errors when editing
+                this.clearValidationErrors();
                 
                 // Then overlay the campaign data on top of the initialized structure
                 this.campaignForm.name = campaign.name || '';
@@ -466,6 +577,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cancelForm() {
                 this.showCreateForm = false;
                 this.editingCampaign = null;
+                this.clearValidationErrors();
                 // Only reinitialize form data when actually canceling (not when switching between campaigns)
                 this.initializeFormData();
             },

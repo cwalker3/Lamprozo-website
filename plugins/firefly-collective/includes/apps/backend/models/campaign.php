@@ -183,9 +183,39 @@
         $preselect_config = $request->get_param('preselect_config');
         
         try {
-            // Convert local datetime to UTC for database storage
-            $start_date_utc = convert_local_to_utc($start_date_local);
-            $end_date_utc = $end_date_local ? convert_local_to_utc($end_date_local) : null;
+            // Validate required fields
+            if (empty($name)) {
+                throw new Exception('Campaign name is required');
+            }
+            
+            // Handle dates for unlimited vs limited campaigns
+            if ($unlimited) {
+                // For unlimited campaigns, set start_date to current time and end_date to NULL
+                $start_date_utc = gmdate('Y-m-d H:i:s'); // Current UTC time
+                $end_date_utc = null;
+            } else {
+                // For limited campaigns, validate and convert dates
+                if (empty($start_date_local)) {
+                    throw new Exception('Start date is required for limited campaigns');
+                }
+                if (empty($end_date_local)) {
+                    throw new Exception('End date is required for limited campaigns');
+                }
+                
+                // Convert local datetime to UTC for database storage
+                $start_date_utc = convert_local_to_utc($start_date_local);
+                $end_date_utc = convert_local_to_utc($end_date_local);
+                
+                // Validate that dates were converted properly
+                if (!$start_date_utc || !$end_date_utc) {
+                    throw new Exception('Invalid date format provided');
+                }
+                
+                // Validate that end date is after start date
+                if (strtotime($end_date_utc) <= strtotime($start_date_utc)) {
+                    throw new Exception('End date must be after start date');
+                }
+            }
             
             // Insert campaign
             $result = $wpdb->insert(
@@ -203,7 +233,9 @@
             );
             
             if ($result === false) {
-                throw new Exception('Failed to create campaign');
+                // Log the actual database error for debugging
+                error_log('Database error creating campaign: ' . $wpdb->last_error);
+                throw new Exception('Failed to create campaign: ' . $wpdb->last_error);
             }
             
             $campaign_id = $wpdb->insert_id;
@@ -243,9 +275,48 @@
         $preselect_config = $request->get_param('preselect_config');
         
         try {
-            // Convert local datetime to UTC for database storage
-            $start_date_utc = convert_local_to_utc($start_date_local);
-            $end_date_utc = $end_date_local ? convert_local_to_utc($end_date_local) : null;
+            // Validate required fields
+            if (empty($name)) {
+                throw new Exception('Campaign name is required');
+            }
+            
+            // Handle dates for unlimited vs limited campaigns
+            if ($unlimited) {
+                // For unlimited campaigns, keep existing start_date and set end_date to NULL
+                $existing_campaign = $wpdb->get_row($wpdb->prepare(
+                    "SELECT start_date FROM {$wpdb->prefix}ffc_campaigns WHERE id = %d",
+                    $id
+                ));
+                
+                if ($existing_campaign) {
+                    $start_date_utc = $existing_campaign->start_date; // Keep existing start date
+                } else {
+                    $start_date_utc = gmdate('Y-m-d H:i:s'); // Fallback to current time
+                }
+                $end_date_utc = null;
+            } else {
+                // For limited campaigns, validate and convert dates
+                if (empty($start_date_local)) {
+                    throw new Exception('Start date is required for limited campaigns');
+                }
+                if (empty($end_date_local)) {
+                    throw new Exception('End date is required for limited campaigns');
+                }
+                
+                // Convert local datetime to UTC for database storage
+                $start_date_utc = convert_local_to_utc($start_date_local);
+                $end_date_utc = convert_local_to_utc($end_date_local);
+                
+                // Validate that dates were converted properly
+                if (!$start_date_utc || !$end_date_utc) {
+                    throw new Exception('Invalid date format provided');
+                }
+                
+                // Validate that end date is after start date
+                if (strtotime($end_date_utc) <= strtotime($start_date_utc)) {
+                    throw new Exception('End date must be after start date');
+                }
+            }
             
             $result = $wpdb->update(
                 $wpdb->prefix . 'ffc_campaigns',
@@ -263,7 +334,9 @@
             );
             
             if ($result === false) {
-                throw new Exception('Failed to update campaign');
+                // Log the actual database error for debugging
+                error_log('Database error updating campaign: ' . $wpdb->last_error);
+                throw new Exception('Failed to update campaign: ' . $wpdb->last_error);
             }
             
             return array('success' => true);
@@ -293,7 +366,7 @@
             return $local_dt->format('Y-m-d H:i:s');
         } catch (Exception $e) {
             error_log('Error converting datetime to UTC: ' . $e->getMessage());
-            return $local_datetime; // Fallback to original value
+            return null; // Return null instead of original value for safety
         }
     }
 
