@@ -297,6 +297,148 @@
                     // Update order button
                     updateOrderButton();
                 };
+
+                // Function to handle manual account creation success (NEW)
+                function handleManualAccountSuccess() {
+                    // Show success message similar to Google flow
+                    setTimeout(() => {
+                        const accountMessage = document.createElement('div');
+                        accountMessage.style.cssText = `
+                            position: fixed;
+                            top: 80px;
+                            right: 20px;
+                            background: #2196F3;
+                            color: white;
+                            padding: 15px 20px;
+                            border-radius: 4px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                            z-index: 10000;
+                            max-width: 300px;
+                        `;
+                        accountMessage.innerHTML = `
+                            <strong>Account Created!</strong><br>
+                            Your account has been successfully created and you are now logged in.
+                        `;
+                        document.body.appendChild(accountMessage);
+                        
+                        // Remove message after 8 seconds
+                        setTimeout(() => {
+                            accountMessage.remove();
+                        }, 8000);
+                    }, 2000);
+
+                    // Update form UI to show account is linked
+                    const manualAccountFields = document.getElementById('manual-account-fields');
+                    const googleLinkedSection = document.getElementById('google-account-linked');
+                    const linkedEmailSpan = document.getElementById('linked-email');
+                    
+                    if (manualAccountFields && googleLinkedSection) {
+                        manualAccountFields.style.display = 'none';
+                        googleLinkedSection.style.display = 'block';
+                        
+                        // Show the email from the form
+                        const emailInput = document.getElementById('anon-email');
+                        if (emailInput && linkedEmailSpan) {
+                            linkedEmailSpan.textContent = emailInput.value;
+                        }
+                        
+                        // Update the status text
+                        const statusDiv = googleLinkedSection.querySelector('.google-account-status span:first-child');
+                        if (statusDiv) {
+                            statusDiv.textContent = '✓';
+                        }
+                        const statusText = googleLinkedSection.querySelector('.google-account-status span:last-child');
+                        if (statusText) {
+                            statusText.innerHTML = 'Account created: <strong>' + (linkedEmailSpan.textContent || 'Success') + '</strong>';
+                        }
+                    }
+
+                    // Disable contact form fields
+                    const contactFields = ['anon-firstName', 'anon-lastName', 'anon-email', 'anon-phone'];
+                    contactFields.forEach(fieldId => {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            field.disabled = true;
+                            field.style.opacity = '0.6';
+                            field.style.backgroundColor = '#f5f5f5';
+                        }
+                    });
+
+                    // Add success note
+                    const existingNote = document.getElementById('contact-fields-note');
+                    if (!existingNote) {
+                        const contactNote = document.createElement('div');
+                        contactNote.id = 'contact-fields-note';
+                        contactNote.style.cssText = `
+                            background: #e8f5e8;
+                            border: 1px solid #4caf50;
+                            border-radius: 4px;
+                            padding: 10px;
+                            margin-bottom: 15px;
+                            color: #2e7d32;
+                            font-size: 14px;
+                        `;
+                        contactNote.innerHTML = '<strong>Success!</strong> Your account has been created and you are now logged in.';
+                        
+                        const contactHeading = document.querySelector('#anonymous-user-form h3');
+                        if (contactHeading && contactHeading.nextSibling) {
+                            contactHeading.parentNode.insertBefore(contactNote, contactHeading.nextSibling);
+                        }
+                    }
+                }
+
+                // Function to check for auth_id changes (detect manual account creation)
+                function detectAccountCreation() {
+                    // Only run in campaign mode for anonymous users
+                    if (!dashboardData.campaign_config || window.auth_id || googleAuthData) {
+                        return;
+                    }
+
+                    // Function to get auth_id from cookie
+                    function getAuthIdFromCookie() {
+                        const name = 'auth_id=';
+                        const decodedCookie = decodeURIComponent(document.cookie);
+                        const ca = decodedCookie.split(';');
+                        for(let i = 0; i < ca.length; i++) {
+                            let c = ca[i];
+                            while (c.charAt(0) === ' ') {
+                                c = c.substring(1);
+                            }
+                            if (c.indexOf(name) === 0) {
+                                return c.substring(name.length, c.length);
+                            }
+                        }
+                        return null;
+                    }
+
+                    // Check if auth_id cookie appears
+                    const currentAuthId = getAuthIdFromCookie();
+                    if (currentAuthId && !window.auth_id) {
+                        // Account was created! Set the auth_id and trigger success flow
+                        window.auth_id = currentAuthId;
+                        handleManualAccountSuccess();
+                        
+                        // Stop checking
+                        if (window.accountCreationChecker) {
+                            clearInterval(window.accountCreationChecker);
+                            window.accountCreationChecker = null;
+                        }
+                    }
+                }
+
+                // Start checking for account creation if in campaign mode
+                if (dashboardData.campaign_config && !window.auth_id) {
+                    // Check every 2 seconds for auth_id cookie
+                    window.accountCreationChecker = setInterval(detectAccountCreation, 2000);
+                    
+                    // Stop checking after 5 minutes to prevent endless polling
+                    setTimeout(() => {
+                        if (window.accountCreationChecker) {
+                            clearInterval(window.accountCreationChecker);
+                            window.accountCreationChecker = null;
+                        }
+                    }, 300000); // 5 minutes
+                }
                 
                 // Email validation
                 async function validateEmail() {
@@ -861,7 +1003,6 @@
                 console.error('Order submission error:', error);
             }
         }
-
 
         // Check if there's actually a valid order
         function hasValidOrder() {
@@ -3502,6 +3643,8 @@
                 }
 
                 const data = await response.json();
+
+                if (data && data.loggedIn) window.auth_id = '1';
 
                 if (data.success) {
                     // Update session storage

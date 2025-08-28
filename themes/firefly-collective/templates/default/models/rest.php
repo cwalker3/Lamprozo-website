@@ -36,13 +36,13 @@
         register_rest_route('custom-api/v1', '/check-username', array(
             'methods'             => 'GET',
             'callback'            => 'check_username_exists',
-            'permission_callback' => 'verify_rest_nonce',
+            'permission_callback' => 'safe_verify_request',
         ));
         
         register_rest_route('custom-api/v1', '/check-email', array(
             'methods'             => 'GET',
             'callback'            => 'check_email_exists',
-            'permission_callback' => 'verify_rest_nonce',
+            'permission_callback' => 'safe_verify_request',
         ));
         
         register_rest_route('custom-api/v1', '/update-profile', array(
@@ -96,31 +96,31 @@
         register_rest_route('custom-api/v1', '/change-template-temp', array(
             'methods'             => 'POST',
             'callback'            => 'handle_change_template_temp',
-            'permission_callback' => 'verify_customizer_request'
+            'permission_callback' => 'safe_verify_request'
         ));
 
         register_rest_route('custom-api/v1', '/change-landing-style-preview', array(
             'methods'             => 'POST',
             'callback'            => 'handle_change_landing_style_preview',
-            'permission_callback' => 'verify_customizer_request'
+            'permission_callback' => 'safe_verify_request'
         ));
 
         register_rest_route('custom-api/v1', '/get-landing-style-preview', array(
             'methods'             => 'GET',
             'callback'            => 'handle_get_landing_style_preview',
-            'permission_callback' => 'verify_customizer_request'
+            'permission_callback' => 'safe_verify_request'
         ));
 
         register_rest_route('custom-api/v1', '/edit-landing-in-gutenberg', array(
             'methods'             => 'POST',
             'callback'            => 'handle_edit_landing_in_gutenberg',
-            'permission_callback' => 'verify_customizer_request'
+            'permission_callback' => 'safe_verify_request'
         ));
 
         register_rest_route('custom-api/v1', '/change-template-option-preview', array(
 			'methods'             => 'POST',
 			'callback'            => 'handle_change_option_preview',
-			'permission_callback' => 'verify_customizer_request'
+			'permission_callback' => 'safe_verify_request'
 		));
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');
@@ -190,10 +190,9 @@
     }
 
     /**
-     * Customizer-safe authentication that doesn't reset cookies
-     * Use this for customizer-related endpoints to avoid breaking publish functionality
+     * Safe authentication that doesn't reset cookies
      */
-    function verify_customizer_request( WP_REST_Request $request ) {
+    function safe_verify_request( WP_REST_Request $request ) {
         // 1. Check if user is already authenticated via WordPress cookies
         if ( is_user_logged_in() && current_user_can( 'customize' ) ) {
             return true;

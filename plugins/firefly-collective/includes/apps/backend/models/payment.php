@@ -1753,39 +1753,52 @@
 
     // Update payment status endpoint
     function firefly_collective_update_payment_status($request) {
-        $params = $request->get_json_params();
-        
+        $params   = $request->get_json_params();
         $order_id = isset($params['orderID']) ? sanitize_text_field($params['orderID']) : '';
-        $status = isset($params['status']) ? sanitize_text_field($params['status']) : '';
-        
+        $status   = isset($params['status'])  ? sanitize_text_field($params['status'])  : '';
+
         if (empty($order_id) || empty($status)) {
-            return new WP_Error('missing_params', 'Order ID and status are required', array('status' => 400));
+            return new WP_Error('missing_params', 'Order ID and status are required', ['status' => 400]);
         }
-        
-        // Check if this order has a subscription_id (meaning it's already handled by webhook)
+
         global $wpdb;
         $has_subscription = $wpdb->get_var($wpdb->prepare(
-            "SELECT subscription_id FROM {$wpdb->prefix}ffc_orders 
-            WHERE orderID = %s AND subscription_id IS NOT NULL 
+            "SELECT subscription_id 
+            FROM {$wpdb->prefix}ffc_orders 
+            WHERE orderID = %s 
+            AND subscription_id IS NOT NULL 
             LIMIT 1",
             $order_id
         ));
-        
+
         $updated = firefly_collective_update_order_payment_status($order_id, $status);
-        
+
+        // Finalize session (custom + WP cookies) after paid
+        $finalize = ['logged_in' => false, 'wp_logged_in' => false, 'user_id' => null, 'email' => null];
+        if ($updated && $status === 'paid') {
+            try {
+                $finalize = firefly_collective_finalize_user_session_for_order($order_id);
+            } catch (Exception $e) {
+                error_log('Finalize account error: ' . $e->getMessage());
+            }
+        }
+
         if ($updated) {
-            // Only send email if it's NOT a subscription order (webhooks handle those)
-            if (!$has_subscription) {
+            if (! $has_subscription) {
                 firefly_collective_orders_email($order_id, $status);
             }
-            
-            return array(
-                'success' => true,
-                'message' => 'Order status updated'
-            );
-        } else {
-            return new WP_Error('update_failed', 'Failed to update order status', array('status' => 500));
+
+            return [
+                'success'    => true,
+                'message'    => 'Order status updated',
+                'loggedIn'   => !empty($finalize['logged_in']),
+                'wpLoggedIn' => !empty($finalize['wp_logged_in']),
+                'userId'     => $finalize['user_id'],
+                'email'      => $finalize['email'],
+            ];
         }
+
+        return new WP_Error('update_failed', 'Failed to update order status', ['status' => 500]);
     }
 
     /**
@@ -2647,14 +2660,101 @@
                         'username' => $user_data['username']
                     ]
                 ]);
-                
-                error_log("SUCCESS: Updated Stripe subscription {$account_item['subscription_id']} metadata with user ID {$user_id}");
+
             } catch (Exception $e) {
                 error_log("ERROR: Failed to update Stripe subscription metadata: " . $e->getMessage());
             }
         }
         
-        error_log("SUCCESS: Created user ID {$user_id} and linked {$updated_rows} orders for order {$order_id}");
+        // Clean up campaign token if present
+        if (!empty($_COOKIE['campaign_token'])) {
+            $campaign_token = sanitize_text_field($_COOKIE['campaign_token']);
+            
+            // Mark this token as used by associating it with the created user
+            $wpdb->update(
+                $wpdb->prefix . 'ffc_orders',
+                ['campaignToken' => $campaign_token],
+                ['userId' => $user_id, 'orderID' => $order_id],
+                ['%s'],
+                ['%d', '%s']
+            );
+            
+            // Remove the campaign cookie
+            setcookie('campaign_token', '', [
+                'expires'  => time() - 3600,
+                'path'     => '/',
+                'secure'   => is_ssl(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            unset($_COOKIE['campaign_token']);
+        }
+        
+    }
+
+    /**
+     * Ensure the shopper ends up logged in (sets both custom and WP auth cookies) after payment.
+     * Safe to call multiple times.
+     */
+    function firefly_collective_finalize_user_session_for_order( $order_id ) {
+        global $wpdb;
+
+        // Try to create/link (if still anonymous). Ignore errors; we’ll still try to find a user.
+        try {
+            firefly_collective_create_user_after_payment($order_id);
+        } catch (Exception $e) {
+            error_log('Finalize account (create) error: ' . $e->getMessage());
+        }
+
+        // Find a row to determine the user (or anon email).
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT userId, anonUserEmail 
+                FROM {$wpdb->prefix}ffc_orders 
+                WHERE orderID = %s 
+                LIMIT 1",
+                $order_id
+            ),
+            ARRAY_A
+        );
+
+        if (! $row) {
+            return ['logged_in' => false, 'wp_logged_in' => false];
+        }
+
+        $user_id = intval($row['userId']);
+        $email   = isset($row['anonUserEmail']) ? $row['anonUserEmail'] : null;
+
+        // If still no userId, try to resolve by email.
+        if (! $user_id && $email) {
+            $existing = get_user_by('email', $email);
+            if ($existing) {
+                $user_id = intval($existing->ID);
+            }
+        }
+
+        if ($user_id > 0) {
+            // 1) Your custom cookie (what you already use from JS)
+            $encrypted = encrypt_with_auth_key($user_id);
+            set_custom_user($encrypted);
+
+            // 2) WordPress auth cookies so $current_user->exists() is true on next page load
+            if (function_exists('wp_set_auth_cookie')) {
+                $remember = true;
+                $secure   = is_ssl();
+                wp_set_current_user($user_id);
+                wp_set_auth_cookie($user_id, $remember, $secure);
+            }
+
+            return [
+                'logged_in'    => true,
+                'wp_logged_in' => true,
+                'user_id'      => $user_id,
+                'email'        => $email,
+            ];
+        }
+
+        return ['logged_in' => false, 'wp_logged_in' => false];
     }
 
     function firefly_collective_link_anonymous_orders($email, $user_id) {
