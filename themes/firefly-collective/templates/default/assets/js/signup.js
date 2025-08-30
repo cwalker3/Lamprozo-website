@@ -89,7 +89,6 @@
                 }
             });
         }
-        console.log(myApi.nonce);
         const usernameInput = document.getElementById('signup-form-username');
         if (usernameInput) {
             usernameInput.addEventListener('blur', function() {

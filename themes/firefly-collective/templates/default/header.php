@@ -26,6 +26,17 @@
         $is_logged_in   = ! empty( $args['is-user-logged-in'] );
         $no_auth_cookie = empty( $_COOKIE['auth_id'] );
 
+        // Get view
+        $view = determine_view();
+
+        // For web app
+        $is_web_app = false;
+        if ($view === 'app') $is_web_app = true;
+        
+        // Website or app nav
+        $nav = 'website-menu';
+        if ($is_web_app) $nav = 'app-menu';
+
         // Reliable Customizer preview (iframe) detection across navigations:
         $in_customizer  = (
             isset($_GET['customize_messenger_channel']) ||
@@ -42,22 +53,25 @@
 
         $element_disabled_class = '';
         $navbar_attr = 'class="';
-        if ( $use_any_overlay || !is_front_page() ) $navbar_attr .= ' element-disable';
+        if ( ($use_any_overlay || !is_front_page()) && !$is_web_app ) $navbar_attr .= ' element-disable';
         $add_user_nav   = $is_logged_in && $no_auth_cookie && ! $in_customizer;
         if ($add_user_nav) $navbar_attr .= ' user-nav';
         $navbar_attr .= '"';
 
         // Logo positioning classes - always add logo-left when any overlay is active
         $logo_classes = array();
-        if ($add_user_nav) {
+        if ($add_user_nav) :
             $logo_classes[] = 'user-nav';
-        }
-        if ($use_any_overlay) {
+        endif;
+        if ($use_any_overlay && !$is_web_app) :
             $logo_classes[] = 'logo-left';
-        }
-        if ( is_front_page() ) {
+        endif;
+        if ( is_front_page() ) :
             $logo_classes[] = 'front-page';
-        }
+        endif;
+        if ($is_web_app === 'app') :
+            $logo_classes[] = 'web-app';
+        endif;
         $logo_class_attr = !empty($logo_classes) ? ' class="' . implode(' ', $logo_classes) . '"' : '';
     ?>
 
@@ -66,14 +80,20 @@
 
         <div id="logo-name"<?php echo $logo_class_attr; ?>>
             <div id="site-logo">
-                <img src="<?php echo esc_url( $template_path_web . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>">
+                <a href="/">
+                    <img src="<?php echo esc_url( $template_path_web . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>">
+                </a>
             </div>
-            <div id="site-name"><?php echo esc_html( get_bloginfo('name') ); ?></div>
+            <div id="site-name">
+                <a href="/">
+                    <?php echo esc_html( get_bloginfo('name') ); ?>
+                </a>
+            </div>
         </div>
     </header>
 
     <!-- Consolidated Overlay Menu System -->
-    <?php if ($use_any_overlay): ?>
+    <?php if ($use_any_overlay && !$is_web_app): ?>
         <div id="overlay-menu-container" class="<?php echo $use_front_overlay ? 'front-page' : 'inner-page'; ?><?php echo $add_user_nav ? ' user-nav' : ''; ?>">
             <nav id="overlay-nav">
                 <?php
@@ -88,7 +108,7 @@
         </div>
     <?php endif; ?>
 
-    <div <?php if ($use_any_overlay):?>
+    <div <?php if ($use_any_overlay && !$is_web_app):?>
             class="element-disable"
          <?php endif; ?>>
         <img id="hamburger"<?php echo $user_nav_attr; ?>
@@ -96,7 +116,7 @@
              alt="<?php esc_attr_e('Menu'); ?>">
     </div>
 
-    <div <?php if ($use_any_overlay):?>
+    <div <?php if ($use_any_overlay && !$is_web_app):?>
             class="element-disable"
          <?php endif; ?>>
         <img id="close-nav-btn"<?php echo $user_nav_attr; ?>
@@ -107,8 +127,8 @@
     <nav>
         <?php
             wp_nav_menu( array(
-                'theme_location'  => 'website-menu',
-                'container_class' => 'website-menu',
+                'theme_location'  => $nav,
+                'container_class' => $nav,
                 'fallback_cb'     => false,
             ) );
         ?>

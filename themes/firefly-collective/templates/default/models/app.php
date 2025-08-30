@@ -3,48 +3,62 @@
     // theme/models/app.php
 
     /**
-     * Get available assets from template directory
+     * Get available assets from template directory with blacklist support
      */
     function get_template_assets($template_name, $theme_path) {
-        $template_dir = get_template_directory() . '/templates/' . $template_name . '/assets';
+        $template_dir      = get_template_directory() . '/templates/' . $template_name . '/assets';
         $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
-        
+
+        // Define blacklists: filenames you want to skip
+        $css_blacklist = array(
+            // Example: 'skip-this.css', 'ignore-me.css'
+        );
+        $js_blacklist = array(
+            'customize.js'
+        );
+
         $assets = array(
             'css' => array(),
-            'js' => array()
+            'js'  => array()
         );
-        
-        // Scan CSS directory for non-core files (exclude files starting with _core_)
+
+        // Scan CSS directory for non-core files and blacklist
         $css_dir = $template_dir . '/css';
         if (is_dir($css_dir)) {
             $css_files = glob($css_dir . '/*.css');
             foreach ($css_files as $file) {
                 $filename = basename($file);
-                // Skip core files (they are handled by the website system)
-                if (strpos($filename, '_core_') !== 0) {
-                    $assets['css'][] = $template_web_path . '/css/' . $filename;
+
+                // Skip core files and blacklisted files
+                if (strpos($filename, '_core_') === 0 || in_array($filename, $css_blacklist, true)) {
+                    continue;
                 }
+
+                $assets['css'][] = $template_web_path . '/css/' . $filename;
             }
         }
-        
-        // Scan JS directory for non-core files (exclude files starting with _core_)
+
+        // Scan JS directory for non-core files and blacklist
         $js_dir = $template_dir . '/js';
         if (is_dir($js_dir)) {
             $js_files = glob($js_dir . '/*.js');
             foreach ($js_files as $file) {
                 $filename = basename($file);
-                // Skip core files (they are handled by the website system)
-                if (strpos($filename, '_core_') !== 0) {
-                    $assets['js'][] = $template_web_path . '/js/' . $filename;
+
+                // Skip core files and blacklisted files
+                if (strpos($filename, '_core_') === 0 || in_array($filename, $js_blacklist, true)) {
+                    continue;
                 }
+
+                $assets['js'][] = $template_web_path . '/js/' . $filename;
             }
         }
-        
+
         return $assets;
     }
 
-    // App initialization - returns menu + front page
-    function app_init($request) {
+	// App initialization - returns menu + front page + dynamic CSS
+	function app_init($request) {
         global $nonce;
 
         $params = $request->get_params();
@@ -53,6 +67,7 @@
         $template_path = $theme_path . '/templates/' . $active_template;
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
         $http_host = $_SERVER['HTTP_HOST'];
+        $user_id = decrypt_with_auth_key( sanitize_text_field( $_COOKIE['auth_id'] ) );
 
         // Get active template name
         $active_template = firefly_collective_get_active_template();
@@ -79,7 +94,13 @@
         $template_assets = get_template_assets($active_template, $theme_path);
 
         // Get third party login status
-        $third_party = get_user_meta( $current_user->ID, 'third_party', true ) ?: null;
+        $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
+
+        // Get dynamic CSS from customize system
+        $dynamic_css = '';
+        if (function_exists('template_get_dynamic_css')) {
+            $dynamic_css = template_get_dynamic_css(false); // Use live values, not preview
+        }
 
         return rest_ensure_response([
             'success'           => true,
@@ -95,7 +116,8 @@
             'http_host'         => $http_host,
             'active_template'   => $active_template,
             'template_assets'   => $template_assets,
-            'third_party'       => $third_party
+            'third_party'       => $third_party,
+            'dynamic_css'       => $dynamic_css
         ]);
     }
 
@@ -252,7 +274,7 @@
 
                 // Get orders view
                 ob_start();
-                include $theme_path . '/views/signup.php';
+                include $template_path . '/views/signup.php';
                 $response_html = ob_get_clean();
 
                 $obj = new stdClass();

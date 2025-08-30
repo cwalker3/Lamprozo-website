@@ -190,7 +190,8 @@ document.addEventListener('DOMContentLoaded', function () {
     window.active_template      = data.active_template;
     window.template_assets      = data.template_assets;
     window.templateData         = data.templateData;
-    window.third_party          = data.templateData;
+    window.third_party          = data.third_party;
+    window.dynamic_css          = data.dynamic_css;
 
     // Notify service worker of active template
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller && data.active_template) {
@@ -201,6 +202,140 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
   }
+
+  // Inject dynamic CSS into the DOM
+  function injectDynamicCSS(cssContent) {
+    if (!cssContent || cssContent.trim() === '') {
+      debugLog('No dynamic CSS to inject');
+      return;
+    }
+
+    // Remove existing dynamic CSS if it exists
+    const existingStyle = document.getElementById('template-custom-properties');
+    if (existingStyle) {
+      existingStyle.remove();
+      debugLog('Removed existing dynamic CSS');
+    }
+
+    // Create and inject new style element
+    const styleElement = document.createElement('style');
+    styleElement.id = 'template-custom-properties';
+    styleElement.textContent = cssContent;
+    
+    // Insert at the beginning of head to ensure it loads before other template CSS
+    document.head.insertBefore(styleElement, document.head.firstChild);
+    
+    debugLog('Dynamic CSS injected successfully');
+    console.log('Injected CSS:', cssContent);
+  }
+
+  // Load and inject dynamic CSS (with offline fallback)
+  async function loadDynamicCSS() {
+    let cssContent = null;
+    let isFromCache = false;
+
+    // Strategy 1: Use fresh CSS from current app-init (when online)
+    if (window.dynamic_css) {
+      cssContent = window.dynamic_css;
+      debugLog('Using fresh dynamic CSS from app-init');
+    }
+    
+    // Strategy 2: Fallback to IndexedDB cache (when offline or no fresh CSS)
+    if (!cssContent) {
+      try {
+        const cachedData = await getFromIndexedDB('dynamic-css', {});
+        if (cachedData && cachedData.dynamic_css) {
+          cssContent = cachedData.dynamic_css;
+          isFromCache = true;
+          debugLog('Using cached dynamic CSS from IndexedDB');
+          console.log('App is using cached CSS customizations (offline mode)');
+        }
+      } catch (e) {
+        debugLog('No cached dynamic CSS found');
+      }
+    }
+
+    // Strategy 3: If still no CSS, try to extract from cached app-init data
+    if (!cssContent) {
+      try {
+        const cachedAppInit = await getFromIndexedDB('app-init', {});
+        if (cachedAppInit && cachedAppInit.dynamic_css) {
+          cssContent = cachedAppInit.dynamic_css;
+          isFromCache = true;
+          debugLog('Using dynamic CSS from cached app-init');
+        }
+      } catch (e) {
+        debugLog('No CSS found in cached app-init');
+      }
+    }
+
+    // Inject whatever CSS we found
+    if (cssContent) {
+      injectDynamicCSS(cssContent);
+      
+      // If we got fresh CSS (not from cache), update our cache
+      if (!isFromCache) {
+        try {
+          await saveToIndexedDB('dynamic-css', {}, {
+            dynamic_css: cssContent,
+            timestamp: Date.now(),
+            cached_from: 'fresh_app_init'
+          });
+          debugLog('Fresh dynamic CSS saved to IndexedDB cache');
+        } catch (e) {
+          console.warn('Failed to cache dynamic CSS:', e);
+        }
+      }
+    } else {
+      debugLog('No dynamic CSS available - app will use default styling');
+      console.log('No CSS customizations found - using default theme styles');
+    }
+
+    return cssContent;
+  }
+
+  // Force refresh CSS when coming back online
+  async function refreshDynamicCSS() {
+    if (!navigator.onLine) {
+      debugLog('Cannot refresh CSS - still offline');
+      return false;
+    }
+
+    try {
+      // Fetch fresh app-init to get latest customizations
+      const freshData = await fetchWithOfflineSupport('app-init', 'POST');
+      
+      if (freshData && freshData.dynamic_css) {
+        // Update window data
+        window.dynamic_css = freshData.dynamic_css;
+        
+        // Inject the fresh CSS
+        injectDynamicCSS(freshData.dynamic_css);
+        
+        // Update cache
+        await saveToIndexedDB('dynamic-css', {}, {
+          dynamic_css: freshData.dynamic_css,
+          timestamp: Date.now(),
+          cached_from: 'refresh_online'
+        });
+        
+        debugLog('Dynamic CSS refreshed successfully');
+        console.log('CSS customizations updated from server');
+        return true;
+      }
+    } catch (error) {
+      console.warn('Failed to refresh dynamic CSS:', error);
+      return false;
+    }
+    
+    return false;
+  }
+
+  // Add event listener to refresh CSS when coming back online
+  window.addEventListener('online', async () => {
+    console.log('Connection restored - refreshing customizations...');
+    await refreshDynamicCSS();
+  });
 
   // Dynamic asset loading - ONLY template-specific assets
   async function loadTemplateAssets() {
@@ -697,8 +832,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // Initialize the app
-  function appInit() {
-    debugLog('Initializing App...');
+  async function appInit() {
+	debugLog('Initializing App...');
     loader.style.display = 'block';
     
     // First, try to restore auth from IndexedDB - with better error handling
@@ -746,6 +881,9 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .then(async data => {
         if (!data.success) throw new Error('App init failed');
+        
+        // Load dynamic CSS FIRST - before template assets
+        await loadDynamicCSS();
         
         // Load template assets dynamically
         await loadTemplateAssets();
@@ -803,6 +941,9 @@ document.addEventListener('DOMContentLoaded', function () {
           const cachedMenu = await getFromIndexedDB('menu-html', {});
           const cachedAppData = await getFromIndexedDB('app-page-data', {});
           
+          // Load dynamic CSS even when offline
+          await loadDynamicCSS();
+          
           // Load assets even when offline
           await loadTemplateAssets();
           
@@ -828,7 +969,10 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         } catch (e) {
           console.error('No cached data available:', e);
-          await loadTemplateAssets(); // Still try to load assets
+          
+          // Still try to load CSS and assets
+          await loadDynamicCSS();
+          await loadTemplateAssets();
           insertFallbackMenu();
         }
       });
@@ -952,6 +1096,11 @@ document.addEventListener('DOMContentLoaded', function () {
       if (offlineIndicator) {
         offlineIndicator.style.display = 'none';
       }
+      
+      // When coming back online, refresh CSS customizations after a short delay
+      setTimeout(async () => {
+        await refreshDynamicCSS();
+      }, 1000);
     }
   }
 

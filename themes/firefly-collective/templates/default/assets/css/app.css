@@ -1,10 +1,15 @@
 /* theme/assets/css/app.css  */
 
 body {
-    background-color: rgb(51, 51, 51);
+    background-color: var(--backgroundColor);
     margin: 0;
     padding: 0;
     font-family: Arial, sans-serif;
+}
+
+body > header {
+  font-family: none;
+  pointer-events: auto;
 }
 
 main {
@@ -12,7 +17,7 @@ main {
 }
 
 h1 {
-    color: yellow;
+    color: var(--mainTextColor);
     margin-top: 1rem;
 }
 

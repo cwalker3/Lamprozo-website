@@ -35,6 +35,16 @@
             }
         }
 
+        // Disable password reset if from third-party login
+        if (typeof dashboardData !== 'undefined' && dashboardData.third_party) {
+            const passwordReset = document.querySelector('#reset-password-btn');
+            if (passwordReset) {
+                passwordReset.style.opacity = '0.3';
+                passwordReset.style.pointerEvents = 'none';
+                passwordReset.disabled = true;
+            }
+        }
+
         // Apply campaign configuration if present
         if (dashboardData.campaign_config) {
             const campaignConfig = dashboardData.campaign_config;
@@ -4545,14 +4555,6 @@
         }
 
     };
-    
-    // Disable password reset if from third party login
-    if (dashboardData.third_party) {
-        const passwordReset = document.querySelector('#reset-password-btn');
-        passwordReset.style.opacity = '0.3';
-        passwordReset.style.pointerEvents = 'none';
-        passwordReset.disabled = true;
-    }
 
     // Reset function to allow re-initialization if needed
     window.resetDashboard = function() {

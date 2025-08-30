@@ -13,6 +13,11 @@ body > header {
     z-index: 3;
 }
 
+body > header a {
+  color: white;
+  text-decoration: none;
+}
+
 #nav-bar {
 	position: fixed;
 	top: 0;

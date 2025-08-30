@@ -15,6 +15,8 @@
      * Enqueue core template assets (files starting with _core_)
      */
     function enqueue_core_assets($template_name, $theme_path, $version) {
+        global $nonce;
+
         $template_dir = get_template_directory() . '/templates/' . $template_name . '/assets';
         $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
         $template_path = get_template_directory_uri() . '/templates/' . $template_name;
