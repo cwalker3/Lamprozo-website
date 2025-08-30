@@ -36,13 +36,13 @@
         register_rest_route('custom-api/v1', '/check-username', array(
             'methods'             => 'GET',
             'callback'            => 'check_username_exists',
-            'permission_callback' => 'safe_verify_request',
+            'permission_callback' => 'verify_rest_nonce',
         ));
         
         register_rest_route('custom-api/v1', '/check-email', array(
             'methods'             => 'GET',
             'callback'            => 'check_email_exists',
-            'permission_callback' => 'safe_verify_request',
+            'permission_callback' => 'verify_rest_nonce',
         ));
         
         register_rest_route('custom-api/v1', '/update-profile', array(

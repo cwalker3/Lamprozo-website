@@ -14,7 +14,7 @@
                 nonce: window.nonce,
                 api_url: window.api_url
             }
-            themePath = window.theme_path;
+            myApi.template_path = window.theme_path;
         }
 
         let usernameValid = true;
@@ -89,6 +89,7 @@
                 }
             });
         }
+        console.log(myApi.nonce);
         const usernameInput = document.getElementById('signup-form-username');
         if (usernameInput) {
             usernameInput.addEventListener('blur', function() {
@@ -156,7 +157,7 @@
                 return;
             }
 
-            signUpBtn.innerHTML = `<img class="loader" src="${themePath}/images/loading.gif" alt="Loading">`;
+            signUpBtn.innerHTML = `<img class="loader" src="${myApi.template_path}/images/loading.gif" alt="Loading">`;
 
             let formData = new FormData();
             formData.append('fname', fname);
