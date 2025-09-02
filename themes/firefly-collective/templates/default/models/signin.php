@@ -445,12 +445,14 @@
         // Fallback to login if neither auth_id nor valid campaign_token
         if ( determine_view() === 'dashboard'
         && empty($_COOKIE['auth_id'])
-        && empty($_COOKIE['campaign_token']) ) {
+        && empty($_COOKIE['campaign_token'])
+        && !is_user_logged_in() ) {
             wp_logout();
             if (session_status() === PHP_SESSION_ACTIVE) session_destroy();
             wp_redirect( home_url(CUSTOM_LOGIN_SLUG) );
             exit;
         }
+        
     }, 5 );
 
     /**
