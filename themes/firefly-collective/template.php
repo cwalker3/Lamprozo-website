@@ -274,8 +274,27 @@
     /**
      * Reset temp template to live template when NOT in customizer
      * This ensures fresh start when entering customizer
+     * DISABLED - The customizer system will handle this properly
      */
     function firefly_collective_maybe_reset_temp_template() {
+        // COMPLETELY DISABLE AUTO-RESET - let the customizer handle it
+        return;
+        
+        // Don't reset during AJAX requests (customizer uses AJAX)
+        if (wp_doing_ajax()) {
+            return;
+        }
+        
+        // Don't reset during admin requests (including customizer saves)
+        if (is_admin()) {
+            return;
+        }
+        
+        // Don't reset during REST API requests (customizer uses REST API)
+        if (defined('REST_REQUEST') && REST_REQUEST) {
+            return;
+        }
+        
         // Only reset if we're NOT in the customizer iframe
         if (!in_customizer_iframe() && !is_customize_preview()) {
             // Check if we need to reset (not in an active customizer session)
@@ -285,6 +304,7 @@
                 
                 // Only update if different to avoid unnecessary database writes
                 if ($temp_template !== $current_live_template) {
+                    error_log("Resetting temp template from {$temp_template} to {$current_live_template}");
                     update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $current_live_template);
                 }
             }
@@ -304,9 +324,6 @@
             'transport' => 'postMessage',
             'sanitize_callback' => 'sanitize_file_name'
         ));
-        
-        // Set the current value to always be the live template
-        $wp_customize->set_post_value('firefly_collective_template_selector', $current_live_template);
         
         // Get available templates for dropdown
         $templates = firefly_collective_get_available_templates();
@@ -1200,10 +1217,28 @@
      * Handle customizer publish - copy temp template to live template and save landing style
      */
     function firefly_collective_customize_save_after($wp_customize) {
-        // Save template changes
-        $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
-        if ($temp_template && firefly_collective_template_exists($temp_template)) {
-            update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $temp_template);
+        // Save template changes - use the customizer setting value, not just temp option
+        $template_setting = $wp_customize->get_setting('firefly_collective_template_selector');
+        $template_value = null;
+        
+        if ($template_setting) {
+            $template_value = $template_setting->post_value();
+            
+            if ($template_value !== null && firefly_collective_template_exists($template_value)) {
+                // Update the live template option
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $template_value);
+                // Sync the temp option to match
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template_value);
+            }
+        }
+        
+        // Fallback: If no customizer setting value, use temp option
+        if (!isset($template_value) || $template_value === null) {
+            $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
+            
+            if ($temp_template && firefly_collective_template_exists($temp_template)) {
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $temp_template);
+            }
         }
         
         // Save landing style changes
