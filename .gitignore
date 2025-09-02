@@ -22,6 +22,8 @@ themes/*
 themes/firefly-collective/templates/*
 !themes/firefly-collective/templates/default/
 !themes/firefly-collective/templates/default/**
+!themes/firefly-collective/templates/glow/
+!themes/firefly-collective/templates/glow/**
 
 # Uploads directory
 !uploads/

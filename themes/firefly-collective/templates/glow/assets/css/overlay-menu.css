@@ -1,0 +1,214 @@
+/* theme/assets/css/overlay-menu.css */
+
+/* Overlay Menu Container */
+#overlay-menu-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    min-height: 10vh;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 1rem 0;
+    animation: fadeInDown 0.5s ease-out;
+}
+
+#overlay-nav {
+    position: relative;
+    z-index: 3;
+    margin-right: 5vw;
+}
+
+.overlay-menu-wrapper {
+    position: relative;
+}
+
+/* Main Menu Styling */
+.overlay-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    flex-wrap: wrap;
+    justify-content: start;
+    max-width: 90vw;
+}
+
+.overlay-menu > li {
+    position: relative;
+}
+
+/* Top Level Menu Items */
+.overlay-menu > li > a {
+    color: rgb(70, 70, 70);
+    text-decoration: none;
+    padding: 1rem 1.5rem;
+    display: block;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+}
+
+.overlay-menu > li > a:hover,
+.overlay-menu > li > a:focus {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateY(-1px);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------------------------
+   Single, consistent dropdown indicators
+   --------------------------- */
+
+/* Reset: remove any text arrows and unify approach */
+.overlay-menu .menu-item-has-children > a::after {
+    /* one triangle caret via borders */
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    transition: transform 200ms ease;
+    /* base: down-pointing triangle (top-level) */
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid currentColor;
+    transform-origin: 50% 45%;
+}
+
+/* Rotate the top-level caret when its submenu is open (hover or keyboard) */
+.overlay-menu > li.menu-item-has-children:hover > a::after,
+.overlay-menu > li.menu-item-has-children:focus-within > a::after {
+    transform: rotate(180deg);
+}
+
+/* Nested menus use right-pointing triangle */
+.overlay-menu ul li.menu-item-has-children > a::after {
+    border: none;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid currentColor;
+    margin-left: 0.5rem;
+    transform: translateY(-1px); /* visually centers with line-height */
+}
+
+/* ---------------------------
+   Dropdowns
+   --------------------------- */
+
+/* Hide all sub-menus by default */
+.overlay-menu ul {
+    display: none;
+    position: absolute;
+    min-width: 220px;
+    background: white;
+    border-radius: 8px;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.15),
+        0 4px 12px rgba(0, 0, 0, 0.1);
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    z-index: 1000;
+    transition: opacity 0.15s ease-in-out;
+    opacity: 1;
+}
+
+/* First Level Dropdowns - show below parent */
+.overlay-menu > li:hover > ul,
+.overlay-menu > li:focus-within > ul {
+    display: block;
+    top: 100%;
+    left: 0;
+}
+
+/* Second Level and Beyond - show to the right with NO GAP */
+.overlay-menu ul li:hover > ul,
+.overlay-menu ul li:focus-within > ul {
+    display: block;
+    top: 0;
+    left: 100%;
+    margin-left: -1px; /* Overlap by 1px to eliminate gap */
+    z-index: 1001;
+}
+
+/* Sub-menu item styling */
+.overlay-menu ul li {
+    position: relative;
+}
+
+.overlay-menu ul li a {
+    color: var(--mainTextColor);
+    text-decoration: none;
+    padding: 0.75rem 1.25rem;
+    display: block;
+    transition: all 0.2s ease;
+    font-weight: 400;
+    font-size: 0.95rem;
+}
+
+.overlay-menu ul li a:hover,
+.overlay-menu ul li a:focus {
+    background-color: var(--mainColor);
+    color: white;
+    padding-left: 1.5rem;
+}
+
+/* Create invisible bridges to help with navigation */
+.overlay-menu ul li.menu-item-has-children::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -10px;
+    width: 10px;
+    height: 100%;
+    background: transparent;
+    z-index: 999;
+}
+
+/* User Navigation Adjustments */
+.user-nav.overlay-menu-wrapper,
+#overlay-menu-container.user-nav {
+    margin-top: 32px;
+}
+
+/* Authentication-based Menu Items (same logic as hamburger menu) */
+.overlay-menu > li:nth-last-of-type(4),
+.overlay-menu > li:nth-last-of-type(3),
+.overlay-menu > li:nth-last-of-type(2) {
+    display: none;
+}
+
+/* Accessibility Enhancements */
+.overlay-menu a:focus {
+    outline: 2px solid #fbbf24;
+    outline-offset: 2px;
+}
+
+/* Animation for menu appearance */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile Breakpoint - Hide Overlay Completely */
+@media (max-width: 800px) {
+    #overlay-menu-container {
+        display: none !important;
+    }
+}
