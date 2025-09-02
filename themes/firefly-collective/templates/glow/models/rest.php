@@ -2,7 +2,8 @@
 
     // theme/models/rest.php
 
-    function register_custom_api_endpoints() {
+    if (!function_exists('register_custom_api_endpoints')) {
+        function register_custom_api_endpoints() {
         register_rest_route('custom-api/v1', '/submit-contact', array(
             'methods'             => 'POST',
             'callback'            => 'handle_contact_form_submission',
@@ -123,17 +124,21 @@
 			'permission_callback' => 'safe_verify_request'
 		));
     }
+}
     add_action('rest_api_init', 'register_custom_api_endpoints');
 
-    function verify_rest_nonce($request) {
+    if (!function_exists('verify_rest_nonce')) {
+        function verify_rest_nonce($request) {
         $nonce = $request->get_header('X-WP-Nonce');
         if (!wp_verify_nonce($nonce, 'wp_rest')) {
             return new WP_Error('invalid_nonce', 'Invalid nonce', array('status' => 403));
         }
         return true;
     }
+}
 
-    function verify_rest_request( WP_REST_Request $request ) {
+    if (!function_exists('verify_rest_request')) {
+        function verify_rest_request( WP_REST_Request $request ) {
         // 1. Use WordPress's logged-in cookie authentication
         if ( ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
             $cookie_value = sanitize_text_field( $_COOKIE[ LOGGED_IN_COOKIE ] );
@@ -188,11 +193,13 @@
 
         return false;
     }
+}
 
     /**
      * Safe authentication that doesn't reset cookies
      */
-    function safe_verify_request( WP_REST_Request $request ) {
+    if (!function_exists('safe_verify_request')) {
+        function safe_verify_request( WP_REST_Request $request ) {
         // 1. Check if user is already authenticated via WordPress cookies
         if ( is_user_logged_in() && current_user_can( 'customize' ) ) {
             return true;
@@ -251,3 +258,4 @@
 
         return false;
     }
+}
