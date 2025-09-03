@@ -23,7 +23,7 @@
                 wp_enqueue_style('pricing-css', $plugin_root_url . 'assets/css/pricing.css', array(), $unique_id);
                 wp_enqueue_script(
                     'pricing-js', 
-                    $plugin_root_url . 'assets/js/pricing.js', 
+                    $plugin_root_url . 'assets/js/pricing/pricing.js', 
                     array(), 
                     $unique_id, 
                     true
