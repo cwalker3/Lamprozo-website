@@ -689,8 +689,76 @@ export class ElementBuilder {
         );
         container.appendChild(metricField);
 
-        // Pricing fields...
-        // (Additional fields would be added here following the same pattern)
+        // Pricing Type field
+        const pricingTypeField = this.fieldFactory.createFieldGroup(
+            'pricingType', 'dropdown',
+            () => addon.pricingType?.value || { types: ['static price', 'price range'], selected: 0 },
+            (value) => {
+                addon.pricingType = {
+                    level: 'admin',
+                    ui_type: 'array',
+                    value: value
+                };
+                this.dataManager.save();
+            }
+        );
+        container.appendChild(pricingTypeField);
+
+        // Price Modifier Type field
+        const priceModifierTypeField = this.fieldFactory.createFieldGroup(
+            'priceModifierType', 'dropdown',
+            () => addon.priceModifierType?.value || { types: ['add', 'multiply'], selected: 0 },
+            (value) => {
+                addon.priceModifierType = {
+                    level: 'admin',
+                    ui_type: 'array',
+                    value: value
+                };
+                this.dataManager.save();
+            }
+        );
+        container.appendChild(priceModifierTypeField);
+
+        // Static Price Modifier field
+        const staticPriceModField = this.fieldFactory.createFieldGroup(
+            'staticPriceMod', 'number',
+            () => addon.staticPriceMod,
+            (value) => {
+                addon.staticPriceMod = value;
+                this.dataManager.save();
+            }
+        );
+        container.appendChild(staticPriceModField);
+
+        // Floor Price Modifier field
+        const floorPriceModField = this.fieldFactory.createFieldGroup(
+            'floorPriceMod', 'number',
+            () => addon.floorPriceMod,
+            (value) => {
+                addon.floorPriceMod = value;
+                this.dataManager.save();
+            }
+        );
+        container.appendChild(floorPriceModField);
+
+        // Ceiling Price Modifier field
+        const ceilingPriceModField = this.fieldFactory.createFieldGroup(
+            'ceilingPriceMod', 'number',
+            () => addon.ceilingPriceMod,
+            (value) => {
+                addon.ceilingPriceMod = value;
+                this.dataManager.save();
+            }
+        );
+        container.appendChild(ceilingPriceModField);
+
+        // Set up pricing type logic
+        this.pricingTypeController.setupAddonPricingType(container, addon, {
+            pricingTypeSelect: pricingTypeField.querySelector('select'),
+            staticPriceModInput: staticPriceModField.querySelector('input'),
+            floorPriceModInput: floorPriceModField.querySelector('input'),
+            ceilingPriceModInput: ceilingPriceModField.querySelector('input')
+        });
     }
 
     addAddonGroupingFields(container, featureIndex, optionIndex, addonIndex, addon) {

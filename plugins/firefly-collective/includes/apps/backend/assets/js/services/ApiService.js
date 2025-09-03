@@ -65,7 +65,6 @@ export class ApiService {
             return result;
 
         } catch (error) {
-            console.error('Save pricing error:', error);
             this.eventBus.emit('saveError', error);
             throw error;
         } finally {
@@ -113,7 +112,6 @@ export class ApiService {
             return await response.json();
 
         } catch (error) {
-            console.error(`API request error (${endpoint}):`, error);
             throw error;
         }
     }
@@ -125,7 +123,6 @@ export class ApiService {
      */
     handleError(error, context = 'API request') {
         const errorMessage = error.message || 'Unknown error occurred';
-        console.error(`${context} failed:`, error);
         
         this.eventBus.emit('apiError', {
             error,

@@ -17,8 +17,15 @@ export class DataManager {
      */
     initialize(baseData) {
         if (this.initialized) {
-            console.warn('DataManager already initialized');
             return;
+        }
+
+        // Initialize global registry for group synchronization like the original system
+        if (!window.groupMaxItemsUIRegistry) {
+            window.groupMaxItemsUIRegistry = {};
+        }
+        if (!window.nameChanges) {
+            window.nameChanges = { features: {}, options: {}, addons: {} };
         }
 
         // Load name changes from session storage
@@ -30,6 +37,10 @@ export class DataManager {
         
         // Normalize descriptions
         this.normalizeDescriptions();
+        
+        // Set global reference for backwards compatibility with any existing code
+        window.pricingData = this.data;
+        window.nameChanges = this.nameChanges;
         
         this.initialized = true;
         this.eventBus.emit('dataInitialized', this.data);
@@ -55,6 +66,10 @@ export class DataManager {
      * Save current state to session storage
      */
     save() {
+        // Keep global references in sync
+        window.pricingData = this.data;
+        window.nameChanges = this.nameChanges;
+        
         this.saveSessionData();
         this.saveNameChanges();
         this.eventBus.emit('dataSaved', this.data);
@@ -205,7 +220,6 @@ export class DataManager {
             const stored = sessionStorage.getItem('pricingData');
             return stored ? JSON.parse(stored) : null;
         } catch (error) {
-            console.error('Error loading session data:', error);
             return null;
         }
     }
@@ -217,7 +231,6 @@ export class DataManager {
         try {
             sessionStorage.setItem('pricingData', JSON.stringify(this.data));
         } catch (error) {
-            console.error('Error saving session data:', error);
         }
     }
 
@@ -230,7 +243,6 @@ export class DataManager {
             const stored = sessionStorage.getItem('nameChanges');
             return stored ? JSON.parse(stored) : { features: {}, options: {}, addons: {} };
         } catch (error) {
-            console.error('Error loading name changes:', error);
             return { features: {}, options: {}, addons: {} };
         }
     }
@@ -242,7 +254,6 @@ export class DataManager {
         try {
             sessionStorage.setItem('nameChanges', JSON.stringify(this.nameChanges));
         } catch (error) {
-            console.error('Error saving name changes:', error);
         }
     }
 

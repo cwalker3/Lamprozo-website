@@ -152,7 +152,7 @@ export class GroupSyncService {
     }
 
     /**
-     * Synchronize max group items across all addons in a group
+     * Synchronize max group items across all addons in a group (matches original system exactly)
      * @param {number} currentFeatureIdx - Current addon feature index
      * @param {number} currentOptionIdx - Current addon option index
      * @param {number} currentAddonIdx - Current addon index
@@ -165,29 +165,61 @@ export class GroupSyncService {
 
         const data = this.dataManager.getData();
 
-        // Update data structures
+        // 1. Update data structures for all addons in the group (like original)
         data.features.forEach((feature, featureIdx) => {
             feature.options.forEach((option, optionIdx) => {
                 option.addons.forEach((addon, addonIdx) => {
                     if (addon.groupName === groupName) {
-                        // Skip current addon
+                        // Skip current addon that triggered the sync
                         if (featureIdx === currentFeatureIdx && 
                             optionIdx === currentOptionIdx && 
                             addonIdx === currentAddonIdx) {
                             return;
                         }
 
+                        // Update the maxGroupItems value
                         addon.maxGroupItems = maxGroupItems;
                     }
                 });
             });
         });
 
+        // 2. Save data after all updates
         this.dataManager.save();
 
-        // Update UI elements
-        this.updateMaxItemsUIs(groupName, currentFeatureIdx, currentOptionIdx, 
-                              currentAddonIdx, maxGroupItems);
+        // 3. Update the UI using PREFERRED APPROACH: the global registry (like original)
+        if (window.groupMaxItemsUIRegistry && window.groupMaxItemsUIRegistry[groupName]) {
+            window.groupMaxItemsUIRegistry[groupName].forEach(uiInfo => {
+                // Skip the current addon to avoid circular updates
+                if (uiInfo.featureIdx === currentFeatureIdx && 
+                    uiInfo.optionIdx === currentOptionIdx && 
+                    uiInfo.addonIdx === currentAddonIdx) {
+                    return;
+                }
+                
+                // Call the render function to update the UI
+                if (uiInfo.renderFunction) {
+                    try {
+                        requestAnimationFrame(() => {
+                            uiInfo.renderFunction(maxGroupItems);
+                        });
+                    } catch (err) {
+                        // Silent error handling like original
+                    }
+                }
+            });
+        } 
+        // FALLBACK: Use the class registry if global registry not available
+        else {
+            this.updateMaxItemsUIs(groupName, currentFeatureIdx, currentOptionIdx, 
+                                  currentAddonIdx, maxGroupItems);
+        }
+
+        // 4. Update container heights to ensure proper display (like original)
+        setTimeout(() => {
+            // Emit event to trigger container height updates
+            this.eventBus.emit('containerHeightUpdate', { delay: 100 });
+        }, 100);
     }
 
     /**
@@ -217,7 +249,6 @@ export class GroupSyncService {
                         uiInfo.renderFunction(discountsCopy, preserveFocusId);
                     });
                 } catch (error) {
-                    console.error('Error updating threshold UI:', error);
                 }
             }
         });
@@ -246,7 +277,6 @@ export class GroupSyncService {
                         uiInfo.renderFunction(maxGroupItems);
                     });
                 } catch (error) {
-                    console.error('Error updating max items UI:', error);
                 }
             }
         });

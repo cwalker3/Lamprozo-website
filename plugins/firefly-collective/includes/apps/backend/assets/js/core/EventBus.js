@@ -45,7 +45,6 @@ export class EventBus {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`Error in event handler for '${event}':`, error);
                 }
             });
         }

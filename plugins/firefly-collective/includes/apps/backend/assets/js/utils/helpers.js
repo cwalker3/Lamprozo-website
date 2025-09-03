@@ -168,7 +168,6 @@ export function safeJsonParse(jsonString, fallback = null) {
     try {
         return JSON.parse(jsonString);
     } catch (error) {
-        console.warn('Failed to parse JSON:', error);
         return fallback;
     }
 }
@@ -183,7 +182,6 @@ export function safeJsonStringify(obj, fallback = '{}') {
     try {
         return JSON.stringify(obj);
     } catch (error) {
-        console.warn('Failed to stringify object:', error);
         return fallback;
     }
 }

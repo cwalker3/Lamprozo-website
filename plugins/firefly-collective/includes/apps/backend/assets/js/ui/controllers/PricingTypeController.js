@@ -125,9 +125,6 @@ export class PricingTypeController {
             priceOptionsDiv
         } = params;
 
-        // Clear all inputs first
-        this.disableAndClearInputs([priceFloorInput, priceCeilingInput, staticPriceInput]);
-
         // Hide price options form first
         if (priceOptionsDiv) {
             priceOptionsDiv.style.display = 'none';
@@ -135,29 +132,81 @@ export class PricingTypeController {
 
         switch (selectedIndex) {
             case this.PRICING_TYPES.STATIC_PRICE:
-                // Enable only static price field
+                // Enable only static price field, disable others
                 if (staticPriceInput) {
                     staticPriceInput.disabled = false;
                 }
+                this.disableAndClearInputs([priceFloorInput, priceCeilingInput]);
                 break;
 
             case this.PRICING_TYPES.PRICE_RANGE:
-                // Enable min/max price fields
+                // Enable min/max price fields, disable others
                 if (priceFloorInput) priceFloorInput.disabled = false;
                 if (priceCeilingInput) priceCeilingInput.disabled = false;
+                this.disableAndClearInputs([staticPriceInput]);
                 break;
 
             case this.PRICING_TYPES.PRICE_OPTIONS:
-                // Show price options form
+                // Show price options form, disable individual price fields
                 if (priceOptionsDiv) {
                     priceOptionsDiv.style.display = 'flex';
                 }
+                this.disableAndClearInputs([priceFloorInput, priceCeilingInput, staticPriceInput]);
+                break;
+                
+            default:
+                // For any other type, disable all inputs
+                this.disableAndClearInputs([priceFloorInput, priceCeilingInput, staticPriceInput]);
                 break;
         }
 
         // Emit container update event for height recalculation
         this.eventBus.emit('containerHeightUpdate', {
             element: this.findContainerElement(priceFloorInput || staticPriceInput)
+        });
+    }
+
+    /**
+     * Set up pricing type logic for an addon
+     * @param {HTMLElement} container - Container element
+     * @param {Object} addon - Addon data
+     * @param {Object} fieldElements - Object containing field elements
+     */
+    setupAddonPricingType(container, addon, fieldElements) {
+        const {
+            pricingTypeSelect,
+            staticPriceModInput,
+            floorPriceModInput,
+            ceilingPriceModInput
+        } = fieldElements;
+
+        if (!pricingTypeSelect) return;
+
+        // Set up event listener
+        pricingTypeSelect.addEventListener('change', (e) => {
+            const selectedIndex = parseInt(e.target.value, 10);
+            this.updateAddonFieldVisibility({
+                selectedIndex,
+                floorPriceModInput,
+                ceilingPriceModInput,
+                staticPriceModInput
+            });
+
+            // Emit event for other components
+            this.eventBus.emit('addonPricingTypeChanged', {
+                container,
+                addon,
+                selectedIndex
+            });
+        });
+
+        // Initial setup
+        const currentIndex = addon.pricingType?.value?.selected || 0;
+        this.updateAddonFieldVisibility({
+            selectedIndex: currentIndex,
+            floorPriceModInput,
+            ceilingPriceModInput,
+            staticPriceModInput
         });
     }
 
@@ -173,21 +222,25 @@ export class PricingTypeController {
             staticPriceModInput
         } = params;
 
-        // Clear all inputs first
-        this.disableAndClearInputs([floorPriceModInput, ceilingPriceModInput, staticPriceModInput]);
-
         switch (selectedIndex) {
             case this.PRICING_TYPES.STATIC_PRICE:
-                // Enable only static price modifier field
+                // Enable only static price modifier field, disable others
                 if (staticPriceModInput) {
                     staticPriceModInput.disabled = false;
                 }
+                this.disableAndClearInputs([floorPriceModInput, ceilingPriceModInput]);
                 break;
 
             case this.PRICING_TYPES.PRICE_RANGE:
-                // Enable min/max price modifier fields
+                // Enable min/max price modifier fields, disable others
                 if (floorPriceModInput) floorPriceModInput.disabled = false;
                 if (ceilingPriceModInput) ceilingPriceModInput.disabled = false;
+                this.disableAndClearInputs([staticPriceModInput]);
+                break;
+                
+            default:
+                // For any other type, disable all
+                this.disableAndClearInputs([floorPriceModInput, ceilingPriceModInput, staticPriceModInput]);
                 break;
         }
 
@@ -306,7 +359,6 @@ export class PricingTypeController {
         const { type, container, selectedIndex } = data;
         
         // Additional logic can be added here for cross-component reactions
-        console.debug(`Pricing type changed to ${selectedIndex} for ${type}`);
     }
 
     // Helper methods

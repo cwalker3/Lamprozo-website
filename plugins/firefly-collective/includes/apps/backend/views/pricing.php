@@ -6,7 +6,6 @@
     <div class="button-group">
       <button id="apply-button">Apply Changes</button>
     </div>
-    <div id="pricing-loader" style="display: none;">Saving changes...</div>
 </div>
 
 <!-- Confirmation Dialog -->

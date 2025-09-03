@@ -21,7 +21,6 @@ export class DialogService {
         this.noButton = document.getElementById('confirm-no');
 
         if (!this.dialog || !this.message || !this.yesButton || !this.noButton) {
-            console.error('Dialog elements not found in DOM');
             return;
         }
 
@@ -58,7 +57,6 @@ export class DialogService {
      */
     showDialog(message, onConfirm, options = {}) {
         if (this.activeDialog) {
-            console.warn('Dialog already active, ignoring new request');
             return;
         }
 
@@ -102,7 +100,6 @@ export class DialogService {
         try {
             onConfirm();
         } catch (error) {
-            console.error('Error in dialog confirmation callback:', error);
             this.eventBus.emit('dialogError', { error });
         }
 
@@ -122,7 +119,6 @@ export class DialogService {
         try {
             onCancel();
         } catch (error) {
-            console.error('Error in dialog cancellation callback:', error);
             this.eventBus.emit('dialogError', { error });
         }
 

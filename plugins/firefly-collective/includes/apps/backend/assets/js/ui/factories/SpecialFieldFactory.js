@@ -106,7 +106,7 @@ export class SpecialFieldFactory {
         rightColumn.style.flexDirection = 'column';
         container.appendChild(rightColumn);
         
-        let preventSync = false; // Prevent circular updates
+        let preventSyncRef = { value: false }; // Prevent circular updates
         
         const updateContainerHeights = debounce(() => {
             this.eventBus.emit('containerHeightUpdate', { 
@@ -116,7 +116,7 @@ export class SpecialFieldFactory {
         
         const renderThresholds = (externalData = null, preserveId = null) => {
             // Handle external data updates from sync
-            if (externalData && !preventSync) {
+            if (externalData && !preventSyncRef.value) {
                 workingData.length = 0;
                 externalData.forEach(item => {
                     workingData.push({ ...item });
@@ -136,17 +136,35 @@ export class SpecialFieldFactory {
             workingData.forEach((threshold, idx) => {
                 const row = this.createThresholdRow(
                     threshold, idx, workingData, onChange, renderThresholds, 
-                    updateContainerHeights, groupInfo, preventSync
+                    updateContainerHeights, groupInfo, preventSyncRef
                 );
                 rightColumn.appendChild(row);
             });
             
             // Add button
             const addBtnRow = this.createAddButtonRow(() => {
-                if (preventSync) return;
+                if (preventSyncRef.value) return;
                 
                 workingData.push({ itemCount: '', discount: '' });
-                this.handleThresholdChange(workingData, onChange, groupInfo, preventSync);
+                
+                // Handle synchronization like the original
+                if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                    onChange([...workingData]);
+                    preventSyncRef.value = true;
+                    this.groupSyncService.synchronizeThresholdDiscounts(
+                        groupInfo.featureIdx,
+                        groupInfo.optionIdx,
+                        groupInfo.addonIdx,
+                        groupInfo.groupName,
+                        workingData,
+                        null,
+                        true
+                    );
+                    setTimeout(() => { preventSyncRef.value = false; }, 10);
+                } else {
+                    onChange([...workingData]);
+                    renderThresholds();
+                }
                 updateContainerHeights();
             });
             
@@ -323,11 +341,32 @@ export class SpecialFieldFactory {
             addon.maxGroupItems = newValue;
         };
         
-        // Register with group sync
+        // Register with group sync using BOTH approaches (like original system)
         if (groupName && groupName.trim()) {
+            // 1. Register with the modular service
             this.groupSyncService.registerMaxItemsUI(
                 groupName, featureIdx, optionIdx, addonIdx, renderMaxItems
             );
+            
+            // 2. Register with global registry (like original system)
+            if (!window.groupMaxItemsUIRegistry[groupName]) {
+                window.groupMaxItemsUIRegistry[groupName] = [];
+            }
+            
+            // Remove any existing entries for this addon
+            window.groupMaxItemsUIRegistry[groupName] = 
+                window.groupMaxItemsUIRegistry[groupName].filter(ui => 
+                    !(ui.featureIdx === featureIdx && 
+                      ui.optionIdx === optionIdx && 
+                      ui.addonIdx === addonIdx));
+            
+            // Add this UI to the registry
+            window.groupMaxItemsUIRegistry[groupName].push({
+                featureIdx: featureIdx,
+                optionIdx: optionIdx,
+                addonIdx: addonIdx,
+                renderFunction: renderMaxItems
+            });
         }
         
         // Event handlers
@@ -410,7 +449,6 @@ export class SpecialFieldFactory {
             
             return [{ itemCount: "", discount: "" }];
         } catch (e) {
-            console.error("Error parsing threshold data:", e);
             return [{ itemCount: "", discount: "" }];
         }
     }
@@ -452,7 +490,7 @@ export class SpecialFieldFactory {
     }
 
     createThresholdRow(threshold, idx, workingData, onChange, renderThresholds, 
-                      updateContainerHeights, groupInfo, preventSync) {
+                      updateContainerHeights, groupInfo, preventSyncRef) {
         const row = document.createElement('div');
         row.className = 'price-option-row';
         
@@ -471,12 +509,28 @@ export class SpecialFieldFactory {
         countInput.id = `${scopePrefix}count-input-${uniqueGroupId}-${idx}`;
         
         const debouncedCountUpdate = debounce((e) => {
-            if (preventSync) return;
+            if (preventSyncRef.value) return;
             const val = e.target.value.trim() !== '' ? parseInt(e.target.value, 10) : '';
             workingData[idx].itemCount = val;
             updateContainerHeights();
-            this.handleThresholdChange(workingData, onChange, groupInfo, preventSync, countInput.id);
-        }, this.config.getUI('DEBOUNCE_DELAY'));
+            
+            // Handle synchronization like the original
+            if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                onChange([...workingData]);
+                preventSyncRef.value = true;
+                this.groupSyncService.synchronizeThresholdDiscounts(
+                    groupInfo.featureIdx,
+                    groupInfo.optionIdx,
+                    groupInfo.addonIdx,
+                    groupInfo.groupName,
+                    workingData,
+                    countInput.id
+                );
+                setTimeout(() => { preventSyncRef.value = false; }, 10);
+            } else {
+                onChange([...workingData]);
+            }
+        }, 300);
         
         countInput.addEventListener('input', debouncedCountUpdate);
         
@@ -490,19 +544,35 @@ export class SpecialFieldFactory {
         discountInput.id = `${scopePrefix}discount-input-${uniqueGroupId}-${idx}`;
         
         const debouncedDiscountUpdate = debounce((e) => {
-            if (preventSync) return;
+            if (preventSyncRef.value) return;
             const val = e.target.value.trim() !== '' ? parseFloat(e.target.value) : '';
             workingData[idx].discount = val;
             updateContainerHeights();
-            this.handleThresholdChange(workingData, onChange, groupInfo, preventSync, discountInput.id);
-        }, this.config.getUI('DEBOUNCE_DELAY'));
+            
+            // Handle synchronization like the original
+            if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                onChange([...workingData]);
+                preventSyncRef.value = true;
+                this.groupSyncService.synchronizeThresholdDiscounts(
+                    groupInfo.featureIdx,
+                    groupInfo.optionIdx,
+                    groupInfo.addonIdx,
+                    groupInfo.groupName,
+                    workingData,
+                    discountInput.id
+                );
+                setTimeout(() => { preventSyncRef.value = false; }, 10);
+            } else {
+                onChange([...workingData]);
+            }
+        }, 300);
         
         discountInput.addEventListener('input', debouncedDiscountUpdate);
         
         // Controls
         const controlsContainer = this.createThresholdRowControls(
             idx, workingData, onChange, renderThresholds, updateContainerHeights, 
-            groupInfo, preventSync
+            groupInfo, preventSyncRef
         );
         
         row.appendChild(countInput);
@@ -518,9 +588,12 @@ export class SpecialFieldFactory {
         
         // Delete button
         const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button'; // Prevent form submission
         deleteBtn.textContent = '−';
         deleteBtn.className = 'price-option-delete';
-        deleteBtn.addEventListener('click', () => {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             workingData.splice(idx, 1);
             onChange([...workingData]);
             renderCallback();
@@ -554,33 +627,96 @@ export class SpecialFieldFactory {
     }
 
     createThresholdRowControls(idx, workingData, onChange, renderCallback, updateContainerHeights, 
-                              groupInfo, preventSync) {
+                              groupInfo, preventSyncRef) {
         const controlsContainer = document.createElement('div');
         controlsContainer.className = 'controls-container';
         
         // Delete button
         const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button'; // Prevent form submission
         deleteBtn.textContent = '−';
         deleteBtn.className = 'price-option-delete';
-        deleteBtn.addEventListener('click', () => {
-            if (preventSync) return;
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (preventSyncRef.value) return;
+            
+            // Delete from working data
             workingData.splice(idx, 1);
-            this.handleThresholdChange(workingData, onChange, groupInfo, preventSync, null, true);
+            
+            // Handle synchronization like the original
+            if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                onChange([...workingData]);
+                preventSyncRef.value = true;
+                this.groupSyncService.synchronizeThresholdDiscounts(
+                    groupInfo.featureIdx,
+                    groupInfo.optionIdx,
+                    groupInfo.addonIdx,
+                    groupInfo.groupName,
+                    workingData,
+                    null,
+                    true
+                );
+                setTimeout(() => { preventSyncRef.value = false; }, 10);
+            } else {
+                onChange([...workingData]);
+                renderCallback();
+            }
             updateContainerHeights();
         });
         
-        // Up/Down arrows
+        // Up/Down arrows  
         const upBtn = this.createArrowButton('up', idx === 0, () => {
-            if (preventSync || idx === 0) return;
+            if (preventSyncRef.value || idx === 0) return;
+            
+            // Swap elements
             [workingData[idx-1], workingData[idx]] = [workingData[idx], workingData[idx-1]];
-            this.handleThresholdChange(workingData, onChange, groupInfo, preventSync, null, true);
+            
+            // Handle synchronization like the original
+            if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                onChange([...workingData]);
+                preventSyncRef.value = true;
+                this.groupSyncService.synchronizeThresholdDiscounts(
+                    groupInfo.featureIdx,
+                    groupInfo.optionIdx,
+                    groupInfo.addonIdx,
+                    groupInfo.groupName,
+                    workingData,
+                    null,
+                    true
+                );
+                setTimeout(() => { preventSyncRef.value = false; }, 10);
+            } else {
+                onChange([...workingData]);
+                renderCallback();
+            }
             updateContainerHeights();
         });
         
         const downBtn = this.createArrowButton('down', idx === workingData.length - 1, () => {
-            if (preventSync || idx === workingData.length - 1) return;
+            if (preventSyncRef.value || idx === workingData.length - 1) return;
+            
+            // Swap elements
             [workingData[idx], workingData[idx+1]] = [workingData[idx+1], workingData[idx]];
-            this.handleThresholdChange(workingData, onChange, groupInfo, preventSync, null, true);
+            
+            // Handle synchronization like the original
+            if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
+                onChange([...workingData]);
+                preventSyncRef.value = true;
+                this.groupSyncService.synchronizeThresholdDiscounts(
+                    groupInfo.featureIdx,
+                    groupInfo.optionIdx,
+                    groupInfo.addonIdx,
+                    groupInfo.groupName,
+                    workingData,
+                    null,
+                    true
+                );
+                setTimeout(() => { preventSyncRef.value = false; }, 10);
+            } else {
+                onChange([...workingData]);
+                renderCallback();
+            }
             updateContainerHeights();
         });
         
@@ -593,10 +729,15 @@ export class SpecialFieldFactory {
 
     createArrowButton(direction, disabled, onClick) {
         const btn = document.createElement('button');
+        btn.type = 'button'; // Prevent form submission
         btn.innerHTML = direction === 'up' ? '&#9650;' : '&#9660;';
         btn.className = 'price-option-arrow';
         btn.disabled = disabled;
-        btn.addEventListener('click', onClick);
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick();
+        });
         return btn;
     }
 
@@ -606,33 +747,20 @@ export class SpecialFieldFactory {
         addBtnRow.style.marginTop = '5px';
         
         const addBtn = document.createElement('button');
+        addBtn.type = 'button'; // Prevent form submission
         addBtn.textContent = '+';
         addBtn.className = this.config.getClass('add_button');
         addBtn.style.marginTop = '0';
-        addBtn.addEventListener('click', onClick);
+        addBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick();
+        });
         
         addBtnRow.appendChild(addBtn);
         return addBtnRow;
     }
 
-    handleThresholdChange(workingData, onChange, groupInfo, preventSync, preserveFocusId = null, forceUpdate = false) {
-        if (groupInfo && groupInfo.groupName && groupInfo.groupName.trim()) {
-            onChange([...workingData]);
-            preventSync = true;
-            this.groupSyncService.synchronizeThresholdDiscounts(
-                groupInfo.featureIdx,
-                groupInfo.optionIdx,
-                groupInfo.addonIdx,
-                groupInfo.groupName,
-                workingData,
-                preserveFocusId,
-                forceUpdate
-            );
-            setTimeout(() => { preventSync = false; }, 10);
-        } else {
-            onChange([...workingData]);
-        }
-    }
 
     restoreFocus(activeId, activeValue, selectionStart, selectionEnd) {
         if (activeId) {

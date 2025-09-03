@@ -140,7 +140,6 @@ export class PricingApp {
      */
     async initialize(options = {}) {
         if (this.initialized) {
-            console.warn('PricingApp already initialized');
             return;
         }
 
@@ -179,10 +178,8 @@ export class PricingApp {
                 dataLength: baseData.features?.length || 0
             });
 
-            console.log('PricingApp initialized successfully');
 
         } catch (error) {
-            console.error('Failed to initialize PricingApp:', error);
             this.handleInitializationError(error);
             throw error;
         }
@@ -232,7 +229,6 @@ export class PricingApp {
             }
 
         } catch (error) {
-            console.error('Save request failed:', error);
             this.components.eventBus.emit('saveError', error);
         }
     }
@@ -272,7 +268,6 @@ export class PricingApp {
         // Log all events for debugging
         const originalEmit = this.components.eventBus.emit;
         this.components.eventBus.emit = function(event, data) {
-            console.debug(`Event: ${event}`, data);
             return originalEmit.call(this, event, data);
         };
     }
@@ -294,7 +289,6 @@ export class PricingApp {
     }
 
     handleSaveSuccess(result) {
-        console.log('Save successful:', result);
         
         // Clear name changes since save was successful
         this.components.dataManager.clearNameChanges();
@@ -306,7 +300,6 @@ export class PricingApp {
     }
 
     handleSaveError(error) {
-        console.error('Save failed:', error);
         
         const errorMessage = error.message || 'An error occurred while saving. Please try again.';
         this.components.dialogService.alert(errorMessage);
@@ -331,23 +324,19 @@ export class PricingApp {
     }
 
     handleValidationError(data) {
-        console.warn('Validation error:', data);
         
         if (data.field && data.error) {
             // Could implement field-level error display here
-            console.warn(`Validation error in ${data.field}: ${data.error}`);
         }
     }
 
     handleApiError(data) {
-        console.error('API error:', data);
         
         const message = `API Error: ${data.message}`;
         this.components.dialogService.alert(message);
     }
 
     handleDialogError(data) {
-        console.error('Dialog error:', data.error);
     }
 
     handleInitializationError(error) {
@@ -388,7 +377,6 @@ export class PricingApp {
         const data = this.components.dataManager.getData();
         const result = this.components.validationService.validatePricingData(data);
         
-        console.log('Validation result:', result);
         return result;
     }
 
@@ -425,6 +413,5 @@ export class PricingApp {
         this.container = null;
         this.components = {};
 
-        console.log('PricingApp destroyed');
     }
 }

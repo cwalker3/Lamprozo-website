@@ -316,10 +316,16 @@ export class ViewManager {
         if (type === 'feature') {
             // Re-render all features to show the new clone
             this.render();
+            // Update heights after rendering
+            this.expandCollapseController.recalculateAllHeights();
         } else if (type === 'option') {
             this.rerenderFeature(featureIndex);
+            // Update heights after re-rendering the feature
+            this.expandCollapseController.recalculateAllHeights();
         } else if (type === 'addon') {
             this.rerenderOption(featureIndex, optionIndex);
+            // Update heights after re-rendering the option
+            this.expandCollapseController.recalculateAllHeights();
         }
     }
 
@@ -336,11 +342,15 @@ export class ViewManager {
         if (this.addFeatureButton) {
             this.container.insertBefore(featureElement, this.addFeatureButton);
             
-            // Expand and scroll to new feature
+            // Expand and scroll to new feature - use timing from original system
             setTimeout(() => {
                 this.expandCollapseController.expandFeature(featureElement);
                 this.expandCollapseController.scrollIntoViewWithOffset(featureElement);
-            }, 100);
+                // Update parent heights after expansion - use updateAllOpenContainers like original
+                setTimeout(() => {
+                    this.expandCollapseController.updateAllOpenContainers();
+                }, 50);
+            }, 10);
         }
     }
 
@@ -363,12 +373,16 @@ export class ViewManager {
         if (addOptionRow) {
             addOptionRow.parentNode.insertBefore(optionElement, addOptionRow);
             
-            // Expand feature and new option
+            // Expand feature and new option - use timing from original system
             setTimeout(() => {
                 this.expandCollapseController.expandFeature(featureElement);
                 this.expandCollapseController.toggleExpandCollapse(optionElement, true);
                 this.expandCollapseController.scrollIntoViewWithOffset(optionElement);
-            }, 100);
+                // Update parent heights after expansion
+                setTimeout(() => {
+                    this.expandCollapseController.updateAllOpenContainers();
+                }, 50);
+            }, 10);
         }
     }
 
@@ -395,13 +409,17 @@ export class ViewManager {
         if (addAddonRow) {
             addAddonRow.parentNode.insertBefore(addonElement, addAddonRow);
             
-            // Expand containers and new addon
+            // Expand containers and new addon - use timing from original system
             setTimeout(() => {
                 this.expandCollapseController.expandFeature(featureElement);
                 this.expandCollapseController.toggleExpandCollapse(optionElement, true);
                 this.expandCollapseController.toggleExpandCollapse(addonElement, true);
                 this.expandCollapseController.scrollIntoViewWithOffset(addonElement);
-            }, 100);
+                // Update parent heights after expansion
+                setTimeout(() => {
+                    this.expandCollapseController.updateAllOpenContainers();
+                }, 50);
+            }, 10);
         }
     }
 
