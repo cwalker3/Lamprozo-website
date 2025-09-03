@@ -21,7 +21,16 @@
 
                 // Enqueue CSS & JS
                 wp_enqueue_style('pricing-css', $plugin_root_url . 'assets/css/pricing.css', array(), $unique_id);
-                wp_enqueue_script('pricing-js', $plugin_root_url . 'assets/js/pricing.js', array(), $unique_id, true);
+                wp_enqueue_script(
+                    'pricing-js', 
+                    $plugin_root_url . 'assets/js/pricing.js', 
+                    array(), 
+                    $unique_id, 
+                    true
+                );
+
+                // Add module type for ES6 modules
+                wp_script_add_data('pricing-js', 'type', 'module');
 
                 // Load pricing.json
                 $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
@@ -52,6 +61,14 @@
         }
     }
     add_action('admin_enqueue_scripts', 'enqueue_pricing_styles_and_scripts');
+
+    add_filter('script_loader_tag', function ($tag, $handle, $src) {
+        if ($handle === 'pricing-js') {
+            // keep the original tag but add type="module"
+            $tag = str_replace('<script ', '<script type="module" ', $tag);
+        }
+        return $tag;
+    }, 10, 3);
 
     function firefly_collective_pricing_dashboard() {
         $plugin_root = dirname(plugin_dir_path(__FILE__));
