@@ -25,6 +25,9 @@ themes/firefly-collective/templates/*
 !themes/firefly-collective/templates/glow/
 !themes/firefly-collective/templates/glow/**
 
+# Ignore MD files within directories (but allow root-level MD files)
+**/**/*.md
+
 # Uploads directory
 !uploads/
 uploads/**
