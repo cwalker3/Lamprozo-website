@@ -110,6 +110,51 @@ main:not(:has(.home)) {
 	.content.dashboard .wp-block-cover:first-child {
 		margin-top: 0 !important;
 		margin-bottom: 5vh !important;
+		box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+	}
+	
+	/* Specific rule for blog page banner shadow - including posts page */
+	#view-content .wp-block-cover:first-child,
+	.blog .wp-block-cover:first-child,
+	body.blog .content .wp-block-cover:first-child {
+		box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+	}
+	
+	/* Page banner title styling */
+	.content.blog .wp-block-cover:first-child p,
+	.content.contact .wp-block-cover:first-child p,
+	.content.signup .wp-block-cover:first-child p,
+	.content.order-history .wp-block-cover:first-child p,
+	.content.dashboard .wp-block-cover:first-child p,
+	.wp-block-cover.height-preset-half p {
+		font-family: var(--font-brand) !important;
+		font-size: 3.5rem !important;
+		font-weight: var(--font-weight-bold) !important;
+		text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.3);
+		line-height: 1.2;
+	}
+	
+	/* Mobile responsive banner title */
+	@media (max-width: 768px) {
+		.content.blog .wp-block-cover:first-child p,
+		.content.contact .wp-block-cover:first-child p,
+		.content.signup .wp-block-cover:first-child p,
+		.content.order-history .wp-block-cover:first-child p,
+		.content.dashboard .wp-block-cover:first-child p,
+		.wp-block-cover.height-preset-half p {
+			font-size: 2.5rem !important;
+		}
+	}
+	
+	@media (max-width: 480px) {
+		.content.blog .wp-block-cover:first-child p,
+		.content.contact .wp-block-cover:first-child p,
+		.content.signup .wp-block-cover:first-child p,
+		.content.order-history .wp-block-cover:first-child p,
+		.content.dashboard .wp-block-cover:first-child p,
+		.wp-block-cover.height-preset-half p {
+			font-size: 2rem !important;
+		}
 	}
 	
 	/* Add depth overlay effect ONLY to specific full-width covers with background images */

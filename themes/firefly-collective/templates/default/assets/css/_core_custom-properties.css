@@ -1,4 +1,38 @@
+/* Font Face Definitions */
+@font-face {
+    font-family: 'GFS Neohellenic';
+    src: url('../fonts/GFSNeohellenic-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'GFS Neohellenic';
+    src: url('../fonts/GFSNeohellenic-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'GFS Neohellenic';
+    src: url('../fonts/GFSNeohellenic-Italic.ttf') format('truetype');
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'GFS Neohellenic';
+    src: url('../fonts/GFSNeohellenic-BoldItalic.ttf') format('truetype');
+    font-weight: 700;
+    font-style: italic;
+    font-display: swap;
+}
+
 :root {
+    /* Colors */
     --mainColor: #c0c0c0;
     --darkGrey: #424242;
     --lightGrey: hsl(240, 0%, 95%);
@@ -6,4 +40,19 @@
     --lightGreen: #1e8d1c;
     --lightBlue: hsl(239, 100%, 72%);
     --outlineRed: hsl(0, 68%, 36%);
+    
+    /* Typography - Easy to change fonts */
+    --font-brand: 'GFS Neohellenic', serif;  /* Logo and branding font */
+    --font-nav: 'GFS Neohellenic', serif;     /* Navigation menu font */
+    --font-heading: 'cinzel', serif;          /* Keep existing heading font */
+    --font-body: system-ui, -apple-system, sans-serif; /* Body text font */
+    
+    /* Font Weights */
+    --font-weight-regular: 400;
+    --font-weight-bold: 700;
+    
+    /* Font Sizes for Navigation */
+    --font-size-logo: 2rem;
+    --font-size-nav: 1.3rem;
+    --font-size-nav-mobile: 1.15rem;
 }

@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const blogFilterBtn = document.getElementById('blog-filter-head');
         const blogFilterSubmitBtn = document.getElementById('blog-filter-submit-btn');
         const loader = document.getElementById('more-blogs-loader');
-        const blogElements = document.querySelectorAll('blog-short');
-        const numBlogs = 0;
+        const blogElements = document.querySelectorAll('.blog-short');
+        let numBlogs = 0;
         if (blogElements.length > 0) numBlogs = blogElements.length;
         if (target && loader) {
             const observer = new IntersectionObserver(function (entries) {
@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const blogFilterHead = document.getElementById('blog-filter-head');
         if (element.style.maxHeight) {
             element.style.maxHeight = null;
-            blogFilterHead.innerHTML = `<img src="${themePath}/images/filter.webp" alt="Filter">`;
+            blogFilterHead.innerHTML = `<img src="${myApi.template_path}/images/filter.webp" alt="Filter">`;
         } else {
             element.style.maxHeight = element.scrollHeight + 'px';
             blogFilterHead.innerHTML = `<img src="${myApi.template_path}/images/close-filter.webp" alt="Close Filter">`;

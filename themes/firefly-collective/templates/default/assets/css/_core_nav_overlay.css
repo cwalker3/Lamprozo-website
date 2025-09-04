@@ -46,7 +46,8 @@ body > header {
 
 /* Inner Page Styling - Blue Background Bar */
 #overlay-menu-container.inner-page {
-    background: #386fb5;
+    background: rgba(56, 111, 181, .7); /* 60% opacity blue */
+    backdrop-filter: blur(10px); /* Blur effect for better readability */
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     position: fixed;
 }
@@ -126,8 +127,9 @@ header.element-disable #logo-name.logo-left {
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    font-size: 1.1rem;
-    font-weight: 500;
+    font-family: var(--font-nav);
+    font-size: var(--font-size-nav);
+    font-weight: var(--font-weight-bold);
     flex-wrap: wrap;
     justify-content: flex-end;
     max-width: 90vw;
@@ -160,9 +162,18 @@ header.element-disable #logo-name.logo-left {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* Active page state for front page - subtle indicator */
+#overlay-menu-container.front-page .overlay-menu > li.current-menu-item > a,
+#overlay-menu-container.front-page .overlay-menu > li.current_page_item > a {
+    background-color: rgba(56, 111, 181, 0.15); /* Very subtle blue tint */
+    color: rgb(56, 111, 181); /* Blue text instead of white */
+    transform: translateY(-1px);
+    text-shadow: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
 /* Inner Page Menu Item Colors */
 #overlay-menu-container.inner-page .overlay-menu > li > a {
-    font-weight: bold;
     color: rgb(255, 255, 255);
 }
 
@@ -172,6 +183,16 @@ header.element-disable #logo-name.logo-left {
     color: white;
     transform: translateY(-1px);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Active page state - slightly stronger than hover */
+#overlay-menu-container.inner-page .overlay-menu > li.current-menu-item > a,
+#overlay-menu-container.inner-page .overlay-menu > li.current_page_item > a {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    transform: translateY(-1px);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* ---------------------------
@@ -342,7 +363,8 @@ header.element-disable #logo-name.logo-left {
     /* Keep the blue bar visible for inner pages */
     #overlay-menu-container.inner-page {
         display: flex !important;
-        background: #386fb5;
+        background: rgba(56, 111, 181, 0.6); /* Match main opacity */
+        backdrop-filter: blur(10px);
         justify-content: flex-start;
         padding-left: 0;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
