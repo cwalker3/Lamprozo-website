@@ -1,6 +1,6 @@
 <?php
 
-    // theme/models/view.php
+    // template/models/view.php
 
     // Parse Request URI Function
     function parse_request_uri() {
@@ -28,6 +28,10 @@
             case 'blog':
                 $assets['css'][]    = $template_path . '/assets/css/blog.css';
                 $assets['js'][]     = $template_path . '/assets/js/blog.js';
+                break;
+            
+            case 'blog-post':
+                $assets['css'][]    = $template_path . '/assets/css/blog-post.css';
                 break;
             
             case 'app':

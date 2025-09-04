@@ -10,15 +10,25 @@
         $landing_page_contents   =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing.html');
 		$landing_page_contents   .= file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing-secondary.html');
 		$template_page_contents  =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/template.html');
+		
+		// Load banner template
+		$banner_template = file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/page-banner.html');
+		
+		// Create banners for each page
+		$blog_banner = str_replace('{{PAGE_TITLE}}', 'Blog', $banner_template);
+		$contact_banner = str_replace('{{PAGE_TITLE}}', 'Contact', $banner_template);
+		$signup_banner = str_replace('{{PAGE_TITLE}}', 'Sign Up', $banner_template);
+		$order_history_banner = str_replace('{{PAGE_TITLE}}', 'Order History', $banner_template);
+		$dashboard_banner = str_replace('{{PAGE_TITLE}}', 'Dashboard', $banner_template);
 
 		return array(
 			'home'              => array('title' => 'Home',             'content' => $landing_page_contents),
 			'app'               => array('title' => 'App',              'content' => 'This is the PWA front end page.'),
-			'blog'              => array('title' => 'Blog',             'content' => 'This is the blog.'),
-			'contact'           => array('title' => 'Contact',          'content' => 'This is the contact page.'),
-			'signup'            => array('title' => 'Signup',           'content' => 'This is the signup page.'),
-			'order-history'     => array('title' => 'Order History',    'content' => 'This is the order history page.'),
-			'dashboard'         => array('title' => 'Dashboard',        'content' => 'This is the dashboard page.'),
+			'blog'              => array('title' => 'Blog',             'content' => $blog_banner),
+			'contact'           => array('title' => 'Contact',          'content' => $contact_banner),
+			'signup'            => array('title' => 'Signup',           'content' => $signup_banner),
+			'order-history'     => array('title' => 'Order History',    'content' => $order_history_banner),
+			'dashboard'         => array('title' => 'Dashboard',        'content' => $dashboard_banner),
 			'template'          => array('title' => 'Template',        	'content' => $template_page_contents),
 		);
 	}

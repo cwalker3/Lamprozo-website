@@ -1,4 +1,4 @@
-// theme/assets/js/_core_nav.js
+// template/assets/js/_core_nav.js
 
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize navigation system

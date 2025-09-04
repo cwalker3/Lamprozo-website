@@ -33,11 +33,23 @@ p {
 }
 
 #view-content:not(:has(#app-root)) {
-    margin-top: 15vh;
+    margin-top: 0;
 }
 
 main:not(:has(.home)) {
     min-height: 1000px;
+}
+
+/* Ensure view content starts at top for pages with banners */
+#view-content {
+    margin-top: 0;
+}
+
+/* Remove any top margin/padding from banner blocks */
+#view-content > .wp-block-cover:first-child,
+.content > .wp-block-cover:first-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 /* =============================================================================
@@ -88,6 +100,81 @@ main:not(:has(.home)) {
 		/* Reset any margins and ensure full width */
 		margin: 0 !important;
 		width: 100% !important;
+	}
+	
+	/* Ensure banners on pages start at the top */
+	.content.blog .wp-block-cover:first-child,
+	.content.contact .wp-block-cover:first-child,
+	.content.signup .wp-block-cover:first-child,
+	.content.order-history .wp-block-cover:first-child,
+	.content.dashboard .wp-block-cover:first-child {
+		margin-top: 0 !important;
+		margin-bottom: 5vh !important;
+	}
+	
+	/* Add depth overlay effect ONLY to specific full-width covers with background images */
+	/* Target covers that have the landing-default-bg image */
+	.content > .wp-block-cover:has(img[src*="landing-default-bg"]) {
+		position: relative;
+	}
+	
+	/* Add gradient overlay only to covers with the landing background image */
+	.content > .wp-block-cover:has(img[src*="landing-default-bg"])::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(
+			to bottom,
+			rgba(0, 0, 0, 0.3) 0%,
+			rgba(0, 0, 0, 0.15) 30%,
+			rgba(0, 0, 0, 0.1) 60%,
+			rgba(0, 0, 0, 0.4) 100%
+		);
+		pointer-events: none;
+		z-index: 1;
+	}
+	
+	/* Fallback for browsers without :has() support - use class-based approach */
+	.content > .wp-block-cover.height-preset-full,
+	.content > .wp-block-cover.height-preset-half {
+		position: relative;
+	}
+	
+	.content > .wp-block-cover.height-preset-full::after,
+	.content > .wp-block-cover.height-preset-half::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(
+			to bottom,
+			rgba(0, 0, 0, 0.3) 0%,
+			rgba(0, 0, 0, 0.15) 30%,
+			rgba(0, 0, 0, 0.1) 60%,
+			rgba(0, 0, 0, 0.4) 100%
+		);
+		pointer-events: none;
+		z-index: 1;
+	}
+	
+	/* Ensure cover inner content is above the overlay for affected covers */
+	.content > .wp-block-cover:has(img[src*="landing-default-bg"]) .wp-block-cover__inner-container,
+	.content > .wp-block-cover.height-preset-full .wp-block-cover__inner-container,
+	.content > .wp-block-cover.height-preset-half .wp-block-cover__inner-container {
+		position: relative;
+		z-index: 2;
+	}
+	
+	/* Explicitly exclude all covers that use transparent-fill or other images */
+	.content > .wp-block-cover:has(img[src*="transparent-fill"])::after,
+	.wp-block-column .wp-block-cover::after {
+		content: none !important;
+		background: none !important;
 	}
 
 	/* Ensure body can scroll when there are cover blocks */
@@ -737,6 +824,7 @@ footer {
     display: grid;
     place-content: center;
     min-height: 25vh;
+	margin-top: 5vh;
     background-color: var(--mainColor);
     color: white;
     z-index: 1;

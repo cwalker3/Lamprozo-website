@@ -1,6 +1,6 @@
 <?php
 
-    // theme/models/init.php
+    // template/models/init.php
 
     // Register Navigation Menu
     function register_website_menu() {

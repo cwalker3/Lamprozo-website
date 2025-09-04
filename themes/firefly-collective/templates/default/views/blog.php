@@ -36,8 +36,6 @@
     ));
 ?>
 
-<h1><?php echo esc_html($pageTitle); ?></h1>
-
 <?php echo apply_filters('the_content', $postContent); ?>
 
 <div id="blog-filter">
@@ -105,11 +103,16 @@
                     <div class="featured-img-container">
                         <img src="<?php echo esc_url(get_the_post_thumbnail_url(get_the_ID(), 'full')); ?>" class="featured-img" alt="<?php the_title_attribute(); ?>">
                     </div>
+                <?php } else { ?>
+                    <div class="featured-img-container">
+                        <!-- Placeholder gradient if no featured image -->
+                    </div>
                 <?php } ?>
-                <h2><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h2>
-                <h2>By: <?php echo get_blog_poster_name(); ?></h2>
-                <div><?php the_excerpt(); ?></div>
-                <hr>
+                <div class="blog-content">
+                    <h2><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h2>
+                    <div class="blog-meta">By: <?php echo get_blog_poster_name(); ?> • <?php echo get_the_date(); ?></div>
+                    <div class="blog-excerpt"><?php the_excerpt(); ?></div>
+                </div>
             </div>
         <?php }
         wp_reset_postdata();

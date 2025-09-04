@@ -1,6 +1,6 @@
 <?php
 
-    // theme/models/nav.php
+    // template/models/nav.php
 
 	function custom_theme_setup_navigation() {
 		// Dynamically get all pages that were created in pages.php (excluding dashboard)
