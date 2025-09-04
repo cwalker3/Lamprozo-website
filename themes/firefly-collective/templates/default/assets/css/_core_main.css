@@ -865,16 +865,7 @@ main:not(:has(.home)) {
     height: auto;
 }
 
-footer {
-    display: grid;
-    place-content: center;
-    min-height: 25vh;
-	margin-top: 5vh;
-    background-color: var(--mainColor);
-    color: white;
-    z-index: 1;
-    width: 100%;
-}
+/* Footer styles moved to footer.css */
 
 .element-disable {
     display: none;

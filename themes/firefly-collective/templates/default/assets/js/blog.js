@@ -95,13 +95,19 @@ document.addEventListener('DOMContentLoaded', function () {
             imgHTML = `<div class="featured-img-container">
                         <img src="${blog.featured_image}" class="featured-img" alt="${blog.title}">
                       </div>`;
+        } else {
+            imgHTML = `<div class="featured-img-container">
+                        <!-- Placeholder gradient if no featured image -->
+                      </div>`;
         }
 
-        blogShort.innerHTML = `<h2><a href="${blog.permalink}" target="_blank">${blog.title}</a></h2>
-                               <h2>By: ${blog.author}</h2>
-                               ${imgHTML}
-                               <div><p>${blog.excerpt}</p></div>
-                               <hr>`;
+        // Match the PHP structure exactly
+        blogShort.innerHTML = `${imgHTML}
+                               <div class="blog-content">
+                                   <h2><a href="${blog.permalink}">${blog.title}</a></h2>
+                                   <div class="blog-meta">By: ${blog.author} • ${blog.date || ''}</div>
+                                   <div class="blog-excerpt">${blog.excerpt}</div>
+                               </div>`;
         blogsContainer.insertBefore(blogShort, moreBlogsLoader);
     }
 

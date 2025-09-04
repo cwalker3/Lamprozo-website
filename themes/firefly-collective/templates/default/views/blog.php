@@ -44,7 +44,7 @@
     </div>
     <div id="blog-filter-options">
         <div>
-            <h3><?php esc_html_e('Filter Options'); ?></h3>
+            <h3><?php esc_html_e('Filter Blog Posts'); ?></h3>
             <div id="blog-filter-options-wrapper">
                 <select id="category-filter">
                     <option value=""><?php esc_html_e('All Categories'); ?></option>
@@ -82,11 +82,10 @@
                 </select>
 
                 <div id="blog-search-text">
-                    <input type="text" id="blog-filter-keywords" placeholder="<?php esc_attr_e('Keywords'); ?>">
-                </div>
-
-                <div id="blog-filter-submit">
-                    <input type="submit" id="blog-filter-submit-btn" value="<?php esc_attr_e('Filter Results'); ?>">
+                    <input type="text" id="blog-filter-keywords" placeholder="<?php esc_attr_e('Search keywords...'); ?>">
+                    <div id="blog-filter-submit">
+                        <input type="submit" id="blog-filter-submit-btn" value="<?php esc_attr_e('Apply'); ?>">
+                    </div>
                 </div>
             </div>
         </div>
