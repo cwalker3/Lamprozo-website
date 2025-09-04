@@ -311,25 +311,124 @@ export class ViewManager {
     }
 
     handleElementCloned(data) {
-        const { type, featureIndex, optionIndex } = data;
+        const { type, featureIndex, optionIndex, newIndex } = data;
         
         if (type === 'feature') {
             // Re-render all features to show the new clone
             this.render();
-            // Update heights after rendering
-            this.expandCollapseController.recalculateAllHeights();
+            
+            // Simple scroll like the old system - just find and scroll
+            if (newIndex !== undefined) {
+                setTimeout(() => {
+                    const newFeatureElement = this.container.querySelector(`[data-feature-index="${newIndex}"]`);
+                    if (newFeatureElement) {
+                        this.expandCollapseController.toggleExpandCollapse(newFeatureElement, true);
+                        this.simpleScrollToElement(newFeatureElement);
+                        // Use the full height calculation system for features too
+                        this.expandCollapseController.recalculateAllHeights();
+                    }
+                }, 100);
+            }
         } else if (type === 'option') {
-            this.rerenderFeature(featureIndex);
-            // Update heights after re-rendering the feature
-            this.expandCollapseController.recalculateAllHeights();
+            // Create and insert the new option element directly, like the old system
+            const data = this.dataManager.getData();
+            const option = data.features[featureIndex]?.options[newIndex];
+            
+            if (option) {
+                const featureElement = this.container.querySelector(`[data-feature-index="${featureIndex}"]`);
+                const availableMetrics = this.dataManager.getAvailableMetrics();
+                const featureRecurringCheckbox = featureElement?.querySelector('input[type="checkbox"]');
+                
+                const newOptionElement = this.elementBuilder.createOptionElement(
+                    featureIndex, newIndex, option, availableMetrics, featureRecurringCheckbox
+                );
+                newOptionElement.classList.add(this.config.getClass('fade_in'));
+                
+                // Insert before add option row - just like the old system
+                const addOptionRow = featureElement?.querySelector('.add-option-row');
+                if (addOptionRow) {
+                    addOptionRow.parentNode.insertBefore(newOptionElement, addOptionRow);
+                    
+                    // Simple scroll like the old system - expand and scroll
+                    setTimeout(() => {
+                        this.expandCollapseController.toggleExpandCollapse(newOptionElement, true);
+                        this.simpleScrollToElement(newOptionElement);
+                        // Use the full height calculation system instead of simple multipliers
+                        this.expandCollapseController.recalculateAllHeights();
+                    }, 100);
+                }
+            }
         } else if (type === 'addon') {
-            this.rerenderOption(featureIndex, optionIndex);
-            // Update heights after re-rendering the option
-            this.expandCollapseController.recalculateAllHeights();
+            // Create and insert the new addon element directly, like the old system
+            const data = this.dataManager.getData();
+            const addon = data.features[featureIndex]?.options[optionIndex]?.addons[newIndex];
+            
+            if (addon) {
+                const optionElement = this.container.querySelector(
+                    `[data-feature-index="${featureIndex}"] [data-option-index="${optionIndex}"]`
+                );
+                const availableMetrics = this.dataManager.getAvailableMetrics();
+                const featureElement = optionElement?.closest('.feature');
+                const featureRecurringCheckbox = featureElement?.querySelector('input[type="checkbox"]');
+                
+                const newAddonElement = this.elementBuilder.createAddonElement(
+                    featureIndex, optionIndex, newIndex, addon,
+                    availableMetrics, featureRecurringCheckbox
+                );
+                newAddonElement.classList.add(this.config.getClass('fade_in'));
+                
+                // Insert before add addon row - just like the old system
+                const addAddonRow = optionElement?.querySelector('.add-addon-row');
+                if (addAddonRow) {
+                    addAddonRow.parentNode.insertBefore(newAddonElement, addAddonRow);
+                    
+                    // Simple scroll like the old system - expand and scroll
+                    setTimeout(() => {
+                        this.expandCollapseController.toggleExpandCollapse(newAddonElement, true);
+                        this.simpleScrollToElement(newAddonElement);
+                        // Use the full height calculation system instead of simple multipliers
+                        this.expandCollapseController.recalculateAllHeights();
+                    }, 100);
+                }
+            }
         }
     }
 
-    handleFeatureCreateSuccess(data) {
+    /**
+     * Simple scroll function like the old monolith system
+     * @param {HTMLElement} element - Element to scroll to
+     */
+    simpleScrollToElement(element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    /**
+     * Update parent container heights like the old monolith system
+     * @param {HTMLElement} element - Element that was added
+     */
+    updateParentContainers(element) {
+        // Find parent option if it exists
+        const optionEl = element.closest('.option');
+        if (optionEl) {
+            const optionContent = optionEl.querySelector('.content');
+            if (optionContent && optionContent.classList.contains('open')) {
+                // Set a generous max-height that won't need adjustment
+                optionContent.style.maxHeight = Math.max(optionContent.scrollHeight * 2.5, 2000) + 'px';
+            }
+        }
+        
+        // Find parent feature
+        const featureEl = element.closest('.feature');
+        if (featureEl) {
+            const featureContent = featureEl.querySelector('.feature-content');
+            if (featureContent && featureContent.classList.contains('open')) {
+                // Set a generous max-height that won't need adjustment
+                featureContent.style.maxHeight = Math.max(featureContent.scrollHeight * 2.5, 3000) + 'px';
+            }
+        }
+    }
+
+    async handleFeatureCreateSuccess(data) {
         const { feature, index } = data;
         const availableMetrics = this.dataManager.getAvailableMetrics();
         
@@ -342,23 +441,25 @@ export class ViewManager {
         if (this.addFeatureButton) {
             this.container.insertBefore(featureElement, this.addFeatureButton);
             
-            // Expand and scroll to new feature - use timing from original system
-            setTimeout(() => {
-                this.expandCollapseController.expandFeature(featureElement);
-                this.expandCollapseController.scrollIntoViewWithOffset(featureElement);
-                // Update parent heights after expansion - use updateAllOpenContainers like original
-                setTimeout(() => {
-                    this.expandCollapseController.updateAllOpenContainers();
-                }, 50);
-            }, 10);
+            // Wait for DOM insertion to complete
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
+            // Sequential async operations for proper timing
+            await this.expandCollapseController.expandFeatureAsync(featureElement);
+            await this.expandCollapseController.updateAllOpenContainersAsync();
+            await this.expandCollapseController.scrollIntoViewWithOffsetAsync(featureElement);
         }
     }
 
-    handleOptionCreateSuccess(data) {
+    async handleOptionCreateSuccess(data) {
+        console.log('🆕 handleOptionCreateSuccess: Starting option creation sequence', data);
         const { option, featureIndex, optionIndex } = data;
         
         const featureElement = this.container.querySelector(`[data-feature-index="${featureIndex}"]`);
-        if (!featureElement) return;
+        if (!featureElement) {
+            console.log('❌ handleOptionCreateSuccess: Feature element not found');
+            return;
+        }
         
         const availableMetrics = this.dataManager.getAvailableMetrics();
         const featureRecurringCheckbox = featureElement.querySelector('input[type="checkbox"]');
@@ -367,26 +468,29 @@ export class ViewManager {
             featureIndex, optionIndex, option, availableMetrics, featureRecurringCheckbox
         );
         optionElement.classList.add(this.config.getClass('fade_in'));
+        console.log('🏗️ handleOptionCreateSuccess: Option element created', optionElement);
         
         // Insert before add option row
         const addOptionRow = featureElement.querySelector('.add-option-row');
         if (addOptionRow) {
             addOptionRow.parentNode.insertBefore(optionElement, addOptionRow);
+            console.log('📍 handleOptionCreateSuccess: Option element inserted into DOM');
             
-            // Expand feature and new option - use timing from original system
-            setTimeout(() => {
-                this.expandCollapseController.expandFeature(featureElement);
-                this.expandCollapseController.toggleExpandCollapse(optionElement, true);
-                this.expandCollapseController.scrollIntoViewWithOffset(optionElement);
-                // Update parent heights after expansion
-                setTimeout(() => {
-                    this.expandCollapseController.updateAllOpenContainers();
-                }, 50);
-            }, 10);
+            // Wait for DOM insertion to complete
+            await new Promise(resolve => setTimeout(resolve, 10));
+            console.log('✅ handleOptionCreateSuccess: DOM insertion wait complete');
+            
+            // Sequential async operations for proper timing
+            console.log('🔄 handleOptionCreateSuccess: Starting async sequence...');
+            await this.expandCollapseController.expandFeatureAsync(featureElement);
+            await this.expandCollapseController.toggleExpandCollapseAsync(optionElement, true);
+            await this.expandCollapseController.updateAllOpenContainersAsync();
+            await this.expandCollapseController.scrollIntoViewWithOffsetAsync(optionElement);
+            console.log('🎉 handleOptionCreateSuccess: Complete sequence finished!');
         }
     }
 
-    handleAddonCreateSuccess(data) {
+    async handleAddonCreateSuccess(data) {
         const { addon, featureIndex, optionIndex, addonIndex } = data;
         
         const optionElement = this.container.querySelector(
@@ -409,17 +513,15 @@ export class ViewManager {
         if (addAddonRow) {
             addAddonRow.parentNode.insertBefore(addonElement, addAddonRow);
             
-            // Expand containers and new addon - use timing from original system
-            setTimeout(() => {
-                this.expandCollapseController.expandFeature(featureElement);
-                this.expandCollapseController.toggleExpandCollapse(optionElement, true);
-                this.expandCollapseController.toggleExpandCollapse(addonElement, true);
-                this.expandCollapseController.scrollIntoViewWithOffset(addonElement);
-                // Update parent heights after expansion
-                setTimeout(() => {
-                    this.expandCollapseController.updateAllOpenContainers();
-                }, 50);
-            }, 10);
+            // Wait for DOM insertion to complete
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
+            // Sequential async operations for proper timing
+            await this.expandCollapseController.expandFeatureAsync(featureElement);
+            await this.expandCollapseController.toggleExpandCollapseAsync(optionElement, true);
+            await this.expandCollapseController.toggleExpandCollapseAsync(addonElement, true);
+            await this.expandCollapseController.updateAllOpenContainersAsync();
+            await this.expandCollapseController.scrollIntoViewWithOffsetAsync(addonElement);
         }
     }
 

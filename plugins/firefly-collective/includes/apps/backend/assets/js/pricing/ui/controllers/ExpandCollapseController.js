@@ -387,6 +387,132 @@ export class ExpandCollapseController {
     }
 
     /**
+     * Async version of expandFeature that waits for completion
+     * @param {HTMLElement} featureElement - Feature element to expand
+     * @returns {Promise} Promise that resolves when expansion is complete
+     */
+    async expandFeatureAsync(featureElement) {
+        return new Promise((resolve) => {
+            console.log('🔓 ExpandFeatureAsync: Expanding feature', featureElement);
+            this.expandFeature(featureElement);
+            // Wait for animation to start and initial layout
+            setTimeout(() => {
+                console.log('✅ ExpandFeatureAsync: Feature expansion complete');
+                resolve();
+            }, 50);
+        });
+    }
+
+    /**
+     * Async version of toggleExpandCollapse that waits for completion
+     * @param {HTMLElement} element - Element to toggle
+     * @param {boolean} forceExpand - Force expand
+     * @returns {Promise} Promise that resolves when toggle is complete
+     */
+    async toggleExpandCollapseAsync(element, forceExpand = false) {
+        return new Promise((resolve) => {
+            console.log('🔄 ToggleExpandCollapseAsync: Toggling element', element, 'forceExpand:', forceExpand);
+            this.toggleExpandCollapse(element, forceExpand);
+            // Wait for animation to start and initial layout
+            setTimeout(() => {
+                console.log('✅ ToggleExpandCollapseAsync: Toggle complete');
+                resolve();
+            }, 50);
+        });
+    }
+
+    /**
+     * Async version of updateAllOpenContainers that waits for completion
+     * @returns {Promise} Promise that resolves when all containers are updated
+     */
+    async updateAllOpenContainersAsync() {
+        return new Promise((resolve) => {
+            console.log('📏 UpdateAllOpenContainersAsync: Starting height calculations');
+            this.updateAllOpenContainers();
+            // Wait for height calculations to complete
+            setTimeout(() => {
+                console.log('✅ UpdateAllOpenContainersAsync: Height calculations complete');
+                resolve();
+            }, 200);
+        });
+    }
+
+    /**
+     * Async version of scrollIntoViewWithOffset that waits for scroll completion
+     * Uses research-based solutions for dynamic content scrolling
+     * @param {HTMLElement} element - Element to scroll to
+     * @returns {Promise} Promise that resolves when scroll is complete
+     */
+    async scrollIntoViewWithOffsetAsync(element) {
+        return new Promise((resolve) => {
+            if (!element) {
+                console.log('🚫 ScrollIntoViewAsync: No element provided');
+                resolve();
+                return;
+            }
+            
+            console.log('🎯 ScrollIntoViewAsync: Starting scroll to element', element);
+            console.log('📏 Element position before scroll:', element.getBoundingClientRect());
+            
+            // Force multiple layout recalculations to ensure stability
+            document.body.offsetHeight;
+            element.offsetHeight;
+            element.scrollHeight;
+            
+            // Get current scroll position
+            const initialScrollY = window.scrollY;
+            console.log('📍 Initial scroll position:', initialScrollY);
+            
+            // Calculate target position manually for better accuracy
+            const rect = element.getBoundingClientRect();
+            const targetY = rect.top + window.scrollY - (window.innerHeight / 2) + (rect.height / 2);
+            
+            console.log('🎯 Target scroll position:', targetY);
+            console.log('📊 Element rect:', rect);
+            
+            // Use requestAnimationFrame for better timing (research-based solution)
+            requestAnimationFrame(() => {
+                console.log('🔄 RequestAnimationFrame: Executing scroll');
+                
+                // Use manual scrollTo with calculated position for more reliability
+                window.scrollTo({
+                    top: targetY,
+                    behavior: 'smooth'
+                });
+                
+                // Use intersection observer to detect when scroll is complete
+                let scrollTimeout;
+                let lastScrollY = window.scrollY;
+                
+                const checkScrollComplete = () => {
+                    const currentScrollY = window.scrollY;
+                    console.log('📍 Current scroll position:', currentScrollY);
+                    
+                    if (Math.abs(currentScrollY - lastScrollY) < 1) {
+                        // Scroll has stopped moving
+                        console.log('✅ Scroll completed at position:', currentScrollY);
+                        clearTimeout(scrollTimeout);
+                        resolve();
+                    } else {
+                        lastScrollY = currentScrollY;
+                        scrollTimeout = setTimeout(checkScrollComplete, 50);
+                    }
+                };
+                
+                // Start checking for scroll completion after a small delay
+                setTimeout(checkScrollComplete, 100);
+                
+                // Fallback timeout in case scroll detection fails
+                setTimeout(() => {
+                    console.log('⏰ Scroll timeout fallback triggered');
+                    clearTimeout(scrollTimeout);
+                    resolve();
+                }, 2000);
+            });
+        });
+    }
+
+    /**
      * Clean up any pending animations or updates
      */
     cleanup() {
