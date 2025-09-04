@@ -72,7 +72,7 @@
         // Get active template name
         $active_template = firefly_collective_get_active_template();
 
-        // Get menu HTML
+        // Get menu HTML - set up menu if it doesn't exist
         ob_start();
         wp_nav_menu(array(
             'theme_location'  => 'app-menu',
@@ -80,6 +80,18 @@
             'fallback_cb'     => false,
         ));
         $menu_html = ob_get_clean();
+        
+        // If menu is empty, set it up
+        if (empty($menu_html)) {
+            app_setup_nav();
+            ob_start();
+            wp_nav_menu(array(
+                'theme_location'  => 'app-menu',
+                'container_class' => 'app-menu',
+                'fallback_cb'     => false,
+            ));
+            $menu_html = ob_get_clean();
+        }
 
         // Get app page title and html
         $app_page_title = '';
