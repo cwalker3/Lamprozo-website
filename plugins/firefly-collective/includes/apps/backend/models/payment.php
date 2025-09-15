@@ -11,7 +11,7 @@
         \Stripe\Stripe::setApiKey($secret_key);
         
         // Set API version
-        \Stripe\Stripe::setApiVersion('2025-07-30.basil');
+        \Stripe\Stripe::setApiVersion('2025-08-27.basil');
     }
 
     /**
