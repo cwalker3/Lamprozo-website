@@ -76,6 +76,25 @@
 	}
 
 	/**
+	 * Normalize option values for control consumption (e.g. ensure checkboxes use real booleans)
+	 */
+	function template_normalize_option_value($option_key, $value) {
+		$options_config = template_get_options_config();
+		
+		if (!isset($options_config[$option_key])) {
+			return $value;
+		}
+		
+		$type = isset($options_config[$option_key]['type']) ? $options_config[$option_key]['type'] : '';
+		
+		if ($type === 'checkbox') {
+			return (bool) $value;
+		}
+		
+		return $value;
+	}
+
+	/**
 	 * Get template-scoped option name
 	 */
 	function template_get_option_name($option_key, $is_preview = false) {
@@ -92,11 +111,13 @@
 		$options_config = template_get_options_config();
 		
 		foreach ($options_config as $option_key => $config) {
-			$live_option = template_get_option_name($option_key, false);
-			$preview_option = template_get_option_name($option_key, true);
-			
-			update_option($live_option, $config['default']);
-			update_option($preview_option, $config['default']);
+		// Apply sanitize callbacks so stored defaults match expected format
+		template_set_option($option_key, $config['default']);
+		template_set_option_preview($option_key, $config['default']);
+		
+		// Clear any previously saved Customizer setting so UI reflects defaults
+		$setting_id = 'template_' . $option_key;
+		delete_option($setting_id);
 		}
 	}
 	add_action('after_switch_theme', 'template_set_defaults');
@@ -134,12 +155,14 @@
 			// Get the current LIVE value (not preview)
 			$current_live_value = template_get_option($option_key, false);
 			
-			// Add setting
-			$wp_customize->add_setting($setting_id, array(
-				'default' => $current_live_value,
-				'transport' => 'postMessage',
-				'sanitize_callback' => isset($config['sanitize_callback']) ? $config['sanitize_callback'] : 'sanitize_text_field'
-			));
+		// Add setting
+		$wp_customize->add_setting($setting_id, array(
+			'default' => $current_live_value,
+			'type' => 'option',
+			'capability' => 'customize',
+			'transport' => 'postMessage',
+			'sanitize_callback' => isset($config['sanitize_callback']) ? $config['sanitize_callback'] : 'sanitize_text_field'
+		));
 
 			// DON'T force set_post_value - let user changes work normally
 			// The JavaScript will handle syncing preview values
@@ -187,7 +210,8 @@
 		$options_config = template_get_options_config();
 		$option_name = template_get_option_name($option_key, $preview);
 		$default = isset($options_config[$option_key]['default']) ? $options_config[$option_key]['default'] : '';
-		return get_option($option_name, $default);
+		$value = get_option($option_name, $default);
+		return template_normalize_option_value($option_key, $value);
 	}
 
 	/**
@@ -196,7 +220,8 @@
 	function template_get_option_preview($option_key) {
 		$option_name = template_get_option_name($option_key, true);
 		$fallback = template_get_option($option_key);
-		return get_option($option_name, $fallback);
+		$value = get_option($option_name, $fallback);
+		return template_normalize_option_value($option_key, $value);
 	}
 
 	/**
@@ -343,6 +368,9 @@
 					
 					// Sync preview value to match live value
 					template_set_option_preview($option_key, $option_value);
+					
+					// Remove the transient option used by the Customizer since we persist elsewhere
+					delete_option($setting_id);
 				}
 			}
 		}
