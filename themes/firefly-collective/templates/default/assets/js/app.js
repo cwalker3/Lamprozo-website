@@ -544,6 +544,12 @@ document.addEventListener('DOMContentLoaded', function () {
       
       setupNavigation();
       updateNavVisibility();
+
+      // Initialize profile dropdown
+      if (typeof window.initProfileDropdown === 'function') {
+        window.initProfileDropdown();
+      }
+
       return true;
     }
     return false;
@@ -563,14 +569,15 @@ document.addEventListener('DOMContentLoaded', function () {
         break;
 
       case 'log-out':
+        // Logout is now handled through the profile dropdown
+        // This case is kept for backward compatibility
         loader.style.display = 'block';
-        
+
         // If offline, just clear local data
         if (!navigator.onLine) {
           loader.style.display = 'none';
           clearUser();
         }
-
         else {
           // Logout endpoint
           fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
@@ -580,12 +587,10 @@ document.addEventListener('DOMContentLoaded', function () {
           }).then(response => response.json())
           .then(data => {
             if (data.logout) {
-              
               // Also reset dashboard if it has a similar pattern
               if (window.resetDashboard) {
                 window.resetDashboard();
               }
-
               clearUser();
               loader.style.display = 'none';
             }
@@ -805,29 +810,37 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function updateNavVisibility() {
-    const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
-    const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
-    const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
-    const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
-    const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
-    const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
-    
+    const profileDropdownContainer = document.getElementById('profile-dropdown-container');
+
+    // Get all menu items and find specific ones by content
+    const allMenuItems = document.querySelectorAll('body > nav ul > li');
+    let loginBtn = null;
+    let signupBtn = null;
+    let backToWebsiteBtn = null;
+
+    allMenuItems.forEach(item => {
+      const text = item.textContent.trim();
+      if (text === 'Log In' || text === 'Login') {
+        loginBtn = item;
+      } else if (text === 'Signup' || text === 'Sign Up') {
+        signupBtn = item;
+      } else if (text === 'Back to Website') {
+        backToWebsiteBtn = item;
+      }
+    });
+
     if (window.navData && window.navData.auth_id) {
       // User is logged in
-      if (signupBtn) signupBtn.style.display = 'none';
       if (loginBtn) loginBtn.style.display = 'none';
-      if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
-      if (dashboardBtn) dashboardBtn.style.display = 'block';
+      if (signupBtn) signupBtn.style.display = 'none';
       if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
-      if (logoutBtn) logoutBtn.style.display = 'block';
+      if (profileDropdownContainer) profileDropdownContainer.style.display = 'block';
     } else {
       // User is logged out
-      if (signupBtn) signupBtn.style.display = 'block';
       if (loginBtn) loginBtn.style.display = 'block';
-      if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
-      if (dashboardBtn) dashboardBtn.style.display = 'none';
+      if (signupBtn) signupBtn.style.display = 'block';
       if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
-      if (logoutBtn) logoutBtn.style.display = 'none';
+      if (profileDropdownContainer) profileDropdownContainer.style.display = 'none';
     }
   }
 
@@ -1325,6 +1338,11 @@ document.addEventListener('DOMContentLoaded', function () {
           
           // Update navigation
           setupNavigation();
+
+          // Initialize profile dropdown
+          if (typeof window.initProfileDropdown === 'function') {
+            window.initProfileDropdown();
+          }
 
           appRoot.innerHTML = '';
 

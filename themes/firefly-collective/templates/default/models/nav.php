@@ -32,10 +32,10 @@
 		$locations['website-menu'] = $menu_id;
 		set_theme_mod('nav_menu_locations', $locations);
 
-		// If newly created, add all pages
+		// If newly created, add all pages (except template, dashboard, and order-history)
 		if ($new_menu) {
 			foreach ($page_ids as $slug => $page_id) {
-				if ($slug === 'template') continue; // Skip template
+				if ($slug === 'template' || $slug === 'dashboard' || $slug === 'order-history') continue;
 				wp_update_nav_menu_item($menu_id, 0, array(
 					'menu-item-title'     => $pages[$slug]['title'],
 					'menu-item-object'    => 'page',
@@ -52,7 +52,6 @@
 
 		// Append custom links in the exact order
 		$custom_links = array(
-			array('title' => 'Log Out',         'url' => '/logout'),
 			array('title' => 'Log In',          'url' => '/ffc-login'),
 		);
 		foreach ($custom_links as $link) {
@@ -67,3 +66,31 @@
 		}
 	}
 	add_action('after_switch_theme', 'custom_theme_setup_navigation', 20);
+
+	// Function to remove logout menu items from existing menus
+	function remove_logout_menu_items() {
+		$menus = wp_get_nav_menus();
+
+		foreach ($menus as $menu) {
+			$menu_items = wp_get_nav_menu_items($menu->term_id);
+
+			if ($menu_items) {
+				foreach ($menu_items as $item) {
+					// Remove logout, dashboard, and order history menu items
+					if ($item->title === 'Log Out' ||
+					    $item->title === 'Logout' ||
+					    $item->title === 'Dashboard' ||
+					    $item->title === 'Order History' ||
+					    strpos($item->url, '/logout') !== false ||
+					    strpos($item->url, '/dashboard') !== false ||
+					    strpos($item->url, '/order-history') !== false) {
+						wp_delete_post($item->ID, true);
+					}
+				}
+			}
+		}
+	}
+
+	// Run cleanup on admin_init to ensure it happens when admin is accessed
+	add_action('admin_init', 'remove_logout_menu_items');
+	add_action('after_switch_theme', 'remove_logout_menu_items', 30);

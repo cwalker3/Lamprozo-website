@@ -3,9 +3,12 @@
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize navigation system
     initNavigation();
-    
+
     // Initialize consolidated overlay menu if it exists
     initOverlayMenu();
+
+    // Initialize profile dropdown
+    initProfileDropdown();
 });
 
 // Extract initialization into a function that can be called after dynamic menu insertion
@@ -14,7 +17,6 @@ function initNavigation() {
     const closeNavBtn = document.getElementById('close-nav-btn');
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
-    const body = document.body;
 
     // Skip if elements don't exist yet
     if (!hamburger || !closeNavBtn || !nav || !backdrop) {
@@ -187,51 +189,40 @@ function initOverlayMenu() {
 
 // IMPROVED: Shared function to handle authentication-based menu item visibility
 function handleAuthMenuVisibility(selector) {
+    // Get all top-level menu items
+    const allTopLevelItems = document.querySelectorAll(selector);
+    const topLevelArray = Array.from(allTopLevelItems).filter(item => {
+        // Only target direct children, not submenu items
+        return !item.closest('.sub-menu');
+    });
+
+    // Find specific menu items by their text content
+    let loginBtn = null;
+    let signupBtn = null;
+    let backToWebsiteBtn = null;
+
+    topLevelArray.forEach(item => {
+        const text = item.textContent.trim();
+        if (text === 'Log In' || text === 'Login') {
+            loginBtn = item;
+        } else if (text === 'Signup' || text === 'Sign Up') {
+            signupBtn = item;
+        } else if (text === 'Back to Website') {
+            backToWebsiteBtn = item;
+        }
+    });
+
     // Make sure navData exists before using it
     if (typeof navData !== 'undefined' && navData.auth_id) {
-        // User is logged IN - Use array-based approach to avoid nth-last-of-type issues
-        const allTopLevelItems = document.querySelectorAll(selector);
-        const topLevelArray = Array.from(allTopLevelItems).filter(item => {
-            // Only target direct children, not submenu items
-            return !item.closest('.sub-menu');
-        });
-        
-        if (topLevelArray.length >= 5) {
-            const signupBtn = topLevelArray[topLevelArray.length - 5];      // 5th from last
-            const orderHistoryBtn = topLevelArray[topLevelArray.length - 4]; // 4th from last
-            const dashboardBtn = topLevelArray[topLevelArray.length - 3];    // 3rd from last
-            const logoutBtn = topLevelArray[topLevelArray.length - 2];       // 2nd from last
-            const loginBtn = topLevelArray[topLevelArray.length - 1];        // last
-            
-            // Hide signup and login, show authenticated user items
-            if (signupBtn) signupBtn.style.display = 'none';
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (orderHistoryBtn) orderHistoryBtn.style.display = 'list-item';
-            if (dashboardBtn) dashboardBtn.style.display = 'list-item';
-            if (logoutBtn) logoutBtn.style.display = 'list-item';
-        }
+        // User is logged IN
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (signupBtn) signupBtn.style.display = 'none';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'list-item';
     } else {
-        // User is logged OUT - Use array-based approach to avoid nth-last-of-type issues
-        const allTopLevelItems = document.querySelectorAll(selector);
-        const topLevelArray = Array.from(allTopLevelItems).filter(item => {
-            // Only target direct children, not submenu items
-            return !item.closest('.sub-menu');
-        });
-        
-        if (topLevelArray.length >= 5) {
-            const signupBtn = topLevelArray[topLevelArray.length - 5];      // 5th from last
-            const orderHistoryBtn = topLevelArray[topLevelArray.length - 4]; // 4th from last
-            const dashboardBtn = topLevelArray[topLevelArray.length - 3];    // 3rd from last
-            const logoutBtn = topLevelArray[topLevelArray.length - 2];       // 2nd from last
-            const loginBtn = topLevelArray[topLevelArray.length - 1];        // last
-            
-            // Show signup and login, hide authenticated user items
-            if (signupBtn) signupBtn.style.display = 'list-item';
-            if (loginBtn) loginBtn.style.display = 'list-item';
-            if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
-            if (dashboardBtn) dashboardBtn.style.display = 'none';
-            if (logoutBtn) logoutBtn.style.display = 'none';
-        }
+        // User is logged OUT
+        if (loginBtn) loginBtn.style.display = 'list-item';
+        if (signupBtn) signupBtn.style.display = 'list-item';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
     }
     
     // CRITICAL: Ensure all submenu items remain visible regardless of authentication
@@ -255,6 +246,91 @@ document.addEventListener('click', function(e) {
 // Handle keyboard navigation for accessibility
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        // Pure CSS handles all hover states - no manual hiding needed  
+        // Pure CSS handles all hover states - no manual hiding needed
     }
 });
+
+// Initialize profile dropdown functionality
+function initProfileDropdown() {
+    const profileButton = document.getElementById('profile-button');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    const profileContainer = document.getElementById('profile-dropdown-container');
+
+    if (!profileButton || !profileDropdown || !profileContainer) {
+        return; // Elements don't exist
+    }
+
+    // For PWA, show container if user is authenticated
+    if (window.auth_id || (typeof navData !== 'undefined' && navData.auth_id)) {
+        profileContainer.style.display = 'block';
+    }
+
+    // Toggle dropdown on button click
+    profileButton.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const isOpen = profileDropdown.getAttribute('aria-hidden') === 'false';
+
+        if (isOpen) {
+            closeProfileDropdown();
+        } else {
+            openProfileDropdown();
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!profileContainer.contains(e.target)) {
+            closeProfileDropdown();
+        }
+    });
+
+    // Close dropdown on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeProfileDropdown();
+        }
+    });
+
+    // Handle dropdown link clicks (for PWA)
+    const profileLinks = profileDropdown.querySelectorAll('.profile-dropdown-item');
+    profileLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            const href = this.getAttribute('href');
+
+            // For PWA, handle logout specially
+            if (href === '/logout' && typeof window.loadContent === 'function') {
+                e.preventDefault();
+                closeProfileDropdown();
+                window.loadContent('log-out');
+            }
+            // For PWA, handle dashboard specially
+            else if (href === '/dashboard' && typeof window.loadContent === 'function') {
+                e.preventDefault();
+                closeProfileDropdown();
+                window.loadContent('dashboard');
+            }
+            // For PWA, handle order history specially
+            else if (href === '/order-history' && typeof window.loadContent === 'function') {
+                e.preventDefault();
+                closeProfileDropdown();
+                window.loadContent('order-history');
+            }
+            // For regular website, let links work normally
+        });
+    });
+
+    function openProfileDropdown() {
+        profileDropdown.setAttribute('aria-hidden', 'false');
+        profileButton.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeProfileDropdown() {
+        profileDropdown.setAttribute('aria-hidden', 'true');
+        profileButton.setAttribute('aria-expanded', 'false');
+    }
+}
+
+// Export for PWA to call after dynamic menu load
+if (typeof window !== 'undefined') {
+    window.initProfileDropdown = initProfileDropdown;
+}

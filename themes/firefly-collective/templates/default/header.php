@@ -124,6 +124,37 @@
              alt="<?php esc_attr_e('Close Menu'); ?>">
     </div>
 
+    <!-- Profile Dropdown -->
+    <?php if ( is_user_logged_in() || ! empty( $_COOKIE['auth_id'] ) ) : ?>
+    <div id="profile-dropdown-container">
+        <button id="profile-button" aria-label="Profile menu" aria-expanded="false">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
+            </svg>
+        </button>
+        <div id="profile-dropdown" class="profile-dropdown-menu" aria-hidden="true">
+            <a href="/dashboard" class="profile-dropdown-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 13H11V3H3V13ZM3 21H11V15H3V21ZM13 21H21V11H13V21ZM13 3V9H21V3H13Z" fill="currentColor"/>
+                </svg>
+                Dashboard
+            </a>
+            <a href="/order-history" class="profile-dropdown-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V8H19V19ZM7 10V12H9V10H7ZM11 10V12H17V10H11ZM7 14V16H9V14H7ZM11 14V16H17V14H11Z" fill="currentColor"/>
+                </svg>
+                Order History
+            </a>
+            <a href="/logout" class="profile-dropdown-item">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17 7L15.59 8.41L18.17 11H8V13H18.17L15.59 15.59L17 17L22 12L17 7ZM4 5H12V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H12V19H4V5Z" fill="currentColor"/>
+                </svg>
+                Logout
+            </a>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <nav>
         <?php
             wp_nav_menu( array(

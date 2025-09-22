@@ -106,7 +106,8 @@
                                 'signup',
                                 'request-an-appointment',
                                 'dashboard',
-                                'order-history');
+                                'order-history',
+                                'logout');
             
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists

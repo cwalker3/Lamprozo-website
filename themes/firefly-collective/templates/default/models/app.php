@@ -153,10 +153,7 @@
 		$existing_titles = wp_list_pluck($existing_items, 'title');
 
 		$custom_links = array(
-			array('title' => 'Order History',     'url' => '#'),
-			array('title' => 'Dashboard',         'url' => '#'),
 			array('title' => 'Back to Website',   'url' => '#'),
-			array('title' => 'Log Out',           'url' => '#'),
 			array('title' => 'Log In',            'url' => '#'),
 		);
 		foreach ($custom_links as $link) {
@@ -171,6 +168,32 @@
 		}
 	}
 	add_action('after_switch_theme', 'app_setup_nav');
+
+	// Function to remove logout from app menu
+	function cleanup_app_menu_logout() {
+		$menu_name = 'App Menu';
+		$menu_obj = wp_get_nav_menu_object($menu_name);
+
+		if ($menu_obj) {
+			$menu_items = wp_get_nav_menu_items($menu_obj->term_id);
+
+			if ($menu_items) {
+				foreach ($menu_items as $item) {
+					// Remove logout, dashboard, and order history menu items
+					if ($item->title === 'Log Out' ||
+					    $item->title === 'Logout' ||
+					    $item->title === 'Dashboard' ||
+					    $item->title === 'Order History') {
+						wp_delete_post($item->ID, true);
+					}
+				}
+			}
+		}
+	}
+
+	// Run cleanup when admin is accessed and after theme switch
+	add_action('admin_init', 'cleanup_app_menu_logout');
+	add_action('after_switch_theme', 'cleanup_app_menu_logout', 30);
 
     function app_get_view($request) {
         global $template_path;

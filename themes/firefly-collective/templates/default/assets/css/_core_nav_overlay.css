@@ -314,12 +314,8 @@ header.element-disable #logo-name.logo-left {
     margin-top: 32px;
 }
 
-/* Authentication-based Menu Items */
-.overlay-menu > li:nth-last-of-type(4),
-.overlay-menu > li:nth-last-of-type(3),
-.overlay-menu > li:nth-last-of-type(2) {
-    display: none;
-}
+/* Authentication-based Menu Items - Now handled by JavaScript */
+/* Removed position-based hiding to prevent interference with legitimate menu items */
 
 /* Accessibility Enhancements */
 .overlay-menu a:focus {
