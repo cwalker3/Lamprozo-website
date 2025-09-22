@@ -3,6 +3,14 @@
 // DEV MODE TOGGLE - Set to true to always fetch fresh content
 const devMode = true;
 
+// Centralized logging function
+function swLog(message, ...args) {
+  return; // Temporarily disabled
+  if (devMode || !self.location.hostname.includes('localhost')) {
+    console.log(`[SW] ${message}`, ...args);
+  }
+}
+
 // Cache configuration
 const CACHE_PREFIX    =   'ffc-';
 const STATIC_CACHE    =   `${CACHE_PREFIX}static`;
@@ -174,7 +182,7 @@ async function cacheWithMetadata(cacheName, url, response) {
   const cacheKey = getCacheKey(url);
   await cache.put(cacheKey, response.clone());
   await setCacheMetadata(url, Date.now());
-  console.log(`[SW] Cached: ${cacheKey}`);
+  swLog(`Cached: ${cacheKey}`);
 }
 
 /**
@@ -188,7 +196,7 @@ async function getFromCache(url) {
     const cache = await caches.open(cacheName);
     const response = await cache.match(cacheKey);
     if (response) {
-      console.log(`[SW] Found in ${cacheName}: ${cacheKey}`);
+      swLog(`Found in ${cacheName}: ${cacheKey}`);
       return response;
     }
   }
@@ -209,10 +217,10 @@ async function cachePostRequest(request, response) {
     const cache = await caches.open(API_CACHE);
     await cache.put(new Request(cacheKey), response.clone());
     await setCacheMetadata(cacheKey, Date.now());
-    console.log('[SW] POST request cached:', cacheKey);
+    swLog('POST request cached:', cacheKey);
     return true;
   } catch (error) {
-    console.log('[SW] Failed to cache POST request:', error);
+    swLog('Failed to cache POST request:', error);
     return false;
   }
 }
@@ -233,13 +241,13 @@ async function getCachedPostResponse(request) {
     if (cachedResponse) {
       const expired = await isCacheExpired(cacheKey);
       if (!expired) {
-        console.log('[SW] Found valid cached POST response');
+        swLog('Found valid cached POST response');
         return cachedResponse;
       }
     }
     return null;
   } catch (error) {
-    console.log('[SW] Failed to retrieve cached POST response:', error);
+    swLog('Failed to retrieve cached POST response:', error);
     return null;
   }
 }
@@ -248,7 +256,7 @@ async function getCachedPostResponse(request) {
  * Cache assets for a specific template
  */
 async function cacheTemplateAssets(templateName) {
-  console.log(`[SW] Caching assets for template: ${templateName}`);
+  swLog(`Caching assets for template: ${templateName}`);
   const cache = await caches.open(STATIC_CACHE);
   
   // Cache core template assets
@@ -258,10 +266,10 @@ async function cacheTemplateAssets(templateName) {
       const response = await fetch(asset);
       if (response.ok) {
         await cache.put(asset, response);
-        console.log(`[SW] Cached core template asset: ${asset}`);
+        swLog(`Cached core template asset: ${asset}`);
       }
     } catch (error) {
-      console.log(`[SW] Failed to cache core template asset ${asset}:`, error);
+      swLog(`Failed to cache core template asset ${asset}:`, error);
     }
   }
   
@@ -272,10 +280,10 @@ async function cacheTemplateAssets(templateName) {
       const response = await fetch(asset);
       if (response.ok) {
         await cache.put(asset, response);
-        console.log(`[SW] Cached template asset: ${asset}`);
+        swLog(`Cached template asset: ${asset}`);
       }
     } catch (error) {
-      console.log(`[SW] Failed to cache template asset ${asset}:`, error);
+      swLog(`Failed to cache template asset ${asset}:`, error);
     }
   }
 }
@@ -284,7 +292,7 @@ async function cacheTemplateAssets(templateName) {
  * Install event - cache initial assets
  */
 self.addEventListener('install', event => {
-  console.log(`[SW] Installing service worker, devMode: ${devMode}`);
+  swLog(`Installing service worker, devMode: ${devMode}`);
   
   // Always skip waiting to activate immediately
   self.skipWaiting();
@@ -307,21 +315,21 @@ self.addEventListener('install', event => {
           const response = await fetch(file);
           if (response.ok) {
             await cache.put(file, response);
-            console.log(`[SW] Cached critical file: ${file}`);
+            swLog(`Cached critical file: ${file}`);
           }
         } catch (error) {
-          console.log(`[SW] Failed to cache critical file ${file}:`, error);
+          swLog(`Failed to cache critical file ${file}:`, error);
         }
       }
       
       // Skip the rest if in dev mode
       if (devMode) {
-        console.log('[SW] Dev mode enabled - skipping full asset cache');
+        swLog('Dev mode enabled - skipping full asset cache');
         return;
       }
       
       // Production mode - cache all assets for all available templates
-      console.log('[SW] Production mode - caching all template assets');
+      swLog('Production mode - caching all template assets');
       
       // Cache common templates
       const commonTemplates = ['default', 'modern', 'classic']; // Add your template names here
@@ -330,7 +338,7 @@ self.addEventListener('install', event => {
       }
       
     })().then(() => {
-      console.log('[SW] Installation complete');
+      swLog('Installation complete');
     })
   );
 });
@@ -339,7 +347,7 @@ self.addEventListener('install', event => {
  * Activate event - clean up old caches
  */
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating service worker');
+  swLog('Activating service worker');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       const validCaches = [STATIC_CACHE, ASSETS_CACHE, DYNAMIC_CACHE, API_CACHE, METADATA_CACHE];
@@ -347,7 +355,7 @@ self.addEventListener('activate', event => {
         cacheNames
           .filter(name => name.startsWith(CACHE_PREFIX) && !validCaches.includes(name))
           .map(name => {
-            console.log('[SW] Deleting old cache:', name);
+            swLog('Deleting old cache:', name);
             return caches.delete(name);
           })
       );
@@ -442,11 +450,11 @@ self.addEventListener('fetch', event => {
 
   // Development mode - check offline status first
   if (devMode) {
-    console.log('[SW] Dev mode fetch:', request.url);
+    swLog('Dev mode fetch:', request.url);
     event.respondWith(
       (async () => {
         if (!navigator.onLine) {
-          console.log('[SW] Offline - going straight to cache');
+          swLog('Offline - going straight to cache');
           if (request.url.includes('/wp-json/')) {
             return new Response(JSON.stringify({
               success: false,
@@ -463,7 +471,7 @@ self.addEventListener('fetch', event => {
               const cache = await caches.open(cacheName);
               const cachedResponse = await cache.match(appShellUrl);
               if (cachedResponse) {
-                console.log('[SW] Returning cached app shell (offline)');
+                swLog('Returning cached app shell (offline)');
                 return cachedResponse;
               }
             }
@@ -472,7 +480,7 @@ self.addEventListener('fetch', event => {
             const cache = await caches.open(cacheName);
             const cachedResponse = await cache.match(request.url);
             if (cachedResponse) {
-              console.log('[SW] Serving from cache (offline):', request.url);
+              swLog('Serving from cache (offline):', request.url);
               return cachedResponse;
             }
           }
@@ -489,7 +497,7 @@ self.addEventListener('fetch', event => {
           return response;
         } catch (error) {
           clearTimeout(timeoutId);
-          console.log('[SW] Network failed or timed out, checking cache');
+          swLog('Network failed or timed out, checking cache');
           if (request.url.includes('/wp-json/')) {
             return new Response(JSON.stringify({
               success: false,
@@ -504,7 +512,7 @@ self.addEventListener('fetch', event => {
             const cache = await caches.open(cacheName);
             const cachedResponse = await cache.match(request.url);
             if (cachedResponse) {
-              console.log('[SW] Serving from cache after timeout:', request.url);
+              swLog('Serving from cache after timeout:', request.url);
               return cachedResponse;
             }
           }
@@ -529,7 +537,7 @@ self.addEventListener('fetch', event => {
           // Check cache first
           const cachedResponse = await getCachedPostResponse(request);
           if (cachedResponse) {
-            console.log('[SW] Serving POST from cache');
+            swLog('Serving POST from cache');
             return cachedResponse;
           }
           
@@ -573,7 +581,7 @@ self.addEventListener('fetch', event => {
         if (cachedResponse) {
           const expired = await isCacheExpired(request.url);
           if (!expired) {
-            console.log('[SW] Serving API from cache (still fresh)');
+            swLog('Serving API from cache (still fresh)');
             return cachedResponse;
           }
         }
@@ -588,7 +596,7 @@ self.addEventListener('fetch', event => {
         } catch {
           // Offline - return stale cache if available
           if (cachedResponse) {
-            console.log('[SW] Offline - serving stale API cache');
+            swLog('Offline - serving stale API cache');
             return cachedResponse;
           }
           return new Response(JSON.stringify({
@@ -614,10 +622,10 @@ self.addEventListener('fetch', event => {
         if (cachedResponse) {
           const expired = await isCacheExpired(request.url);
           if (!expired) {
-            console.log('[SW] Serving HTML from cache (still fresh)');
+            swLog('Serving HTML from cache (still fresh)');
             return cachedResponse;
           }
-          console.log('[SW] HTML cache expired, fetching fresh');
+          swLog('HTML cache expired, fetching fresh');
         }
         
         // Not cached or expired, fetch from network
@@ -630,7 +638,7 @@ self.addEventListener('fetch', event => {
         } catch {
           // Offline - return stale cache if available
           if (cachedResponse) {
-            console.log('[SW] Offline - serving stale HTML cache');
+            swLog('Offline - serving stale HTML cache');
             return cachedResponse;
           }
           return new Response('App is offline. Please try again when you have a network connection.', {
@@ -652,22 +660,21 @@ self.addEventListener('fetch', event => {
       if (cachedResponse) {
         const expired = await isCacheExpired(request.url);
         if (!expired) {
-          console.log('[SW] Serving from cache (still fresh):', request.url);
+          swLog('Serving from cache (still fresh):', request.url);
           return cachedResponse;
         }
-        console.log('[SW] Cache expired for:', request.url);
+        swLog('Cache expired for:', request.url);
       }
       
       // Not in cache or expired - fetch from network
       try {
-        console.log('[SW] Fetching from network:', request.url);
+        swLog('Fetching from network:', request.url);
         const response = await fetch(request);
         
         if (response.ok) {
           // Determine cache name - check if it's a template asset
           let cacheName = DYNAMIC_CACHE;
-          const allCoreAssets = getAllAssets(activeTemplate);
-          
+
           if (CORE_THEME_ASSETS.some(asset => request.url.includes(asset))) {
             cacheName = STATIC_CACHE;
           } else if (request.url.includes('/templates/')) {
@@ -682,11 +689,11 @@ self.addEventListener('fetch', event => {
         
         return response;
       } catch (error) {
-        console.log('[SW] Fetch failed:', error);
+        swLog('Fetch failed:', error);
         
         // If offline and have stale cache, use it
         if (cachedResponse) {
-          console.log('[SW] Offline - serving stale cache');
+          swLog('Offline - serving stale cache');
           return cachedResponse;
         }
         
@@ -710,14 +717,14 @@ self.addEventListener('message', event => {
   }
   
   if (message && message.action === 'checkDevMode') {
-    console.log('[SW] Dev mode is:', devMode ? 'ENABLED' : 'DISABLED');
+    swLog('Dev mode is:', devMode ? 'ENABLED' : 'DISABLED');
   }
   
   if (message && message.action === 'refreshCache') {
     event.waitUntil(
       caches.keys().then(cacheNames => 
         Promise.all(cacheNames.map(name => caches.delete(name)))
-      ).then(() => console.log('[SW] All caches cleared'))
+      ).then(() => swLog('All caches cleared'))
     );
   }
 
@@ -725,7 +732,7 @@ self.addEventListener('message', event => {
   if (message && message.action === 'setActiveTemplate') {
     activeTemplate = message.template || 'default';
     templateAssetsList = message.assets || null;
-    console.log(`[SW] Active template set to: ${activeTemplate}`);
+    swLog(`Active template set to: ${activeTemplate}`);
     
     // Cache assets for the new template
     event.waitUntil(cacheTemplateAssets(activeTemplate));

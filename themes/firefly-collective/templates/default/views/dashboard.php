@@ -14,9 +14,6 @@
     
 <?php if ($current_user->exists()) : ?>
     <!-- Only show profile stuff if NOT in campaign mode -->
-    <div id="welcome-msg">
-        Hi, <?php echo esc_html( $current_user->first_name ); ?>
-    </div>
     <div id="profile-container">
         <form id="profile-form">
             <div>

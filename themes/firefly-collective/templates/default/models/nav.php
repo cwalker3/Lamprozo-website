@@ -66,31 +66,3 @@
 		}
 	}
 	add_action('after_switch_theme', 'custom_theme_setup_navigation', 20);
-
-	// Function to remove logout menu items from existing menus
-	function remove_logout_menu_items() {
-		$menus = wp_get_nav_menus();
-
-		foreach ($menus as $menu) {
-			$menu_items = wp_get_nav_menu_items($menu->term_id);
-
-			if ($menu_items) {
-				foreach ($menu_items as $item) {
-					// Remove logout, dashboard, and order history menu items
-					if ($item->title === 'Log Out' ||
-					    $item->title === 'Logout' ||
-					    $item->title === 'Dashboard' ||
-					    $item->title === 'Order History' ||
-					    strpos($item->url, '/logout') !== false ||
-					    strpos($item->url, '/dashboard') !== false ||
-					    strpos($item->url, '/order-history') !== false) {
-						wp_delete_post($item->ID, true);
-					}
-				}
-			}
-		}
-	}
-
-	// Run cleanup on admin_init to ensure it happens when admin is accessed
-	add_action('admin_init', 'remove_logout_menu_items');
-	add_action('after_switch_theme', 'remove_logout_menu_items', 30);

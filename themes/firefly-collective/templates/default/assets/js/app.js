@@ -18,19 +18,27 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log(`[PWA Debug] ${message}`, data || '');
   }
 
+  // Centralized logging function
+  function appLog(message, ...args) {
+    return; // Temporarily disabled
+    // if (devMode || !window.location.hostname.includes('localhost')) {
+    //   console.log(`[APP] ${message}`, ...args);
+    // }
+  }
+
   // Initialize IndexedDB
   function initIndexedDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       
       request.onerror = event => {
-        console.error('IndexedDB error:', event.target.error);
+        appLog('IndexedDB error:', event.target.error);
         reject('Could not open IndexedDB');
       };
       
       request.onsuccess = event => {
         db = event.target.result;
-        console.log('IndexedDB initialized successfully');
+        appLog('IndexedDB initialized successfully');
         resolve(db);
       };
       
@@ -40,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('endpoint', 'endpoint', { unique: false });
           store.createIndex('timestamp', 'timestamp', { unique: false });
-          console.log('Object store created');
+          appLog('Object store created');
         }
       };
     });
@@ -59,11 +67,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const item = { id, endpoint, params, data, timestamp: Date.now() };
       const request = store.put(item);
       request.onsuccess = () => {
-        console.log('Data saved to IndexedDB:', id);
+        appLog('Data saved to IndexedDB:', id);
         resolve();
       };
       request.onerror = event => {
-        console.error('Error saving to IndexedDB:', event.target.error);
+        appLog('Error saving to IndexedDB:', event.target.error);
         reject(event.target.error);
       };
     });
@@ -83,14 +91,14 @@ document.addEventListener('DOMContentLoaded', function () {
       request.onsuccess = event => {
         const result = event.target.result;
         if (result) {
-          console.log('Data retrieved from IndexedDB:', result);
+        appLog('Data retrieved from IndexedDB:', result);
           resolve(result.data);
         } else {
           reject('No matching data found in IndexedDB');
         }
       };
       request.onerror = event => {
-        console.error('Error retrieving from IndexedDB:', event.target.error);
+        appLog('Error retrieving from IndexedDB:', event.target.error);
         reject(event.target.error);
       };
     });
@@ -129,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
         await saveToIndexedDB(endpoint, params, data);
         return data;
       } catch (err) {
-        console.warn('DevMode network failed, falling back to cache:', err);
+        appLog('DevMode network failed, falling back to cache:', err);
         return getFromIndexedDB(endpoint, params);
       }
     }
@@ -164,11 +172,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Save fresh data into IndexedDB for next time
       saveToIndexedDB(endpoint, params, data).catch(e =>
-        console.warn('Could not save to IndexedDB:', e)
+        appLog('Could not save to IndexedDB:', e)
       );
       return data;
     } catch (err) {
-      console.error('ProdMode network failed, falling back to cache:', err);
+      appLog('ProdMode network failed, falling back to cache:', err);
       return getFromIndexedDB(endpoint, params); // final fallback
     }
   }
@@ -226,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.head.insertBefore(styleElement, document.head.firstChild);
     
     debugLog('Dynamic CSS injected successfully');
-    console.log('Injected CSS:', cssContent);
+    appLog('Injected CSS:', cssContent);
   }
 
   // Load and inject dynamic CSS (with offline fallback)
@@ -248,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
           cssContent = cachedData.dynamic_css;
           isFromCache = true;
           debugLog('Using cached dynamic CSS from IndexedDB');
-          console.log('App is using cached CSS customizations (offline mode)');
+          appLog('App is using cached CSS customizations (offline mode)');
         }
       } catch (e) {
         debugLog('No cached dynamic CSS found');
@@ -283,12 +291,12 @@ document.addEventListener('DOMContentLoaded', function () {
           });
           debugLog('Fresh dynamic CSS saved to IndexedDB cache');
         } catch (e) {
-          console.warn('Failed to cache dynamic CSS:', e);
+          appLog('Failed to cache dynamic CSS:', e);
         }
       }
     } else {
       debugLog('No dynamic CSS available - app will use default styling');
-      console.log('No CSS customizations found - using default theme styles');
+      appLog('No CSS customizations found - using default theme styles');
     }
 
     return cssContent;
@@ -320,11 +328,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         
         debugLog('Dynamic CSS refreshed successfully');
-        console.log('CSS customizations updated from server');
+        appLog('CSS customizations updated from server');
         return true;
       }
     } catch (error) {
-      console.warn('Failed to refresh dynamic CSS:', error);
+      appLog('Failed to refresh dynamic CSS:', error);
       return false;
     }
     
@@ -333,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Add event listener to refresh CSS when coming back online
   window.addEventListener('online', async () => {
-    console.log('Connection restored - refreshing customizations...');
+    appLog('Connection restored - refreshing customizations...');
     await refreshDynamicCSS();
   });
 
@@ -386,17 +394,17 @@ document.addEventListener('DOMContentLoaded', function () {
       // Load template CSS
       if (templateAssets.css && templateAssets.css.length > 0) {
         await Promise.all(templateAssets.css.map(href => loadCSS(href)));
-        console.log('Template CSS loaded successfully');
+        appLog('Template CSS loaded successfully');
       }
 
       // Load template JS
       if (templateAssets.js && templateAssets.js.length > 0) {
         await Promise.all(templateAssets.js.map(src => loadJS(src)));
-        console.log('Template JS loaded successfully');
+        appLog('Template JS loaded successfully');
       }
 
     } catch (error) {
-      console.warn('Some template assets failed to load:', error);
+      appLog('Some template assets failed to load:', error);
     }
   }
 
@@ -433,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Check if this is an offline response from service worker
         if (dataResponse._offline || !dataResponse.success) {
-          console.log('Got offline response from service worker, trying IndexedDB');
+          appLog('Got offline response from service worker, trying IndexedDB');
           throw new Error('Offline response - fallback to IndexedDB');
         }
         
@@ -445,16 +453,16 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         }
       } catch (networkError) {
-        console.warn('Network failed or offline, trying IndexedDB:', networkError);
+        appLog('Network failed or offline, trying IndexedDB:', networkError);
         isOffline = true;
         
         // Try IndexedDB
         try {
           const cachedData = await getFromIndexedDB(`view:${view}`, {});
           dataResponse = cachedData;
-          console.log('Loaded view from IndexedDB:', view);
+          appLog('Loaded view from IndexedDB:', view);
         } catch (cacheError) {
-          console.error('View not available in IndexedDB:', cacheError);
+          appLog('View not available in IndexedDB:', cacheError);
           loader.style.display = 'none';
           
           // Show offline message
@@ -500,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function () {
       
     } catch (err) {
       loader.style.display = 'none';
-      console.error('Failed to load view:', err);
+      appLog('Failed to load view:', err);
       
       // Show error message
       appRoot.innerHTML = `
@@ -536,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function () {
         navItem.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          console.log(`Nav item clicked: ${navSlug}`);
+          appLog(`Nav item clicked: ${navSlug}`);
           closeWebsiteMenu(true);  // Use force parameter
           loadContent(navSlug);
         });
@@ -544,12 +552,6 @@ document.addEventListener('DOMContentLoaded', function () {
       
       setupNavigation();
       updateNavVisibility();
-
-      // Initialize profile dropdown
-      if (typeof window.initProfileDropdown === 'function') {
-        window.initProfileDropdown();
-      }
-
       return true;
     }
     return false;
@@ -569,15 +571,14 @@ document.addEventListener('DOMContentLoaded', function () {
         break;
 
       case 'log-out':
-        // Logout is now handled through the profile dropdown
-        // This case is kept for backward compatibility
         loader.style.display = 'block';
-
+        
         // If offline, just clear local data
         if (!navigator.onLine) {
           loader.style.display = 'none';
           clearUser();
         }
+
         else {
           // Logout endpoint
           fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
@@ -587,16 +588,18 @@ document.addEventListener('DOMContentLoaded', function () {
           }).then(response => response.json())
           .then(data => {
             if (data.logout) {
+              
               // Also reset dashboard if it has a similar pattern
               if (window.resetDashboard) {
                 window.resetDashboard();
               }
+
               clearUser();
               loader.style.display = 'none';
             }
           })
           .catch(error => {
-            console.error('Error logging out:', error);
+            appLog('Error logging out:', error);
             loader.style.display = 'none';
           });
         }
@@ -655,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const backdrop = document.getElementById('backdrop');
     
     if (!hamburger || !closeNavBtn || !nav || !backdrop) {
-      console.error('Navigation elements not found', {
+      appLog('Navigation elements not found', {
         hamburger: !!hamburger,
         closeNavBtn: !!closeNavBtn,
         nav: !!nav,
@@ -741,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeNavBtn = document.getElementById('close-nav-btn');
     
     if (!nav || !backdrop || !hamburger || !closeNavBtn) {
-      console.error('Elements missing for openWebsiteMenu');
+      appLog('Elements missing for openWebsiteMenu');
       menuState.isAnimating = false;
       menuState.isOpen = false;
       return;
@@ -776,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeNavBtn = document.getElementById('close-nav-btn');
     
     if (!nav || !backdrop || !hamburger || !closeNavBtn) {
-      console.error('Elements missing for closeWebsiteMenu');
+      appLog('Elements missing for closeWebsiteMenu');
       menuState.isAnimating = false;
       menuState.isOpen = true;
       return;
@@ -810,37 +813,29 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function updateNavVisibility() {
-    const profileDropdownContainer = document.getElementById('profile-dropdown-container');
-
-    // Get all menu items and find specific ones by content
-    const allMenuItems = document.querySelectorAll('body > nav ul > li');
-    let loginBtn = null;
-    let signupBtn = null;
-    let backToWebsiteBtn = null;
-
-    allMenuItems.forEach(item => {
-      const text = item.textContent.trim();
-      if (text === 'Log In' || text === 'Login') {
-        loginBtn = item;
-      } else if (text === 'Signup' || text === 'Sign Up') {
-        signupBtn = item;
-      } else if (text === 'Back to Website') {
-        backToWebsiteBtn = item;
-      }
-    });
-
+    const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
+    const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
+    const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
+    const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+    const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+    const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
+    
     if (window.navData && window.navData.auth_id) {
       // User is logged in
-      if (loginBtn) loginBtn.style.display = 'none';
       if (signupBtn) signupBtn.style.display = 'none';
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
+      if (dashboardBtn) dashboardBtn.style.display = 'block';
       if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
-      if (profileDropdownContainer) profileDropdownContainer.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'block';
     } else {
       // User is logged out
-      if (loginBtn) loginBtn.style.display = 'block';
       if (signupBtn) signupBtn.style.display = 'block';
+      if (loginBtn) loginBtn.style.display = 'block';
+      if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
+      if (dashboardBtn) dashboardBtn.style.display = 'none';
       if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
-      if (profileDropdownContainer) profileDropdownContainer.style.display = 'none';
+      if (logoutBtn) logoutBtn.style.display = 'none';
     }
   }
 
@@ -853,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return getFromIndexedDB('user-auth', {})
       .then(authData => {
         if (authData && authData.auth_id) {
-          console.log('Restored auth from IndexedDB:', authData.auth_id);
+          appLog('Restored auth from IndexedDB:', authData.auth_id);
           window.auth_id = authData.auth_id;
           window.navData = { auth_id: authData.auth_id };
           return true; // Auth restored successfully
@@ -861,7 +856,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return false; // No auth found
       })
       .catch(() => {
-        console.log('No saved auth found');
+        appLog('No saved auth found');
         return false; // No auth found
       })
       .then((authRestored) => {
@@ -869,7 +864,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!navigator.onLine) {
           return getFromIndexedDB('app-init', {})
             .then(cachedData => {
-              console.log('Using cached app-init data');
+              appLog('Using cached app-init data');
               // Set the app data from cache
               if (cachedData) {
                 setAuthId(cachedData.auth_id || window.auth_id);
@@ -878,7 +873,7 @@ document.addEventListener('DOMContentLoaded', function () {
               return cachedData;
             })
             .catch(() => {
-              console.log('No cached app-init, creating minimal data');
+              appLog('No cached app-init, creating minimal data');
               // Return minimal data structure
               return {
                 success: true,
@@ -912,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function () {
               insertMenuIntoDOM(cachedMenu.menu_html);
             }
           } catch (e) {
-            console.log('No cached menu available');
+            appLog('No cached menu available');
           }
         }
         
@@ -946,7 +941,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loader.style.display = 'none';
       })
       .catch(async error => {
-        console.error('Failed to load app:', error);
+        appLog('Failed to load app:', error);
         loader.style.display = 'none';
         
         // Try to load cached data if available
@@ -981,7 +976,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }
         } catch (e) {
-          console.error('No cached data available:', e);
+          appLog('No cached data available:', e);
           
           // Still try to load CSS and assets
           await loadDynamicCSS();
@@ -994,7 +989,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // App page title and HTML
   function loadAppTitleAndAppHTML() {
     if (!window.app_page_title || !window.app_page_html) {
-      console.log('App page data not available');
+      appLog('App page data not available');
       return;
     }
     
@@ -1031,20 +1026,20 @@ document.addEventListener('DOMContentLoaded', function () {
           { scope: '/wp-content/themes/firefly-collective/templates/default/' }
         )
         .then(function(registration) {
-          console.log('Service worker registration succeeded:', registration);
+          appLog('Service worker registration succeeded:', registration);
           
           // Check for updates immediately
           registration.update();
           
           // Listen for updates
           registration.addEventListener('updatefound', () => {
-            console.log('Service worker update found');
+            appLog('Service worker update found');
             const newWorker = registration.installing;
             
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New service worker ready - but DON'T auto-reload
-                console.log('New service worker ready! Refresh to get updates.');
+                appLog('New service worker ready! Refresh to get updates.');
                 // Just skip waiting, don't reload
                 newWorker.postMessage({ action: 'skipWaiting' });
               }
@@ -1053,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', function () {
           
           // DON'T auto-reload on controller change - let user control refreshes
           navigator.serviceWorker.addEventListener('controllerchange', () => {
-            console.log('Service worker updated. New version will be used on next refresh.');
+            appLog('Service worker updated. New version will be used on next refresh.');
           });
           
           // Check service worker periodically (but don't auto-reload)
@@ -1062,19 +1057,19 @@ document.addEventListener('DOMContentLoaded', function () {
           }, 60000); // Check every minute
         })
         .catch(function(error) {
-          console.log('Service worker registration failed:', error);
+          appLog('Service worker registration failed:', error);
         });
     });
     
     // Add dev helper to check service worker status
     window.checkSW = function() {
       navigator.serviceWorker.getRegistrations().then(registrations => {
-        console.log('Service Worker Registrations:', registrations);
+        appLog('Service Worker Registrations:', registrations);
         registrations.forEach(reg => {
-          console.log('Scope:', reg.scope);
-          console.log('Active:', reg.active);
-          console.log('Waiting:', reg.waiting);
-          console.log('Installing:', reg.installing);
+          appLog('Scope:', reg.scope);
+          appLog('Active:', reg.active);
+          appLog('Waiting:', reg.waiting);
+          appLog('Installing:', reg.installing);
         });
       });
     };
@@ -1084,9 +1079,9 @@ document.addEventListener('DOMContentLoaded', function () {
       caches.keys().then(names => {
         names.forEach(name => {
           caches.delete(name);
-          console.log('Deleted cache:', name);
+          appLog('Deleted cache:', name);
         });
-        console.log('All caches cleared');
+        appLog('All caches cleared');
       });
     };
   }
@@ -1094,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Check for network connection status
   function updateOnlineStatus() {
     const condition = navigator.onLine ? "online" : "offline";
-    console.log(`Connection status: ${condition}`);
+    appLog(`Connection status: ${condition}`);
     
     // Control the offline indicator that's already in the HTML
     const offlineIndicator = document.querySelector('.offline-indicator');
@@ -1154,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
           // Only preload if user is authenticated (for protected views)
           if (view === 'signup' || window.auth_id) {
-            console.log(`Preloading view: ${view}`);
+            appLog(`Preloading view: ${view}`);
             
             // Use a hidden fetch to cache the view
             fetch(`${window.api_url}app-get-view`, {
@@ -1169,10 +1164,10 @@ document.addEventListener('DOMContentLoaded', function () {
                   ...data,
                   timestamp: Date.now()
                 });
-                console.log(`View preloaded: ${view}`);
+                appLog(`View preloaded: ${view}`);
               }
             })
-            .catch(() => console.log(`Failed to preload view: ${view}`));
+            .catch(() => appLog(`Failed to preload view: ${view}`));
           }
         }, index * 2000); // 2 second delay between each preload
       });
@@ -1210,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return response;
       }
     } catch (error) {
-      console.error('Failed to check subscription status:', error);
+      appLog('Failed to check subscription status:', error);
       
       // Try to get cached status
       try {
@@ -1311,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } 
       catch (err) {
         loader.style.display = 'none';
-        console.warn('the network failed:', err);
+        appLog('the network failed:', err);
       }
     });
 
@@ -1334,15 +1329,23 @@ document.addEventListener('DOMContentLoaded', function () {
       // Save to IndexedDB
       saveToIndexedDB('user-auth', {}, { auth_id: user_id })
         .then(async () => {
-          console.log('User authenticated:', user_id);
+          appLog('User authenticated:', user_id);
           
           // Update navigation
           setupNavigation();
+          updateNavVisibility();
 
-          // Initialize profile dropdown
-          if (typeof window.initProfileDropdown === 'function') {
-            window.initProfileDropdown();
-          }
+          // Initialize profile dropdown after a short delay to ensure DOM is ready
+          setTimeout(() => {
+            // Reset the initialization flag to allow re-initialization after login
+            window.profileDropdownInitialized = false;
+
+            if (typeof window.initProfileDropdown === 'function') {
+              window.initProfileDropdown();
+            } else if (typeof initProfileDropdown === 'function') {
+              initProfileDropdown();
+            }
+          }, 100);
 
           appRoot.innerHTML = '';
 
@@ -1356,12 +1359,12 @@ document.addEventListener('DOMContentLoaded', function () {
               if (window.initializeDashboard) {
                   window.initializeDashboard();
               } else {
-                  console.error('Dashboard initialization function not found');
+                  appLog('Dashboard initialization function not found');
               }
           }, 100);
         })
         .catch(error => {
-          console.error('Failed to save auth:', error);
+          appLog('Failed to save auth:', error);
         });
   }
   window.loginUser = loginUser;

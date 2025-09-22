@@ -252,6 +252,11 @@ document.addEventListener('keydown', function(e) {
 
 // Initialize profile dropdown functionality
 function initProfileDropdown() {
+    // Prevent multiple initializations
+    if (window.profileDropdownInitialized) {
+        return;
+    }
+
     const profileButton = document.getElementById('profile-button');
     const profileDropdown = document.getElementById('profile-dropdown');
     const profileContainer = document.getElementById('profile-dropdown-container');
@@ -260,15 +265,32 @@ function initProfileDropdown() {
         return; // Elements don't exist
     }
 
+    // Mark as initialized
+    window.profileDropdownInitialized = true;
+
     // For PWA, show container if user is authenticated
     if (window.auth_id || (typeof navData !== 'undefined' && navData.auth_id)) {
         profileContainer.style.display = 'block';
+    } else {
+        profileContainer.style.display = 'none';
     }
 
+    // Ensure dropdown starts in closed state
+    profileDropdown.setAttribute('aria-hidden', 'true');
+    profileButton.setAttribute('aria-expanded', 'false');
+
+    // Remove any existing event listeners by cloning
+    const newProfileButton = profileButton.cloneNode(true);
+    profileButton.parentNode.replaceChild(newProfileButton, profileButton);
+
+    // Get fresh reference after cloning
+    const freshProfileButton = document.getElementById('profile-button');
+
     // Toggle dropdown on button click
-    profileButton.addEventListener('click', function(e) {
+    freshProfileButton.addEventListener('click', function(e) {
         e.stopPropagation();
-        const isOpen = profileDropdown.getAttribute('aria-hidden') === 'false';
+        const currentDropdown = document.getElementById('profile-dropdown');
+        const isOpen = currentDropdown.getAttribute('aria-hidden') === 'false';
 
         if (isOpen) {
             closeProfileDropdown();
@@ -277,19 +299,24 @@ function initProfileDropdown() {
         }
     });
 
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!profileContainer.contains(e.target)) {
-            closeProfileDropdown();
-        }
-    });
+    // Close dropdown when clicking outside (only add once)
+    if (!window.profileDropdownGlobalListeners) {
+        window.profileDropdownGlobalListeners = true;
 
-    // Close dropdown on Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeProfileDropdown();
-        }
-    });
+        document.addEventListener('click', function(e) {
+            const profileContainer = document.getElementById('profile-dropdown-container');
+            if (profileContainer && !profileContainer.contains(e.target)) {
+                closeProfileDropdown();
+            }
+        });
+
+        // Close dropdown on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeProfileDropdown();
+            }
+        });
+    }
 
     // Handle dropdown link clicks (for PWA)
     const profileLinks = profileDropdown.querySelectorAll('.profile-dropdown-item');
@@ -320,13 +347,17 @@ function initProfileDropdown() {
     });
 
     function openProfileDropdown() {
-        profileDropdown.setAttribute('aria-hidden', 'false');
-        profileButton.setAttribute('aria-expanded', 'true');
+        const currentDropdown = document.getElementById('profile-dropdown');
+        const currentButton = document.getElementById('profile-button');
+        currentDropdown.setAttribute('aria-hidden', 'false');
+        currentButton.setAttribute('aria-expanded', 'true');
     }
 
     function closeProfileDropdown() {
-        profileDropdown.setAttribute('aria-hidden', 'true');
-        profileButton.setAttribute('aria-expanded', 'false');
+        const currentDropdown = document.getElementById('profile-dropdown');
+        const currentButton = document.getElementById('profile-button');
+        currentDropdown.setAttribute('aria-hidden', 'true');
+        currentButton.setAttribute('aria-expanded', 'false');
     }
 }
 
