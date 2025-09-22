@@ -16,6 +16,10 @@ main {
   margin: 0 auto;
 }
 
+h1:first-child {
+  margin-top: 15vh;
+}
+
 h1 {
     color: var(--mainTextColor);
     margin-top: 1rem;
@@ -23,11 +27,6 @@ h1 {
 
 h1, p, .app-nav {
   user-select: none;
-}
-
-main {
-    margin-top: 12vh; /* Adjust to account for fixed header */
-    padding: 1rem;
 }
 
 .app-nav {
@@ -195,6 +194,15 @@ body > nav a {
   background-color: rgb(58, 128, 58);
 }
 
+footer {
+  width: 100vw;
+  height: 20vh;
+  display: grid;
+  background: #1a1a1a;
+  color: white;
+  place-content: center;
+}
+
 #loader {
     display: none;
     position: fixed;
@@ -221,6 +229,10 @@ body > nav a {
 
 body.is-offline .offline-indicator {
   display: block;
+}
+
+[aria-hidden="true"] {
+  display: none;
 }
 
 /* PWA-specific overrides for nav.css */

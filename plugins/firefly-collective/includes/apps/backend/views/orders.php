@@ -6,8 +6,9 @@
 
 ?>
 
+<?php echo apply_filters('the_content', $postContent); ?>
+
 <div class="wrap" id="ffc-orders-app" v-cloak>
-    <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
     
     <!-- Loading State -->
     <div v-if="loading" class="ffc-loading">

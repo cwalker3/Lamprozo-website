@@ -251,6 +251,15 @@
                 global $currentUserIdAdmin;
                 $currentUserIdAdmin = current_user_can('manage_options');
 
+                // Get the order-history page from WordPress for banner
+                $orders_page = get_page_by_path('order-history');
+                
+                if ($orders_page) {
+                    $postContent = apply_filters('the_content', $orders_page->post_content);
+                } else {
+                    $postContent = '';
+                }
+
                 // Get orders view
                 ob_start();
                 include $plugin_path . '/views/orders.php';

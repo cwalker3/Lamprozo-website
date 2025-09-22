@@ -9,7 +9,6 @@
 ?>
 
 <?php if (!$is_campaign_mode) : ?>
-    <h1><?php echo esc_html($pageTitle); ?></h1>
     <p><?php echo apply_filters('the_content', $postContent); ?></p>
 <?php endif; ?>
     
