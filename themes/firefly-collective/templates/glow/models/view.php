@@ -1,6 +1,6 @@
 <?php
 
-    // theme/models/view.php
+    // template/models/view.php
 
     // Parse Request URI Function
     function parse_request_uri() {
