@@ -148,10 +148,10 @@
     function firefly_collective_template_exists($template_name) {
         $template_name = sanitize_file_name($template_name);
         $template_path = FIREFLY_COLLECTIVE_TEMPLATES_DIR . '/' . $template_name;
-        
+
         // Check if template directory exists and has required files
-        return is_dir($template_path) && 
-               file_exists($template_path . '/header.php') && 
+        return is_dir($template_path) &&
+               file_exists($template_path . '/header.php') &&
                file_exists($template_path . '/footer.php');
     }
 
@@ -319,8 +319,11 @@
         
         $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         
-        $wp_customize->add_setting('firefly_collective_template_selector', array(
-            'default' => $current_live_template,
+        // Register the setting to save directly to the template option
+        $wp_customize->add_setting(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, array(
+            'type' => 'option',
+            'capability' => 'manage_options',
+            'default' => FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE,
             'transport' => 'postMessage',
             'sanitize_callback' => 'sanitize_file_name'
         ));
@@ -338,6 +341,7 @@
         $wp_customize->add_control('firefly_collective_template_selector', array(
             'label' => __('Active Template'),
             'section' => 'title_tagline',
+            'settings' => FIREFLY_COLLECTIVE_TEMPLATE_OPTION,
             'type' => 'select',
             'choices' => $template_choices,
             'priority' => 9
@@ -1217,29 +1221,10 @@
      * Handle customizer publish - copy temp template to live template and save landing style
      */
     function firefly_collective_customize_save_after($wp_customize) {
-        // Save template changes - use the customizer setting value, not just temp option
-        $template_setting = $wp_customize->get_setting('firefly_collective_template_selector');
-        $template_value = null;
-        
-        if ($template_setting) {
-            $template_value = $template_setting->post_value();
-            
-            if ($template_value !== null && firefly_collective_template_exists($template_value)) {
-                // Update the live template option
-                update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $template_value);
-                // Sync the temp option to match
-                update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template_value);
-            }
-        }
-        
-        // Fallback: If no customizer setting value, use temp option
-        if (!isset($template_value) || $template_value === null) {
-            $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
-            
-            if ($temp_template && firefly_collective_template_exists($temp_template)) {
-                update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $temp_template);
-            }
-        }
+        // The template is now saved automatically by the customizer since we're using type => 'option'
+        // Just sync the temp option to match the saved value
+        $saved_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+        update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $saved_template);
         
         // Save landing style changes
         $landing_style = $wp_customize->get_setting('firefly_collective_landing_style');

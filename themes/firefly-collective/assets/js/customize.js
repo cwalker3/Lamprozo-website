@@ -90,7 +90,7 @@
         window.fireflyTemplateRefresh = handleTemplateOptionRefresh;
         
         // Listen for template selector changes
-        wp.customize('firefly_collective_template_selector', function(setting) {
+        wp.customize('firefly_collective_active_template', function(setting) {
             setting.bind(function(newTemplate) {
                 
                 // Make API call to update temp template
