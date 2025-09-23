@@ -17,7 +17,17 @@
     <?php wp_head(); ?>
 </head>
 
-<body <?php body_class(); ?>>
+<body <?php
+    $additional_classes = array();
+
+    // Add page slug as class
+    global $post;
+    if (isset($post) && $post->post_name) {
+        $additional_classes[] = 'page-' . $post->post_name;
+    }
+
+    body_class($additional_classes);
+?>>
     <div id="backdrop"></div>
 
     <?php

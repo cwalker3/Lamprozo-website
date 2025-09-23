@@ -194,7 +194,7 @@ body > nav a {
   background-color: rgb(58, 128, 58);
 }
 
-footer {
+body.app-shell footer {
   width: 100vw;
   height: 20vh;
   display: grid;
