@@ -1355,18 +1355,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
           appRoot.innerHTML = '';
 
-          // Load dashboard view
+          // Load dashboard view (same as loadContent('dashboard'))
+          if (window.resetDashboard && typeof window.resetDashboard === 'function') {
+            window.resetDashboard();
+          }
           await getView('dashboard');
-          scrollToTop();
-          window.resetDashboard();
-          // Dashboard.js is already loaded, but its DOMContentLoaded won't fire again
-          // So we need to manually initialize it
+
+          // Add delay to ensure DOM is fully rendered before initializing
           setTimeout(() => {
-              if (window.initializeDashboard) {
-                  window.initializeDashboard();
-              } else {
-                  appLog('Dashboard initialization function not found');
+            if (document.getElementById('features-container')) {
+              if (window.initializeDashboard && typeof window.initializeDashboard === 'function') {
+                window.initializeDashboard();
               }
+              scrollToTop();
+            }
           }, 100);
         })
         .catch(error => {
