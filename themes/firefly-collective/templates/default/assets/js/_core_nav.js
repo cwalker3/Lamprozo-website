@@ -79,17 +79,24 @@ function initNavigation() {
     function openWebsiteMenu() {
         const hamburger = document.getElementById('hamburger');
         const closeNavBtn = document.getElementById('close-nav-btn');
-        
+
         nav.style.display = 'grid';
+        nav.style.visibility = 'visible';  // Override CSS hidden state when explicitly opening
+        nav.style.opacity = '1';  // Override CSS opacity when explicitly opening
         backdrop.style.display = 'block';
         backdrop.style.pointerEvents = 'auto';
         hamburger.style.display = 'none';
         closeNavBtn.style.display = 'block';
         nav.classList.remove('slide-out');
         backdrop.classList.remove('fade');
-        
+
         // Add body class for CSS styling
         document.body.classList.add('menu-open');
+
+        // Ensure auth check has run to show menu items
+        if (!document.body.classList.contains('auth-checked')) {
+            document.body.classList.add('auth-checked');
+        }
     }
 
     function closeWebsiteMenu() {
