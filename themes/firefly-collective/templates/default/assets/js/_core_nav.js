@@ -318,33 +318,50 @@ function initProfileDropdown() {
         });
     }
 
-    // Handle dropdown link clicks (for PWA)
-    const profileLinks = profileDropdown.querySelectorAll('.profile-dropdown-item');
-    profileLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
+    // Handle dropdown links - convert to app navigation if on /app pag
 
-            // For PWA, handle logout specially
-            if (href === '/logout' && typeof window.loadContent === 'function') {
+    if (websiteApp) {
+        // Simply remove href and add click handlers
+        const profileLinks = profileDropdown.querySelectorAll('.profile-dropdown-item');
+        profileLinks.forEach(link => {
+            const href = link.getAttribute('href');
+
+            // Remove the href so it's not a link anymore
+            link.removeAttribute('href');
+
+            // Add click handler
+            link.addEventListener('click', async (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 closeProfileDropdown();
-                window.loadContent('log-out');
-            }
-            // For PWA, handle dashboard specially
-            else if (href === '/dashboard' && typeof window.loadContent === 'function') {
-                e.preventDefault();
-                closeProfileDropdown();
-                window.loadContent('dashboard');
-            }
-            // For PWA, handle order history specially
-            else if (href === '/order-history' && typeof window.loadContent === 'function') {
-                e.preventDefault();
-                closeProfileDropdown();
-                window.loadContent('order-history');
-            }
-            // For regular website, let links work normally
+
+                // Use the same functions as sidebar nav
+                if (href === '/logout') {
+                    window.loadContent('log-out');
+                } else if (href === '/dashboard') {
+                    // Reset dashboard if function exists
+                    if (window.resetDashboard && typeof window.resetDashboard === 'function') {
+                        window.resetDashboard();
+                    }
+                    await window.getView('dashboard');
+                    if (document.getElementById('features-container')) {
+                        if (window.initializeDashboard && typeof window.initializeDashboard === 'function') {
+                            window.initializeDashboard();
+                        }
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                } else if (href === '/order-history') {
+                    await window.getView('order-history');
+                    // initOrdersApp is called in the original loadContent - check if it exists
+                    if (typeof initOrdersApp === 'function') {
+                        initOrdersApp();
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
         });
-    });
+    }
+    // For regular website, links work normally without any special handling
 
     function openProfileDropdown() {
         const currentDropdown = document.getElementById('profile-dropdown');

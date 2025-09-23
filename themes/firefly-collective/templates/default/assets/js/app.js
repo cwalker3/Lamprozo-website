@@ -635,7 +635,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     store.delete('user-auth:{}');
-    
+
+    // Hide profile dropdown container
+    const profileContainer = document.getElementById('profile-dropdown-container');
+    if (profileContainer) {
+      profileContainer.style.display = 'none';
+    }
+
     updateNavVisibility();
     appRoot.innerHTML = '';
     loadAppTitleAndAppHTML();
@@ -1368,6 +1374,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
   }
   window.loginUser = loginUser;
+  window.getView = getView;
+  window.loadContent = loadContent;
 
   function scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
