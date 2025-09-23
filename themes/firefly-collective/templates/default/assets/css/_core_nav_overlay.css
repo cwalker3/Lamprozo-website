@@ -55,7 +55,7 @@ body > header {
 #overlay-nav {
     position: relative;
     z-index: 3;
-    margin-right: 5vw;
+    margin-right: 8vw;
 }
 
 .overlay-menu-wrapper {
