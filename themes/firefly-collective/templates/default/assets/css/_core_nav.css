@@ -359,6 +359,7 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 }
 
 .profile-dropdown-item {
+	cursor: pointer;
 	display: flex;
 	align-items: center;
 	gap: 12px;
