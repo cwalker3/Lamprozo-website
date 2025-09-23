@@ -319,8 +319,7 @@ function initProfileDropdown() {
     }
 
     // Handle dropdown links - convert to app navigation if on /app pag
-
-    if (websiteApp) {
+    if (websiteApp || isPWA) {
         // Simply remove href and add click handlers
         const profileLinks = profileDropdown.querySelectorAll('.profile-dropdown-item');
         profileLinks.forEach(link => {
@@ -378,7 +377,24 @@ function initProfileDropdown() {
     }
 }
 
+// Function to update profile dropdown visibility based on auth state
+function updateProfileDropdownVisibility() {
+    const profileContainer = document.getElementById('profile-dropdown-container');
+    if (!profileContainer) return;
+
+    // Mark that auth state has been checked
+    document.body.classList.add('auth-checked');
+
+    // Check auth state
+    if (window.auth_id || (typeof window.navData !== 'undefined' && window.navData && window.navData.auth_id)) {
+        profileContainer.style.display = 'block';
+    } else {
+        profileContainer.style.display = 'none';
+    }
+}
+
 // Export for PWA to call after dynamic menu load
 if (typeof window !== 'undefined') {
     window.initProfileDropdown = initProfileDropdown;
+    window.updateProfileDropdownVisibility = updateProfileDropdownVisibility;
 }

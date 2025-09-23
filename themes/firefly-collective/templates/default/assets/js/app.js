@@ -819,30 +819,69 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function updateNavVisibility() {
-    const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
-    const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
-    const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
-    const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
-    const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
-    const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
-    
-    if (window.navData && window.navData.auth_id) {
-      // User is logged in
-      if (signupBtn) signupBtn.style.display = 'none';
-      if (loginBtn) loginBtn.style.display = 'none';
-      if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
-      if (dashboardBtn) dashboardBtn.style.display = 'block';
-      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
-      if (logoutBtn) logoutBtn.style.display = 'block';
+    // Check if we're in PWA/app mode (converted menu items are .app-nav divs)
+    const appNavItems = document.querySelectorAll('.app-nav');
+    const isPWA = appNavItems.length > 0;
+
+    if (isPWA) {
+      // PWA navigation - use .app-nav divs
+      const signupBtn = document.querySelector('.app-nav#signup, .app-nav#sign-up');
+      const orderHistoryBtn = document.querySelector('.app-nav#order-history');
+      const dashboardBtn = document.querySelector('.app-nav#dashboard');
+      const backToWebsiteBtn = document.querySelector('.app-nav#back-to-website');
+      const logoutBtn = document.querySelector('.app-nav#log-out');
+      const loginBtn = document.querySelector('.app-nav#log-in, .app-nav#login');
+
+      if (window.navData && window.navData.auth_id) {
+        // User is logged in
+        if (signupBtn) signupBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
+        if (dashboardBtn) dashboardBtn.style.display = 'block';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'block';
+      } else {
+        // User is logged out
+        if (signupBtn) signupBtn.style.display = 'block';
+        if (loginBtn) loginBtn.style.display = 'block';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
+        if (dashboardBtn) dashboardBtn.style.display = 'none';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+      }
     } else {
-      // User is logged out
-      if (signupBtn) signupBtn.style.display = 'block';
-      if (loginBtn) loginBtn.style.display = 'block';
-      if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
-      if (dashboardBtn) dashboardBtn.style.display = 'none';
-      if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
-      if (logoutBtn) logoutBtn.style.display = 'none';
+      // Regular website navigation - use li selectors
+      const signupBtn = document.querySelector('body > nav ul > li:nth-last-of-type(6)');
+      const orderHistoryBtn = document.querySelector('body > nav ul > li:nth-last-of-type(5)');
+      const dashboardBtn = document.querySelector('body > nav ul > li:nth-last-of-type(4)');
+      const backToWebsiteBtn = document.querySelector('body > nav ul > li:nth-last-of-type(3)');
+      const logoutBtn = document.querySelector('body > nav ul > li:nth-last-of-type(2)');
+      const loginBtn = document.querySelector('body > nav ul > li:last-of-type');
+
+      if (window.navData && window.navData.auth_id) {
+        // User is logged in
+        if (signupBtn) signupBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'block';
+        if (dashboardBtn) dashboardBtn.style.display = 'block';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'block';
+      } else {
+        // User is logged out
+        if (signupBtn) signupBtn.style.display = 'block';
+        if (loginBtn) loginBtn.style.display = 'block';
+        if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
+        if (dashboardBtn) dashboardBtn.style.display = 'none';
+        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+      }
     }
+
+    // Mark that auth state has been checked and nav filtering is complete
+    // Add small delay to ensure DOM is fully processed
+    setTimeout(() => {
+      document.body.classList.add('auth-checked');
+    }, 50);
   }
 
   // Initialize the app
@@ -857,6 +896,12 @@ document.addEventListener('DOMContentLoaded', function () {
           appLog('Restored auth from IndexedDB:', authData.auth_id);
           window.auth_id = authData.auth_id;
           window.navData = { auth_id: authData.auth_id };
+
+          // Update profile dropdown visibility since auth was restored
+          if (typeof window.updateProfileDropdownVisibility === 'function') {
+            window.updateProfileDropdownVisibility();
+          }
+
           return true; // Auth restored successfully
         }
         return false; // No auth found

@@ -309,6 +309,50 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 	top: 25px;
 	right: 25px;
 	z-index: 6;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+/* Hide profile dropdown behind backdrop when menu is open */
+body.menu-open #profile-dropdown-container {
+	z-index: 2;
+}
+
+/* Hide profile dropdown initially until auth state is determined */
+#profile-dropdown-container {
+	display: none;
+}
+
+/* Show profile dropdown only when auth state is determined */
+body.auth-checked #profile-dropdown-container {
+	display: block;
+}
+
+/* Hide main navigation initially until auth state is determined */
+body > nav {
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+}
+
+/* Hide all nav menu items initially */
+body > nav ul li {
+	display: none !important;
+}
+
+/* Show main navigation only when auth state is determined */
+body.auth-checked > nav {
+	visibility: visible;
+	opacity: 1;
+}
+
+/* Allow nav items to be shown after auth check (override the !important) */
+body.auth-checked > nav ul li {
+	display: list-item !important;
 }
 
 #profile-button {
@@ -324,6 +368,13 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 	transition: all 0.3s ease;
 	color: white;
 	padding: 0;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	outline: none;
 }
 
 #profile-button:hover {
@@ -370,6 +421,13 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 	font-size: 14px;
 	font-weight: 500;
 	transition: background-color 0.2s ease;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	outline: none;
 }
 
 .profile-dropdown-item:hover {
