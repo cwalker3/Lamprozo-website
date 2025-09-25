@@ -319,7 +319,7 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 
 /* Hide profile dropdown behind backdrop when menu is open */
 body.menu-open #profile-dropdown-container {
-	z-index: 2;
+	z-index: 0;
 }
 
 /* Hide profile dropdown initially until auth state is determined */
