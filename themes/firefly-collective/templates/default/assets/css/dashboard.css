@@ -374,11 +374,10 @@ td .feature-fields-list {
 
 .addon-item {
   display: flex;
-  align-items: center;
-  margin-bottom: 8px;
+  align-items: flex-start; /* Align items to top when text wraps */
+  margin-bottom: 12px; /* More space between items */
   padding: 4px 0;
-  height: 24px; /* Enforce consistent height */
-  line-height: 24px; /* Match line height to container height */
+  min-height: 24px; /* Minimum height, can expand */
   cursor: default; /* Important - no pointer cursor on the entire container */
 }
 
@@ -387,23 +386,20 @@ td .feature-fields-list {
   height: 16px;
   width: 16px;
   margin: 0;
-  margin-right: 1.5rem;
+  margin-right: 12px; /* Consistent spacing */
+  margin-top: 2px; /* Slight offset to align with first line of text */
   padding: 0;
-  position: relative;
-  top: 0; /* No offset */
-  vertical-align: middle;
   cursor: pointer; /* Cursor only on the checkbox itself */
 }
 
 .addon-text {
-  color: black; 
+  color: black;
   flex: 1;
   margin: 0;
   padding: 0;
-  line-height: 24px;
-  vertical-align: middle;
-  position: relative;
-  top: 0; /* No offset */
+  line-height: 1.4; /* Allow normal line spacing for wrapped text */
+  word-wrap: break-word; /* Force long words to break */
+  white-space: normal; /* Allow text to wrap */
   cursor: default; /* Explicitly not clickable */
 }
 
