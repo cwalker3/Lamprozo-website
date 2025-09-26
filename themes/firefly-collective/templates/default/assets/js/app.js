@@ -498,6 +498,7 @@ document.addEventListener('DOMContentLoaded', function () {
             window.features = dataResponse.features;
             window.stripeKey = dataResponse.stripeKey;
             window.subscription_status = dataResponse.subscription_status;
+            window.third_party = dataResponse.third_party;
             break;
             
           case 'order-history':

@@ -236,6 +236,9 @@
                 
                 $subscription_status = firefly_collective_check_subscription_status($request);
 
+                // Get third party login status
+                $third_party = get_user_meta( $uid, 'third_party', true ) ?: null;
+
                 return rest_ensure_response([
                     'success'               => true,
                     'response_html'         => $response_html,
@@ -243,7 +246,8 @@
                     'features'              => $features_options_addons,
                     'theme_path'            => $theme_path_web,
                     'stripeKey'             => $publishable_key,
-                    'subscription_status'   => $subscription_status
+                    'subscription_status'   => $subscription_status,
+                    'third_party'           => $third_party
                 ]);
             break;
 
