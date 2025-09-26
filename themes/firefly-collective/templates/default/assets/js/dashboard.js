@@ -1,14 +1,18 @@
 // plugin/assets/js/dashboard.js
 
 (function() {
-    // Store initialization state
-    let isInitialized = false;
-    
+    // Store initialization state globally to persist across re-renders
+    if (typeof window.dashboardInitialized === 'undefined') {
+        window.dashboardInitialized = false;
+    }
+
     // Main initialization function
     window.initializeDashboard = function() {
-        
+
         // Prevent multiple initializations
-        if (isInitialized) return;
+        if (window.dashboardInitialized) {
+            return;
+        }
         
         // Check if we have the required elements
         const featuresContainer = document.getElementById('features-container');
@@ -17,7 +21,8 @@
             return;
         }
 
-        isInitialized = true;
+        window.dashboardInitialized = true;
+
         if (isPWA || websiteApp) {
             myApi = {
                 nonce: window.nonce,
@@ -4558,7 +4563,7 @@
 
     // Reset function to allow re-initialization if needed
     window.resetDashboard = function() {
-        isInitialized = false;
+        window.dashboardInitialized = false;
     };
     
     // Still run on DOMContentLoaded in case the HTML is already there

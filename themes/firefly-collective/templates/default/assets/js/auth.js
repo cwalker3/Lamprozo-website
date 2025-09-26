@@ -1,10 +1,15 @@
 // theme/assets/js/auth.js
 
+// Track if we've already set up the message listener (use window to avoid redeclaration)
+if (typeof window.googleAuthListenerSetup === 'undefined') {
+    window.googleAuthListenerSetup = false;
+}
+
 function handleGoogleAuth () {
     const googleSigninBtn = document.getElementById('google-signin');
     if (googleSigninBtn) {
         googleSigninBtn.addEventListener('click', function(e) {
-            let gapiEndPoint 
+            let gapiEndPoint
             if (!isPWA) gapiEndPoint  = myApi.gapiDomain  + '/wp-json/custom-api/v1/google-auth-init';
             if (isPWA || websiteApp)  gapiEndPoint  = window.gapiDomain + '/wp-json/custom-api/v1/google-auth-init';
             let googleAuthUrl = gapiEndPoint;
@@ -16,41 +21,45 @@ function handleGoogleAuth () {
         });
     }
 
-    window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'googleSignupSuccess') {
+    // Only set up the message listener once
+    if (!window.googleAuthListenerSetup) {
+        window.googleAuthListenerSetup = true;
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'googleSignupSuccess') {
 
-            // App login
-            if (isPWA || websiteApp) {
-                // From app.js
-                loginUser(event.data.auth_id);
-                return;
+                // App login
+                if (isPWA || websiteApp) {
+                    // From app.js
+                    loginUser(event.data.auth_id);
+                    return;
+                }
+
+                // Check if we're in campaign mode (set by dashboard when Google button is clicked)
+                if (window.campaignMode) {
+                    // Handle campaign Google auth success
+                    handleCampaignGoogleAuth(event.data);
+                    return;
+                }
+
+                // Regular website login (existing behavior)
+                const googleSignInBtnEle = document.querySelector('#google-signin-btn');
+                if (googleSignInBtnEle) {
+                    googleSignInBtnEle.innerHTML = event.data.message;
+                }
+
+                // For local host use only
+                // if (event.data.auth_id) {
+                //     let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
+                //     if (window.location.protocol === "https:") {
+                //         cookieStr += "; secure";
+                //     }
+                //     document.cookie = cookieStr;
+                // }
+
+                window.location.href = '/dashboard';
             }
-
-            // Check if we're in campaign mode (set by dashboard when Google button is clicked)
-            if (window.campaignMode) {
-                // Handle campaign Google auth success
-                handleCampaignGoogleAuth(event.data);
-                return;
-            }
-
-            // Regular website login (existing behavior)
-            const googleSignInBtnEle = document.querySelector('#google-signin-btn');
-            if (googleSignInBtnEle) {
-                googleSignInBtnEle.innerHTML = event.data.message;
-            }
-
-            // For local host use only
-            // if (event.data.auth_id) {
-            //     let cookieStr = "auth_id=" + event.data.auth_id + "; path=/; samesite=Lax";
-            //     if (window.location.protocol === "https:") {
-            //         cookieStr += "; secure";
-            //     }
-            //     document.cookie = cookieStr;
-            // }
-            
-            window.location.href = '/dashboard';
-        }
-    });
+        });
+    }
 }
 
 // New function to handle campaign Google authentication

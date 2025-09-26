@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   const devMode = true;
+
   const api_url = `${window.location.origin}/wp-json/custom-api/v1/`;
   const DB_NAME = 'ffc-app-db';
   const DB_VERSION = 1;
@@ -409,8 +410,14 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function getView(view) {
+    const appRoot = document.querySelector('#app-root');
+
+    if (!appRoot) {
+      return;
+    }
+
     loader.style.display = 'block';
-    
+
     try {
       const endpoint = 'app-get-view';
       const params = { view };
@@ -607,8 +614,8 @@ document.addEventListener('DOMContentLoaded', function () {
         break;
 
       case 'dashboard':
-        // Only call resetDashboard if it exists
-        if (window.resetDashboard && typeof window.resetDashboard === 'function') {
+        // Only reset if dashboard was already initialized (meaning we're navigating back)
+        if (window.dashboardInitialized && window.resetDashboard && typeof window.resetDashboard === 'function') {
           window.resetDashboard();
         }
         await getView('dashboard');
@@ -1363,6 +1370,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const startSignup = document.querySelector('#start-signup');
     startSignup.addEventListener('pointerup', async ()=>{
+      const appRoot = document.querySelector('#app-root');
       appRoot.innerHTML = '';
       await getView('signup');
       window.initializeSignup();
@@ -1372,7 +1380,17 @@ document.addEventListener('DOMContentLoaded', function () {
     handleGoogleAuth();
   }
 
+  // Track if login is in progress to prevent duplicate calls
+  let loginInProgress = false;
+
   function loginUser(user_id) {
+
+      // Prevent multiple simultaneous login attempts
+      if (loginInProgress) {
+          return;
+      }
+      loginInProgress = true;
+
       // Set auth_id
       window.auth_id = user_id;
       window.navData = { auth_id: user_id };
@@ -1400,24 +1418,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
           appRoot.innerHTML = '';
 
-          // Load dashboard view (same as loadContent('dashboard'))
-          if (window.resetDashboard && typeof window.resetDashboard === 'function') {
-            window.resetDashboard();
-          }
+          // Load dashboard view - no need to reset on initial login
           await getView('dashboard');
 
           // Add delay to ensure DOM is fully rendered before initializing
           setTimeout(() => {
-            if (document.getElementById('features-container')) {
+            const featuresContainer = document.getElementById('features-container');
+            if (featuresContainer) {
               if (window.initializeDashboard && typeof window.initializeDashboard === 'function') {
                 window.initializeDashboard();
+              } else {
               }
               scrollToTop();
+            } else {
             }
           }, 100);
+
+          // Reset the login flag after everything is complete
+          setTimeout(() => {
+            loginInProgress = false;
+          }, 200);
         })
         .catch(error => {
           appLog('Failed to save auth:', error);
+          loginInProgress = false; // Reset on error
         });
   }
   window.loginUser = loginUser;
