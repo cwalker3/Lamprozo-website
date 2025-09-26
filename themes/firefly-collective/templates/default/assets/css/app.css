@@ -47,6 +47,14 @@ body > nav ul > li:nth-last-of-type(3) {
   display: block !important;
 }
 
+/* Hide profile dropdown by default in app - JS will show if authenticated */
+body.page-app #profile-dropdown-container {
+  display: none !important;
+}
+body.page-app #profile-dropdown-container.authenticated {
+  display: block !important;
+}
+
 #app-page-html {
   margin-bottom: 2rem;
 }

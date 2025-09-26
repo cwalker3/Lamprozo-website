@@ -643,13 +643,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const store = transaction.objectStore(STORE_NAME);
     store.delete('user-auth:{}');
 
-    // Hide profile dropdown container
-    const profileContainer = document.getElementById('profile-dropdown-container');
-    if (profileContainer) {
-      profileContainer.style.display = 'none';
-    }
-
+    // Update visibility of both nav and profile dropdown
     updateNavVisibility();
+    updateProfileDropdownVisibility();
     appRoot.innerHTML = '';
     loadAppTitleAndAppHTML();
     loadLoginForm();
@@ -825,6 +821,29 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  // Function to update profile dropdown visibility based on auth state
+  function updateProfileDropdownVisibility() {
+    const profileContainer = document.getElementById('profile-dropdown-container');
+    if (profileContainer) {
+      if (window.navData && window.navData.auth_id) {
+        // For app pages, use class. For other pages, use inline style
+        if (document.body.classList.contains('page-app')) {
+          profileContainer.classList.add('authenticated');
+        } else {
+          profileContainer.style.display = 'block';
+        }
+      } else {
+        // For app pages, use class. For other pages, use inline style
+        if (document.body.classList.contains('page-app')) {
+          profileContainer.classList.remove('authenticated');
+        } else {
+          profileContainer.style.display = 'none';
+        }
+      }
+    }
+  }
+  window.updateProfileDropdownVisibility = updateProfileDropdownVisibility;
+
   function updateNavVisibility() {
     // Check if we're in PWA/app mode (converted menu items are .app-nav divs)
     const appNavItems = document.querySelectorAll('.app-nav');
@@ -905,9 +924,7 @@ document.addEventListener('DOMContentLoaded', function () {
           window.navData = { auth_id: authData.auth_id };
 
           // Update profile dropdown visibility since auth was restored
-          if (typeof window.updateProfileDropdownVisibility === 'function') {
-            window.updateProfileDropdownVisibility();
-          }
+          updateProfileDropdownVisibility();
 
           return true; // Auth restored successfully
         }
@@ -956,7 +973,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Insert menu into DOM
         const menuInserted = insertMenuIntoDOM(data.menu_html);
-        
+
         // If menu wasn't inserted but we have cached menu, try that
         if (!menuInserted && !navigator.onLine) {
           try {
@@ -968,6 +985,9 @@ document.addEventListener('DOMContentLoaded', function () {
             appLog('No cached menu available');
           }
         }
+
+        // Update profile dropdown visibility based on auth state
+        updateProfileDropdownVisibility();
         
         // Always save menu HTML separately for offline use
         if (data.menu_html) {
@@ -1403,6 +1423,7 @@ document.addEventListener('DOMContentLoaded', function () {
           // Update navigation
           setupNavigation();
           updateNavVisibility();
+          updateProfileDropdownVisibility();
 
           // Initialize profile dropdown after a short delay to ensure DOM is ready
           setTimeout(() => {
