@@ -59,12 +59,26 @@
                         <li><a href="/contact"><?php esc_html_e('Contact Us'); ?></a></li>
                         <li><a href="/signup"><?php esc_html_e('Book Appointment'); ?></a></li>
                     </ul>
-                    <div class="footer-newsletter">
-                        <h4><?php esc_html_e('Stay Updated'); ?></h4>
-                        <form class="newsletter-form" action="#" method="post">
-                            <input type="email" placeholder="<?php esc_attr_e('Your email'); ?>" required>
-                            <button type="submit"><?php esc_html_e('Subscribe'); ?></button>
+                    <div class="footer-contact-box">
+                        <h4><?php esc_html_e('Send a Message'); ?></h4>
+                        <form class="footer-contact-form" novalidate>
+                            <label class="footer-contact-field">
+                                <span class="screen-reader-text"><?php esc_html_e('Name', 'firefly-collective'); ?></span>
+                                <input type="text" id="footer-contact-name" placeholder="<?php esc_attr_e('Your name', 'firefly-collective'); ?>" autocomplete="name">
+                            </label>
+                            <label class="footer-contact-field">
+                                <span class="screen-reader-text"><?php esc_html_e('Email', 'firefly-collective'); ?></span>
+                                <input type="email" id="footer-contact-email" placeholder="<?php esc_attr_e('you@example.com', 'firefly-collective'); ?>" autocomplete="email">
+                            </label>
+                            <label class="footer-contact-field footer-contact-field--textarea">
+                                <span class="screen-reader-text"><?php esc_html_e('Message', 'firefly-collective'); ?></span>
+                                <textarea id="footer-contact-message" rows="3" placeholder="<?php esc_attr_e('How can we help?', 'firefly-collective'); ?>"></textarea>
+                            </label>
+                            <div class="footer-contact-submit">
+                                <button type="button" id="footer-contact-submit"><?php esc_html_e('Send Message', 'firefly-collective'); ?></button>
+                            </div>
                         </form>
+                        <div class="footer-contact-status" aria-live="polite"></div>
                     </div>
                 </div>
             </div>

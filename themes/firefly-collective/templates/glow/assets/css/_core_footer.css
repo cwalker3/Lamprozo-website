@@ -215,66 +215,127 @@
     color: var(--mainColor);
 }
 
-/* Newsletter Section */
-.footer-newsletter {
+/* Footer Contact Box */
+.footer-contact-box {
     margin-top: 2rem;
-    padding: 1.5rem;
+    padding: 1.75rem;
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    display: grid;
+    gap: 1rem;
 }
 
-.footer-newsletter h4 {
+.footer-contact-box h4 {
     font-family: var(--font-brand);
     font-size: 1rem;
-    margin-bottom: 1rem;
+    margin: 0;
     color: #ffffff;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
-.newsletter-form {
-    display: flex;
-    gap: 0.5rem;
+.footer-contact-form {
+    display: grid;
+    gap: 0.75rem;
 }
 
-.newsletter-form input[type="email"] {
-    flex: 1;
-    padding: 0.75rem;
+.footer-contact-field {
+    display: grid;
+}
+
+.footer-contact-field input,
+.footer-contact-field textarea {
+    width: 100%;
+    padding: 0.8rem 1rem;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
-    font-size: 0.9rem;
-    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    resize: vertical;
+    box-sizing: border-box;
 }
 
-.newsletter-form input[type="email"]::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+.footer-contact-field textarea {
+    min-height: 110px;
 }
 
-.newsletter-form input[type="email"]:focus {
+.footer-contact-field input::placeholder,
+.footer-contact-field textarea::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.footer-contact-field input:focus,
+.footer-contact-field textarea:focus {
     outline: none;
     border-color: var(--mainColor);
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 10px 25px rgba(56, 111, 181, 0.18);
 }
 
-.newsletter-form button {
-    padding: 0.75rem 1.5rem;
+.footer-contact-submit {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.footer-contact-submit button {
+    padding: 0.8rem 1.8rem;
     background: var(--mainColor);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 999px;
     font-family: var(--font-brand);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.newsletter-form button:hover {
-    background: var(--navBgColor);
+.footer-contact-submit button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(56, 111, 181, 0.3);
+    box-shadow: 0 8px 20px rgba(56, 111, 181, 0.25);
+}
+
+.footer-contact-submit button:active {
+    transform: translateY(-1px);
+}
+
+.footer-contact-submit button.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.footer-contact-status {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    min-height: 0;
+    transition: opacity 0.2s ease;
+}
+
+.footer-contact-status[hidden] {
+    display: none;
+}
+
+.footer-contact-status[data-state="success"] {
+    color: #8be0a3;
+}
+
+.footer-contact-status[data-state="error"] {
+    color: #ff9b9b;
+}
+
+.footer-contact-field input.invalid,
+.footer-contact-field textarea.invalid {
+    border-color: rgba(255, 155, 155, 0.85);
+    background: rgba(255, 80, 80, 0.1);
+}
+
+.footer-contact-field input.valid,
+.footer-contact-field textarea.valid {
+    border-color: rgba(139, 224, 163, 0.7);
+    background: rgba(139, 224, 163, 0.12);
 }
 
 /* Footer Bottom */
@@ -361,11 +422,15 @@
         justify-content: center;
     }
     
-    .newsletter-form {
-        flex-direction: column;
+    .footer-contact-form {
+        gap: 0.65rem;
     }
-    
-    .newsletter-form button {
+
+    .footer-contact-submit {
+        justify-content: stretch;
+    }
+
+    .footer-contact-submit button {
         width: 100%;
     }
 }

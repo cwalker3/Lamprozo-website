@@ -33,9 +33,9 @@
     function determine_view() {
         $aCmd = parse_request_uri();
 
-        // Get template path 
+        // Build template path fragment for view lookups
         $active_template = firefly_collective_get_active_template();
-        $template_path = $theme_path . '/templates/' . $active_template;
+        $template_path = '/templates/' . $active_template;
 
         // For single blog posts
         if ( is_single() ) return 'blog-post';

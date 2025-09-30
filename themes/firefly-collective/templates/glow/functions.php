@@ -13,7 +13,8 @@
     $models = array(  
                 'init',         'view',         
                 'pages',        'nav',
-                'customize',    'rest');
+                'customize',    'rest',
+                'mail',         'contact');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";

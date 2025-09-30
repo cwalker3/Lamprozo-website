@@ -49,10 +49,13 @@
     // Enqueue Styles and Scripts
     function enqueue_my_styles_and_scripts() {
 
-        global $theme_path_web, $template_path, $template_web_path, $nonce;
+        global $backend_plugin_path, $backend_plugin_path_web;
+        global $theme_path, $theme_path_web, $template_path, $template_web_path, $nonce;
 
+        $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
+        $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
         $theme_path = get_template_directory_uri();
-        $theme_path_web = get_template_directory_uri();
+        $theme_path_web = $theme_path;
         $active_template = firefly_collective_get_active_template();
         $template_path = $theme_path_web . '/templates/' . $active_template;
         $template_path_web = $template_path;
@@ -67,7 +70,9 @@
         // Localize main.js with the nonce and API URL for security
         wp_localize_script('core-main-js', 'myApi', array(
             'nonce'         => $nonce,
-            'api_url'       => $api_url
+            'api_url'       => $api_url,
+            'themePath'     => $theme_path,
+            'template_path' => $template_path_web
         ));
 
         // Get dynamic asset paths
@@ -86,13 +91,15 @@
         $suffix = $type === 'css' ? '-css' : '-js';
 
         foreach ( $files as $path ) {
+            if ( ! $path ) {
+                continue;
+            }
 
-            // remote?
-            if ( false !== strpos( $file, '://' ) ) {
-                $host  = parse_url( $file, PHP_URL_HOST );
+            if ( false !== strpos( $path, '://' ) ) {
+                $host  = parse_url( $path, PHP_URL_HOST );
                 $parts = explode( '.', $host );
                 $name  = $parts[ count( $parts ) - 2 ];
-                $src   = $file;
+                $src   = $path;
             } else {
                 $name = pathinfo( $path, PATHINFO_FILENAME );
                 $src  = "{$path}";
