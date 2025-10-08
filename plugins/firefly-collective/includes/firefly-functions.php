@@ -11,12 +11,12 @@
 
     // Load backend models
     $models = array(
-                'init',         'rest',     
-                'db',           'admin-nav',    
+                'init',         'rest',
+                'db',           'admin-nav',
                 'bookings',     'util',
                 'projects',     'pricing',
                 'orders',       'payment',
-                'campaign');
+                'campaign',     'cache');
     foreach($models as $model) {
         require_once(plugin_dir_path(__FILE__) . "apps/backend/models/$model.php");
     }

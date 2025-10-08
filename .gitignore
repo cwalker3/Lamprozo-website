@@ -34,3 +34,10 @@ uploads/**
 !uploads/campaigns/
 uploads/campaigns/**
 !uploads/campaigns/.gitkeep
+
+# Cache directory
+!cache/
+cache/**
+!cache/firefly-collective/
+cache/firefly-collective/**
+!cache/firefly-collective/.gitkeep
