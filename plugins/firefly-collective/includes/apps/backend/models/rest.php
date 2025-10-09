@@ -302,6 +302,26 @@
                 'permission_callback' => 'verify_rest_request'
             )
         );
-        
+
+        register_rest_route(
+            'custom-api/v1',
+            '/toggle-online-payments',
+            array(
+                'methods'             => 'POST',
+                'callback'            => 'firefly_collective_toggle_online_payments',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
+        register_rest_route(
+            'custom-api/v1',
+            '/get-online-payments-status',
+            array(
+                'methods'             => 'GET',
+                'callback'            => 'firefly_collective_get_online_payments_status',
+                'permission_callback' => 'verify_rest_request'
+            )
+        );
+
     }
     add_action('rest_api_init', 'register_plugin_custom_api_endpoints');

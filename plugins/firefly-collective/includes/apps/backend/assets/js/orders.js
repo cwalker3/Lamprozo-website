@@ -64,6 +64,11 @@ function initOrdersApp() {
             // State for tracking item refunds
             const itemToRefund = ref(null);
             const showItemRefundModal = ref(false);
+
+            // Online payments toggle state
+            const onlinePaymentsEnabled = ref(ordersData.onlinePaymentsEnabled === '1' || ordersData.onlinePaymentsEnabled === true);
+            const toggleMessage = ref('');
+            const toggleMessageType = ref('success');
             
             // Filters
             const filters = ref({
@@ -1015,13 +1020,54 @@ function initOrdersApp() {
             
             function getAddonNames(addonIds) {
                 if (!addonIds || !Array.isArray(JSON.parse(addonIds))) return [];
-                
+
                 return JSON.parse(addonIds).map(id => {
                     const addon = addons.value.find(a => a.id == id);
                     return addon ? addon.addonName : `Addon #${id}`;
                 });
             }
-            
+
+            // Toggle online payments
+            async function toggleOnlinePayments() {
+                try {
+                    const response = await fetch(`${ordersData.apiUrl}toggle-online-payments`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            enabled: onlinePaymentsEnabled.value,
+                            auth_id: ordersData.auth_id
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        toggleMessageType.value = 'success';
+                        toggleMessage.value = data.message || 'Setting updated successfully';
+
+                        // Clear message after 3 seconds
+                        setTimeout(() => {
+                            toggleMessage.value = '';
+                        }, 3000);
+                    } else {
+                        toggleMessageType.value = 'error';
+                        toggleMessage.value = data.message || 'Failed to update setting';
+
+                        // Revert toggle on error
+                        onlinePaymentsEnabled.value = !onlinePaymentsEnabled.value;
+                    }
+                } catch (error) {
+                    console.error('Error toggling online payments:', error);
+                    toggleMessageType.value = 'error';
+                    toggleMessage.value = 'An error occurred while updating the setting';
+
+                    // Revert toggle on error
+                    onlinePaymentsEnabled.value = !onlinePaymentsEnabled.value;
+                }
+            }
+
             // Lifecycle hooks
             onMounted(() => {
                 fetchLookupData();
@@ -1056,9 +1102,13 @@ function initOrdersApp() {
                 currentUserIdAdmin,
                 itemToRefund,
                 showItemRefundModal,
-                
+                onlinePaymentsEnabled,
+                toggleMessage,
+                toggleMessageType,
+
                 // Methods
                 fetchOrders,
+                toggleOnlinePayments,
                 toggleExpand,
                 toggleSelectAll,
                 handleOrderSelection,

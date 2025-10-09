@@ -3464,6 +3464,13 @@
                 // Success path
                 const data = await response.json();
 
+                // Check if payments are disabled
+                if (data.payment_disabled) {
+                    hideLoadingOverlay(overlay);
+                    showOrderSuccess();
+                    return;
+                }
+
                 if (data.success && data.clientSecret) {
                     // Create the payment form
                     createPaymentForm(data.clientSecret);
@@ -3720,18 +3727,18 @@
             }
         }
 
-        function showPaymentSuccess() {
+        function showOrderSuccess() {
             const payNowBtn = document.getElementById('pay-now');
-            
+
             // Disable form interaction immediately
             disableFormInteraction();
-            
+
             // Remove any existing payment form
             const existingPaymentContainer = document.getElementById('payment-element-container');
             if (existingPaymentContainer) {
                 existingPaymentContainer.remove();
             }
-            
+
             // Clear any Stripe elements
             if (paymentElement) {
                 try {
@@ -3742,32 +3749,32 @@
                     console.log('Payment element already unmounted');
                 }
             }
-            
+
             // Remove any existing success container to avoid duplicates
             const existingSuccessContainer = document.getElementById('payment-success-container');
             if (existingSuccessContainer) {
                 existingSuccessContainer.remove();
             }
-            
+
             // Create success message with new order button
             const successContainer = document.createElement('div');
             successContainer.id = 'payment-success-container';
             successContainer.style.marginBottom = '20px';
-            
-            // Different messages for campaign vs regular orders
+
+            // Success message for when payments are disabled
             let successMessage = `
                 <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
-                    <p style="margin: 0;">Your order has been paid. Thank you for your purchase!</p>
+                    <h3 style="margin: 0 0 10px 0;">Order Placed Successfully!</h3>
+                    <p style="margin: 0;">Your order has been received. Thank you!</p>
                 </div>
             `;
-            
+
             let buttonText = 'Start a New Order';
             let buttonAction = () => {
                 // Clear the session storage
                 sessionStorage.removeItem('placedOrder');
                 sessionStorage.removeItem('priceCalcSelections');
-                
+
                 // If this was a campaign order, redirect to login page so they can access full dashboard
                 if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
                     window.location.href = '/ffc-login'; // Use your custom login slug
@@ -3776,19 +3783,19 @@
                     window.location.reload();
                 }
             };
-            
+
             // If this was a campaign order with account creation
             if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
                 successMessage = `
                     <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
-                        <p style="margin: 0 0 10px 0;">Your order has been paid and your account has been created!</p>
+                        <h3 style="margin: 0 0 10px 0;">Order Placed Successfully!</h3>
+                        <p style="margin: 0 0 10px 0;">Your order has been received and your account has been created!</p>
                         <p style="margin: 0; font-size: 14px;">You can now access your full dashboard anytime by logging in with Google.</p>
                     </div>
                 `;
                 buttonText = 'Go to Login Page';
             }
-            
+
             successContainer.innerHTML = `
                 ${successMessage}
                 <button id="start-new-order" style="
@@ -3806,12 +3813,109 @@
                     ${buttonText}
                 </button>
             `;
-            
+
             // Insert before the pay now button
             if (payNowBtn && payNowBtn.parentNode) {
                 payNowBtn.parentNode.insertBefore(successContainer, payNowBtn);
                 payNowBtn.style.display = 'none';
-                
+
+                // Add event listener to new order button
+                document.getElementById('start-new-order').addEventListener('click', buttonAction);
+            }
+        }
+
+        function showPaymentSuccess() {
+            const payNowBtn = document.getElementById('pay-now');
+
+            // Disable form interaction immediately
+            disableFormInteraction();
+
+            // Remove any existing payment form
+            const existingPaymentContainer = document.getElementById('payment-element-container');
+            if (existingPaymentContainer) {
+                existingPaymentContainer.remove();
+            }
+
+            // Clear any Stripe elements
+            if (paymentElement) {
+                try {
+                    paymentElement.unmount();
+                    paymentElement = null;
+                    elements = null;
+                } catch (error) {
+                    console.log('Payment element already unmounted');
+                }
+            }
+
+            // Remove any existing success container to avoid duplicates
+            const existingSuccessContainer = document.getElementById('payment-success-container');
+            if (existingSuccessContainer) {
+                existingSuccessContainer.remove();
+            }
+
+            // Create success message with new order button
+            const successContainer = document.createElement('div');
+            successContainer.id = 'payment-success-container';
+            successContainer.style.marginBottom = '20px';
+
+            // Different messages for campaign vs regular orders
+            let successMessage = `
+                <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
+                    <p style="margin: 0;">Your order has been paid. Thank you for your purchase!</p>
+                </div>
+            `;
+
+            let buttonText = 'Start a New Order';
+            let buttonAction = () => {
+                // Clear the session storage
+                sessionStorage.removeItem('placedOrder');
+                sessionStorage.removeItem('priceCalcSelections');
+
+                // If this was a campaign order, redirect to login page so they can access full dashboard
+                if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
+                    window.location.href = '/ffc-login'; // Use your custom login slug
+                } else {
+                    // Regular flow - reload page
+                    window.location.reload();
+                }
+            };
+
+            // If this was a campaign order with account creation
+            if (dashboardData.campaign_config && (googleAuthData || window.auth_id)) {
+                successMessage = `
+                    <div style="padding: 20px; background-color: #4CAF50; color: white; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0 0 10px 0;">Payment Successful!</h3>
+                        <p style="margin: 0 0 10px 0;">Your order has been paid and your account has been created!</p>
+                        <p style="margin: 0; font-size: 14px;">You can now access your full dashboard anytime by logging in with Google.</p>
+                    </div>
+                `;
+                buttonText = 'Go to Login Page';
+            }
+
+            successContainer.innerHTML = `
+                ${successMessage}
+                <button id="start-new-order" style="
+                    display: block;
+                    width: 100%;
+                    padding: 12px 20px;
+                    background-color: #0073aa;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                ">
+                    ${buttonText}
+                </button>
+            `;
+
+            // Insert before the pay now button
+            if (payNowBtn && payNowBtn.parentNode) {
+                payNowBtn.parentNode.insertBefore(successContainer, payNowBtn);
+                payNowBtn.style.display = 'none';
+
                 // Add event listener to new order button
                 document.getElementById('start-new-order').addEventListener('click', buttonAction);
             }

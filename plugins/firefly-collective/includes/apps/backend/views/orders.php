@@ -4,18 +4,47 @@
 
     global $currentUserIdAdmin;
 
+    // Get current online payments setting
+    $online_payments_enabled = get_option('firefly_online_payments_enabled', '1');
+
 ?>
 
 <?php echo apply_filters('the_content', $postContent); ?>
 
 <div class="wrap" id="ffc-orders-app" v-cloak>
-    
+
     <!-- Loading State -->
     <div v-if="loading" class="ffc-loading">
         <div class="spinner is-active"></div>
         <p>Loading orders...</p>
     </div>
-    
+
+    <!-- Online Payments Toggle Section (Admin Only) -->
+    <?php if ($currentUserIdAdmin): ?>
+    <div class="ffc-online-payments-toggle-container" style="background: #fff; padding: 15px 20px; margin: 20px 0; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="margin: 0 0 5px 0; font-size: 16px;">Online Payments</h3>
+                <p style="margin: 0; color: #666; font-size: 13px;">
+                    {{ onlinePaymentsEnabled ? 'Customers will be required to pay online via Stripe when placing orders' : 'Customers can place orders without online payment (orders only mode)' }}
+                </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label class="ffc-toggle-switch">
+                    <input type="checkbox" v-model="onlinePaymentsEnabled" @change="toggleOnlinePayments">
+                    <span class="ffc-toggle-slider"></span>
+                </label>
+                <span style="font-weight: bold; color: {{ onlinePaymentsEnabled ? '#28a745' : '#dc3545' }}">
+                    {{ onlinePaymentsEnabled ? 'ENABLED' : 'DISABLED' }}
+                </span>
+            </div>
+        </div>
+        <div v-if="toggleMessage" :class="'ffc-toggle-message ffc-toggle-' + toggleMessageType" style="margin-top: 10px; padding: 8px 12px; border-radius: 3px; font-size: 13px;">
+            {{ toggleMessage }}
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Filters Section -->
     <?php if ($currentUserIdAdmin): ?>
     <div class="ffc-filters-container">

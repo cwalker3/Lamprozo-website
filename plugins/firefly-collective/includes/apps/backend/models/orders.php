@@ -64,6 +64,9 @@
                 $nonce   = wp_create_nonce('wp_rest');
                 $api_url = get_rest_url(null, 'custom-api/v1/');
                 
+                // Get online payments setting
+                $online_payments_enabled = get_option('firefly_online_payments_enabled', '1');
+
                 wp_localize_script('orders-js', 'ordersData', array(
                     'data'   => $obj,
                     'nonce'  => $nonce,
@@ -71,7 +74,8 @@
                     'auth_id'=> $auth_id,
                     'currentUserIsAdmin' => $currentUserIdAdmin,
                     'currentUserId'      => get_current_user_id(),
-                    'isPWA' => 0
+                    'isPWA' => 0,
+                    'onlinePaymentsEnabled' => $online_payments_enabled
                 ));
                 break;
 
@@ -242,6 +246,12 @@
             
             $price_data = calculate_server_price($feature_id, $option_id, $addon_ids, $price_option_index, $quantity);
             
+            // Check if online payments are enabled
+            $online_payments_enabled = get_option('firefly_online_payments_enabled', '1');
+
+            // If online payments are disabled, mark orders as completed by default
+            $initial_status = ($online_payments_enabled === '1') ? 'pending' : 'completed';
+
             $insert_data = array(
                 'orderID'            => $order_id,
                 'userId'             => $user_id,
@@ -254,7 +264,7 @@
                 'totalPriceDiscount' => $price_data['totalPriceDiscount'],
                 'priceDiscountsInfo' => json_encode($price_data['priceDiscountsInfo']),
                 'userData'           => json_encode($user_data),
-                'status'             => 'pending',
+                'status'             => $initial_status,
                 'createdAt'          => current_time('mysql')
             );
             
@@ -285,12 +295,18 @@
             
             $total_order_value += $price_data['totalPrice'];
         }
-        
+
+        // If online payments are disabled, send order email immediately
+        if ($online_payments_enabled !== '1') {
+            firefly_collective_orders_email($order_id, 'completed');
+        }
+
         return array(
             'success'         => true,
             'orderID'         => $order_id,
             'records'         => $inserted_records,
-            'totalOrderValue' => $total_order_value
+            'totalOrderValue' => $total_order_value,
+            'paymentDisabled' => ($online_payments_enabled !== '1')
         );
     }
 
@@ -967,6 +983,52 @@
         }
         
         return array('lines' => $lines);
+    }
+
+    /**
+     * Toggle online payments on/off
+     */
+    function firefly_collective_toggle_online_payments($request) {
+        // Check if user has admin permissions
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('unauthorized', 'You do not have permission to change this setting', array('status' => 403));
+        }
+
+        $params = $request->get_json_params();
+        $enabled = isset($params['enabled']) ? $params['enabled'] : false;
+
+        // Convert to string '1' or '0'
+        $enabled_value = $enabled ? '1' : '0';
+
+        // Update the option in the database
+        $result = update_option('firefly_online_payments_enabled', $enabled_value);
+
+        if ($result || get_option('firefly_online_payments_enabled') === $enabled_value) {
+            return array(
+                'success' => true,
+                'message' => $enabled ? 'Online payments enabled' : 'Online payments disabled',
+                'enabled' => $enabled_value
+            );
+        } else {
+            return new WP_Error('update_failed', 'Failed to update online payments setting', array('status' => 500));
+        }
+    }
+
+    /**
+     * Get online payments status
+     */
+    function firefly_collective_get_online_payments_status($request) {
+        // Check if user has admin permissions
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('unauthorized', 'You do not have permission to view this setting', array('status' => 403));
+        }
+
+        $enabled = get_option('firefly_online_payments_enabled', '1');
+
+        return array(
+            'success' => true,
+            'enabled' => $enabled === '1'
+        );
     }
 
     function firefly_collective_orders_email($order_id, $new_status = '', $order_data = null) {

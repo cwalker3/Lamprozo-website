@@ -299,12 +299,25 @@
     // Create a payment intent (for orders and subscriptions)
     function firefly_collective_create_payment_intent($request) {
         try {
+            // Check if online payments are enabled
+            $online_payments_enabled = get_option('firefly_online_payments_enabled', '1');
+
+            if ($online_payments_enabled !== '1') {
+                // Online payments are disabled - return success without creating payment intent
+                return array(
+                    'success' => true,
+                    'payment_disabled' => true,
+                    'message' => 'Order placed successfully. Online payments are currently disabled.',
+                    'clientSecret' => null
+                );
+            }
+
             firefly_collective_stripe_init();
-            
+
             $params = $request->get_json_params();
             $order_id = isset($params['orderID']) ? sanitize_text_field($params['orderID']) : '';
             $item_id = isset($params['itemId']) ? intval($params['itemId']) : null;
-            
+
             if (empty($order_id)) {
                 return new WP_Error('missing_order_id', 'Order ID is required', array('status' => 400));
             }
