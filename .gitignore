@@ -12,13 +12,20 @@ plugins/*
 !plugins/firefly-collective/
 !plugins/firefly-collective/**
 
+# Ignore everything in plugin templates except "default"
+plugins/firefly-collective/templates/*
+!plugins/firefly-collective/templates/default/
+!plugins/firefly-collective/templates/default/**
+!plugins/firefly-collective/templates/glow/
+!plugins/firefly-collective/templates/glow/**
+
 # Themes directory
 !themes/
 themes/*
 !themes/firefly-collective/
 !themes/firefly-collective/**
 
-# Ignore everything in templates except "default"
+# Ignore everything in theme templates except "default"
 themes/firefly-collective/templates/*
 !themes/firefly-collective/templates/default/
 !themes/firefly-collective/templates/default/**
