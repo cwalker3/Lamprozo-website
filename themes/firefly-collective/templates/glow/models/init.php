@@ -52,8 +52,10 @@
         global $backend_plugin_path, $backend_plugin_path_web;
         global $theme_path, $theme_path_web, $template_path, $template_web_path, $nonce;
 
-        $backend_plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/includes/apps/backend';
-        $backend_plugin_path_web = '/wp-content/plugins/firefly-collective/includes/apps/backend';
+        // Get active template for template-scoped plugin paths
+        $active_template = firefly_collective_get_active_template();
+        $backend_plugin_path = ABSPATH . 'wp-content/themes/firefly-collective/templates/' . $active_template;
+        $backend_plugin_path_web = '/wp-content/themes/firefly-collective/templates/' . $active_template;
         $theme_path = get_template_directory_uri();
         $theme_path_web = $theme_path;
         $active_template = firefly_collective_get_active_template();

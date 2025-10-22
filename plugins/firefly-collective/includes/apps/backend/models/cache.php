@@ -29,8 +29,14 @@ function firefly_collective_cache_serve() {
         return;
     }
 
-    // Get template
-    $template = firefly_collective_get_active_template();
+    // Get template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     if (!$template) {
         return;
     }
@@ -84,8 +90,14 @@ function firefly_collective_cache_start() {
  * Called automatically by ob_start() callback
  */
 function firefly_collective_cache_save($html) {
-    // Get current template
-    $template = firefly_collective_get_active_template();
+    // Get current template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     if (!$template) {
         return $html; // No template, don't cache
     }
@@ -306,7 +318,14 @@ function firefly_collective_cache_invalidate_post($post_id, $post = null) {
         return;
     }
 
-    $template = firefly_collective_get_active_template();
+    // Get template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     if (!$template) {
         return;
     }
@@ -467,7 +486,14 @@ function firefly_collective_cache_admin_bar($wp_admin_bar) {
     ]);
 
     // Sub-menu: Clear current template only
-    $template = firefly_collective_get_active_template();
+    // Get template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     $wp_admin_bar->add_node([
         'parent' => 'ffc-clear-cache',
         'id'     => 'ffc-clear-cache-current',
@@ -520,7 +546,14 @@ add_action('admin_post_ffc_clear_cache_current', 'firefly_collective_cache_handl
 function firefly_collective_cache_handle_clear() {
     check_admin_referer('ffc_clear_cache');
 
-    $template = firefly_collective_get_active_template();
+    // Get template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     firefly_collective_cache_delete_template($template);
 
     wp_redirect(add_query_arg('cache_cleared', '1', wp_get_referer()));
@@ -539,7 +572,14 @@ function firefly_collective_cache_handle_clear_all() {
 function firefly_collective_cache_handle_clear_current() {
     check_admin_referer('ffc_clear_cache_current');
 
-    $template = firefly_collective_get_active_template();
+    // Get template (with fallback if theme hasn't loaded yet)
+    if (function_exists('firefly_collective_get_active_template')) {
+        $template = firefly_collective_get_active_template();
+    } else {
+        // Fallback to direct option read if theme function not available
+        $template = get_option('firefly_collective_active_template', 'default');
+    }
+
     firefly_collective_cache_delete_template($template);
 
     wp_redirect(add_query_arg('cache_cleared', $template, wp_get_referer()));

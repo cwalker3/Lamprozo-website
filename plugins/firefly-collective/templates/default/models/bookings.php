@@ -10,15 +10,16 @@
 
         $theme_path = get_template_directory_uri();
         $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        $plugin_path = plugin_dir_url(dirname(dirname(__FILE__)));
         $unique_id = uniqid(); // Adjust this for versioning or cache-busting
 
         // Enqueue Stylesheets
         wp_enqueue_style('calendar-css', $theme_path . '/templates/' . $template_name . '/assets/css/calendar.css', array(), $unique_id);
-        wp_enqueue_style('bookings-css', PLUGIN_PATH_BACKEND . '/assets/css/bookings.css', array(), $unique_id);
+        wp_enqueue_style('bookings-css', $plugin_path . $template_name . '/assets/css/bookings.css', array(), $unique_id);
 
         // Enqueue Scripts
         wp_enqueue_script('cal-js', $theme_path . '/templates/' . $template_name . '/assets/js/calendar.js', array(), $unique_id, true);
-        wp_enqueue_script('bookings-js', PLUGIN_PATH_BACKEND . '/assets/js/bookings.js', array(), $unique_id, true);
+        wp_enqueue_script('bookings-js', $plugin_path . $template_name . '/assets/js/bookings.js', array(), $unique_id, true);
 
         // Admin access
         $nonce = wp_create_nonce('wp_rest');
@@ -42,6 +43,18 @@
         ));
     }
     add_action('admin_enqueue_scripts', 'enqueue_bookings_styles_and_scripts');
+
+    function firefly_collective_add_bookings_link() {
+        add_menu_page(
+            'My Bookings',
+            'Bookings',
+            'manage_options',
+            'my-bookings',
+            'firefly_collective_bookings_dashboard',
+            'dashicons-calendar'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_bookings_link');
 
     function firefly_collective_create_tables() {
         global $wpdb;
@@ -561,16 +574,18 @@
     }
 
     function firefly_collective_bookings_dashboard() {
-        // Navigate up one directory from /models to the plugin root
-        $plugin_root = dirname(plugin_dir_path(__FILE__));
-        
-        // Construct the path to the view file
-        $view_path = $plugin_root . '/views/my-bookings.php';
+        // Get the current template directory
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        // Go up from models/ -> default/ -> templates/ -> plugin_root/
+        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
+
+        // Construct the path to the view file in the template directory
+        $view_path = $plugin_base . 'templates/default/views/my-bookings.php';
 
         if (file_exists($view_path)) {
             require_once $view_path;
         } else {
             // Optional: handle missing file scenario (e.g., log an error)
-            wp_die('The app file could not be found.', 'File Not Found', array('response' => 404));
+            wp_die('The bookings view file could not be found at: ' . $view_path, 'File Not Found', array('response' => 404));
         }
     }

@@ -3,22 +3,31 @@
     // plugin/models/orders.php
 
     function firefly_collective_orders_dashboard() {
-        $plugin_root = dirname(plugin_dir_path(__FILE__));
-        $view_path   = $plugin_root . '/views/orders.php';
+        // Get the current template directory
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        // Go up from models/ -> default/ -> templates/ -> plugin_root/
+        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
+
+        // Construct the path to the view file in the template directory
+        $view_path = $plugin_base . 'templates/default/views/orders.php';
+
         if (file_exists($view_path)) {
             require_once $view_path;
         } else {
-            wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
+            wp_die('The orders view file could not be found at: ' . $view_path, 'File Not Found', array('response' => 404));
         }
     }
 
     function firefly_collective_subscriptions_dashboard() {
-        $plugin_root = dirname(plugin_dir_path(__FILE__));
-        $view_path   = $plugin_root . '/views/subscriptions.php';
+        // Subscriptions view stays in core backend directory (not template-specific)
+        // Go up from models/ -> default/ -> templates/ -> plugin_root/
+        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
+        $view_path = $plugin_base . 'includes/apps/backend/views/subscriptions.php';
+
         if (file_exists($view_path)) {
             require_once $view_path;
         } else {
-            wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
+            wp_die('The subscriptions view file could not be found at: ' . $view_path, 'File Not Found', array('response' => 404));
         }
     }
 
@@ -27,7 +36,8 @@
             return;
         }
 
-        $plugin_root_url = dirname(plugin_dir_url(__FILE__)) . '/';
+        $plugin_path = plugin_dir_url(dirname(dirname(__FILE__)));
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
         $unique_id       = uniqid();
         $hookName = '';
         $nonce   = wp_create_nonce('wp_rest');
@@ -55,8 +65,8 @@
             case "toplevel_page_orders":
 
                 // Enqueue CSS & JS
-                wp_enqueue_style('orders-css', $plugin_root_url . 'assets/css/orders.css', array(), $unique_id);
-                wp_enqueue_script('orders-js', $plugin_root_url . 'assets/js/orders.js', array(), $unique_id, true);
+                wp_enqueue_style('orders-css', $plugin_path . $template_name . '/assets/css/orders.css', array(), $unique_id);
+                wp_enqueue_script('orders-js', $plugin_path . $template_name . '/assets/js/orders.js', array(), $unique_id, true);
 
                 $obj = new stdClass();
 
@@ -83,9 +93,9 @@
         case "toplevel_page_subscriptions":
 
             // Enqueue CSS & JS
-            wp_enqueue_style('subscriptions-css', $plugin_root_url . 'assets/css/subscriptions.css', array(), $unique_id);
+            wp_enqueue_style('subscriptions-css', $plugin_path . $template_name . '/assets/css/subscriptions.css', array(), $unique_id);
             wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-            wp_enqueue_script('subscriptions-js', $plugin_root_url . 'assets/js/subscriptions.js', array(), $unique_id, true);
+            wp_enqueue_script('subscriptions-js', $plugin_path . $template_name . '/assets/js/subscriptions.js', array(), $unique_id, true);
 
             // Get Stripe configuration
             $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
@@ -109,6 +119,30 @@
         }
     }
     add_action('admin_enqueue_scripts', 'enqueue_orders_styles_and_scripts');
+
+    function firefly_collective_add_orders_link() {
+        add_menu_page(
+            'Orders',
+            'Orders',
+            'manage_options',
+            'orders',
+            'firefly_collective_orders_dashboard',
+            'dashicons-cart'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_orders_link');
+
+    function firefly_collective_add_subscriptions_link() {
+        add_menu_page(
+            'Subscriptions',
+            'Subscriptions',
+            'manage_options',
+            'subscriptions',
+            'firefly_collective_subscriptions_dashboard',
+            'dashicons-tickets-alt'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_subscriptions_link');
 
     /**
      * Create or update the ffc_orders table to include invoice_id and its index.

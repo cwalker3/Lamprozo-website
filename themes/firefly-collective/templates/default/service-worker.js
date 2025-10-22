@@ -19,8 +19,8 @@ const DYNAMIC_CACHE   =   `${CACHE_PREFIX}dynamic`;
 const API_CACHE       =   `${CACHE_PREFIX}api`;
 const METADATA_CACHE  =   `${CACHE_PREFIX}metadata`;
 const themePath       =   '/wp-content/themes/firefly-collective';
-const plugin_path     =   '/wp-content/plugins/firefly-collective/includes/apps/backend';
-const activeTemplate    =   'default';
+const activeTemplate  =   'default';
+const plugin_path     =   `/wp-content/themes/firefly-collective/templates/${activeTemplate}`;
 const templatePath    =   `${themePath}/templates/${activeTemplate}`;
 
 // Cache duration (1 hour in milliseconds)

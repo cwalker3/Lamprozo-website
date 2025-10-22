@@ -7,34 +7,34 @@
             return;
         }
 
-        $plugin_root_url = dirname(plugin_dir_url(__FILE__)) . '/';
+        $plugin_path = plugin_dir_url(dirname(dirname(__FILE__)));
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
         $unique_id       = uniqid();
         $hookName = '';
         $nonce   = wp_create_nonce('wp_rest');
         $api_url = get_rest_url(null, 'custom-api/v1/');
         $theme_path = get_template_directory_uri();
-        
+
         switch ($hook) {
 
             // Pricing admin
             case "toplevel_page_pricing":
 
                 // Enqueue CSS & JS
-                wp_enqueue_style('pricing-css', $plugin_root_url . 'assets/css/pricing.css', array(), $unique_id);
+                wp_enqueue_style('pricing-css', $plugin_path . $template_name . '/assets/css/pricing.css', array(), $unique_id);
                 wp_enqueue_script(
-                    'pricing-js', 
-                    $plugin_root_url . 'assets/js/pricing/pricing.js', 
-                    array(), 
-                    $unique_id, 
+                    'pricing-js',
+                    $plugin_path . $template_name . '/assets/js/pricing/pricing.js',
+                    array(),
+                    $unique_id,
                     true
                 );
 
                 // Add module type for ES6 modules
                 wp_script_add_data('pricing-js', 'type', 'module');
 
-                // Load pricing.json
-                $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
-                $pricing_json_path = $plugin_root_path . '/pricing.json';
+                // Load pricing.json from template data folder
+                $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
                 $pricing_data      = array();
                 if (file_exists($pricing_json_path)) {
                     $content = file_get_contents($pricing_json_path);
@@ -62,6 +62,18 @@
     }
     add_action('admin_enqueue_scripts', 'enqueue_pricing_styles_and_scripts');
 
+    function firefly_collective_add_pricing_link() {
+        add_menu_page(
+            'Pricing',
+            'Pricing',
+            'manage_options',
+            'pricing',
+            'firefly_collective_pricing_dashboard',
+            'dashicons-money-alt'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_pricing_link');
+
     add_filter('script_loader_tag', function ($tag, $handle, $src) {
         if ($handle === 'pricing-js') {
             // keep the original tag but add type="module"
@@ -71,12 +83,18 @@
     }, 10, 3);
 
     function firefly_collective_pricing_dashboard() {
-        $plugin_root = dirname(plugin_dir_path(__FILE__));
-        $view_path   = $plugin_root . '/views/pricing.php';
+        // Get the current template directory
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        // Go up from models/ -> default/ -> templates/ -> plugin_root/
+        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
+
+        // Construct the path to the view file in the template directory
+        $view_path = $plugin_base . 'templates/default/views/pricing.php';
+
         if (file_exists($view_path)) {
             require_once $view_path;
         } else {
-            wp_die('The pricing view file could not be found.', 'File Not Found', array('response' => 404));
+            wp_die('The pricing view file could not be found at: ' . $view_path, 'File Not Found', array('response' => 404));
         }
     }
 
@@ -983,9 +1001,8 @@
         // Always create the orders table
         create_ffc_orders_table_if_not_exist();
         
-        // Check if pricing.json exists and has data
-        $plugin_root_path = dirname(plugin_dir_path(__FILE__));
-        $pricing_json_path = $plugin_root_path . '/pricing.json';
+        // Check if pricing.json exists and has data in template data folder
+        $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
         
         if (file_exists($pricing_json_path)) {
             $content = file_get_contents($pricing_json_path);
@@ -1212,8 +1229,8 @@
      */
     function firefly_collective_save_pricing($request) {
         $data              = $request->get_json_params();
-        $plugin_root_path  = dirname(plugin_dir_path(__FILE__));
-        $pricing_json_path = $plugin_root_path . '/pricing.json';
+        // Save to template data folder
+        $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
 
         // Process the data before saving to both JSON and database
         if (isset($data['pricingData']) && isset($data['pricingData']['features']) && is_array($data['pricingData']['features'])) {

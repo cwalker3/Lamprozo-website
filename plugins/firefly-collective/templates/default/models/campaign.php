@@ -4,12 +4,18 @@
 
     // Dashboard view
     function firefly_collective_campaign_dashboard() {
-        $plugin_root = dirname(plugin_dir_path(__FILE__));
-        $view_path   = $plugin_root . '/views/campaign.php';
+        // Get the current template directory
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        // Go up from models/ -> default/ -> templates/ -> plugin_root/
+        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
+
+        // Construct the path to the view file in the template directory
+        $view_path = $plugin_base . 'templates/default/views/campaign.php';
+
         if (file_exists($view_path)) {
             require_once $view_path;
         } else {
-            wp_die('The campaign view file could not be found.', 'File Not Found', array('response' => 404));
+            wp_die('The campaign view file could not be found at: ' . $view_path, 'File Not Found', array('response' => 404));
         }
     }
 
@@ -19,7 +25,8 @@
             return;
         }
 
-        $plugin_root_url = dirname(plugin_dir_url(__FILE__)) . '/';
+        $plugin_path = plugin_dir_url(dirname(dirname(__FILE__)));
+        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
         $unique_id       = uniqid();
         $nonce   = wp_create_nonce('wp_rest');
         $api_url = get_rest_url(null, 'custom-api/v1/');
@@ -27,7 +34,7 @@
         $active_template = firefly_collective_get_active_template();
         $template_path = $theme_path . '/templates/' . $active_template;
         $auth_id = $_COOKIE['auth_id'];
-        
+
         global $features_options_addons;
         // Get features for configuration
         $features_options_addons = get_features_options_addons();
@@ -42,9 +49,9 @@
         wp_enqueue_script('vue-js', VUE_REMOTE_CORE, array(), null, true);
 
         // Enqueue CSS & JS
-        wp_enqueue_style('campaign-css', $plugin_root_url . 'assets/css/campaign.css', array(), $unique_id);
+        wp_enqueue_style('campaign-css', $plugin_path . $template_name . '/assets/css/campaign.css', array(), $unique_id);
         wp_enqueue_script('main-js', $theme_path . '/assets/js/main.js', array(), $unique_id, true);
-        wp_enqueue_script('campaign-js', $plugin_root_url . 'assets/js/campaign.js', array(), $unique_id, true);
+        wp_enqueue_script('campaign-js', $plugin_path . $template_name . '/assets/js/campaign.js', array(), $unique_id, true);
 
         // Localize into JS
         $api_url = get_rest_url(null, 'custom-api/v1/');
@@ -54,6 +61,18 @@
         ));
     }
     add_action('admin_enqueue_scripts', 'enqueue_campaign_styles_and_scripts');
+
+    function firefly_collective_add_campaign_link() {
+        add_menu_page(
+            'Campaigns',
+            'Campaigns',
+            'manage_options',
+            'campaign',
+            'firefly_collective_campaign_dashboard',
+            'dashicons-megaphone'
+        );
+    }
+    add_action('admin_menu', 'firefly_collective_add_campaign_link');
 
     // Create mysql table for campaigns
     function firefly_collective_init_campaigns() {

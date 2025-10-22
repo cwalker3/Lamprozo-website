@@ -1,6 +1,21 @@
 <?php
     // plugin/models/projects.php
 
+    function firefly_collective_add_projects_link() {
+        add_menu_page(
+            'Projects',
+            'Projects',
+            'manage_options',
+            'projects',
+            'firefly_collective_projects_dashboard'
+        );
+    }
+    add_action('admin_enqueue_scripts', 'enqueue_projects_styles_and_scripts');
+
+    if (defined('FIREFLY_DEV')) {
+        add_action('admin_menu', 'firefly_collective_add_projects_link');
+    }
+
     /**
      * Enqueue styles and scripts for the Projects admin page.
      */
