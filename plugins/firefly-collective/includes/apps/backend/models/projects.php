@@ -1021,8 +1021,10 @@
 
         error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restoring from: ' . $backup['id']);
 
-        // Send the backup ZIP to remote (always as 'full' sync since it's a complete restore)
-        $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, 'full');
+        // Send the backup ZIP to remote using the original sync mode from the backup
+        $sync_mode = isset($backup['sync_mode']) ? $backup['sync_mode'] : 'full';
+        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Using sync mode: ' . $sync_mode);
+        $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
 
         if (is_wp_error($response)) {
             error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restore failed: ' . $response->get_error_message());
