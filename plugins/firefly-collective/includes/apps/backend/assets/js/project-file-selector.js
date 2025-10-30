@@ -185,7 +185,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncMode: 'partial', // Default to safe mode: 'partial' or 'full'
                 totalFileCount: 0, // Track total files for all-files detection
                 showSyncModal: false, // Control modal visibility
-                savedPartialSelections: new Set() // Store selections when switching to Full Sync
+                savedPartialSelections: new Set(), // Store selections when switching to Full Sync
+                backupHistory: [],
+                isLoadingHistory: false,
+                isRestoring: false,
+                showRestoreModal: false,
+                restoreBackup: null,
+                isDeletingBackup: false,
+                showDeleteModal: false,
+                deleteBackup: null
             };
         },
         computed: {
@@ -386,6 +394,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 // Auto-select all files initially
                                 this.selectAllFiles();
                             }
+
+                            // Load backup history for this project
+                            this.loadBackupHistory();
                         } else {
                             this.message = 'No files found for this project.';
                             this.messageType = 'error';
@@ -549,6 +560,154 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 return count;
+            },
+            async loadBackupHistory() {
+                if (!this.selectedProject) return;
+
+                this.isLoadingHistory = true;
+
+                try {
+                    const url = `${this.apiUrl}get-backup-history?project_name=${encodeURIComponent(this.selectedProject)}`;
+                    const response = await fetch(url, {
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-WP-Nonce': this.nonce
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.backupHistory = data.backups || [];
+                    }
+                } catch (error) {
+                    console.error('[Firefly Projects Error] loadBackupHistory:', error);
+                } finally {
+                    this.isLoadingHistory = false;
+                }
+            },
+            confirmRestore(backup) {
+                this.restoreBackup = backup;
+                this.showRestoreModal = true;
+            },
+            cancelRestore() {
+                this.showRestoreModal = false;
+                this.restoreBackup = null;
+            },
+            async performRestore() {
+                if (!this.restoreBackup) return;
+
+                this.showRestoreModal = false;
+                this.isRestoring = true;
+                this.message = '';
+
+                try {
+                    const url = `${this.apiUrl}restore-backup`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({
+                            project_name: this.selectedProject,
+                            backup_id: this.restoreBackup.id
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.message = data.message;
+                        this.messageType = 'success';
+
+                        // Reload backup history to update current marker
+                        await this.loadBackupHistory();
+
+                        setTimeout(() => this.dismissMessage(), 5000);
+                    } else {
+                        this.message = data.message || 'Failed to restore backup.';
+                        this.messageType = 'error';
+                    }
+                } catch (error) {
+                    this.message = 'Network error: ' + error.message;
+                    this.messageType = 'error';
+                } finally {
+                    this.isRestoring = false;
+                    this.restoreBackup = null;
+                }
+            },
+            confirmDeleteBackup(backup) {
+                console.log('[Firefly Projects Debug] confirmDeleteBackup - Backup:', backup.id);
+                this.deleteBackup = backup;
+                this.showDeleteModal = true;
+            },
+            cancelDeleteBackup() {
+                console.log('[Firefly Projects Debug] cancelDeleteBackup - Cancelled');
+                this.showDeleteModal = false;
+                this.deleteBackup = null;
+            },
+            async performDeleteBackup() {
+                if (!this.deleteBackup) return;
+
+                console.log('[Firefly Projects Debug] performDeleteBackup - Deleting:', this.deleteBackup.id);
+
+                this.showDeleteModal = false;
+                this.isDeletingBackup = true;
+                this.message = '';
+
+                try {
+                    const url = `${this.apiUrl}delete-backup`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({
+                            project_name: this.selectedProject,
+                            backup_id: this.deleteBackup.id
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.message = 'Backup deleted successfully';
+                        this.messageType = 'success';
+
+                        console.log('[Firefly Projects Debug] performDeleteBackup - Success');
+
+                        // Reload backup history
+                        await this.loadBackupHistory();
+
+                        setTimeout(() => this.dismissMessage(), 5000);
+                    } else {
+                        this.message = data.message || 'Failed to delete backup.';
+                        this.messageType = 'error';
+                        console.error('[Firefly Projects Error] performDeleteBackup - Error:', data);
+                    }
+                } catch (error) {
+                    this.message = 'Network error: ' + error.message;
+                    this.messageType = 'error';
+                    console.error('[Firefly Projects Error] performDeleteBackup - Exception:', error);
+                } finally {
+                    this.isDeletingBackup = false;
+                    this.deleteBackup = null;
+                }
+            },
+            formatTimestamp(timestamp) {
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            },
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             },
             dismissMessage() {
                 // Add dismissing class for animation

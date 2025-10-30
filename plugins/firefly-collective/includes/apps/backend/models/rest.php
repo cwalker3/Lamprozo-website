@@ -76,8 +76,47 @@ function firefly_plugin_register_rest_endpoints() {
     error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Registered /update-project: ' . ($result2 ? 'SUCCESS' : 'FAILED'));
 
     $api_url = rest_url('firefly-plugin/v1/');
+    // Projects: Get backup history
+    $result3 = register_rest_route(
+        'firefly-plugin/v1',
+        '/get-backup-history',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_collective_get_backup_history',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
+        )
+    );
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Registered /get-backup-history: ' . ($result3 ? 'SUCCESS' : 'FAILED'));
+
+    // Projects: Restore from backup
+    $result4 = register_rest_route(
+        'firefly-plugin/v1',
+        '/restore-backup',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_collective_restore_backup',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
+        )
+    );
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Registered /restore-backup: ' . ($result4 ? 'SUCCESS' : 'FAILED'));
+
+    // Projects: Delete backup
+    $result5 = register_rest_route(
+        'firefly-plugin/v1',
+        '/delete-backup',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_collective_delete_backup',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
+        )
+    );
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Registered /delete-backup: ' . ($result5 ? 'SUCCESS' : 'FAILED'));
+
     error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Complete REST URL: ' . $api_url);
     error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Full get-project-files URL: ' . $api_url . 'get-project-files');
     error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Full update-project URL: ' . $api_url . 'update-project');
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Full get-backup-history URL: ' . $api_url . 'get-backup-history');
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Full restore-backup URL: ' . $api_url . 'restore-backup');
+    error_log('[Firefly Projects Debug] firefly_plugin_register_rest_endpoints - Full delete-backup URL: ' . $api_url . 'delete-backup');
 }
 add_action('rest_api_init', 'firefly_plugin_register_rest_endpoints');

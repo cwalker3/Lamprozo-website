@@ -108,6 +108,118 @@ error_log('[Firefly Debug View] JSON encode error: ' . json_last_error_msg());
         <p>No files found for this project.</p>
     </div>
 
+    <!-- Backup History Section -->
+    <div v-if="selectedProject" class="backup-history-section">
+        <h2>Backup History</h2>
+        <p class="description">View and restore from previous syncs (last 5 kept)</p>
+
+        <button @click="loadBackupHistory" class="action-button" :disabled="isLoadingHistory">
+            {{ isLoadingHistory ? 'Loading...' : 'Refresh History' }}
+        </button>
+
+        <div v-if="backupHistory.length > 0" class="backup-list">
+            <div v-for="backup in backupHistory" :key="backup.id" class="backup-item">
+                <div class="backup-info">
+                    <div class="backup-header">
+                        <strong>{{ formatTimestamp(backup.timestamp) }}</strong>
+                    </div>
+                    <div class="backup-details">
+                        <span class="backup-mode" :class="'mode-' + backup.sync_mode">
+                            {{ backup.sync_mode === 'full' ? 'Full Sync' : 'Partial Sync' }}
+                        </span>
+                        <span class="backup-files">{{ backup.file_count }} files</span>
+                        <span v-if="backup.sync_mode === 'partial'" class="backup-selected">
+                            ({{ backup.selected_count }} selected)
+                        </span>
+                        <span class="backup-size">{{ formatFileSize(backup.zip_size) }}</span>
+                    </div>
+                </div>
+                <div class="backup-actions">
+                    <button @click="confirmRestore(backup)"
+                            class="restore-button" :disabled="isRestoring || isDeletingBackup">
+                        Restore
+                    </button>
+                    <button @click="confirmDeleteBackup(backup)"
+                            class="delete-button" :disabled="isRestoring || isDeletingBackup">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-else-if="!isLoadingHistory" class="no-backups">
+            <p>No backup history available. Perform a sync to create the first backup.</p>
+        </div>
+    </div>
+
+    <!-- Restore Confirmation Modal -->
+    <div v-if="showRestoreModal" class="modal-overlay" @click.self="cancelRestore">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Confirm Restore</h2>
+                <button class="modal-close" @click="cancelRestore">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-warning">
+                    <span class="warning-icon">⚠️</span>
+                    <strong>Warning: This will overwrite the remote site</strong>
+                </div>
+
+                <div class="modal-details">
+                    <p><strong>Restore Point:</strong> {{ restoreBackup ? formatTimestamp(restoreBackup.timestamp) : '' }}</p>
+                    <p><strong>Sync Mode:</strong> {{ restoreBackup ? (restoreBackup.sync_mode === 'full' ? 'Full Sync' : 'Partial Sync') : '' }}</p>
+                    <p><strong>Files:</strong> {{ restoreBackup ? restoreBackup.file_count : 0 }}</p>
+                    <p class="modal-description">
+                        This will restore the remote site to the exact state it was in at this backup point.
+                        All current files on the remote will be overwritten. This action cannot be undone.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="cancelRestore" class="modal-button modal-button-cancel">
+                    Cancel
+                </button>
+                <button @click="performRestore" class="modal-button modal-button-confirm modal-button-danger">
+                    Confirm Restore
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Backup Confirmation Modal -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click.self="cancelDeleteBackup">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Confirm Delete</h2>
+                <button class="modal-close" @click="cancelDeleteBackup">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-warning">
+                    <span class="warning-icon">⚠️</span>
+                    <strong>Delete this backup?</strong>
+                </div>
+
+                <div class="modal-details">
+                    <p><strong>Backup Date:</strong> {{ deleteBackup ? formatTimestamp(deleteBackup.timestamp) : '' }}</p>
+                    <p><strong>Sync Mode:</strong> {{ deleteBackup ? (deleteBackup.sync_mode === 'full' ? 'Full Sync' : 'Partial Sync') : '' }}</p>
+                    <p><strong>Files:</strong> {{ deleteBackup ? deleteBackup.file_count : 0 }}</p>
+                    <p class="modal-description">
+                        This will permanently delete this backup. You will not be able to restore
+                        to this point in time after deletion. This action cannot be undone.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="cancelDeleteBackup" class="modal-button modal-button-cancel">
+                    Cancel
+                </button>
+                <button @click="performDeleteBackup" class="modal-button modal-button-confirm modal-button-danger">
+                    Delete Backup
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Sync Confirmation Modal -->
     <div v-if="showSyncModal" class="modal-overlay" @click.self="cancelSync">
         <div class="modal-container">

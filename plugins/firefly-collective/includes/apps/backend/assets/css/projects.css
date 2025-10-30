@@ -704,3 +704,129 @@
 .modal-button-danger:hover {
     background: #c82333;
 }
+
+/* ====================================
+   Backup History Section
+   ==================================== */
+
+.backup-history-section {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 2px solid #ddd;
+}
+
+.backup-history-section h2 {
+    margin: 0 0 10px 0;
+    font-size: 20px;
+}
+
+.backup-list {
+    margin-top: 20px;
+}
+
+.backup-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    transition: all 0.2s;
+}
+
+.backup-item:hover {
+    border-color: #007cba;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.backup-info {
+    flex: 1;
+}
+
+.backup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.backup-details {
+    display: flex;
+    gap: 15px;
+    font-size: 14px;
+    color: #666;
+}
+
+.backup-mode {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.mode-full {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.mode-partial {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.backup-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.restore-button {
+    padding: 8px 16px;
+    background: #007cba;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.restore-button:hover:not(:disabled) {
+    background: #006ba1;
+}
+
+.restore-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.delete-button {
+    padding: 8px 16px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.delete-button:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.delete-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.no-backups {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 20px;
+}

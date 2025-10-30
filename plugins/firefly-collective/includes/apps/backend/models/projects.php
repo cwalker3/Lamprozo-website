@@ -383,6 +383,105 @@
     }
 
     /**
+     * Get backup directory for a project
+     */
+    function firefly_collective_get_backup_dir($project_name) {
+        $upload_dir = wp_upload_dir();
+        $project_slug = sanitize_title($project_name);
+        $backup_dir = trailingslashit($upload_dir['basedir']) . 'firefly_backups/' . $project_slug;
+
+        if (!file_exists($backup_dir)) {
+            wp_mkdir_p($backup_dir);
+        }
+
+        return $backup_dir;
+    }
+
+    /**
+     * Get backups metadata file path
+     */
+    function firefly_collective_get_backups_metadata_path($project_name) {
+        $backup_dir = firefly_collective_get_backup_dir($project_name);
+        return trailingslashit($backup_dir) . 'backups.json';
+    }
+
+    /**
+     * Load backups metadata
+     */
+    function firefly_collective_load_backups_metadata($project_name) {
+        $metadata_path = firefly_collective_get_backups_metadata_path($project_name);
+
+        if (!file_exists($metadata_path)) {
+            return array();
+        }
+
+        $content = file_get_contents($metadata_path);
+        $backups = json_decode($content, true);
+
+        return is_array($backups) ? $backups : array();
+    }
+
+    /**
+     * Save backups metadata
+     */
+    function firefly_collective_save_backups_metadata($project_name, $backups) {
+        $metadata_path = firefly_collective_get_backups_metadata_path($project_name);
+        file_put_contents($metadata_path, json_encode($backups, JSON_PRETTY_PRINT));
+    }
+
+    /**
+     * Add a new backup and rotate (keep last 5)
+     */
+    function firefly_collective_add_backup($project_name, $zip_path, $sync_mode, $file_count, $selected_count) {
+        $backups = firefly_collective_load_backups_metadata($project_name);
+        $backup_dir = firefly_collective_get_backup_dir($project_name);
+
+        // Create backup ID based on timestamp
+        $timestamp = current_time('mysql');
+        $id = 'sync_' . date('Y-m-d_H-i-s');
+        $zip_filename = $id . '.zip';
+        $permanent_zip_path = trailingslashit($backup_dir) . $zip_filename;
+
+        // Copy ZIP to backup location
+        copy($zip_path, $permanent_zip_path);
+
+        // Add new backup metadata
+        $new_backup = array(
+            'id' => $id,
+            'timestamp' => $timestamp,
+            'sync_mode' => $sync_mode,
+            'file_count' => $file_count,
+            'selected_count' => $selected_count,
+            'zip_filename' => $zip_filename,
+            'zip_size' => filesize($permanent_zip_path)
+        );
+
+        // Add to beginning of array (newest first)
+        array_unshift($backups, $new_backup);
+
+        // Keep only last 5 backups
+        if (count($backups) > 5) {
+            $removed_backups = array_splice($backups, 5);
+
+            // Delete old ZIP files
+            foreach ($removed_backups as $old_backup) {
+                $old_zip_path = trailingslashit($backup_dir) . $old_backup['zip_filename'];
+                if (file_exists($old_zip_path)) {
+                    @unlink($old_zip_path);
+                    error_log('[Firefly Backups] Deleted old backup: ' . $old_backup['zip_filename']);
+                }
+            }
+        }
+
+        // Save updated metadata
+        firefly_collective_save_backups_metadata($project_name, $backups);
+
+        error_log('[Firefly Backups] Added backup: ' . $zip_filename . ' (keeping ' . count($backups) . ' backups)');
+
+        return $new_backup;
+    }
+
+    /**
      * Local environment: Trigger an update by zipping and sending files to live dev.
      * Supports optional 'selected_files' parameter for selective file syncing.
      */
@@ -486,6 +585,17 @@
         }
 
         error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Zip created: ' . $zip_path);
+
+        // Save backup before sending
+        $backup = firefly_collective_add_backup(
+            $project_name,
+            $zip_path,
+            $sync_mode,
+            count($directories), // total files in project
+            count($directories)  // files actually selected (same for full sync, subset for partial)
+        );
+
+        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Backup saved: ' . $backup['id']);
         error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Sending to live dev endpoint: ' . LIVE_DEV_ENDPOINT);
 
         $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
@@ -495,6 +605,10 @@
         }
 
         error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Update successful');
+
+        // Clean up temp directory
+        firefly_collective_cleanup_temp_dir();
+
         return array('success' => true, 'message' => $response);
     }
 
@@ -769,6 +883,31 @@
     }
 
     /**
+     * Clean up temp directory after sync operations
+     */
+    function firefly_collective_cleanup_temp_dir() {
+        $upload_dir = wp_upload_dir();
+        $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
+
+        if (!file_exists($temp_dir)) {
+            return;
+        }
+
+        // Delete all files in temp directory
+        $files = glob($temp_dir . '/*');
+        $deleted_count = 0;
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                if (@unlink($file)) {
+                    $deleted_count++;
+                }
+            }
+        }
+
+        error_log('[Firefly Projects Debug] Cleaned temp directory: deleted ' . $deleted_count . ' files');
+    }
+
+    /**
      * Send the zipped project file to the live dev environment (Local Site).
      */
     function firefly_collective_send_project_update($zip_path, $project_name, $destination_url, $sync_mode = 'partial') {
@@ -816,4 +955,145 @@
         }
 
         return $decoded_response;
+    }
+
+    /**
+     * REST handler: Get backup history for a project
+     */
+    function firefly_collective_get_backup_history(WP_REST_Request $request) {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
+        }
+
+        $project_name = sanitize_text_field($request->get_param('project_name'));
+
+        if (empty($project_name)) {
+            return new WP_Error('missing_param', 'Project name is required', array('status' => 400));
+        }
+
+        $backups = firefly_collective_load_backups_metadata($project_name);
+
+        return array(
+            'success' => true,
+            'project' => $project_name,
+            'backups' => $backups
+        );
+    }
+
+    /**
+     * REST handler: Restore from a specific backup
+     */
+    function firefly_collective_restore_backup(WP_REST_Request $request) {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
+        }
+
+        $project_name = sanitize_text_field($request->get_param('project_name'));
+        $backup_id = sanitize_text_field($request->get_param('backup_id'));
+
+        if (empty($project_name) || empty($backup_id)) {
+            return new WP_Error('missing_params', 'Project name and backup ID are required', array('status' => 400));
+        }
+
+        // Load metadata
+        $backups = firefly_collective_load_backups_metadata($project_name);
+
+        // Find the backup
+        $backup = null;
+        foreach ($backups as $b) {
+            if ($b['id'] === $backup_id) {
+                $backup = $b;
+                break;
+            }
+        }
+
+        if (!$backup) {
+            return new WP_Error('backup_not_found', 'Backup not found', array('status' => 404));
+        }
+
+        // Get ZIP path
+        $backup_dir = firefly_collective_get_backup_dir($project_name);
+        $zip_path = trailingslashit($backup_dir) . $backup['zip_filename'];
+
+        if (!file_exists($zip_path)) {
+            return new WP_Error('zip_not_found', 'Backup ZIP file not found', array('status' => 404));
+        }
+
+        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restoring from: ' . $backup['id']);
+
+        // Send the backup ZIP to remote (always as 'full' sync since it's a complete restore)
+        $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, 'full');
+
+        if (is_wp_error($response)) {
+            error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restore failed: ' . $response->get_error_message());
+            return $response;
+        }
+
+        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restore successful');
+
+        // Clean up temp directory
+        firefly_collective_cleanup_temp_dir();
+
+        return array(
+            'success' => true,
+            'message' => 'Successfully restored from backup: ' . $backup['timestamp'],
+            'backup' => $backup
+        );
+    }
+
+    /**
+     * REST handler: Delete a specific backup
+     */
+    function firefly_collective_delete_backup(WP_REST_Request $request) {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
+        }
+
+        $project_name = sanitize_text_field($request->get_param('project_name'));
+        $backup_id = sanitize_text_field($request->get_param('backup_id'));
+
+        if (empty($project_name) || empty($backup_id)) {
+            return new WP_Error('missing_params', 'Project name and backup ID are required', array('status' => 400));
+        }
+
+        // Load metadata
+        $backups = firefly_collective_load_backups_metadata($project_name);
+
+        // Find the backup
+        $backup_index = null;
+        $backup = null;
+        foreach ($backups as $index => $b) {
+            if ($b['id'] === $backup_id) {
+                $backup = $b;
+                $backup_index = $index;
+                break;
+            }
+        }
+
+        if (!$backup) {
+            return new WP_Error('backup_not_found', 'Backup not found', array('status' => 404));
+        }
+
+        // Get ZIP path and delete file
+        $backup_dir = firefly_collective_get_backup_dir($project_name);
+        $zip_path = trailingslashit($backup_dir) . $backup['zip_filename'];
+
+        if (file_exists($zip_path)) {
+            if (!@unlink($zip_path)) {
+                return new WP_Error('delete_failed', 'Failed to delete backup file', array('status' => 500));
+            }
+            error_log('[Firefly Backups] Manually deleted backup: ' . $backup['zip_filename']);
+        }
+
+        // Remove from metadata
+        array_splice($backups, $backup_index, 1);
+        firefly_collective_save_backups_metadata($project_name, $backups);
+
+        error_log('[Firefly Projects Debug] firefly_collective_delete_backup - Deleted backup: ' . $backup_id);
+
+        return array(
+            'success' => true,
+            'message' => 'Backup deleted successfully',
+            'deleted_backup' => $backup
+        );
     }
