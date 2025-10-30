@@ -1,0 +1,63 @@
+<?php
+/**
+ * Core helper functions for Firefly Projects
+ */
+
+// Ensure no direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Check if plugin is properly configured
+ *
+ * @return bool True if both FIREFLY_SHARED_SECRET and LIVE_DEV_ENDPOINT are set
+ */
+function firefly_projects_is_configured() {
+    return !empty(FIREFLY_SHARED_SECRET) && !empty(LIVE_DEV_ENDPOINT);
+}
+
+/**
+ * Get projects.json path
+ *
+ * @return string Absolute path to projects.json file
+ */
+function firefly_projects_get_json_path() {
+    return FIREFLY_PROJECTS_PLUGIN_DIR . 'projects.json';
+}
+
+/**
+ * Load projects from projects.json file
+ *
+ * @return array Array of projects or empty array if file doesn't exist
+ */
+function firefly_projects_load_projects() {
+    $projects_json_path = firefly_projects_get_json_path();
+
+    if (!file_exists($projects_json_path)) {
+        return array();
+    }
+
+    $content = file_get_contents($projects_json_path);
+    $decoded = json_decode($content, true);
+
+    return is_array($decoded) ? $decoded : array();
+}
+
+/**
+ * Find a project by name
+ *
+ * @param string $project_name The name of the project to find
+ * @return array|null The project array or null if not found
+ */
+function firefly_projects_find_project($project_name) {
+    $projects = firefly_projects_load_projects();
+
+    foreach ($projects as $project) {
+        if (isset($project['name']) && $project['name'] === $project_name) {
+            return $project;
+        }
+    }
+
+    return null;
+}

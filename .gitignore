@@ -11,6 +11,8 @@
 plugins/*
 !plugins/firefly-collective/
 !plugins/firefly-collective/**
+!plugins/firefly-projects/
+!plugins/firefly-projects/**
 
 # Ignore everything in plugin templates except "default"
 plugins/firefly-collective/templates/*
