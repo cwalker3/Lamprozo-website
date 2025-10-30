@@ -1,3 +1,8 @@
+/* v-cloak directive hides Vue templates until Vue is ready */
+[v-cloak] {
+    display: none;
+}
+
 .projects-table {
     border-collapse: collapse;
     width: 100%;
@@ -82,4 +87,620 @@
     max-width: 30px;
     height: auto;
     vertical-align: middle; /* Aligns loader vertically with the button */
+}
+
+/* ====================================
+   File Selector Styles
+   ==================================== */
+
+.description {
+    color: #666;
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+/* Project Selector Container */
+.project-selector-container {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.project-selector-container label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+#project-select {
+    width: 100%;
+    max-width: 600px;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+}
+
+#project-select:disabled {
+    background: #e9e9e9;
+    cursor: not-allowed;
+}
+
+/* Loading Indicator */
+.loading-indicator {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #007cba;
+    font-weight: 500;
+}
+
+.loading-indicator img {
+    width: 24px;
+    height: 24px;
+}
+
+/* Toast Notification - Fixed in top right */
+.toast-notification {
+    position: fixed;
+    top: 32px; /* Below WP admin bar */
+    right: 20px;
+    z-index: 100000; /* Above everything including modals */
+    min-width: 300px;
+    max-width: 500px;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-notification.toast-dismissing {
+    animation: slideOutRight 0.3s ease forwards;
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+.toast-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.toast-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.toast-icon {
+    font-size: 20px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+}
+
+.toast-success .toast-icon {
+    color: #28a745;
+}
+
+.toast-error .toast-icon {
+    color: #dc3545;
+}
+
+.toast-message {
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: inherit;
+    opacity: 0.5;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+
+/* Old message-box styles - keep for backward compatibility but hide */
+.message-box {
+    display: none;
+}
+
+.message-box.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message-box.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* File Selector Wrapper */
+.file-selector-wrapper {
+    margin-top: 20px;
+}
+
+/* File Selector Actions */
+.file-selector-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.action-button {
+    padding: 10px 18px;
+    font-size: 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+    font-weight: 500;
+}
+
+.action-button:not(.primary) {
+    background: #0073aa;
+    color: white;
+}
+
+.action-button:not(.primary):hover {
+    background: #005a87;
+    transform: translateY(-1px);
+}
+
+.action-button.primary {
+    background: #00a32a;
+    color: white;
+    font-weight: 600;
+}
+
+.action-button.primary:hover {
+    background: #008a26;
+    transform: translateY(-1px);
+}
+
+.action-button:disabled {
+    background: #ccc;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* File Tree Container */
+.file-tree-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    padding: 15px;
+    /* Removed max-height and overflow-y to let page grow naturally */
+}
+
+.file-tree-root {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* File Tree Item */
+.file-tree-item {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.file-tree-node {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    margin: 2px 0;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+}
+
+.file-tree-node:hover {
+    background: #f0f7ff;
+}
+
+/* Toggle Icon */
+.toggle-icon {
+    cursor: pointer;
+    user-select: none;
+    width: 20px;
+    text-align: center;
+    color: #555;
+    font-size: 12px;
+    transition: transform 0.15s ease;
+}
+
+.toggle-icon:hover {
+    color: #007cba;
+}
+
+.file-spacer {
+    width: 20px;
+    display: inline-block;
+}
+
+/* Checkbox */
+.file-checkbox {
+    margin: 0 8px 0 5px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.file-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.file-tree-node:has(.file-checkbox:disabled) {
+    opacity: 0.8;
+}
+
+/* File Label */
+.file-label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+}
+
+.file-icon {
+    font-size: 16px;
+}
+
+.file-name {
+    font-weight: 500;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: #777;
+    margin-left: 8px;
+}
+
+/* File Tree Children (nested) */
+.file-tree-children {
+    list-style: none;
+    margin: 0;
+    padding-left: 28px;
+    border-left: 1px dotted #ccc;
+    margin-left: 10px;
+}
+
+/* Directory specific styling */
+.is-directory .file-name {
+    color: #0073aa;
+    font-weight: 600;
+}
+
+/* No files message */
+.no-files-message {
+    padding: 30px;
+    text-align: center;
+    color: #666;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+/* ====================================
+   Sync Mode Selector Styles
+   ==================================== */
+
+.sync-mode-selector {
+    margin: 0 0 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.sync-mode-selector > label:first-child {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 15px;
+    color: #333;
+}
+
+.sync-mode-option {
+    display: flex;
+    align-items: flex-start;
+    margin: 10px 0;
+    padding: 12px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sync-mode-option:hover {
+    border-color: #0073aa;
+    background: #f0f7ff;
+}
+
+.sync-mode-option input[type="radio"] {
+    margin: 4px 12px 0 0;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.sync-mode-option input[type="radio"]:checked {
+    accent-color: #0073aa;
+}
+
+.sync-mode-label {
+    flex: 1;
+    line-height: 1.5;
+    color: #333;
+}
+
+.sync-mode-label strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+    color: #222;
+}
+
+.sync-mode-warning {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-left: 4px solid #ff9800;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.sync-mode-warning strong {
+    color: #d9534f;
+}
+
+.sync-mode-suggestion {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-left: 4px solid #28a745;
+    border-radius: 4px;
+    color: #155724;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* ====================================
+   Sync Confirmation Modal
+   ==================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    background: #f8f9fa;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-warning,
+.modal-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.modal-warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+}
+
+.modal-info {
+    background: #d1ecf1;
+    border: 1px solid #17a2b8;
+    color: #0c5460;
+}
+
+.warning-icon,
+.info-icon {
+    font-size: 24px;
+}
+
+.modal-details p {
+    margin: 10px 0;
+    color: #333;
+}
+
+.modal-description {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-left: 4px solid #007cba;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 20px;
+    border-top: 1px solid #ddd;
+    background: #f8f9fa;
+}
+
+.modal-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modal-button-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+.modal-button-cancel:hover {
+    background: #5a6268;
+}
+
+.modal-button-confirm {
+    background: #007cba;
+    color: white;
+}
+
+.modal-button-confirm:hover {
+    background: #006ba1;
+}
+
+.modal-button-danger {
+    background: #dc3545;
+}
+
+.modal-button-danger:hover {
+    background: #c82333;
 }
