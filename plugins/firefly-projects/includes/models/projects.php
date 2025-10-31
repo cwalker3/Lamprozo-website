@@ -20,15 +20,8 @@
     add_action('admin_enqueue_scripts', 'enqueue_projects_styles_and_scripts');
 
     // Only register admin menu on dev environment (not on live/production)
-    $is_dev_defined = defined('FIREFLY_DEV');
-    $dev_value = $is_dev_defined ? FIREFLY_DEV : 'not defined';
-    error_log('[Firefly Projects] FIREFLY_DEV defined: ' . ($is_dev_defined ? 'YES' : 'NO') . ', value: ' . var_export($dev_value, true));
-
     if (defined('FIREFLY_DEV') && FIREFLY_DEV === true) {
-        error_log('[Firefly Projects] Registering admin menu - FIREFLY_DEV is true');
         add_action('admin_menu', 'firefly_collective_add_projects_link');
-    } else {
-        error_log('[Firefly Projects] NOT registering admin menu - FIREFLY_DEV is not true');
     }
 
     // REST endpoint registration in includes/models/rest.php
@@ -37,14 +30,9 @@
      * Enqueue styles and scripts for the Projects admin page.
      */
     function enqueue_projects_styles_and_scripts($hook) {
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Hook: ' . $hook);
-
         if ($hook !== 'toplevel_page_firefly-projects') {
-            error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Not projects page, returning');
             return;
         }
-
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - On projects page, proceeding with enqueue');
 
         // Enqueue CSS
         wp_enqueue_style('firefly-projects-css', FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/projects.css', array(), FIREFLY_PROJECTS_VERSION);
@@ -59,24 +47,12 @@
         $nonce = wp_create_nonce('wp_rest');
         $is_admin = current_user_can('manage_options') ? 'true' : 'false';
 
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Nonce created: ' . substr($nonce, 0, 10) . '...');
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Is admin: ' . $is_admin);
-
         // Define the API URL for the plugin's REST API (firefly-plugin namespace)
         $api_url = rest_url('firefly-plugin/v1/');
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - API URL: ' . $api_url);
 
         // Load projects data directly from projects.json
         $projects_json_path = firefly_projects_get_json_path();
         $projects = firefly_projects_load_projects();
-
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Projects JSON path: ' . $projects_json_path);
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - File exists: ' . (file_exists($projects_json_path) ? 'YES' : 'NO'));
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Loaded ' . count($projects) . ' projects for inline script');
-
-        if (!empty($projects)) {
-            error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Project names: ' . implode(', ', array_column($projects, 'name')));
-        }
 
         // Add project data for Vue app BEFORE the script loads
         $projects_json = json_encode($projects);
@@ -90,48 +66,23 @@
             adminUrl: '" . admin_url('admin.php?page=firefly-projects') . "',
             pluginUrl: '" . FIREFLY_PROJECTS_PLUGIN_URL . "'
         };
-        console.log('[Firefly Debug] projectData set via wp_add_inline_script:', window.projectData);
         ";
         wp_add_inline_script('firefly-project-file-selector-js', $inline_script, 'before');
-
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Inline script data prepared');
-        error_log('[Firefly Projects Debug] enqueue_projects_styles_and_scripts - Data being passed to frontend: ' . print_r(array(
-            'projects_count' => count($projects),
-            'apiUrl' => $api_url,
-            'nonce' => substr($nonce, 0, 10) . '...',
-            'isAdmin' => $is_admin
-        ), true));
     }
 
     /**
      * Display the projects dashboard page (local site).
      */
     function firefly_collective_projects_dashboard() {
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - Function called');
-
         $view_path = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/views/projects.php';
 
         // Load projects data from projects.json on local site
         $projects_json_path = firefly_projects_get_json_path();
         $projects_data = firefly_projects_load_projects();
 
-        // Debug output
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - Projects JSON path: ' . $projects_json_path);
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - File exists: ' . (file_exists($projects_json_path) ? 'YES' : 'NO'));
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - Projects data count: ' . count($projects_data));
-
-        if (!empty($projects_data)) {
-            error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - Project names: ' . implode(', ', array_column($projects_data, 'name')));
-        }
-
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - View path: ' . $view_path);
-        error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - View file exists: ' . (file_exists($view_path) ? 'YES' : 'NO'));
-
         if (file_exists($view_path)) {
-            error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - Loading view file');
             require_once $view_path;
         } else {
-            error_log('[Firefly Projects Debug] firefly_collective_projects_dashboard - View file not found, dying');
             wp_die('The projects view file could not be found.', 'File Not Found', array('response' => 404));
         }
     }
@@ -156,7 +107,6 @@
         if (empty($sync_mode) || !in_array($sync_mode, array('full', 'partial'), true)) {
             $sync_mode = 'partial';
         }
-        error_log('[Firefly Projects Debug] firefly_collective_handle_project_update - Sync mode received: ' . $sync_mode);
 
         if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             return new WP_Error('upload_failed', 'Failed to upload file.', array('status' => 400));
@@ -213,8 +163,6 @@
      * @param string $sync_mode Either 'full' (mirror exactly, delete extras) or 'partial' (update only, keep extras)
      */
     function firefly_collective_sync_unzipped($update_dir, $sync_mode = 'partial') {
-        error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - Starting sync with mode: ' . $sync_mode);
-
         // 1. Overwrite all unzipped files, gathering their relative paths in an array.
         $unzipped_paths = array();
         $files = new RecursiveIteratorIterator(
@@ -253,11 +201,8 @@
             $unzipped_paths[] = $relative_path;
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - Files copied/updated: ' . $files_copied);
-
         // 2. Conditionally remove extraneous plugin/theme files based on sync mode
         if ($sync_mode === 'full') {
-            error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - FULL SYNC: Removing files not in sync package');
             $top_level_dirs = firefly_collective_extract_top_level_dirs($unzipped_paths);
             $files_deleted = 0;
             foreach ($top_level_dirs as $dir) {
@@ -265,12 +210,7 @@
                 if (! is_dir($live_dir)) continue;
                 $files_deleted += firefly_collective_remove_extras($live_dir, $dir, $unzipped_paths);
             }
-            error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - Files deleted: ' . $files_deleted);
-        } else {
-            error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - PARTIAL SYNC: Skipping file deletion phase (keeping existing files)');
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_sync_unzipped - Sync completed');
     }
 
     /**
@@ -330,7 +270,6 @@
             if (!in_array($relative, $unzipped_paths, true)) {
                 if (@unlink($file_path)) {
                     $deleted_count++;
-                    error_log('[Firefly Projects Debug] firefly_collective_remove_extras - Deleted: ' . $relative);
                 }
             }
         }
@@ -442,15 +381,12 @@
                 $old_zip_path = trailingslashit($backup_dir) . $old_backup['zip_filename'];
                 if (file_exists($old_zip_path)) {
                     @unlink($old_zip_path);
-                    error_log('[Firefly Backups] Deleted old backup: ' . $old_backup['zip_filename']);
                 }
             }
         }
 
         // Save updated metadata
         firefly_collective_save_backups_metadata($project_name, $backups);
-
-        error_log('[Firefly Backups] Added backup: ' . $zip_filename . ' (keeping ' . count($backups) . ' backups)');
 
         return $new_backup;
     }
@@ -460,30 +396,19 @@
      * Supports optional 'selected_files' parameter for selective file syncing.
      */
     function firefly_collective_local_update_project(WP_REST_Request $request) {
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Function called');
-
         if (!current_user_can('manage_options')) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Permission denied: User lacks manage_options capability');
             return new WP_Error('forbidden', 'You do not have permission to perform this action.', array('status' => 403));
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Permission check passed');
-
         $project_name = sanitize_text_field($request->get_param('project_name'));
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Project name: ' . $project_name);
 
         if (empty($project_name)) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - No project name provided');
             return new WP_Error('no_project_name', 'No project_name provided.', array('status' => 400));
         }
 
         $projects_json_path = firefly_projects_get_json_path();
 
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Projects JSON path: ' . $projects_json_path);
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - File exists: ' . (file_exists($projects_json_path) ? 'YES' : 'NO'));
-
         if (!file_exists($projects_json_path)) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - projects.json not found');
             return new WP_Error('no_projects_file', 'projects.json not found.', array('status' => 404));
         }
 
@@ -491,21 +416,13 @@
         $project = firefly_projects_find_project($project_name);
 
         if (!$project) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Project not found: ' . $project_name);
-            $all_projects = firefly_projects_load_projects();
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Available projects: ' . implode(', ', array_column($all_projects, 'name')));
             return new WP_Error('not_found', 'Project not found.', array('status' => 404));
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Project found');
 
         // Get directories from project
         $directories = isset($project['files']) ? $project['files'] : (isset($project['directories']) ? $project['directories'] : array());
 
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Directories count: ' . (is_array($directories) ? count($directories) : 'NOT AN ARRAY'));
-
         if (empty($directories) || !is_array($directories)) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - No directories defined');
             return new WP_Error('no_files', 'No directories defined for the project.', array('status' => 400));
         }
 
@@ -514,35 +431,24 @@
         if (empty($sync_mode) || !in_array($sync_mode, array('full', 'partial'), true)) {
             $sync_mode = 'partial';
         }
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Sync mode: ' . $sync_mode);
 
         // For FULL sync mode, ALWAYS use all project files (ignore selected_files parameter)
         if ($sync_mode === 'full') {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - FULL SYNC: Using all project files (ignoring selections)');
             // $directories already contains all files from projects.json
             // Don't filter by selected_files
         } else {
             // PARTIAL sync mode: use selected_files if provided
             $selected_files = $request->get_param('selected_files');
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Selected files parameter: ' . (empty($selected_files) ? 'EMPTY' : 'PROVIDED'));
 
             if (!empty($selected_files) && is_array($selected_files)) {
-                error_log('[Firefly Projects Debug] firefly_collective_local_update_project - PARTIAL SYNC: Using selected files: ' . count($selected_files) . ' items');
-                error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Selected files list: ' . print_r($selected_files, true));
                 $directories = $selected_files;
-            } else {
-                error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Using all project directories: ' . count($directories) . ' items');
             }
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Creating zip file');
         $zip_path = firefly_collective_zip_contents($project_name, $directories);
         if (is_wp_error($zip_path)) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Zip creation failed: ' . $zip_path->get_error_message());
             return $zip_path;
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Zip created: ' . $zip_path);
 
         // Save backup before sending
         $backup = firefly_collective_add_backup(
@@ -553,16 +459,10 @@
             count($directories)  // files actually selected (same for full sync, subset for partial)
         );
 
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Backup saved: ' . $backup['id']);
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Sending to live dev endpoint: ' . LIVE_DEV_ENDPOINT);
-
         $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
         if (is_wp_error($response)) {
-            error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Send failed: ' . $response->get_error_message());
             return $response;
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Update successful');
 
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
@@ -646,30 +546,19 @@
      * @return WP_REST_Response|WP_Error Response with file tree or error
      */
     function firefly_collective_get_project_files(WP_REST_Request $request) {
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Function called');
-
         if (!current_user_can('manage_options')) {
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Permission denied: User lacks manage_options capability');
             return new WP_Error('forbidden', 'You do not have permission to perform this action.', array('status' => 403));
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Permission check passed');
-
         $project_name = sanitize_text_field($request->get_param('project_name'));
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Project name: ' . $project_name);
 
         if (empty($project_name)) {
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - No project name provided');
             return new WP_Error('no_project_name', 'No project_name provided.', array('status' => 400));
         }
 
         $projects_json_path = firefly_projects_get_json_path();
 
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Projects JSON path: ' . $projects_json_path);
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - File exists: ' . (file_exists($projects_json_path) ? 'YES' : 'NO'));
-
         if (!file_exists($projects_json_path)) {
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - projects.json not found');
             return new WP_Error('no_projects_file', 'projects.json not found.', array('status' => 404));
         }
 
@@ -677,21 +566,12 @@
         $project = firefly_projects_find_project($project_name);
 
         if (!$project) {
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Project not found: ' . $project_name);
-            $all_projects = firefly_projects_load_projects();
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Available projects: ' . implode(', ', array_column($all_projects, 'name')));
             return new WP_Error('not_found', 'Project not found.', array('status' => 404));
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Project found: ' . print_r($project, true));
-
         $directories = isset($project['files']) ? $project['files'] : (isset($project['directories']) ? $project['directories'] : array());
 
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Directories count: ' . (is_array($directories) ? count($directories) : 'NOT AN ARRAY'));
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Directories: ' . print_r($directories, true));
-
         if (empty($directories) || !is_array($directories)) {
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - No directories defined');
             return new WP_Error('no_files', 'No directories defined for the project.', array('status' => 400));
         }
 
@@ -701,12 +581,7 @@
             $relative_path = ltrim($dir, '/');
             $absolute_path = ABSPATH . $relative_path;
 
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Processing directory: ' . $dir);
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Absolute path: ' . $absolute_path);
-            error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Path exists: ' . (file_exists($absolute_path) ? 'YES' : 'NO'));
-
             if (!file_exists($absolute_path)) {
-                error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Skipping non-existent path: ' . $absolute_path);
                 continue;
             }
 
@@ -724,13 +599,9 @@
                 $tree_node = firefly_collective_build_directory_tree($relative_path, $absolute_path, true);
                 if ($tree_node) {
                     $file_tree[] = $tree_node;
-                    error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Added tree node: ' . $tree_node['path']);
                 }
             }
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - File tree count: ' . count($file_tree));
-        error_log('[Firefly Projects Debug] firefly_collective_get_project_files - Returning success response');
 
         return new WP_REST_Response(array(
             'success' => true,
@@ -837,16 +708,11 @@
 
         // Delete all files in temp directory
         $files = glob($temp_dir . '/*');
-        $deleted_count = 0;
         foreach ($files as $file) {
             if (is_file($file)) {
-                if (@unlink($file)) {
-                    $deleted_count++;
-                }
+                @unlink($file);
             }
         }
-
-        error_log('[Firefly Projects Debug] Cleaned temp directory: deleted ' . $deleted_count . ' files');
     }
 
     /**
@@ -856,8 +722,6 @@
         if (!file_exists($zip_path)) {
             return new WP_Error('no_zip', 'Zip file does not exist.');
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_send_project_update - Sync mode being sent: ' . $sync_mode);
 
         $ch = curl_init();
 
@@ -961,19 +825,13 @@
             return new WP_Error('zip_not_found', 'Backup ZIP file not found', array('status' => 404));
         }
 
-        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restoring from: ' . $backup['id']);
-
         // Send the backup ZIP to remote using the original sync mode from the backup
         $sync_mode = isset($backup['sync_mode']) ? $backup['sync_mode'] : 'full';
-        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Using sync mode: ' . $sync_mode);
         $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
 
         if (is_wp_error($response)) {
-            error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restore failed: ' . $response->get_error_message());
             return $response;
         }
-
-        error_log('[Firefly Projects Debug] firefly_collective_restore_backup - Restore successful');
 
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
@@ -1026,14 +884,11 @@
             if (!@unlink($zip_path)) {
                 return new WP_Error('delete_failed', 'Failed to delete backup file', array('status' => 500));
             }
-            error_log('[Firefly Backups] Manually deleted backup: ' . $backup['zip_filename']);
         }
 
         // Remove from metadata
         array_splice($backups, $backup_index, 1);
         firefly_collective_save_backups_metadata($project_name, $backups);
-
-        error_log('[Firefly Projects Debug] firefly_collective_delete_backup - Deleted backup: ' . $backup_id);
 
         return array(
             'success' => true,

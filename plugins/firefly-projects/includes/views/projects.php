@@ -1,24 +1,9 @@
-<!-- PHP Debug Output -->
 <?php
-error_log('[Firefly Debug View] START OF VIEW FILE');
-error_log('[Firefly Debug View] $projects_data type: ' . gettype($projects_data));
-error_log('[Firefly Debug View] $projects_data isset: ' . (isset($projects_data) ? 'YES' : 'NO'));
-
 // CRITICAL CHECK: If $projects_data is not set or not an array, default to empty array
 if (!isset($projects_data) || !is_array($projects_data)) {
-    error_log('[Firefly Debug View] WARNING: $projects_data is not set or not an array, defaulting to empty array');
     $projects_data = array();
 }
-
-if (isset($projects_data)) {
-    error_log('[Firefly Debug View] $projects_data count: ' . count($projects_data));
-    error_log('[Firefly Debug View] $projects_data content: ' . print_r($projects_data, true));
-}
-$json_encoded = json_encode($projects_data);
-error_log('[Firefly Debug View] JSON encoded: ' . $json_encoded);
-error_log('[Firefly Debug View] JSON encode error: ' . json_last_error_msg());
 ?>
-<!-- Projects Data: <?php echo esc_html(print_r($projects_data, true)); ?> -->
 
 <!--
     Project data is now injected via wp_add_inline_script in projects.php

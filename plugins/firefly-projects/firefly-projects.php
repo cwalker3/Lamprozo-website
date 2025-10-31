@@ -39,8 +39,6 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
  * Activation hook - Create necessary directories
  */
 function firefly_projects_activate() {
-    error_log('[Firefly Projects] Plugin activation started');
-
     // Create necessary directories
     $upload_dir = wp_upload_dir();
     $backups_dir = trailingslashit($upload_dir['basedir']) . 'firefly_backups';
@@ -48,18 +46,14 @@ function firefly_projects_activate() {
 
     if (!file_exists($backups_dir)) {
         wp_mkdir_p($backups_dir);
-        error_log('[Firefly Projects] Created backups directory: ' . $backups_dir);
     }
 
     if (!file_exists($temp_dir)) {
         wp_mkdir_p($temp_dir);
-        error_log('[Firefly Projects] Created temp directory: ' . $temp_dir);
     }
 
     // Flush rewrite rules for REST API
     flush_rewrite_rules();
-
-    error_log('[Firefly Projects] Plugin activation completed');
 }
 register_activation_hook(__FILE__, 'firefly_projects_activate');
 
@@ -67,12 +61,8 @@ register_activation_hook(__FILE__, 'firefly_projects_activate');
  * Deactivation hook - Clean up
  */
 function firefly_projects_deactivate() {
-    error_log('[Firefly Projects] Plugin deactivation started');
-
     // Flush rewrite rules
     flush_rewrite_rules();
-
-    error_log('[Firefly Projects] Plugin deactivation completed');
 }
 register_deactivation_hook(__FILE__, 'firefly_projects_deactivate');
 

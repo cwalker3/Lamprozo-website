@@ -236,17 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (newMode === 'full') {
                     // Switching TO Full Sync: Save current selections
-                    console.log('[Firefly Projects Debug] Switching to Full Sync - Saving current selections');
                     this.savedPartialSelections = new Set(this.selectedPaths);
 
                     // Auto-select all files
                     this.selectAllFiles();
                 } else if (oldMode === 'full' && newMode === 'partial') {
                     // Switching FROM Full Sync TO Partial: Restore saved selections
-                    console.log('[Firefly Projects Debug] Switching back to Partial Sync - Restoring saved selections');
                     if (this.savedPartialSelections.size > 0) {
                         this.selectedPaths = new Set(this.savedPartialSelections);
-                        console.log('[Firefly Projects Debug] Restored', this.savedPartialSelections.size, 'selections');
                     }
                 }
             },
@@ -259,12 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         methods: {
             async loadProjects() {
-                console.log('[Firefly Projects Debug] loadProjects - Method called');
-
                 // Parse projects from PHP data injected into the page
-                console.log('[Firefly Projects Debug] loadProjects - Checking for window.projectData');
-                console.log('[Firefly Projects Debug] loadProjects - typeof window.projectData:', typeof window.projectData);
-
                 if (typeof window.projectData === 'undefined') {
                     this.message = 'Error: Project data not loaded. Please refresh the page.';
                     this.messageType = 'error';
@@ -272,14 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                console.log('[Firefly Projects Debug] loadProjects - window.projectData found:', window.projectData);
-
                 // Extract configuration
                 this.apiUrl = window.projectData.apiUrl || '';
                 this.nonce = window.projectData.nonce || '';
-
-                console.log('[Firefly Projects Debug] loadProjects - Extracted apiUrl:', this.apiUrl);
-                console.log('[Firefly Projects Debug] loadProjects - Extracted nonce:', this.nonce ? this.nonce.substring(0, 10) + '...' : 'EMPTY');
 
                 // Validate required data
                 if (!this.apiUrl) {
@@ -297,35 +284,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Load projects
-                console.log('[Firefly Projects Debug] loadProjects - Checking projects array');
-                console.log('[Firefly Projects Debug] loadProjects - Is array:', Array.isArray(window.projectData.projects));
-                console.log('[Firefly Projects Debug] loadProjects - Projects:', window.projectData.projects);
-
                 if (Array.isArray(window.projectData.projects) && window.projectData.projects.length > 0) {
                     this.projects = window.projectData.projects;
-                    console.log('[Firefly Projects Debug] loadProjects - Loaded', this.projects.length, 'projects');
-                    console.log('[Firefly Projects Debug] loadProjects - Project names:', this.projects.map(p => p.name));
                 } else {
                     this.message = 'No projects found. Please check your projects.json file.';
                     this.messageType = 'error';
                     console.warn('[Firefly Projects Error] loadProjects - No projects found in projectData.projects');
                 }
-
-                console.log('[Firefly Projects Debug] loadProjects - Method completed');
             },
             async loadProjectFiles() {
-                console.log('[Firefly Projects Debug] loadProjectFiles - Method called');
-                console.log('[Firefly Projects Debug] loadProjectFiles - Selected project:', this.selectedProject);
-
                 if (!this.selectedProject) {
                     this.message = 'Please select a project.';
                     this.messageType = 'error';
                     console.warn('[Firefly Projects Error] loadProjectFiles - No project selected');
                     return;
                 }
-
-                console.log('[Firefly Projects Debug] loadProjectFiles - API URL:', this.apiUrl);
-                console.log('[Firefly Projects Debug] loadProjectFiles - Nonce:', this.nonce ? this.nonce.substring(0, 10) + '...' : 'EMPTY');
 
                 if (!this.apiUrl || !this.nonce) {
                     this.message = 'Error: API configuration missing. Please refresh the page.';
@@ -341,12 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.showFileSelector = false;
 
                 const url = `${this.apiUrl}get-project-files?project_name=${encodeURIComponent(this.selectedProject)}`;
-                console.log('[Firefly Projects Debug] loadProjectFiles - Full API URL:', url);
-                console.log('[Firefly Projects Debug] loadProjectFiles - Request headers:', { 'X-WP-Nonce': this.nonce });
 
                 try {
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Making fetch request...');
-
                     const response = await fetch(url, {
                         method: 'GET',
                         credentials: 'same-origin',
@@ -355,25 +324,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Response status:', response.status);
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Response ok:', response.ok);
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Response headers:', Array.from(response.headers.entries()));
-
                     const data = await response.json();
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Response data:', data);
 
                     if (data.success) {
-                        console.log('[Firefly Projects Debug] loadProjectFiles - Success response received');
-                        console.log('[Firefly Projects Debug] loadProjectFiles - Files array:', data.files);
-                        console.log('[Firefly Projects Debug] loadProjectFiles - Files count:', data.files ? data.files.length : 0);
-
                         if (Array.isArray(data.files) && data.files.length > 0) {
                             this.fileTree = data.files;
                             this.showFileSelector = true;
 
                             // Count total files for all-files detection
                             this.totalFileCount = this.countTotalFiles(this.fileTree);
-                            console.log('[Firefly Projects Debug] loadProjectFiles - Total file count:', this.totalFileCount);
 
                             // Try to restore saved selections from session storage
                             const savedPaths = sessionStorage.getItem('firefly_selected_paths');
@@ -383,14 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 try {
                                     const paths = JSON.parse(savedPaths);
                                     this.selectedPaths = new Set(paths);
-                                    console.log('[Firefly Projects Debug] loadProjectFiles - Restored', paths.length, 'saved selections');
                                 } catch (e) {
                                     console.error('[Firefly Projects Error] loadProjectFiles - Failed to restore selections:', e);
                                     // Fall back to selecting all files
                                     this.selectAllFiles();
                                 }
                             } else {
-                                console.log('[Firefly Projects Debug] loadProjectFiles - No saved selections, auto-selecting all files');
                                 // Auto-select all files initially
                                 this.selectAllFiles();
                             }
@@ -414,7 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('[Firefly Projects Error] loadProjectFiles - Error stack:', error.stack);
                 } finally {
                     this.isLoadingFiles = false;
-                    console.log('[Firefly Projects Debug] loadProjectFiles - Method completed');
                 }
             },
             selectAllFiles() {
@@ -438,11 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             syncSelectedFiles() {
-                console.log('[Firefly Projects Debug] syncSelectedFiles - Method called');
-                console.log('[Firefly Projects Debug] syncSelectedFiles - Selected project:', this.selectedProject);
-                console.log('[Firefly Projects Debug] syncSelectedFiles - Selected files count:', this.selectedPaths.size);
-                console.log('[Firefly Projects Debug] syncSelectedFiles - Sync mode:', this.syncMode);
-
                 if (!this.selectedProject) {
                     this.message = 'Please select a project first.';
                     this.messageType = 'error';
@@ -459,20 +410,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.showSyncModal = true;
             },
             cancelSync() {
-                console.log('[Firefly Projects Debug] cancelSync - User cancelled sync');
                 this.showSyncModal = false;
             },
             async confirmSync() {
-                console.log('[Firefly Projects Debug] confirmSync - User confirmed sync');
                 this.showSyncModal = false;
 
                 // Now perform the actual sync
                 await this.performSync();
             },
             async performSync() {
-                // Move the actual sync logic here (everything that was in syncSelectedFiles)
-                console.log('[Firefly Projects Debug] performSync - Starting actual sync operation');
-
                 if (!this.apiUrl || !this.nonce) {
                     this.message = 'Error: API configuration missing. Please refresh the page.';
                     this.messageType = 'error';
@@ -484,7 +430,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.message = '';
 
                 const selectedArray = Array.from(this.selectedPaths);
-                console.log('[Firefly Projects Debug] performSync - Selected files array:', selectedArray);
 
                 const url = `${this.apiUrl}update-project`;
                 const payload = {
@@ -493,17 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     sync_mode: this.syncMode
                 };
 
-                console.log('[Firefly Projects Debug] performSync - API URL:', url);
-                console.log('[Firefly Projects Debug] performSync - Request payload:', payload);
-                console.log('[Firefly Projects Debug] performSync - Sync mode:', this.syncMode);
-                console.log('[Firefly Projects Debug] performSync - Request headers:', {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': this.nonce
-                });
-
                 try {
-                    console.log('[Firefly Projects Debug] performSync - Making fetch request...');
-
                     const response = await fetch(url, {
                         method: 'POST',
                         credentials: 'same-origin',
@@ -514,16 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify(payload)
                     });
 
-                    console.log('[Firefly Projects Debug] performSync - Response status:', response.status);
-                    console.log('[Firefly Projects Debug] performSync - Response ok:', response.ok);
-
                     const data = await response.json();
-                    console.log('[Firefly Projects Debug] performSync - Response data:', data);
 
                     if (data.success) {
                         this.message = `Project "${this.selectedProject}" synced successfully! (${this.selectedCount} items)`;
                         this.messageType = 'success';
-                        console.log('[Firefly Projects Debug] performSync - Sync successful');
 
                         // Auto-dismiss success messages after 5 seconds
                         setTimeout(() => {
@@ -542,7 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('[Firefly Projects Error] performSync - Error stack:', error.stack);
                 } finally {
                     this.isSyncing = false;
-                    console.log('[Firefly Projects Debug] performSync - Method completed');
                 }
             },
             handleUpdate() {
@@ -639,19 +568,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             confirmDeleteBackup(backup) {
-                console.log('[Firefly Projects Debug] confirmDeleteBackup - Backup:', backup.id);
                 this.deleteBackup = backup;
                 this.showDeleteModal = true;
             },
             cancelDeleteBackup() {
-                console.log('[Firefly Projects Debug] cancelDeleteBackup - Cancelled');
                 this.showDeleteModal = false;
                 this.deleteBackup = null;
             },
             async performDeleteBackup() {
                 if (!this.deleteBackup) return;
-
-                console.log('[Firefly Projects Debug] performDeleteBackup - Deleting:', this.deleteBackup.id);
 
                 this.showDeleteModal = false;
                 this.isDeletingBackup = true;
@@ -677,8 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.success) {
                         this.message = 'Backup deleted successfully';
                         this.messageType = 'success';
-
-                        console.log('[Firefly Projects Debug] performDeleteBackup - Success');
 
                         // Reload backup history
                         await this.loadBackupHistory();
@@ -725,13 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         mounted() {
-            console.log('[Firefly Projects Debug] Vue app - mounted() lifecycle hook called');
-            console.log('[Firefly Projects Debug] Vue app - Checking window.projectData at mount time');
-            console.log('[Firefly Projects Debug] Vue app - typeof window.projectData:', typeof window.projectData);
-
-            if (typeof window.projectData !== 'undefined') {
-                console.log('[Firefly Projects Debug] Vue app - window.projectData at mount:', window.projectData);
-            } else {
+            if (typeof window.projectData === 'undefined') {
                 console.error('[Firefly Projects Error] Vue app - window.projectData is UNDEFINED at mount time');
             }
 
@@ -743,7 +660,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const paths = JSON.parse(savedExpanded);
                     this.expandedPaths = new Set(paths);
-                    console.log('[Firefly Projects Debug] Vue app - Restored expansion state:', paths.length, 'paths');
                 } catch (e) {
                     console.error('[Firefly Projects Error] Vue app - Failed to restore expansion state:', e);
                 }
@@ -753,7 +669,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedSyncMode = sessionStorage.getItem('firefly_sync_mode');
             if (savedSyncMode && (savedSyncMode === 'full' || savedSyncMode === 'partial')) {
                 this.syncMode = savedSyncMode;
-                console.log('[Firefly Projects Debug] Vue app - Restored sync mode:', savedSyncMode);
             }
 
             // Restore saved partial selections
@@ -762,7 +677,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const paths = JSON.parse(savedPartialSelections);
                     this.savedPartialSelections = new Set(paths);
-                    console.log('[Firefly Projects Debug] Vue app - Restored saved partial selections');
                 } catch (e) {
                     console.error('[Firefly Projects Error] Vue app - Failed to restore saved partial selections:', e);
                 }
@@ -776,7 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (this.projects.find(p => p.name === savedProject)) {
                         this.selectedProject = savedProject;
                         this.loadProjectFiles();
-                        console.log('[Firefly Projects Debug] Vue app - Restored project selection:', savedProject);
                     }
                 });
             }
