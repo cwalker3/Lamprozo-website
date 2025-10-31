@@ -46,7 +46,7 @@ body > header {
 
 /* Inner Page Styling - Blue Background Bar */
 #overlay-menu-container.inner-page {
-    background: purple; /* 60% opacity blue */
+    background: rgba(56, 111, 181, .7); /* 60% opacity blue */
     backdrop-filter: blur(10px); /* Blur effect for better readability */
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     position: fixed;
