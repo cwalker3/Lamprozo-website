@@ -23,7 +23,6 @@ define('FIREFLY_PROJECTS_VERSION', '1.0.0');
 define('FIREFLY_PROJECTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_FILE', __FILE__);
-define('LIVE_DEV_ENDPOINT', 'https://fireflycollective.org/wp-json/firefly-plugin/v1/update_project');
 
 // Load configuration constants
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/constants.php';
