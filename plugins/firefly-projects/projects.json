@@ -5,6 +5,7 @@
         "files": [
             "/wp-content/.htaccess",
             "/wp-content/plugins/firefly-collective",
+            "/wp-content/plugins/firefly-projects",
             "/wp-content/themes/firefly-collective"
         ]
     }
