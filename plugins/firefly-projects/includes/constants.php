@@ -2,16 +2,23 @@
 /**
  * Configuration Constants for Firefly Projects
  *
+ * THREE ENVIRONMENT SETUP:
+ * 1. Local Dev (your machine) - Full UI, initiates syncs
+ * 2. Live Dev (dev.subdomain.com) - Headless, receives syncs, -dev plugins
+ * 3. Production (subdomain.com) - No Firefly or inactive, live plugins
+ *
  * Add these to your wp-config.php file to configure the plugin:
  *
- * // Show Projects menu in admin (development mode)
+ * // LOCAL DEV - Show Projects menu in admin (your development machine)
  * define('FIREFLY_DEV', true);
+ * define('FIREFLY_SHARED_SECRET', 'your-secret-key-here');
+ * define('LIVE_DEV_ENDPOINT', 'https://dev.yoursite.com/wp-json/firefly-plugin/v1/update_project');
  *
- * // Shared secret for remote sync authentication
+ * // LIVE DEV - Headless mode (dev.yoursite.com on production hosting)
+ * define('FIREFLY_LIVE_DEV', true);
  * define('FIREFLY_SHARED_SECRET', 'your-secret-key-here');
  *
- * // Remote endpoint URL for syncing
- * define('LIVE_DEV_ENDPOINT', 'https://your-remote-site.com/wp-json/firefly-plugin/v1/update_project');
+ * // PRODUCTION - Do not define any constants or leave plugin inactive
  */
 
 // Ensure no direct access
@@ -20,7 +27,8 @@ if (!defined('ABSPATH')) {
 }
 
 // Set default values if not defined in wp-config.php
-// Note: FIREFLY_DEV is intentionally not given a default - it must be explicitly set to true in wp-config.php
+// Note: FIREFLY_DEV and FIREFLY_LIVE_DEV are intentionally not given defaults
+// They must be explicitly set in wp-config.php
 
 if (!defined('FIREFLY_SHARED_SECRET')) {
     define('FIREFLY_SHARED_SECRET', '');

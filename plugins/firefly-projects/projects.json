@@ -4,9 +4,8 @@
         "description": "Core website features.",
         "files": [
             "/wp-content/.htaccess",
-            "/wp-content/plugins/firefly-collective",
-            "/wp-content/plugins/firefly-projects",
-            "/wp-content/themes/firefly-collective"
+            "/wp-content/themes/firefly-collective-dev",
+            "/wp-content/plugins/firefly-collective-dev"
         ]
     }
 ]

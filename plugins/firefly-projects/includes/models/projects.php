@@ -19,8 +19,9 @@
     }
     add_action('admin_enqueue_scripts', 'enqueue_projects_styles_and_scripts');
 
-    // Only register admin menu on dev environment (not on live/production)
-    if (defined('FIREFLY_DEV') && FIREFLY_DEV === true) {
+    // Only register admin menu on LOCAL DEV environment (not on Live Dev or Production)
+    // Live Dev is headless - it only receives syncs via REST API
+    if (firefly_projects_is_local_dev()) {
         add_action('admin_menu', 'firefly_collective_add_projects_link');
     }
 
@@ -54,12 +55,25 @@
         $projects_json_path = firefly_projects_get_json_path();
         $projects = firefly_projects_load_projects();
 
+        // Check which projects need -dev suffixes
+        $projects_needing_dev = array();
+        foreach ($projects as $project) {
+            if (isset($project['name'])) {
+                $missing_dev = firefly_projects_needs_dev_suffix($project['name']);
+                if ($missing_dev !== false) {
+                    $projects_needing_dev[$project['name']] = $missing_dev;
+                }
+            }
+        }
+
         // Add project data for Vue app BEFORE the script loads
         $projects_json = json_encode($projects);
+        $projects_needing_dev_json = json_encode($projects_needing_dev);
         $inline_script = "
         // Initialize project data for Vue app
         window.projectData = {
             projects: {$projects_json},
+            projectsNeedingDev: {$projects_needing_dev_json},
             apiUrl: '{$api_url}',
             nonce: '{$nonce}',
             isAdmin: {$is_admin},
@@ -894,5 +908,159 @@
             'success' => true,
             'message' => 'Backup deleted successfully',
             'deleted_backup' => $backup
+        );
+    }
+
+    /**
+     * REST handler: Add -dev suffix to plugins/themes in Live Dev environment
+     * Renames folders and updates projects.json
+     */
+    function firefly_collective_add_dev_suffix(WP_REST_Request $request) {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
+        }
+
+        $project_name = sanitize_text_field($request->get_param('project_name'));
+
+        if (empty($project_name)) {
+            return new WP_Error('missing_param', 'Project name is required', array('status' => 400));
+        }
+
+        // Find the project
+        $project = firefly_projects_find_project($project_name);
+
+        if (!$project) {
+            return new WP_Error('not_found', 'Project not found', array('status' => 404));
+        }
+
+        $files = isset($project['files']) ? $project['files'] : array();
+
+        if (empty($files)) {
+            return new WP_Error('no_files', 'No files in project', array('status' => 400));
+        }
+
+        $renamed = array();
+        $errors = array();
+        $updated_files = array();
+
+        foreach ($files as $path) {
+            $path = ltrim($path, '/');
+
+            // Skip if already has -dev suffix
+            if (preg_match('/-dev\/?$/', $path)) {
+                $updated_files[] = '/' . $path;
+                continue;
+            }
+
+            // Only process plugins and themes
+            if (!preg_match('#^wp-content/(plugins|themes)/([^/]+)#', $path, $matches)) {
+                $updated_files[] = '/' . $path;
+                continue;
+            }
+
+            $type = $matches[1]; // 'plugins' or 'themes'
+            $folder_name = $matches[2];
+            $new_folder_name = $folder_name . '-dev';
+
+            $old_path = ABSPATH . 'wp-content/' . $type . '/' . $folder_name;
+            $new_path = ABSPATH . 'wp-content/' . $type . '/' . $new_folder_name;
+
+            // Check if old path exists
+            if (!file_exists($old_path)) {
+                $errors[] = "Folder not found: {$folder_name}";
+                $updated_files[] = '/' . $path;
+                continue;
+            }
+
+            // Check if new path already exists
+            if (file_exists($new_path)) {
+                $errors[] = "{$new_folder_name} already exists";
+                $updated_files[] = '/wp-content/' . $type . '/' . $new_folder_name;
+                continue;
+            }
+
+            // Rename the folder
+            if (rename($old_path, $new_path)) {
+                $renamed[] = array(
+                    'old' => $folder_name,
+                    'new' => $new_folder_name,
+                    'type' => $type
+                );
+                $updated_files[] = '/wp-content/' . $type . '/' . $new_folder_name;
+            } else {
+                $errors[] = "Failed to rename {$folder_name}";
+                $updated_files[] = '/' . $path;
+            }
+        }
+
+        // Update projects.json with new paths
+        if (!empty($renamed)) {
+            $all_projects = firefly_projects_load_projects();
+
+            foreach ($all_projects as $key => $proj) {
+                if ($proj['name'] === $project_name) {
+                    $all_projects[$key]['files'] = $updated_files;
+                    break;
+                }
+            }
+
+            // Save updated projects.json
+            $projects_json_path = firefly_projects_get_json_path();
+            file_put_contents($projects_json_path, json_encode($all_projects, JSON_PRETTY_PRINT));
+        }
+
+        return array(
+            'success' => true,
+            'message' => 'Suffix added successfully',
+            'renamed' => $renamed,
+            'errors' => $errors,
+            'updated_files' => $updated_files
+        );
+    }
+
+    /**
+     * REST handler: Sync firefly-projects plugin itself
+     */
+    function firefly_collective_sync_self(WP_REST_Request $request) {
+        if (!current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
+        }
+
+        $sync_mode = sanitize_text_field($request->get_param('sync_mode'));
+        if (empty($sync_mode) || !in_array($sync_mode, array('full', 'partial'), true)) {
+            $sync_mode = 'partial';
+        }
+
+        // Hardcoded path for firefly-projects plugin
+        $plugin_path = '/wp-content/plugins/firefly-projects';
+        $directories = array($plugin_path);
+
+        // Create ZIP
+        $zip_path = firefly_collective_zip_contents('firefly-projects', $directories);
+        if (is_wp_error($zip_path)) {
+            return $zip_path;
+        }
+
+        // Save backup
+        $backup = firefly_collective_add_backup(
+            'firefly-projects',
+            $zip_path,
+            $sync_mode,
+            1, // file count
+            1  // selected count
+        );
+
+        // Send to remote
+        $response = firefly_collective_send_project_update($zip_path, 'firefly-projects', LIVE_DEV_ENDPOINT, $sync_mode);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        // Clean up temp directory
+        firefly_collective_cleanup_temp_dir();
+
+        return array(
+            'success' => true,
+            'message' => 'Firefly Projects plugin synced successfully'
         );
     }

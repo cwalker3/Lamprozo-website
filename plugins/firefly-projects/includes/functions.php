@@ -61,3 +61,89 @@ function firefly_projects_find_project($project_name) {
 
     return null;
 }
+
+/**
+ * Check if current environment is Local Dev
+ *
+ * @return bool True if this is a local development environment
+ */
+function firefly_projects_is_local_dev() {
+    return defined('FIREFLY_DEV') && FIREFLY_DEV === true;
+}
+
+/**
+ * Check if current environment is Live Dev
+ *
+ * @return bool True if this is a live development environment (headless)
+ */
+function firefly_projects_is_live_dev() {
+    return defined('FIREFLY_LIVE_DEV') && FIREFLY_LIVE_DEV === true;
+}
+
+/**
+ * Check if current environment is Production
+ *
+ * @return bool True if this is a production environment
+ */
+function firefly_projects_is_production() {
+    return !firefly_projects_is_local_dev() && !firefly_projects_is_live_dev();
+}
+
+/**
+ * Get current environment name
+ *
+ * @return string 'local_dev', 'live_dev', or 'production'
+ */
+function firefly_projects_get_environment() {
+    if (firefly_projects_is_local_dev()) {
+        return 'local_dev';
+    }
+    if (firefly_projects_is_live_dev()) {
+        return 'live_dev';
+    }
+    return 'production';
+}
+
+/**
+ * Check if a project has paths without -dev suffix
+ *
+ * @param string $project_name The name of the project to check
+ * @return array|false Array of paths without -dev suffix, or false if none found
+ */
+function firefly_projects_needs_dev_suffix($project_name) {
+    $project = firefly_projects_find_project($project_name);
+
+    if (!$project) {
+        return false;
+    }
+
+    $files = isset($project['files']) ? $project['files'] : array();
+
+    if (empty($files)) {
+        return false;
+    }
+
+    $missing_dev = array();
+
+    foreach ($files as $path) {
+        $path = ltrim($path, '/');
+
+        // Check if it's a plugin or theme path
+        if (!preg_match('#^wp-content/(plugins|themes)/([^/]+)#', $path, $matches)) {
+            continue;
+        }
+
+        $folder_name = $matches[2];
+
+        // Check if it already has -dev suffix
+        if (!preg_match('/-dev$/', $folder_name)) {
+            $missing_dev[] = array(
+                'path' => '/' . $path,
+                'folder' => $folder_name,
+                'type' => $matches[1]
+            );
+        }
+    }
+
+    return empty($missing_dev) ? false : $missing_dev;
+}

@@ -830,3 +830,123 @@
     border-radius: 4px;
     margin-top: 20px;
 }
+
+/* ====================================
+   Self-Sync Section Styles
+   ==================================== */
+
+.firefly-self-sync-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #e7f5ff;
+    border: 2px solid #339af0;
+    border-radius: 5px;
+}
+
+.firefly-self-sync-section h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: #1971c2;
+}
+
+.firefly-self-sync-section .description {
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+/* ====================================
+   Dev Suffix Warning Styles
+   ==================================== */
+
+.dev-suffix-warning {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-left: 5px solid #ff9800;
+    border-radius: 5px;
+}
+
+.dev-suffix-warning .warning-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.dev-suffix-warning .warning-header .warning-icon {
+    font-size: 24px;
+}
+
+.dev-suffix-warning .warning-header strong {
+    font-size: 16px;
+    color: #856404;
+}
+
+.dev-suffix-warning p {
+    margin: 10px 0;
+    color: #856404;
+    line-height: 1.6;
+}
+
+.dev-suffix-warning code {
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #f0ad4e;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.dev-suffix-list {
+    list-style: none;
+    padding: 0;
+    margin: 15px 0;
+    background: #fff;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+}
+
+.dev-suffix-list li {
+    padding: 10px 15px;
+    border-bottom: 1px solid #ffe8a1;
+    font-size: 14px;
+}
+
+.dev-suffix-list li:last-child {
+    border-bottom: none;
+}
+
+.dev-suffix-list li strong {
+    color: #d9534f;
+}
+
+.dev-suffix-table {
+    width: 100%;
+    margin: 15px 0;
+    border-collapse: collapse;
+    background: #fff;
+}
+
+.dev-suffix-table th,
+.dev-suffix-table td {
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    text-align: left;
+}
+
+.dev-suffix-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.dev-suffix-table td {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.dev-suffix-table code {
+    background: #f8f9fa;
+    padding: 3px 6px;
+    border-radius: 3px;
+}

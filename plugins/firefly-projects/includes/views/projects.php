@@ -14,6 +14,47 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 <p class="description">Select individual files and folders to sync to your live environment.</p>
 
 <div id="project-file-selector" v-cloak>
+    <!-- Self-Sync Section for Firefly Projects Plugin -->
+    <div class="firefly-self-sync-section">
+        <h2>Sync Firefly Projects Plugin</h2>
+        <p class="description">Sync the Firefly Projects plugin itself to your Live Dev environment.</p>
+        <button @click="showSelfSyncModal = true" class="action-button primary" :disabled="isSyncingSelf">
+            <span v-if="!isSyncingSelf">Sync Firefly Projects</span>
+            <span v-else>Syncing...</span>
+        </button>
+    </div>
+
+    <!-- Self-Sync Confirmation Modal -->
+    <div v-if="showSelfSyncModal" class="modal-overlay" @click.self="cancelSelfSync">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Confirm Sync</h2>
+                <button class="modal-close" @click="cancelSelfSync">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info">
+                    <span class="info-icon">ℹ️</span>
+                    <strong>Sync Firefly Projects Plugin</strong>
+                </div>
+                <div class="modal-details">
+                    <p><strong>Target:</strong> /wp-content/plugins/firefly-projects</p>
+                    <p><strong>Mode:</strong> Partial Sync</p>
+                    <p class="modal-description">
+                        This will sync the Firefly Projects plugin to your Live Dev environment.
+                        This is useful when you've made changes to the plugin itself.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="cancelSelfSync" class="modal-button modal-button-cancel">
+                    Cancel
+                </button>
+                <button @click="confirmSelfSync" class="modal-button modal-button-confirm">
+                    Confirm Sync
+                </button>
+            </div>
+        </div>
+    </div>
     <div class="project-selector-container">
         <label for="project-select">Select Project:</label>
         <select id="project-select" v-model="selectedProject" @change="loadProjectFiles" :disabled="isLoadingFiles || isSyncing">
@@ -25,6 +66,80 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 
         <div v-if="isLoadingFiles" class="loading-indicator">
             <span>Loading project files...</span>
+        </div>
+    </div>
+
+    <!-- Warning: Project needs -dev suffix -->
+    <div v-if="currentProjectNeedsDev" class="dev-suffix-warning">
+        <div class="warning-header">
+            <span class="warning-icon">⚠️</span>
+            <strong>Action Required: Add -dev Suffix to Plugins/Themes</strong>
+        </div>
+        <p>The following plugins/themes in this project do not have the <code>-dev</code> suffix:</p>
+        <ul class="dev-suffix-list">
+            <li v-for="item in currentProjectNeedsDev" :key="item.folder">
+                <strong>{{ item.folder }}</strong> ({{ item.type }})
+                →
+                <strong>{{ item.folder }}-dev</strong>
+            </li>
+        </ul>
+        <p>
+            <strong>Why is this important?</strong> The <code>-dev</code> suffix ensures your syncs target development versions
+            on Live Dev, never the production versions. This prevents accidentally overwriting live code.
+        </p>
+        <button @click="showDevSuffixModal = true" class="action-button primary" :disabled="isAddingDevSuffix">
+            <span v-if="!isAddingDevSuffix">Add -dev Suffix Now</span>
+            <span v-else>Processing...</span>
+        </button>
+    </div>
+
+    <!-- Add -dev Suffix Confirmation Modal -->
+    <div v-if="showDevSuffixModal" class="modal-overlay" @click.self="cancelDevSuffix">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Confirm -dev Suffix Addition</h2>
+                <button class="modal-close" @click="cancelDevSuffix">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-warning">
+                    <span class="warning-icon">⚠️</span>
+                    <strong>This will rename folders on your server</strong>
+                </div>
+                <div class="modal-details">
+                    <p><strong>The following folders will be renamed:</strong></p>
+                    <table class="dev-suffix-table">
+                        <thead>
+                            <tr>
+                                <th>Current Name</th>
+                                <th></th>
+                                <th>New Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in currentProjectNeedsDev" :key="item.folder">
+                                <td><code>{{ item.folder }}</code></td>
+                                <td>→</td>
+                                <td><code>{{ item.folder }}-dev</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="modal-description">
+                        <strong>What happens next:</strong><br>
+                        1. Folders will be renamed to include <code>-dev</code> suffix<br>
+                        2. Your <code>projects.json</code> will be automatically updated<br>
+                        3. You'll need to reactivate the renamed plugins/themes in WordPress admin<br>
+                        4. Future syncs will target these <code>-dev</code> versions
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="cancelDevSuffix" class="modal-button modal-button-cancel">
+                    Cancel
+                </button>
+                <button @click="confirmDevSuffix" class="modal-button modal-button-confirm modal-button-danger">
+                    Rename Folders
+                </button>
+            </div>
         </div>
     </div>
 

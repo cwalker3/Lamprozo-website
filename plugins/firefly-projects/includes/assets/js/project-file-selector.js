@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         data() {
             return {
                 projects: [],
+                projectsNeedingDev: {}, // Object mapping project names to arrays of items needing -dev
                 selectedProject: '',
                 fileTree: [],
                 selectedPaths: new Set(),
@@ -177,6 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 isLoading: false,
                 isLoadingFiles: false,
                 isSyncing: false,
+                isSyncingSelf: false, // For firefly-projects self-sync
+                isAddingDevSuffix: false, // For adding -dev suffix
                 message: '',
                 messageType: '', // 'success' or 'error'
                 showFileSelector: false,
@@ -185,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncMode: 'partial', // Default to safe mode: 'partial' or 'full'
                 totalFileCount: 0, // Track total files for all-files detection
                 showSyncModal: false, // Control modal visibility
+                showSelfSyncModal: false, // Control self-sync modal
+                showDevSuffixModal: false, // Control dev suffix modal
                 savedPartialSelections: new Set(), // Store selections when switching to Full Sync
                 backupHistory: [],
                 isLoadingHistory: false,
@@ -208,6 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             checkboxesDisabled() {
                 return this.syncMode === 'full';
+            },
+            currentProjectNeedsDev() {
+                if (!this.selectedProject || !this.projectsNeedingDev) {
+                    return null;
+                }
+                return this.projectsNeedingDev[this.selectedProject] || null;
             }
         },
         watch: {
@@ -267,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Extract configuration
                 this.apiUrl = window.projectData.apiUrl || '';
                 this.nonce = window.projectData.nonce || '';
+                this.projectsNeedingDev = window.projectData.projectsNeedingDev || {};
 
                 // Validate required data
                 if (!this.apiUrl) {
@@ -334,22 +346,27 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Count total files for all-files detection
                             this.totalFileCount = this.countTotalFiles(this.fileTree);
 
-                            // Try to restore saved selections from session storage
-                            const savedPaths = sessionStorage.getItem('firefly_selected_paths');
-                            const savedProject = sessionStorage.getItem('firefly_selected_project');
+                            // If Full Sync mode is active, always select all files (ignore saved selections)
+                            if (this.syncMode === 'full') {
+                                this.selectAllFiles();
+                            } else {
+                                // Partial Sync: Try to restore saved selections from session storage
+                                const savedPaths = sessionStorage.getItem('firefly_selected_paths');
+                                const savedProject = sessionStorage.getItem('firefly_selected_project');
 
-                            if (savedPaths && savedProject === this.selectedProject) {
-                                try {
-                                    const paths = JSON.parse(savedPaths);
-                                    this.selectedPaths = new Set(paths);
-                                } catch (e) {
-                                    console.error('[Firefly Projects Error] loadProjectFiles - Failed to restore selections:', e);
-                                    // Fall back to selecting all files
+                                if (savedPaths && savedProject === this.selectedProject) {
+                                    try {
+                                        const paths = JSON.parse(savedPaths);
+                                        this.selectedPaths = new Set(paths);
+                                    } catch (e) {
+                                        console.error('[Firefly Projects Error] loadProjectFiles - Failed to restore selections:', e);
+                                        // Fall back to selecting all files
+                                        this.selectAllFiles();
+                                    }
+                                } else {
+                                    // Auto-select all files initially
                                     this.selectAllFiles();
                                 }
-                            } else {
-                                // Auto-select all files initially
-                                this.selectAllFiles();
                             }
 
                             // Load backup history for this project
@@ -644,6 +661,98 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     this.message = '';
                     this.messageType = '';
+                }
+            },
+            // Self-sync methods
+            cancelSelfSync() {
+                this.showSelfSyncModal = false;
+            },
+            async confirmSelfSync() {
+                this.showSelfSyncModal = false;
+                this.isSyncingSelf = true;
+                this.message = '';
+
+                try {
+                    const url = `${this.apiUrl}sync-self`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({
+                            sync_mode: 'partial'
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.message = 'Firefly Projects plugin synced successfully!';
+                        this.messageType = 'success';
+                        setTimeout(() => this.dismissMessage(), 5000);
+                    } else {
+                        this.message = data.message || 'Failed to sync plugin.';
+                        this.messageType = 'error';
+                    }
+                } catch (error) {
+                    this.message = 'Network error: ' + error.message;
+                    this.messageType = 'error';
+                    console.error('[Firefly Projects Error] confirmSelfSync:', error);
+                } finally {
+                    this.isSyncingSelf = false;
+                }
+            },
+            // Dev suffix methods
+            cancelDevSuffix() {
+                this.showDevSuffixModal = false;
+            },
+            async confirmDevSuffix() {
+                this.showDevSuffixModal = false;
+                this.isAddingDevSuffix = true;
+                this.message = '';
+
+                try {
+                    const url = `${this.apiUrl}add-dev-suffix`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({
+                            project_name: this.selectedProject
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const renamedCount = data.renamed ? data.renamed.length : 0;
+                        this.message = `Successfully renamed ${renamedCount} folder(s) to include -dev suffix. Please reactivate the renamed plugins/themes in WordPress admin.`;
+                        this.messageType = 'success';
+
+                        // Remove this project from projectsNeedingDev
+                        if (this.projectsNeedingDev[this.selectedProject]) {
+                            delete this.projectsNeedingDev[this.selectedProject];
+                        }
+
+                        // Reload projects to get updated paths
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 3000);
+                    } else {
+                        this.message = data.message || 'Failed to add -dev suffix.';
+                        this.messageType = 'error';
+                    }
+                } catch (error) {
+                    this.message = 'Network error: ' + error.message;
+                    this.messageType = 'error';
+                    console.error('[Firefly Projects Error] confirmDevSuffix:', error);
+                } finally {
+                    this.isAddingDevSuffix = false;
                 }
             }
         },

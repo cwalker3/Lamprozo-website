@@ -104,5 +104,27 @@ function firefly_plugin_register_rest_endpoints() {
             'permission_callback' => 'firefly_plugin_verify_rest_admin'
         )
     );
+
+    // Projects: Add -dev suffix to plugins/themes
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/add-dev-suffix',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_collective_add_dev_suffix',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
+        )
+    );
+
+    // Projects: Sync firefly-projects plugin itself
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/sync-self',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_collective_sync_self',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
+        )
+    );
 }
 add_action('rest_api_init', 'firefly_plugin_register_rest_endpoints');
