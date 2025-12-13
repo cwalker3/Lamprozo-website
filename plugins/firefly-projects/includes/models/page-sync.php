@@ -1,0 +1,492 @@
+<?php
+/**
+ * Firefly Projects - Page Sync Handler
+ *
+ * Handles packaging and syncing page/post content to remote sites,
+ * including Gutenberg block content and associated media assets.
+ */
+
+// Ensure no direct access to the file
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Extract asset URLs from Gutenberg content
+ *
+ * @param string $content The post content
+ * @return array List of asset URLs found in content
+ */
+function firefly_projects_extract_assets($content) {
+    $assets = array();
+
+    // Patterns to match asset URLs
+    $patterns = array(
+        // Image sources
+        '/src=["\']([^"\']*\/wp-content\/uploads\/[^"\']+)["\']/i',
+        // Background images in inline styles
+        '/url\(["\']?([^"\')]*\/wp-content\/uploads\/[^"\')]+)["\']?\)/i',
+        // href to files (PDFs, docs, etc.)
+        '/href=["\']([^"\']*\/wp-content\/uploads\/[^"\']+\.(?:pdf|doc|docx|xls|xlsx|zip|png|jpg|jpeg|gif|webp|svg))["\']/i'
+    );
+
+    foreach ($patterns as $pattern) {
+        if (preg_match_all($pattern, $content, $matches)) {
+            foreach ($matches[1] as $url) {
+                // Normalize URL to path
+                $path = $url;
+                
+                // Remove domain if present
+                if (strpos($path, 'http') === 0) {
+                    $parsed = parse_url($path);
+                    $path = isset($parsed['path']) ? $parsed['path'] : $path;
+                }
+
+                // Only add unique assets
+                if (!in_array($path, $assets)) {
+                    $assets[] = $path;
+                }
+            }
+        }
+    }
+
+    return $assets;
+}
+
+/**
+ * Convert asset URL to local file path
+ *
+ * @param string $url The asset URL or path
+ * @return string|false The local file path, or false if not found
+ */
+function firefly_projects_asset_url_to_path($url) {
+    // Get WordPress upload directory info
+    $upload_dir = wp_upload_dir();
+    $upload_base_url = $upload_dir['baseurl'];
+    $upload_base_path = $upload_dir['basedir'];
+
+    // Handle relative URLs starting with /wp-content/uploads/
+    if (strpos($url, '/wp-content/uploads/') === 0) {
+        $relative_path = str_replace('/wp-content/uploads/', '', $url);
+        $file_path = $upload_base_path . '/' . $relative_path;
+        
+        if (file_exists($file_path)) {
+            return $file_path;
+        }
+    }
+
+    // Handle full URLs
+    if (strpos($url, $upload_base_url) !== false) {
+        $relative_path = str_replace($upload_base_url . '/', '', $url);
+        $file_path = $upload_base_path . '/' . $relative_path;
+        
+        if (file_exists($file_path)) {
+            return $file_path;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Package page content and assets for sync
+ *
+ * @param WP_Post $post The post object
+ * @param bool $include_assets Whether to include media assets
+ * @return array Package data including content and assets
+ */
+function firefly_projects_package_page($post, $include_assets = true) {
+    $package = array(
+        'post_data' => array(
+            'post_title'   => $post->post_title,
+            'post_name'    => $post->post_name,
+            'post_content' => $post->post_content,
+            'post_excerpt' => $post->post_excerpt,
+            'post_type'    => $post->post_type,
+            'post_status'  => $post->post_status,
+            'menu_order'   => $post->menu_order,
+            'post_parent'  => $post->post_parent,
+        ),
+        'meta_data' => array(),
+        'assets'    => array(),
+        'asset_files' => array()
+    );
+
+    // Get post meta (excluding internal WordPress meta)
+    $meta = get_post_meta($post->ID);
+    foreach ($meta as $key => $values) {
+        // Skip internal meta keys
+        if (strpos($key, '_') === 0 && !in_array($key, array('_thumbnail_id'))) {
+            continue;
+        }
+        $package['meta_data'][$key] = $values[0];
+    }
+
+    // Extract and package assets if requested
+    if ($include_assets) {
+        $asset_urls = firefly_projects_extract_assets($post->post_content);
+        
+        foreach ($asset_urls as $url) {
+            $local_path = firefly_projects_asset_url_to_path($url);
+            
+            if ($local_path && file_exists($local_path)) {
+                $package['assets'][] = array(
+                    'url'  => $url,
+                    'path' => $local_path,
+                    'name' => basename($local_path),
+                    'size' => filesize($local_path)
+                );
+            }
+        }
+    }
+
+    return $package;
+}
+
+/**
+ * Perform page sync to remote site
+ *
+ * @param WP_Post $post The post object to sync
+ * @param bool $include_assets Whether to include media assets
+ * @param string $target_env Target environment: 'dev' (Live Dev) or 'prod' (Production)
+ * @return array Result array with success status and message
+ */
+function firefly_projects_perform_page_sync($post, $include_assets = true, $target_env = 'dev') {
+    // Load asset mapping functions
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/asset-mapping.php';
+
+    // Get asset map for this page
+    $asset_map = firefly_projects_get_asset_map($post->ID);
+
+    // Get remote endpoint based on target environment
+    $project_endpoint = ($target_env === 'prod') ? PROD_ENDPOINT : LIVE_DEV_ENDPOINT;
+
+    // Extract base URL and build page sync endpoint
+    if (preg_match('/(https?:\/\/[^\/]+)/', $project_endpoint, $matches)) {
+        $base_url = $matches[1];
+        $page_endpoint = $base_url . '/wp-json/firefly-plugin/v1/receive-page';
+    } else {
+        $page_endpoint = str_replace('/update_project', '/receive-page', $project_endpoint);
+        $page_endpoint = str_replace('firefly-collective', 'firefly-plugin', $page_endpoint);
+    }
+
+    $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
+
+    // Prepare content and assets based on target environment
+    $content_to_sync = $post->post_content;
+    $assets_to_sync = array();
+
+    if ($target_env === 'prod') {
+        // PRODUCTION SYNC
+        // Restore original URLs if we have mappings from production
+        if ($asset_map['asset_origin'] === 'production' && !empty($asset_map['mappings'])) {
+            // Reverse the mappings: dev -> original
+            $content_to_sync = firefly_projects_rewrite_content_urls($post->post_content, $asset_map['mappings'], 'to_prod');
+            // Don't send assets - originals already exist on production
+        }
+        // For dev-created content, create production paths and send assets
+        elseif (!empty($asset_map['dev_created']) || $asset_map['asset_origin'] === 'dev') {
+            $prod_result = firefly_projects_prepare_content_for_production($post->ID);
+            if ($prod_result['success']) {
+                $content_to_sync = $prod_result['content'];
+                $assets_to_sync = $prod_result['assets_to_sync'];
+            }
+        }
+    } else {
+        // LIVE DEV SYNC
+        // Content already has dev URLs (from local editing)
+        // Get dev assets to sync
+        if ($include_assets) {
+            $assets_to_sync = firefly_projects_get_dev_assets_for_sync($post->ID);
+        }
+    }
+
+    // Package post data
+    $meta = get_post_meta($post->ID);
+    $meta_data = array();
+    foreach ($meta as $key => $values) {
+        if (strpos($key, '_') === 0 && !in_array($key, array('_thumbnail_id'))) {
+            continue;
+        }
+        $meta_data[$key] = $values[0];
+    }
+
+    $post_data = array(
+        'post_title'   => $post->post_title,
+        'post_name'    => $post->post_name,
+        'post_content' => $content_to_sync,
+        'post_excerpt' => $post->post_excerpt,
+        'post_type'    => $post->post_type,
+        'post_status'  => $post->post_status,
+        'menu_order'   => $post->menu_order,
+        'post_parent'  => $post->post_parent,
+    );
+
+    // Create temporary zip file with assets if any
+    $zip_path = null;
+    if (!empty($assets_to_sync)) {
+        $upload_dir = wp_upload_dir();
+        $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
+
+        if (!file_exists($temp_dir)) {
+            wp_mkdir_p($temp_dir);
+        }
+
+        $zip_path = $temp_dir . '/page_sync_' . $post->post_name . '_' . time() . '.zip';
+
+        $zip = new ZipArchive();
+        if ($zip->open($zip_path, ZipArchive::CREATE) !== true) {
+            return array(
+                'success' => false,
+                'message' => 'Failed to create asset package.'
+            );
+        }
+
+        // Add assets to zip
+        foreach ($assets_to_sync as $asset) {
+            $asset_path = isset($asset['path']) ? $asset['path'] : (isset($asset['dev_path']) ? $asset['dev_path'] : '');
+            $asset_name = isset($asset['filename']) ? $asset['filename'] : basename($asset_path);
+            if ($asset_path && file_exists($asset_path)) {
+                $zip->addFile($asset_path, 'assets/' . $asset_name);
+            }
+        }
+
+        // Add manifest
+        $manifest = array(
+            'post_data'   => $post_data,
+            'meta_data'   => $meta_data,
+            'target_env'  => $target_env,
+            'asset_map'   => $asset_map,
+            'assets'      => array_map(function($a) {
+                return array(
+                    'url'      => isset($a['url']) ? $a['url'] : '',
+                    'filename' => isset($a['filename']) ? $a['filename'] : basename($a['path'])
+                );
+            }, $assets_to_sync)
+        );
+        $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
+
+        $zip->close();
+    }
+
+    // Prepare request body
+    $body = array(
+        'post_data'   => $post_data,
+        'meta_data'   => $meta_data,
+        'target_env'  => $target_env,
+        'asset_map'   => $asset_map,
+        'has_assets'  => !empty($assets_to_sync)
+    );
+
+    // Send request
+    if ($zip_path && file_exists($zip_path)) {
+        // Use cURL for multipart form data
+        $ch = curl_init();
+
+        $post_fields = array(
+            'manifest' => json_encode($body),
+            'assets'   => new CURLFile($zip_path, 'application/zip', 'assets.zip')
+        );
+
+        curl_setopt_array($ch, array(
+            CURLOPT_URL            => $page_endpoint,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post_fields,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => array(
+                'X-Firefly-Secret: ' . FIREFLY_SHARED_SECRET
+            ),
+            CURLOPT_TIMEOUT        => 120
+        ));
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        // Clean up temp file
+        @unlink($zip_path);
+
+        if ($error) {
+            return array(
+                'success' => false,
+                'message' => 'Connection error: ' . $error
+            );
+        }
+    } else {
+        // Simple JSON request without assets
+        $response = wp_remote_post($page_endpoint, array(
+            'headers' => array(
+                'Content-Type'      => 'application/json',
+                'X-Firefly-Secret'  => FIREFLY_SHARED_SECRET
+            ),
+            'body'    => json_encode($body),
+            'timeout' => 60
+        ));
+
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'message' => 'Connection error: ' . $response->get_error_message()
+            );
+        }
+
+        $http_code = wp_remote_retrieve_response_code($response);
+        $response = wp_remote_retrieve_body($response);
+    }
+
+    // Parse response
+    $result = json_decode($response, true);
+
+    if ($http_code === 200 && isset($result['success']) && $result['success']) {
+        // Save last sync timestamp per environment
+        $sync_time = time();
+        if ($target_env === 'prod') {
+            update_post_meta($post->ID, '_firefly_last_sync_prod', $sync_time);
+        } else {
+            update_post_meta($post->ID, '_firefly_last_sync_dev', $sync_time);
+        }
+
+        return array(
+            'success' => true,
+            'message' => 'Page synced successfully to ' . $env_label . '.',
+            'details' => array(
+                'page_title'   => $post->post_title,
+                'page_slug'    => $post->post_name,
+                'files_synced' => count($assets_to_sync),
+                'synced_at'    => time(),
+                'target_env'   => $target_env
+            )
+        );
+    } else {
+        $error_message = isset($result['message']) ? $result['message'] : 'Unknown error occurred.';
+        return array(
+            'success' => false,
+            'message' => 'Sync to ' . $env_label . ' failed: ' . $error_message
+        );
+    }
+}
+
+/**
+ * Handle incoming page sync from local site (remote endpoint)
+ *
+ * @param WP_REST_Request $request The REST request
+ * @return array Result array with success status and message
+ */
+function firefly_projects_handle_incoming_page($request) {
+    // Get content type to determine how data was sent
+    $content_type = $request->get_content_type();
+
+    // Handle multipart form data (with assets)
+    if (isset($content_type['value']) && strpos($content_type['value'], 'multipart/form-data') !== false) {
+        $manifest = json_decode($request->get_param('manifest'), true);
+        $post_data = $manifest['post_data'];
+        $meta_data = isset($manifest['meta_data']) ? $manifest['meta_data'] : array();
+        $has_assets = isset($manifest['has_assets']) ? $manifest['has_assets'] : false;
+        $target_env = isset($manifest['target_env']) ? $manifest['target_env'] : 'dev';
+        $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
+
+        // Handle uploaded zip file
+        $files = $request->get_file_params();
+        $zip_file = isset($files['assets']) ? $files['assets']['tmp_name'] : null;
+    } else {
+        // Handle JSON request (no assets)
+        $body = $request->get_json_params();
+        $post_data = $body['post_data'];
+        $meta_data = isset($body['meta_data']) ? $body['meta_data'] : array();
+        $has_assets = isset($body['has_assets']) ? $body['has_assets'] : false;
+        $target_env = isset($body['target_env']) ? $body['target_env'] : 'dev';
+        $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
+        $zip_file = null;
+    }
+
+    // Find existing post by slug and type
+    $existing_post = get_page_by_path($post_data['post_name'], OBJECT, $post_data['post_type']);
+
+    // Prepare post data for insert/update
+    $wp_post_data = array(
+        'post_title'   => $post_data['post_title'],
+        'post_name'    => $post_data['post_name'],
+        'post_content' => $post_data['post_content'],
+        'post_excerpt' => isset($post_data['post_excerpt']) ? $post_data['post_excerpt'] : '',
+        'post_type'    => $post_data['post_type'],
+        'post_status'  => $post_data['post_status'],
+        'menu_order'   => isset($post_data['menu_order']) ? $post_data['menu_order'] : 0,
+    );
+
+    if ($existing_post) {
+        // Update existing post
+        $wp_post_data['ID'] = $existing_post->ID;
+        $post_id = wp_update_post($wp_post_data, true);
+    } else {
+        // Create new post
+        $post_id = wp_insert_post($wp_post_data, true);
+    }
+
+    if (is_wp_error($post_id)) {
+        return array(
+            'success' => false,
+            'message' => 'Failed to save post: ' . $post_id->get_error_message()
+        );
+    }
+
+    // Update meta data
+    foreach ($meta_data as $key => $value) {
+        update_post_meta($post_id, $key, $value);
+    }
+
+    // Save asset map if provided
+    if (!empty($asset_map)) {
+        update_post_meta($post_id, '_firefly_asset_map', $asset_map);
+    }
+
+    // Process assets if included
+    if ($has_assets && $zip_file && file_exists($zip_file)) {
+        // Determine asset directory based on target environment
+        // Live Dev uses: uploads-dev/pages/{slug}/
+        // Production uses: uploads/pages/{slug}/
+        $upload_dir = wp_upload_dir();
+
+        if ($target_env === 'prod') {
+            // Production: store in regular uploads
+            $page_assets_dir = trailingslashit($upload_dir['basedir']) . 'pages/' . $post_data['post_name'];
+        } else {
+            // Live Dev: store in uploads-dev
+            $page_assets_dir = dirname($upload_dir['basedir']) . '/uploads-dev/pages/' . $post_data['post_name'];
+        }
+
+        // Create directory if needed
+        if (!file_exists($page_assets_dir)) {
+            wp_mkdir_p($page_assets_dir);
+        }
+
+        // Extract assets from zip
+        $zip = new ZipArchive();
+        if ($zip->open($zip_file) === true) {
+            // Read manifest from zip
+            $manifest_json = $zip->getFromName('manifest.json');
+            $zip_manifest = json_decode($manifest_json, true);
+
+            // Extract assets
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $filename = $zip->getNameIndex($i);
+                if (strpos($filename, 'assets/') === 0 && $filename !== 'assets/') {
+                    $asset_name = basename($filename);
+                    $destination = $page_assets_dir . '/' . $asset_name;
+
+                    // Extract file
+                    $content = $zip->getFromIndex($i);
+                    file_put_contents($destination, $content);
+                }
+            }
+            $zip->close();
+        }
+    }
+
+    $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
+
+    return array(
+        'success' => true,
+        'message' => ($existing_post ? 'Page updated' : 'Page created') . ' successfully on ' . $env_label . '.'
+    );
+}

@@ -1,0 +1,645 @@
+/**
+ * Firefly Projects - Gutenberg Sync Panel Styles
+ * Follows WordPress admin UI standards
+ */
+
+/* Panel Content */
+.firefly-page-sync-panel .firefly-sync-panel-content {
+    padding: 8px 0;
+}
+
+.firefly-sync-info {
+    margin-bottom: 12px;
+}
+
+.firefly-sync-status {
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.firefly-status-published {
+    color: #00a32a;
+    font-weight: 500;
+}
+
+.firefly-status-draft {
+    color: #d63638;
+    font-weight: 500;
+}
+
+.firefly-status-never {
+    color: #757575;
+    font-style: italic;
+}
+
+.firefly-unsaved-notice {
+    margin: 8px 0 !important;
+}
+
+/* Sync Button */
+.firefly-sync-button {
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.firefly-sync-note {
+    font-size: 12px;
+    color: #757575;
+    margin: 8px 0 0;
+    font-style: italic;
+}
+
+/* Modal Styles */
+.firefly-sync-modal {
+    max-width: 500px;
+}
+
+.firefly-sync-modal .components-modal__content {
+    padding: 0;
+}
+
+.firefly-modal-content {
+    padding: 16px 24px;
+}
+
+.firefly-sync-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #fcf0f1;
+    border-left: 4px solid #d63638;
+    margin-bottom: 16px;
+    border-radius: 2px;
+}
+
+.firefly-sync-warning .dashicon,
+.firefly-sync-warning svg {
+    fill: #d63638;
+    color: #d63638;
+}
+
+.firefly-sync-warning span {
+    color: #d63638;
+    font-weight: 500;
+}
+
+/* Sync Summary Table */
+.firefly-sync-summary {
+    margin-bottom: 16px;
+}
+
+.firefly-sync-summary h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.firefly-sync-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.firefly-sync-table th,
+.firefly-sync-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.firefly-sync-table th {
+    width: 80px;
+    color: #757575;
+    font-weight: 500;
+}
+
+.firefly-sync-table td code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+/* Assets Section */
+.firefly-sync-assets {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f6f7f7;
+    border-radius: 4px;
+}
+
+.firefly-sync-assets h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.firefly-analyzing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #757575;
+}
+
+.firefly-asset-count {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #1e1e1e;
+}
+
+.firefly-asset-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.firefly-asset-list li {
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.firefly-asset-list code {
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid #e0e0e0;
+}
+
+.firefly-more-assets {
+    color: #757575;
+    font-style: italic;
+}
+
+.firefly-no-assets {
+    margin: 0;
+    color: #757575;
+    font-size: 13px;
+}
+
+/* Description */
+.firefly-sync-description {
+    font-size: 13px;
+    color: #757575;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Modal Footer */
+.firefly-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e0e0e0;
+    background: #f6f7f7;
+}
+
+.firefly-confirm-sync-button {
+    min-width: 120px;
+}
+
+/* Sync Result */
+.firefly-sync-result {
+    margin-bottom: 16px !important;
+}
+
+.firefly-sync-details {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.firefly-sync-details p {
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+/* Success state adjustments */
+.firefly-sync-result.is-success {
+    background: #edfaef;
+    border-color: #00a32a;
+}
+
+/* Responsive adjustments */
+@media (max-width: 782px) {
+    .firefly-sync-modal {
+        max-width: calc(100% - 32px);
+    }
+
+    .firefly-modal-content,
+    .firefly-modal-footer {
+        padding: 12px 16px;
+    }
+}
+
+/* ====================================
+   Environment Toggle Switch
+   ==================================== */
+
+.firefly-env-toggle-container {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+.firefly-env-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.firefly-env-toggle-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #757575;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.firefly-env-toggle-label.active {
+    color: #1e1e1e;
+    font-weight: 600;
+}
+
+.firefly-env-toggle-label:hover {
+    color: #1e1e1e;
+}
+
+.firefly-env-toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #339af0 0%, #228be6 100%);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.firefly-env-toggle-switch:focus {
+    outline: none;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(51, 154, 240, 0.4);
+}
+
+.firefly-env-toggle-switch.is-prod {
+    background: linear-gradient(135deg, #f03e3e 0%, #c92a2a 100%);
+}
+
+.firefly-env-toggle-switch.is-prod:focus {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(240, 62, 62, 0.4);
+}
+
+.firefly-env-toggle-switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.firefly-env-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.firefly-env-toggle-switch.is-prod .firefly-env-toggle-knob {
+    left: 22px;
+}
+
+/* ====================================
+   Environment Badges
+   ==================================== */
+
+.firefly-env-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.firefly-env-dev {
+    background: linear-gradient(135deg, #d0ebff 0%, #a5d8ff 100%);
+    color: #1864ab;
+    border: 1px solid #74c0fc;
+}
+
+.firefly-env-prod {
+    background: linear-gradient(135deg, #ffe3e3 0%, #ffc9c9 100%);
+    color: #c92a2a;
+    border: 1px solid #ff8787;
+}
+
+/* Target site text */
+.firefly-target-site {
+    font-size: 11px;
+    color: #757575;
+}
+
+/* ====================================
+   Production-specific styling
+   ==================================== */
+
+/* Production warning in modal */
+.firefly-sync-warning-prod {
+    background: #ffe3e3;
+    border-left-color: #c92a2a;
+}
+
+.firefly-sync-warning-prod .dashicon,
+.firefly-sync-warning-prod svg {
+    fill: #c92a2a;
+    color: #c92a2a;
+}
+
+.firefly-sync-warning-prod span {
+    color: #c92a2a;
+}
+
+/* Production sync button */
+.firefly-sync-button-prod.is-primary {
+    background: linear-gradient(135deg, #f03e3e 0%, #c92a2a 100%);
+    border-color: #c92a2a;
+}
+
+.firefly-sync-button-prod.is-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e03131 0%, #b82525 100%);
+}
+
+.firefly-sync-button-prod.is-primary:focus:not(:disabled) {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f03e3e;
+}
+
+/* Production confirm button in modal */
+.firefly-confirm-sync-prod {
+    background: linear-gradient(135deg, #f03e3e 0%, #c92a2a 100%) !important;
+    border-color: #c92a2a !important;
+}
+
+.firefly-confirm-sync-prod:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e03131 0%, #b82525 100%) !important;
+}
+
+.firefly-confirm-sync-prod:focus:not(:disabled) {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f03e3e !important;
+}
+
+/* ====================================
+   Pull Panel Styles
+   ==================================== */
+
+.firefly-page-pull-panel .firefly-sync-panel-content {
+    padding: 8px 0;
+}
+
+/* Pull button styling */
+.firefly-pull-button {
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+/* Pull modal specific styles */
+.firefly-pull-modal .firefly-modal-content {
+    min-height: 200px;
+}
+
+/* Slug input field in pull modal */
+.firefly-pull-slug-input {
+    margin-bottom: 16px;
+}
+
+.firefly-pull-slug-input label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e1e1e;
+}
+
+.firefly-pull-slug-input .components-text-control__input {
+    width: 100%;
+    font-size: 14px;
+}
+
+.firefly-pull-slug-input .components-base-control__help {
+    font-size: 12px;
+    color: #757575;
+    margin-top: 4px;
+}
+
+/* Source info in pull modal */
+.firefly-pull-source-info {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f6f7f7;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
+.firefly-pull-source-info .firefly-env-badge {
+    margin-left: 0;
+    margin-right: 8px;
+}
+
+/* Redirect notice after successful pull */
+.firefly-reload-notice {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    font-size: 12px;
+    color: #757575;
+    font-style: italic;
+}
+
+/* Loading state in pull modal */
+.firefly-pull-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    color: #757575;
+    font-size: 14px;
+}
+
+/* Search input in pull modal */
+.firefly-pull-search {
+    margin-bottom: 12px;
+}
+
+.firefly-pull-search .components-text-control__input {
+    width: 100%;
+}
+
+/* No pages message */
+.firefly-pull-no-pages {
+    padding: 30px 20px;
+    text-align: center;
+    color: #757575;
+    font-size: 14px;
+    background: #f6f7f7;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+/* Page list container */
+.firefly-pull-page-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+/* Individual page item */
+.firefly-pull-page-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.firefly-pull-page-item:last-child {
+    border-bottom: none;
+}
+
+.firefly-pull-page-item:hover {
+    background: #f0f6fc;
+}
+
+.firefly-pull-page-item.selected {
+    background: #e5f3ff;
+    border-left: 3px solid #007cba;
+    padding-left: 11px;
+}
+
+/* Page item header row */
+.firefly-pull-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.firefly-pull-page-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e1e1e;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 10px;
+}
+
+/* Page status badges */
+.firefly-pull-page-status {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.firefly-pull-page-status-publish {
+    background: #d4edda;
+    color: #155724;
+}
+
+.firefly-pull-page-status-draft {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.firefly-pull-page-status-pending {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Page meta row */
+.firefly-pull-page-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: #757575;
+}
+
+.firefly-pull-page-meta code {
+    background: #f0f0f1;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 11px;
+}
+
+.firefly-pull-page-date {
+    font-size: 11px;
+}
+
+/* Page excerpt */
+.firefly-pull-page-excerpt {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #757575;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Wider modal for page browser */
+.firefly-pull-modal {
+    min-width: 500px;
+    max-width: 600px;
+}
+
+@media (max-width: 640px) {
+    .firefly-pull-modal {
+        min-width: auto;
+        max-width: calc(100% - 32px);
+    }
+
+    .firefly-pull-page-list {
+        max-height: 250px;
+    }
+}
+
+/* Overwrite warning */
+.firefly-overwrite-warning {
+    margin: 12px 0 !important;
+}
+
+.firefly-overwrite-warning p {
+    margin: 4px 0 0 0;
+}
+
+/* Overwrite button - red/warning style */
+.firefly-overwrite-button.is-primary {
+    background: linear-gradient(135deg, #d63638 0%, #b32d2e 100%);
+    border-color: #b32d2e;
+}
+
+.firefly-overwrite-button.is-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #c32d2f 0%, #a02829 100%);
+}
+
+.firefly-overwrite-button.is-primary:focus:not(:disabled) {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d63638;
+}

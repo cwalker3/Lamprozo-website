@@ -186,6 +186,16 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                 <span v-if="!isSyncing">Sync Selected Files ({{ selectedCount }})</span>
                 <span v-else>Syncing...</span>
             </button>
+
+            <!-- Environment Toggle Switch -->
+            <div class="env-toggle-container" v-if="hasProdEndpoint">
+                <span class="env-label" :class="{ active: targetEnv === 'dev' }">Live Dev</span>
+                <label class="env-toggle-switch">
+                    <input type="checkbox" v-model="targetEnvProd" :disabled="isSyncing" />
+                    <span class="env-toggle-slider"></span>
+                </label>
+                <span class="env-label" :class="{ active: targetEnv === 'prod' }">Production</span>
+            </div>
         </div>
 
         <div class="file-tree-container">
@@ -221,6 +231,9 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                 <div class="backup-info">
                     <div class="backup-header">
                         <strong>{{ formatTimestamp(backup.timestamp) }}</strong>
+                        <span class="backup-env" :class="'env-' + (backup.target_env || 'dev')">
+                            {{ (backup.target_env || 'dev') === 'prod' ? 'Production' : 'Live Dev' }}
+                        </span>
                     </div>
                     <div class="backup-details">
                         <span class="backup-mode" :class="'mode-' + backup.sync_mode">
@@ -266,10 +279,16 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 
                 <div class="modal-details">
                     <p><strong>Restore Point:</strong> {{ restoreBackup ? formatTimestamp(restoreBackup.timestamp) : '' }}</p>
+                    <p><strong>Target Environment:</strong>
+                        <span :class="'backup-env env-' + (restoreBackup ? (restoreBackup.target_env || 'dev') : 'dev')">
+                            {{ restoreBackup ? ((restoreBackup.target_env || 'dev') === 'prod' ? 'Production' : 'Live Dev') : '' }}
+                        </span>
+                    </p>
                     <p><strong>Sync Mode:</strong> {{ restoreBackup ? (restoreBackup.sync_mode === 'full' ? 'Full Sync' : 'Partial Sync') : '' }}</p>
                     <p><strong>Files:</strong> {{ restoreBackup ? restoreBackup.file_count : 0 }}</p>
                     <p class="modal-description">
-                        This will restore the remote site to the exact state it was in at this backup point.
+                        This will restore the <strong>{{ restoreBackup ? ((restoreBackup.target_env || 'dev') === 'prod' ? 'Production' : 'Live Dev') : '' }}</strong>
+                        site to the exact state it was in at this backup point.
                         All current files on the remote will be overwritten. This action cannot be undone.
                     </p>
                 </div>
@@ -338,15 +357,21 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 
                 <div class="modal-details">
                     <p><strong>Project:</strong> {{ selectedProject }}</p>
+                    <p><strong>Target:</strong>
+                        <span :class="'backup-env env-' + targetEnv">
+                            {{ targetEnv === 'prod' ? 'Production' : 'Live Dev' }}
+                        </span>
+                    </p>
                     <p><strong>Files to sync:</strong> {{ selectedCount }}</p>
                     <p v-if="syncMode === 'full'" class="modal-description">
-                        This will <strong>completely mirror</strong> your local project to the remote site.
+                        This will <strong>completely mirror</strong> your local project to
+                        <strong>{{ targetEnv === 'prod' ? 'Production' : 'Live Dev' }}</strong>.
                         All {{ selectedCount }} files will be synced, and any files on the remote that
                         are not in your local project will be <strong>permanently deleted</strong>.
                     </p>
                     <p v-else class="modal-description">
                         This will <strong>update only the selected files</strong> ({{ selectedCount }} files)
-                        on the remote site. Other files will remain unchanged.
+                        on <strong>{{ targetEnv === 'prod' ? 'Production' : 'Live Dev' }}</strong>. Other files will remain unchanged.
                     </p>
                 </div>
             </div>

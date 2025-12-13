@@ -37,3 +37,7 @@ if (!defined('FIREFLY_SHARED_SECRET')) {
 if (!defined('LIVE_DEV_ENDPOINT')) {
     define('LIVE_DEV_ENDPOINT', '');
 }
+
+if (!defined('PROD_ENDPOINT')) {
+    define('PROD_ENDPOINT', '');
+}

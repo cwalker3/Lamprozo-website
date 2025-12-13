@@ -69,6 +69,7 @@
         // Add project data for Vue app BEFORE the script loads
         $projects_json = json_encode($projects);
         $projects_needing_dev_json = json_encode($projects_needing_dev);
+        $has_prod_endpoint = defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT) ? 'true' : 'false';
         $inline_script = "
         // Initialize project data for Vue app
         window.projectData = {
@@ -78,7 +79,8 @@
             nonce: '{$nonce}',
             isAdmin: {$is_admin},
             adminUrl: '" . admin_url('admin.php?page=firefly-projects') . "',
-            pluginUrl: '" . FIREFLY_PROJECTS_PLUGIN_URL . "'
+            pluginUrl: '" . FIREFLY_PROJECTS_PLUGIN_URL . "',
+            hasProdEndpoint: {$has_prod_endpoint}
         };
         ";
         wp_add_inline_script('firefly-project-file-selector-js', $inline_script, 'before');
@@ -359,7 +361,7 @@
     /**
      * Add a new backup and rotate (keep last 5)
      */
-    function firefly_collective_add_backup($project_name, $zip_path, $sync_mode, $file_count, $selected_count) {
+    function firefly_collective_add_backup($project_name, $zip_path, $sync_mode, $file_count, $selected_count, $target_env = 'dev') {
         $backups = firefly_collective_load_backups_metadata($project_name);
         $backup_dir = firefly_collective_get_backup_dir($project_name);
 
@@ -380,7 +382,8 @@
             'file_count' => $file_count,
             'selected_count' => $selected_count,
             'zip_filename' => $zip_filename,
-            'zip_size' => filesize($permanent_zip_path)
+            'zip_size' => filesize($permanent_zip_path),
+            'target_env' => $target_env
         );
 
         // Add to beginning of array (newest first)
@@ -446,6 +449,25 @@
             $sync_mode = 'partial';
         }
 
+        // Check for target_env parameter (default to 'dev' for Live Dev)
+        $target_env = sanitize_text_field($request->get_param('target_env'));
+        if (empty($target_env) || !in_array($target_env, array('dev', 'prod'), true)) {
+            $target_env = 'dev';
+        }
+
+        // Determine the correct endpoint based on target environment
+        if ($target_env === 'prod') {
+            if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+                return new WP_Error('no_prod_endpoint', 'PROD_ENDPOINT is not configured in wp-config.php.', array('status' => 400));
+            }
+            $endpoint = PROD_ENDPOINT;
+        } else {
+            if (!defined('LIVE_DEV_ENDPOINT') || empty(LIVE_DEV_ENDPOINT)) {
+                return new WP_Error('no_dev_endpoint', 'LIVE_DEV_ENDPOINT is not configured in wp-config.php.', array('status' => 400));
+            }
+            $endpoint = LIVE_DEV_ENDPOINT;
+        }
+
         // For FULL sync mode, ALWAYS use all project files (ignore selected_files parameter)
         if ($sync_mode === 'full') {
             // $directories already contains all files from projects.json
@@ -459,21 +481,22 @@
             }
         }
 
-        $zip_path = firefly_collective_zip_contents($project_name, $directories);
+        $zip_path = firefly_collective_zip_contents($project_name, $directories, $target_env);
         if (is_wp_error($zip_path)) {
             return $zip_path;
         }
 
-        // Save backup before sending
+        // Save backup before sending (include target_env)
         $backup = firefly_collective_add_backup(
             $project_name,
             $zip_path,
             $sync_mode,
             count($directories), // total files in project
-            count($directories)  // files actually selected (same for full sync, subset for partial)
+            count($directories), // files actually selected (same for full sync, subset for partial)
+            $target_env          // target environment
         );
 
-        $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
+        $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode);
         if (is_wp_error($response)) {
             return $response;
         }
@@ -486,8 +509,20 @@
 
     /**
      * Zip directories from local site, placing files under plugins/ or themes/ as needed.
+     *
+     * For Production syncs (target_env === 'prod'):
+     * - Strips -dev suffix from source paths (reads from non-dev folders)
+     * - Strips -dev suffix from destination paths (zips as non-dev)
+     *
+     * For Live Dev syncs (target_env === 'dev'):
+     * - Uses paths as-is (with -dev suffix)
+     *
+     * @param string $project_name The project name
+     * @param array  $directories  Array of directory/file paths from projects.json
+     * @param string $target_env   Target environment: 'dev' or 'prod'
+     * @return string|WP_Error Path to created zip file or error
      */
-    function firefly_collective_zip_contents($project_name, $directories) {
+    function firefly_collective_zip_contents($project_name, $directories, $target_env = 'dev') {
         $upload_dir = wp_upload_dir();
         $temp_dir   = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
         if (!file_exists($temp_dir)) {
@@ -502,26 +537,47 @@
             return new WP_Error('zip_error', 'Unable to create zip file.');
         }
 
+        // For production: strip -dev suffix from paths
+        $strip_dev = ($target_env === 'prod');
+        $files_added = 0;
+        $skipped_dirs = array();
+
         foreach ($directories as $dir) {
-            $absolute_dir = ABSPATH . ltrim($dir, '/');
-            if (!file_exists($absolute_dir)) continue;
+            // Determine source path (where to read from)
+            $source_dir = $dir;
+            if ($strip_dev) {
+                // Strip -dev suffix to read from non-dev folders
+                $source_dir = preg_replace('/-dev(\/|$)/', '$1', $dir);
+            }
+
+            $absolute_dir = ABSPATH . ltrim($source_dir, '/');
+
+            // Skip missing directories/files (e.g., no non-dev version exists for prod sync)
+            if (!file_exists($absolute_dir)) {
+                if ($strip_dev && $source_dir !== $dir) {
+                    // Track skipped -dev only items (no non-dev counterpart)
+                    $skipped_dirs[] = $dir;
+                }
+                continue;
+            }
 
             // Handle single files from wp-content
-            if (is_file($absolute_dir) && strpos($dir, '/wp-content/') !== false) {
-                $relative_path = trim(str_replace('/wp-content/', '', $dir), '/');
+            if (is_file($absolute_dir) && strpos($source_dir, '/wp-content/') !== false) {
+                $relative_path = trim(str_replace('/wp-content/', '', $source_dir), '/');
                 $zip->addFile($absolute_dir, $relative_path);
+                $files_added++;
                 continue;
             }
 
             // Determine if it's a plugin or theme directory
-            if (strpos($dir, '/wp-content/plugins/') !== false) {
+            if (strpos($source_dir, '/wp-content/plugins/') !== false) {
                 // e.g. /wp-content/plugins/firefly-collective
-                $relative_path = str_replace('/wp-content/plugins/', '', $dir);
+                $relative_path = str_replace('/wp-content/plugins/', '', $source_dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'plugins/' . $relative_path;
-            } elseif (strpos($dir, '/wp-content/themes/') !== false) {
+            } elseif (strpos($source_dir, '/wp-content/themes/') !== false) {
                 // e.g. /wp-content/themes/firefly-collective
-                $relative_path = str_replace('/wp-content/themes/', '', $dir);
+                $relative_path = str_replace('/wp-content/themes/', '', $source_dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'themes/' . $relative_path;
             } else {
@@ -529,9 +585,20 @@
             }
 
             firefly_collective_add_directory_to_zip($zip, $absolute_dir, $absolute_dir, $root_folder);
+            $files_added++;
         }
 
         $zip->close();
+
+        // Check if anything was added to the zip
+        if ($files_added === 0) {
+            @unlink($zip_path);
+            $message = 'No files to sync.';
+            if ($strip_dev && !empty($skipped_dirs)) {
+                $message .= ' The following -dev items have no non-dev counterparts for Production sync: ' . implode(', ', $skipped_dirs);
+            }
+            return new WP_Error('empty_zip', $message);
+        }
 
         return $zip_path;
     }
@@ -839,9 +906,26 @@
             return new WP_Error('zip_not_found', 'Backup ZIP file not found', array('status' => 404));
         }
 
-        // Send the backup ZIP to remote using the original sync mode from the backup
+        // Send the backup ZIP to remote using the original sync mode and target_env from the backup
         $sync_mode = isset($backup['sync_mode']) ? $backup['sync_mode'] : 'full';
-        $response = firefly_collective_send_project_update($zip_path, $project_name, LIVE_DEV_ENDPOINT, $sync_mode);
+        $target_env = isset($backup['target_env']) ? $backup['target_env'] : 'dev';
+
+        // Determine the correct endpoint based on target environment
+        if ($target_env === 'prod') {
+            if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+                return new WP_Error('no_prod_endpoint', 'PROD_ENDPOINT is not configured. Cannot restore to Production.', array('status' => 400));
+            }
+            $endpoint = PROD_ENDPOINT;
+            $env_label = 'Production';
+        } else {
+            if (!defined('LIVE_DEV_ENDPOINT') || empty(LIVE_DEV_ENDPOINT)) {
+                return new WP_Error('no_dev_endpoint', 'LIVE_DEV_ENDPOINT is not configured. Cannot restore to Live Dev.', array('status' => 400));
+            }
+            $endpoint = LIVE_DEV_ENDPOINT;
+            $env_label = 'Live Dev';
+        }
+
+        $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode);
 
         if (is_wp_error($response)) {
             return $response;
@@ -852,7 +936,7 @@
 
         return array(
             'success' => true,
-            'message' => 'Successfully restored from backup: ' . $backup['timestamp'],
+            'message' => 'Successfully restored to ' . $env_label . ' from backup: ' . $backup['timestamp'],
             'backup' => $backup
         );
     }
@@ -1031,12 +1115,15 @@
             $sync_mode = 'partial';
         }
 
-        // Hardcoded path for firefly-projects plugin
+        // Hardcoded path for firefly-projects plugin (no -dev version)
         $plugin_path = '/wp-content/plugins/firefly-projects';
         $directories = array($plugin_path);
 
+        // Self-sync always goes to Live Dev
+        $target_env = 'dev';
+
         // Create ZIP
-        $zip_path = firefly_collective_zip_contents('firefly-projects', $directories);
+        $zip_path = firefly_collective_zip_contents('firefly-projects', $directories, $target_env);
         if (is_wp_error($zip_path)) {
             return $zip_path;
         }
@@ -1047,7 +1134,8 @@
             $zip_path,
             $sync_mode,
             1, // file count
-            1  // selected count
+            1, // selected count
+            $target_env
         );
 
         // Send to remote

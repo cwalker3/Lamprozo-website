@@ -198,7 +198,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 restoreBackup: null,
                 isDeletingBackup: false,
                 showDeleteModal: false,
-                deleteBackup: null
+                deleteBackup: null,
+                targetEnvProd: false, // false = dev, true = prod
+                hasProdEndpoint: false // Whether PROD_ENDPOINT is configured
             };
         },
         computed: {
@@ -219,6 +221,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     return null;
                 }
                 return this.projectsNeedingDev[this.selectedProject] || null;
+            },
+            targetEnv() {
+                return this.targetEnvProd ? 'prod' : 'dev';
             }
         },
         watch: {
@@ -263,6 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionStorage.setItem('firefly_saved_partial_selections', JSON.stringify(Array.from(newSelections)));
                 },
                 deep: true
+            },
+            targetEnvProd(newValue) {
+                sessionStorage.setItem('firefly_target_env', newValue ? 'prod' : 'dev');
             }
         },
         methods: {
@@ -279,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.apiUrl = window.projectData.apiUrl || '';
                 this.nonce = window.projectData.nonce || '';
                 this.projectsNeedingDev = window.projectData.projectsNeedingDev || {};
+                this.hasProdEndpoint = window.projectData.hasProdEndpoint || false;
 
                 // Validate required data
                 if (!this.apiUrl) {
@@ -452,7 +461,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const payload = {
                     project_name: this.selectedProject,
                     selected_files: selectedArray,
-                    sync_mode: this.syncMode
+                    sync_mode: this.syncMode,
+                    target_env: this.targetEnv
                 };
 
                 try {
@@ -469,8 +479,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await response.json();
 
                     if (data.success) {
-                        this.message = `Project "${this.selectedProject}" synced successfully! (${this.selectedCount} items)`;
+                        const envLabel = this.targetEnv === 'prod' ? 'Production' : 'Live Dev';
+                        this.message = `Project "${this.selectedProject}" synced to ${envLabel}! (${this.selectedCount} items)`;
                         this.messageType = 'success';
+
+                        // Reload backup history to show new backup
+                        await this.loadBackupHistory();
 
                         // Auto-dismiss success messages after 5 seconds
                         setTimeout(() => {
@@ -778,6 +792,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedSyncMode = sessionStorage.getItem('firefly_sync_mode');
             if (savedSyncMode && (savedSyncMode === 'full' || savedSyncMode === 'partial')) {
                 this.syncMode = savedSyncMode;
+            }
+
+            // Restore target environment preference from session storage
+            const savedTargetEnv = sessionStorage.getItem('firefly_target_env');
+            if (savedTargetEnv === 'prod') {
+                this.targetEnvProd = true;
             }
 
             // Restore saved partial selections
