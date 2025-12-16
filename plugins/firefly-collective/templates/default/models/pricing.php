@@ -998,8 +998,9 @@
      * Creates tables and syncs JSON with database
      */
     function firefly_collective_pricing_init() {
-        // Always create the orders table
+        // Always create the pricing tables
         create_ffc_orders_table_if_not_exist();
+        create_pricing_tables_if_not_exist();
         
         // Check if pricing.json exists and has data in template data folder
         $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
