@@ -290,7 +290,19 @@
     add_action('after_setup_theme', function () {
         add_theme_support('editor-styles');
         add_theme_support('align-wide');
-        add_editor_style('editor-style.css');
+    });
+
+    // Enqueue editor styles with cache-busting based on file modification time
+    add_action('enqueue_block_editor_assets', function () {
+        $editor_style_path = get_template_directory() . '/editor-style.css';
+        $version = file_exists($editor_style_path) ? filemtime($editor_style_path) : '1.0.0';
+
+        wp_enqueue_style(
+            'theme-editor-styles',
+            get_template_directory_uri() . '/editor-style.css',
+            array(),
+            $version
+        );
     });
 
     /**

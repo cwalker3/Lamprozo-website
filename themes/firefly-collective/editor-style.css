@@ -102,7 +102,7 @@ p.wp-block {
 
 /* Alternative: More specific selector to override WordPress core styles */
 .editor-styles-wrapper p.wp-block {
-  margin-left: 5vw !important;
+  /* margin-left: 5vw !important; */
   margin-right: 5vw !important;
 }
 

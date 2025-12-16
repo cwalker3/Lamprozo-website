@@ -436,6 +436,11 @@
      * Opens a modal to browse and select pages from remote
      */
     const PagePullPanel = () => {
+        // =====================================================================
+        // ALL HOOKS MUST BE DECLARED AT THE TOP - BEFORE ANY EARLY RETURNS
+        // React requires hooks to be called in the same order on every render
+        // =====================================================================
+
         const [isPullModalOpen, setIsPullModalOpen] = useState(false);
         const [isPulling, setIsPulling] = useState(false);
         const [isLoadingPages, setIsLoadingPages] = useState(false);
@@ -444,6 +449,8 @@
         const [selectedPage, setSelectedPage] = useState(null);
         const [searchTerm, setSearchTerm] = useState('');
         const [loadError, setLoadError] = useState(null);
+        const [localPageExists, setLocalPageExists] = useState(null);
+        const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
 
         // Environment toggle state for pull - load from localStorage
         const [pullEnvProd, setPullEnvProd] = useState(() => {
@@ -508,6 +515,35 @@
             localStorage.setItem('firefly_page_pull_env', pullEnvProd ? 'prod' : 'dev');
         }, [pullEnvProd]);
 
+        // Reload pages when environment toggle changes in modal
+        useEffect(() => {
+            if (isPullModalOpen && loadedForEnv !== sourceEnv) {
+                fetchRemotePages();
+            }
+        }, [sourceEnv, isPullModalOpen]);
+
+        // Check for existing local page when selection changes
+        useEffect(() => {
+            if (selectedPage) {
+                // Quick check via REST API
+                wp.apiFetch({
+                    path: '/wp/v2/pages?slug=' + selectedPage.slug + '&status=any',
+                    method: 'GET'
+                }).then(pages => {
+                    setLocalPageExists(pages && pages.length > 0 ? pages[0] : null);
+                }).catch(() => {
+                    setLocalPageExists(null);
+                });
+            } else {
+                setLocalPageExists(null);
+            }
+            setShowOverwriteConfirm(false);
+        }, [selectedPage]);
+
+        // =====================================================================
+        // END OF HOOKS - Early returns and other logic can now safely follow
+        // =====================================================================
+
         // Fetch remote pages when modal opens or environment changes
         const fetchRemotePages = async () => {
             setIsLoadingPages(true);
@@ -533,13 +569,6 @@
                 setIsLoadingPages(false);
             }
         };
-
-        // Reload pages when environment toggle changes in modal
-        useEffect(() => {
-            if (isPullModalOpen && loadedForEnv !== sourceEnv) {
-                fetchRemotePages();
-            }
-        }, [sourceEnv, isPullModalOpen]);
 
         // Format date for display
         const formatDate = (dateInput) => {
@@ -589,28 +618,6 @@
                 setSearchTerm('');
             }
         };
-
-        // Check if page exists locally
-        const [localPageExists, setLocalPageExists] = useState(null);
-        const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
-
-        // Check for existing local page when selection changes
-        useEffect(() => {
-            if (selectedPage) {
-                // Quick check via REST API
-                wp.apiFetch({
-                    path: '/wp/v2/pages?slug=' + selectedPage.slug + '&status=any',
-                    method: 'GET'
-                }).then(pages => {
-                    setLocalPageExists(pages && pages.length > 0 ? pages[0] : null);
-                }).catch(() => {
-                    setLocalPageExists(null);
-                });
-            } else {
-                setLocalPageExists(null);
-            }
-            setShowOverwriteConfirm(false);
-        }, [selectedPage]);
 
         // Perform pull with selected page
         const handleConfirmPull = async () => {
