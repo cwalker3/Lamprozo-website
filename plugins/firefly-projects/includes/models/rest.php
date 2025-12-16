@@ -273,14 +273,29 @@ function firefly_plugin_register_rest_endpoints() {
         )
     );
 
-    // Pages List Sync: List all published pages (remote site only)
+    // Pages List Sync: List all published pages/posts (remote site only)
     register_rest_route(
         'firefly-plugin/v1',
         '/list-pages',
         array(
             'methods'             => 'GET',
             'callback'            => 'firefly_projects_list_pages',
-            'permission_callback' => '__return_true' // Uses shared secret authentication
+            'permission_callback' => '__return_true', // Uses shared secret authentication
+            'args'                => array(
+                'post_type' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'page',
+                    'enum'              => array('page', 'post'),
+                    'description'       => 'Post type to list: page or post'
+                ),
+                'include_drafts' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'false',
+                    'description'       => 'Include draft posts'
+                )
+            )
         )
     );
 
@@ -374,6 +389,13 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'dev',
                     'enum'              => array('dev', 'prod'),
                     'description'       => 'Source environment: dev (Live Dev) or prod (Production)'
+                ),
+                'post_type' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'page',
+                    'enum'              => array('page', 'post'),
+                    'description'       => 'Post type to fetch: page or post'
                 )
             )
         )
@@ -943,6 +965,22 @@ function firefly_projects_export_page($request) {
     // Get existing asset map if any
     $asset_map = firefly_projects_get_asset_map($post->ID);
 
+    // Get featured image data if exists
+    $featured_image = null;
+    $thumbnail_id = get_post_thumbnail_id($post->ID);
+    if ($thumbnail_id) {
+        $thumbnail_path = get_attached_file($thumbnail_id);
+        if ($thumbnail_path && file_exists($thumbnail_path)) {
+            $featured_image = array(
+                'filename' => basename($thumbnail_path),
+                'content'  => base64_encode(file_get_contents($thumbnail_path)),
+                'mime_type' => get_post_mime_type($thumbnail_id),
+                'alt_text' => get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true),
+                'title'    => get_the_title($thumbnail_id)
+            );
+        }
+    }
+
     return new WP_REST_Response(array(
         'success' => true,
         'post_data' => array(
@@ -955,9 +993,10 @@ function firefly_projects_export_page($request) {
             'menu_order'   => $post->menu_order,
             'post_parent'  => $post->post_parent,
         ),
-        'meta_data'  => $meta_data,
-        'assets'     => $asset_data,
-        'asset_map'  => $asset_map
+        'meta_data'      => $meta_data,
+        'assets'         => $asset_data,
+        'asset_map'      => $asset_map,
+        'featured_image' => $featured_image
     ), 200);
 }
 
@@ -1071,6 +1110,46 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         }
     }
 
+    // Process featured image if included
+    $featured_image_set = false;
+    if (!empty($data['featured_image'])) {
+        $featured = $data['featured_image'];
+        $filename = sanitize_file_name($featured['filename']);
+
+        // Save to uploads-dev directory
+        $featured_path = $dev_dir . '/' . $filename;
+        $featured_content = base64_decode($featured['content']);
+
+        if (file_put_contents($featured_path, $featured_content)) {
+            // Create attachment post
+            $attachment = array(
+                'post_mime_type' => $featured['mime_type'],
+                'post_title'     => !empty($featured['title']) ? $featured['title'] : pathinfo($filename, PATHINFO_FILENAME),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
+            );
+
+            // Insert attachment
+            $attach_id = wp_insert_attachment($attachment, $featured_path, $post_id);
+
+            if (!is_wp_error($attach_id)) {
+                // Generate attachment metadata
+                require_once(ABSPATH . 'wp-admin/includes/image.php');
+                $attach_data = wp_generate_attachment_metadata($attach_id, $featured_path);
+                wp_update_attachment_metadata($attach_id, $attach_data);
+
+                // Set alt text if provided
+                if (!empty($featured['alt_text'])) {
+                    update_post_meta($attach_id, '_wp_attachment_image_alt', $featured['alt_text']);
+                }
+
+                // Set as featured image
+                set_post_thumbnail($post_id, $attach_id);
+                $featured_image_set = true;
+            }
+        }
+    }
+
     // Save pull timestamp
     $pull_time = time();
     if ($source_env === 'prod') {
@@ -1081,16 +1160,20 @@ function firefly_projects_import_pulled_page($data, $source_env) {
 
     $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
 
+    // Use appropriate label for message
+    $type_label = ($post_data['post_type'] === 'post') ? 'Post' : 'Page';
+
     return array(
         'success' => true,
-        'message' => 'Page pulled successfully from ' . $env_label,
+        'message' => $type_label . ' pulled successfully from ' . $env_label,
         'post_id' => $post_id,
         'details' => array(
-            'page_title'    => $post_data['post_title'],
-            'page_slug'     => $page_slug,
-            'assets_pulled' => $assets_saved,
-            'source_env'    => $source_env,
-            'is_update'     => $existing_post ? true : false
+            'page_title'         => $post_data['post_title'],
+            'page_slug'          => $page_slug,
+            'assets_pulled'      => $assets_saved,
+            'featured_image_set' => $featured_image_set,
+            'source_env'         => $source_env,
+            'is_update'          => $existing_post ? true : false
         )
     );
 }
@@ -1135,6 +1218,7 @@ function firefly_projects_process_page_assets($request) {
  */
 function firefly_projects_fetch_remote_pages($request) {
     $source_env = $request->get_param('source_env');
+    $post_type = $request->get_param('post_type');
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -1158,7 +1242,7 @@ function firefly_projects_fetch_remote_pages($request) {
     // Build list-pages URL
     if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
         $base_url = $matches[1];
-        $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-pages?include_drafts=true';
+        $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-pages?include_drafts=true&post_type=' . urlencode($post_type);
     } else {
         return new WP_REST_Response(array(
             'success' => false,

@@ -222,9 +222,26 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         'post_parent'  => $post->post_parent,
     );
 
-    // Create temporary zip file with assets if any
+    // Get featured image data if exists
+    $featured_image = null;
+    $featured_image_path = null;
+    $thumbnail_id = get_post_thumbnail_id($post->ID);
+    if ($thumbnail_id) {
+        $thumbnail_path = get_attached_file($thumbnail_id);
+        if ($thumbnail_path && file_exists($thumbnail_path)) {
+            $featured_image = array(
+                'filename'  => basename($thumbnail_path),
+                'mime_type' => get_post_mime_type($thumbnail_id),
+                'alt_text'  => get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true),
+                'title'     => get_the_title($thumbnail_id)
+            );
+            $featured_image_path = $thumbnail_path;
+        }
+    }
+
+    // Create temporary zip file with assets or featured image
     $zip_path = null;
-    if (!empty($assets_to_sync)) {
+    if (!empty($assets_to_sync) || $featured_image_path) {
         $upload_dir = wp_upload_dir();
         $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
 
@@ -251,13 +268,19 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             }
         }
 
+        // Add featured image to zip if exists
+        if ($featured_image_path && file_exists($featured_image_path)) {
+            $zip->addFile($featured_image_path, 'featured/' . basename($featured_image_path));
+        }
+
         // Add manifest
         $manifest = array(
-            'post_data'   => $post_data,
-            'meta_data'   => $meta_data,
-            'target_env'  => $target_env,
-            'asset_map'   => $asset_map,
-            'assets'      => array_map(function($a) {
+            'post_data'      => $post_data,
+            'meta_data'      => $meta_data,
+            'target_env'     => $target_env,
+            'asset_map'      => $asset_map,
+            'featured_image' => $featured_image,
+            'assets'         => array_map(function($a) {
                 return array(
                     'url'      => isset($a['url']) ? $a['url'] : '',
                     'filename' => isset($a['filename']) ? $a['filename'] : basename($a['path'])
@@ -271,11 +294,12 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
 
     // Prepare request body
     $body = array(
-        'post_data'   => $post_data,
-        'meta_data'   => $meta_data,
-        'target_env'  => $target_env,
-        'asset_map'   => $asset_map,
-        'has_assets'  => !empty($assets_to_sync)
+        'post_data'      => $post_data,
+        'meta_data'      => $meta_data,
+        'target_env'     => $target_env,
+        'asset_map'      => $asset_map,
+        'featured_image' => $featured_image,
+        'has_assets'     => !empty($assets_to_sync) || $featured_image_path
     );
 
     // Send request
@@ -385,6 +409,7 @@ function firefly_projects_handle_incoming_page($request) {
         $has_assets = isset($manifest['has_assets']) ? $manifest['has_assets'] : false;
         $target_env = isset($manifest['target_env']) ? $manifest['target_env'] : 'dev';
         $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
+        $featured_image = isset($manifest['featured_image']) ? $manifest['featured_image'] : null;
 
         // Handle uploaded zip file
         $files = $request->get_file_params();
@@ -397,6 +422,7 @@ function firefly_projects_handle_incoming_page($request) {
         $has_assets = isset($body['has_assets']) ? $body['has_assets'] : false;
         $target_env = isset($body['target_env']) ? $body['target_env'] : 'dev';
         $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
+        $featured_image = isset($body['featured_image']) ? $body['featured_image'] : null;
         $zip_file = null;
     }
 
@@ -479,14 +505,53 @@ function firefly_projects_handle_incoming_page($request) {
                     file_put_contents($destination, $content);
                 }
             }
+
+            // Extract and process featured image if included
+            if ($featured_image && !empty($featured_image['filename'])) {
+                $featured_filename = $featured_image['filename'];
+                $featured_content = $zip->getFromName('featured/' . $featured_filename);
+
+                if ($featured_content !== false) {
+                    $featured_path = $page_assets_dir . '/' . $featured_filename;
+                    file_put_contents($featured_path, $featured_content);
+
+                    // Create attachment post
+                    $attachment = array(
+                        'post_mime_type' => $featured_image['mime_type'],
+                        'post_title'     => !empty($featured_image['title']) ? $featured_image['title'] : pathinfo($featured_filename, PATHINFO_FILENAME),
+                        'post_content'   => '',
+                        'post_status'    => 'inherit'
+                    );
+
+                    // Insert attachment
+                    $attach_id = wp_insert_attachment($attachment, $featured_path, $post_id);
+
+                    if (!is_wp_error($attach_id)) {
+                        // Generate attachment metadata
+                        require_once(ABSPATH . 'wp-admin/includes/image.php');
+                        $attach_data = wp_generate_attachment_metadata($attach_id, $featured_path);
+                        wp_update_attachment_metadata($attach_id, $attach_data);
+
+                        // Set alt text if provided
+                        if (!empty($featured_image['alt_text'])) {
+                            update_post_meta($attach_id, '_wp_attachment_image_alt', $featured_image['alt_text']);
+                        }
+
+                        // Set as featured image
+                        set_post_thumbnail($post_id, $attach_id);
+                    }
+                }
+            }
+
             $zip->close();
         }
     }
 
     $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
+    $type_label = ($post_data['post_type'] === 'post') ? 'Post' : 'Page';
 
     return array(
         'success' => true,
-        'message' => ($existing_post ? 'Page updated' : 'Page created') . ' successfully on ' . $env_label . '.'
+        'message' => ($existing_post ? $type_label . ' updated' : $type_label . ' created') . ' successfully on ' . $env_label . '.'
     );
 }

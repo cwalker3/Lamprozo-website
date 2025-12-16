@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FIREFLY_PROJECTS_VERSION', '1.0.19');
+define('FIREFLY_PROJECTS_VERSION', '1.0.20');
 define('FIREFLY_PROJECTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_FILE', __FILE__);
@@ -685,6 +685,12 @@ function firefly_projects_enqueue_gutenberg_assets() {
         return;
     }
 
+    // Use file modification time for versioning on dev environments to prevent caching
+    $js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/gutenberg-sync-button.js';
+    $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/gutenberg-sync.css';
+    $js_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($js_file) : FIREFLY_PROJECTS_VERSION;
+    $css_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($css_file) : FIREFLY_PROJECTS_VERSION;
+
     // Register and enqueue the sync button script
     wp_enqueue_script(
         'firefly-gutenberg-sync',
@@ -698,7 +704,7 @@ function firefly_projects_enqueue_gutenberg_assets() {
             'wp-i18n',
             'wp-api-fetch'
         ),
-        FIREFLY_PROJECTS_VERSION,
+        $js_version,
         true
     );
 
@@ -707,7 +713,7 @@ function firefly_projects_enqueue_gutenberg_assets() {
         'firefly-gutenberg-sync',
         FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/gutenberg-sync.css',
         array('wp-components'),
-        FIREFLY_PROJECTS_VERSION
+        $css_version
     );
 
     // Pass configuration to JavaScript
@@ -917,12 +923,18 @@ function firefly_projects_enqueue_menu_sync_assets($hook) {
         $menu_id = absint($_REQUEST['menu']);
     }
 
+    // Use file modification time for versioning on dev environments
+    $js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/menu-sync.js';
+    $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/menu-sync.css';
+    $js_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($js_file) : FIREFLY_PROJECTS_VERSION;
+    $css_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($css_file) : FIREFLY_PROJECTS_VERSION;
+
     // Enqueue JavaScript
     wp_enqueue_script(
         'firefly-menu-sync',
         FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/menu-sync.js',
         array('jquery'),
-        FIREFLY_PROJECTS_VERSION,
+        $js_version,
         true
     );
 
@@ -931,7 +943,7 @@ function firefly_projects_enqueue_menu_sync_assets($hook) {
         'firefly-menu-sync',
         FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/menu-sync.css',
         array(),
-        FIREFLY_PROJECTS_VERSION
+        $css_version
     );
 
     // Get sync timestamps for current menu
@@ -1058,12 +1070,18 @@ function firefly_projects_enqueue_pages_list_sync_assets($hook) {
         return;
     }
 
+    // Use file modification time for versioning on dev environments
+    $js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/pages-list-sync.js';
+    $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/pages-list-sync.css';
+    $js_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($js_file) : FIREFLY_PROJECTS_VERSION;
+    $css_version = (firefly_projects_is_local_dev() || firefly_projects_is_live_dev()) ? filemtime($css_file) : FIREFLY_PROJECTS_VERSION;
+
     // Enqueue JavaScript
     wp_enqueue_script(
         'firefly-pages-list-sync',
         FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/pages-list-sync.js',
         array('jquery'),
-        FIREFLY_PROJECTS_VERSION,
+        $js_version,
         true
     );
 
@@ -1072,7 +1090,7 @@ function firefly_projects_enqueue_pages_list_sync_assets($hook) {
         'firefly-pages-list-sync',
         FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/pages-list-sync.css',
         array(),
-        FIREFLY_PROJECTS_VERSION
+        $css_version
     );
 
     // Enqueue dashicons for warning icon

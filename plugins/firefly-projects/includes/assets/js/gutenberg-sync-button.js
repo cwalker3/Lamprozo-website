@@ -480,6 +480,10 @@
 
         const lastPullTime = pullEnvProd ? lastPullProd : lastPullDev;
 
+        // Post type label for UI
+        const postTypeLabel = postType === 'post' ? __('Posts', 'firefly-projects') : __('Pages', 'firefly-projects');
+        const postTypeSingular = postType === 'post' ? __('post', 'firefly-projects') : __('page', 'firefly-projects');
+
         // Check if page is in "fresh" state (no title AND no content)
         const isPageFresh = () => {
             const hasTitle = postTitle && postTitle.trim() !== '';
@@ -513,7 +517,7 @@
 
             try {
                 const response = await wp.apiFetch({
-                    path: '/firefly-plugin/v1/fetch-remote-pages?source_env=' + sourceEnv,
+                    path: '/firefly-plugin/v1/fetch-remote-pages?source_env=' + sourceEnv + '&post_type=' + postType,
                     method: 'GET'
                 });
 
@@ -739,7 +743,7 @@
                     modalChildren.push(
                         el('div', { key: 'loading', className: 'firefly-pull-loading' },
                             el(Spinner, null),
-                            el('span', null, __('Loading pages from', 'firefly-projects') + ' ' + envLabel + '...')
+                            el('span', null, __('Loading', 'firefly-projects') + ' ' + postTypeLabel.toLowerCase() + ' ' + __('from', 'firefly-projects') + ' ' + envLabel + '...')
                         )
                     );
                 } else if (loadError) {
@@ -758,7 +762,7 @@
                             el(TextControl, {
                                 value: searchTerm,
                                 onChange: setSearchTerm,
-                                placeholder: __('Search pages...', 'firefly-projects'),
+                                placeholder: __('Search', 'firefly-projects') + ' ' + postTypeLabel.toLowerCase() + '...',
                                 className: 'firefly-pull-search-input'
                             })
                         )
@@ -769,8 +773,8 @@
                         modalChildren.push(
                             el('div', { key: 'no-pages', className: 'firefly-pull-no-pages' },
                                 searchTerm
-                                    ? __('No pages match your search.', 'firefly-projects')
-                                    : __('No pages available on remote.', 'firefly-projects')
+                                    ? __('No', 'firefly-projects') + ' ' + postTypeLabel.toLowerCase() + ' ' + __('match your search.', 'firefly-projects')
+                                    : __('No', 'firefly-projects') + ' ' + postTypeLabel.toLowerCase() + ' ' + __('available on remote.', 'firefly-projects')
                             )
                         );
                     } else {
@@ -821,7 +825,7 @@
                         // Description
                         modalChildren.push(
                             el('p', { key: 'desc', className: 'firefly-sync-description' },
-                                __('Select a page to pull. Content and assets will be copied to your local environment.', 'firefly-projects')
+                                __('Select a', 'firefly-projects') + ' ' + postTypeSingular + ' ' + __('to pull. Content and assets will be copied to your local environment.', 'firefly-projects')
                             )
                         );
                     }
@@ -840,13 +844,15 @@
             ];
 
             if (!pullResult && !isLoadingPages && !loadError) {
+                const overwriteLabel = postType === 'post' ? __('Overwrite Local Post', 'firefly-projects') : __('Overwrite Local Page', 'firefly-projects');
+                const selectLabel = postType === 'post' ? __('Select a post', 'firefly-projects') : __('Select a page', 'firefly-projects');
                 const buttonLabel = isPulling
                     ? __('Pulling...', 'firefly-projects')
                     : showOverwriteConfirm
-                        ? __('Overwrite Local Page', 'firefly-projects')
+                        ? overwriteLabel
                         : selectedPage
                             ? __('Pull', 'firefly-projects') + ' "' + selectedPage.title + '"'
-                            : __('Select a page', 'firefly-projects');
+                            : selectLabel;
 
                 footerButtons.push(
                     el(FlexItem, { key: 'confirm' },
@@ -861,8 +867,9 @@
                 );
             }
 
+            const modalTitle = postType === 'post' ? __('Pull Post from Remote', 'firefly-projects') : __('Pull Page from Remote', 'firefly-projects');
             pullModalContent = el(Modal, {
-                title: __('Pull Page from Remote', 'firefly-projects'),
+                title: modalTitle,
                 onRequestClose: handleClosePullModal,
                 className: 'firefly-sync-modal firefly-pull-modal',
                 isDismissible: !isPulling
@@ -878,15 +885,15 @@
         const panelContent = [];
 
         // Info text
+        const freshLabel = postType === 'post' ? __('This is a fresh post. You can pull content from a remote environment.', 'firefly-projects') : __('This is a fresh page. You can pull content from a remote environment.', 'firefly-projects');
         panelContent.push(
             el('div', { key: 'info', className: 'firefly-sync-info' },
-                el('p', { className: 'firefly-sync-status' },
-                    __('This is a fresh page. You can pull content from a remote environment.', 'firefly-projects')
-                )
+                el('p', { className: 'firefly-sync-status' }, freshLabel)
             )
         );
 
         // Pull button
+        const browseLabel = postType === 'post' ? __('Browse Remote Posts', 'firefly-projects') : __('Browse Remote Pages', 'firefly-projects');
         panelContent.push(
             el(Button, {
                 key: 'button',
@@ -894,14 +901,13 @@
                 onClick: handlePullClick,
                 className: 'firefly-pull-button',
                 icon: 'download'
-            }, __('Browse Remote Pages', 'firefly-projects'))
+            }, browseLabel)
         );
 
         // Note about pull
+        const noteLabel = postType === 'post' ? __('Opens a list of available posts to pull from the remote site.', 'firefly-projects') : __('Opens a list of available pages to pull from the remote site.', 'firefly-projects');
         panelContent.push(
-            el('p', { key: 'note', className: 'firefly-sync-note' },
-                __('Opens a list of available pages to pull from the remote site.', 'firefly-projects')
-            )
+            el('p', { key: 'note', className: 'firefly-sync-note' }, noteLabel)
         );
 
         return el(PluginDocumentSettingPanel, {

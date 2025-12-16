@@ -205,8 +205,8 @@ function firefly_projects_get_orphan_count($target_env) {
 }
 
 /**
- * List all pages for pull/sync operations (remote endpoint handler)
- * Includes published and draft pages with extended metadata
+ * List all pages/posts for pull/sync operations (remote endpoint handler)
+ * Includes published and draft content with extended metadata
  *
  * @param WP_REST_Request $request
  * @return array
@@ -215,6 +215,12 @@ function firefly_projects_list_pages_handler($request) {
     // Check if we should include drafts (for pull operations)
     $include_drafts = $request->get_param('include_drafts') === 'true' || $request->get_param('include_drafts') === '1';
 
+    // Get post type (default to 'page' for backwards compatibility)
+    $post_type = $request->get_param('post_type');
+    if (!in_array($post_type, array('page', 'post'))) {
+        $post_type = 'page';
+    }
+
     $post_statuses = array('publish');
     if ($include_drafts) {
         $post_statuses[] = 'draft';
@@ -222,7 +228,7 @@ function firefly_projects_list_pages_handler($request) {
     }
 
     $pages = get_posts(array(
-        'post_type'   => 'page',
+        'post_type'   => $post_type,
         'post_status' => $post_statuses,
         'numberposts' => -1,
         'orderby'     => 'title',
@@ -257,9 +263,10 @@ function firefly_projects_list_pages_handler($request) {
     }
 
     return array(
-        'success' => true,
-        'pages'   => $list,
-        'count'   => count($list)
+        'success'   => true,
+        'pages'     => $list,
+        'count'     => count($list),
+        'post_type' => $post_type
     );
 }
 
