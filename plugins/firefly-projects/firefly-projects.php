@@ -877,7 +877,7 @@ function firefly_projects_add_menu_sync_metabox() {
 
     add_meta_box(
         'firefly-menu-sync',
-        __('Sync to Remote', 'firefly-projects'),
+        __('Remote Sync', 'firefly-projects'),
         'firefly_projects_menu_sync_metabox_content',
         'nav-menus',
         'side',
@@ -946,9 +946,11 @@ function firefly_projects_enqueue_menu_sync_assets($hook) {
         $css_version
     );
 
-    // Get sync timestamps for current menu
+    // Get sync/pull timestamps for current menu
     $last_sync_dev = $menu_id ? get_option('firefly_menu_sync_dev_' . $menu_id, 0) : 0;
     $last_sync_prod = $menu_id ? get_option('firefly_menu_sync_prod_' . $menu_id, 0) : 0;
+    $last_pull_dev = $menu_id ? get_option('firefly_menu_pull_dev_' . $menu_id, 0) : 0;
+    $last_pull_prod = $menu_id ? get_option('firefly_menu_pull_prod_' . $menu_id, 0) : 0;
 
     // Pass configuration to JavaScript
     wp_localize_script('firefly-menu-sync', 'fireflyMenuSync', array(
@@ -957,6 +959,8 @@ function firefly_projects_enqueue_menu_sync_assets($hook) {
         'hasProdEndpoint' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT),
         'lastSyncDev' => (int) $last_sync_dev,
         'lastSyncProd' => (int) $last_sync_prod,
+        'lastPullDev' => (int) $last_pull_dev,
+        'lastPullProd' => (int) $last_pull_prod,
         'menuId' => $menu_id
     ));
 }

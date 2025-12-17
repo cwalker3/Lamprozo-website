@@ -336,3 +336,111 @@ function firefly_projects_handle_incoming_menu($request) {
         )
     );
 }
+
+/**
+ * Import a pulled menu into a local menu (full sync - replaces all items)
+ *
+ * @param int $local_menu_id The local menu term ID to sync into
+ * @param array $data The menu data from remote (menu_data + items)
+ * @return array Result array with success status and message
+ */
+function firefly_projects_import_pulled_menu($local_menu_id, $data) {
+    if (!isset($data['menu_data']) || !isset($data['items'])) {
+        return array(
+            'success' => false,
+            'message' => 'Invalid menu data received.'
+        );
+    }
+
+    $items = $data['items'];
+
+    // Verify local menu exists
+    $local_menu = wp_get_nav_menu_object($local_menu_id);
+    if (!$local_menu) {
+        return array(
+            'success' => false,
+            'message' => 'Local menu not found.'
+        );
+    }
+
+    // Delete ALL existing menu items (full sync)
+    $existing_items = wp_get_nav_menu_items($local_menu_id);
+    if ($existing_items) {
+        foreach ($existing_items as $item) {
+            wp_delete_post($item->ID, true);
+        }
+    }
+
+    // Map menu_order to new item ID for parent resolution
+    $order_to_id = array();
+
+    // First pass: create all menu items
+    foreach ($items as $item) {
+        $item_data = array(
+            'menu-item-title'       => $item['title'],
+            'menu-item-position'    => $item['menu_order'],
+            'menu-item-classes'     => is_array($item['classes']) ? implode(' ', $item['classes']) : $item['classes'],
+            'menu-item-target'      => isset($item['target']) ? $item['target'] : '',
+            'menu-item-xfn'         => isset($item['xfn']) ? $item['xfn'] : '',
+            'menu-item-description' => isset($item['description']) ? $item['description'] : '',
+            'menu-item-attr-title'  => isset($item['attr_title']) ? $item['attr_title'] : '',
+            'menu-item-status'      => 'publish'
+        );
+
+        // Resolve object by slug
+        $resolved = false;
+
+        if ($item['object_type'] === 'post_type' && !empty($item['object_slug'])) {
+            // Try to find post by slug
+            $post = get_page_by_path($item['object_slug'], OBJECT, $item['object']);
+            if ($post) {
+                $item_data['menu-item-type'] = 'post_type';
+                $item_data['menu-item-object'] = $item['object'];
+                $item_data['menu-item-object-id'] = $post->ID;
+                $resolved = true;
+            }
+        } elseif ($item['object_type'] === 'taxonomy' && !empty($item['object_slug'])) {
+            // Try to find term by slug
+            $term = get_term_by('slug', $item['object_slug'], $item['object']);
+            if ($term && !is_wp_error($term)) {
+                $item_data['menu-item-type'] = 'taxonomy';
+                $item_data['menu-item-object'] = $item['object'];
+                $item_data['menu-item-object-id'] = $term->term_id;
+                $resolved = true;
+            }
+        } elseif ($item['object_type'] === 'custom') {
+            // Custom link - convert to relative path if internal
+            $item_data['menu-item-type'] = 'custom';
+            $item_data['menu-item-url'] = firefly_projects_make_url_relative($item['url']);
+            $resolved = true;
+        }
+
+        // Fallback: if not resolved, create as custom link with relative URL
+        if (!$resolved) {
+            $item_data['menu-item-type'] = 'custom';
+            $item_data['menu-item-url'] = firefly_projects_make_url_relative($item['url']);
+        }
+
+        // Create menu item
+        $new_id = wp_update_nav_menu_item($local_menu_id, 0, $item_data);
+
+        if (!is_wp_error($new_id)) {
+            $order_to_id[$item['menu_order']] = $new_id;
+        }
+    }
+
+    // Second pass: set parent relationships
+    foreach ($items as $item) {
+        if (!empty($item['parent_order']) && isset($order_to_id[$item['parent_order']]) && isset($order_to_id[$item['menu_order']])) {
+            $child_id = $order_to_id[$item['menu_order']];
+            $parent_id = $order_to_id[$item['parent_order']];
+            update_post_meta($child_id, '_menu_item_menu_item_parent', $parent_id);
+        }
+    }
+
+    return array(
+        'success'     => true,
+        'message'     => 'Menu items replaced successfully.',
+        'items_count' => count($items)
+    );
+}

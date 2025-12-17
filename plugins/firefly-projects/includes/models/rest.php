@@ -226,6 +226,88 @@ function firefly_plugin_register_rest_endpoints() {
         )
     );
 
+    // Menu Pull: List available menus (remote site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/list-menus',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_list_menus',
+            'permission_callback' => '__return_true' // Uses shared secret authentication
+        )
+    );
+
+    // Menu Pull: Export menu for pull request (remote site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/export-menu',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_export_menu',
+            'permission_callback' => '__return_true', // Uses shared secret authentication
+            'args'                => array(
+                'menu_id' => array(
+                    'required'          => true,
+                    'type'              => 'integer',
+                    'sanitize_callback' => 'absint',
+                    'description'       => 'The menu term ID to export'
+                )
+            )
+        )
+    );
+
+    // Menu Pull: Fetch available menus from remote (local site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/fetch-remote-menus',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_fetch_remote_menus',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'source_env' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'dev',
+                    'enum'              => array('dev', 'prod'),
+                    'description'       => 'Source environment: dev (Live Dev) or prod (Production)'
+                )
+            )
+        )
+    );
+
+    // Menu Pull: Pull menu from remote (local site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/pull-menu',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_pull_menu',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'remote_menu_id' => array(
+                    'required'          => true,
+                    'type'              => 'integer',
+                    'sanitize_callback' => 'absint',
+                    'description'       => 'The remote menu term ID to pull'
+                ),
+                'local_menu_id' => array(
+                    'required'          => true,
+                    'type'              => 'integer',
+                    'sanitize_callback' => 'absint',
+                    'description'       => 'The local menu term ID to sync into'
+                ),
+                'source_env' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'dev',
+                    'enum'              => array('dev', 'prod'),
+                    'description'       => 'Source environment: dev (Live Dev) or prod (Production)'
+                )
+            )
+        )
+    );
+
     // Pages List Sync: Sync all pages to remote (local site only)
     register_rest_route(
         'firefly-plugin/v1',
@@ -1286,4 +1368,285 @@ function firefly_projects_fetch_remote_pages($request) {
         'source_env' => $source_env,
         'source_label' => $env_label
     ), 200);
+}
+
+/**
+ * List available menus (remote endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_list_menus($request) {
+    // Verify shared secret
+    $provided_secret = $request->get_header('X-Firefly-Secret');
+
+    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Shared secret not configured on remote.'
+        ), 500);
+    }
+
+    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Invalid shared secret.'
+        ), 403);
+    }
+
+    // Get all nav menus
+    $menus = wp_get_nav_menus();
+    $menu_list = array();
+
+    foreach ($menus as $menu) {
+        $items = wp_get_nav_menu_items($menu->term_id);
+        $menu_list[] = array(
+            'id'          => $menu->term_id,
+            'name'        => $menu->name,
+            'slug'        => $menu->slug,
+            'description' => $menu->description,
+            'count'       => $menu->count,
+            'items_count' => $items ? count($items) : 0
+        );
+    }
+
+    return new WP_REST_Response(array(
+        'success' => true,
+        'menus'   => $menu_list,
+        'count'   => count($menu_list)
+    ), 200);
+}
+
+/**
+ * Export menu for pull request (remote endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_export_menu($request) {
+    // Verify shared secret
+    $provided_secret = $request->get_header('X-Firefly-Secret');
+
+    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Shared secret not configured on remote.'
+        ), 500);
+    }
+
+    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Invalid shared secret.'
+        ), 403);
+    }
+
+    $menu_id = $request->get_param('menu_id');
+
+    // Load the menu sync handler for packaging
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/menu-sync.php';
+
+    // Package the menu
+    $package = firefly_projects_package_menu($menu_id);
+
+    if (is_wp_error($package)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => $package->get_error_message()
+        ), 404);
+    }
+
+    return new WP_REST_Response(array(
+        'success'   => true,
+        'menu_data' => $package['menu_data'],
+        'items'     => $package['items']
+    ), 200);
+}
+
+/**
+ * Fetch available menus from remote environment (local endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_fetch_remote_menus($request) {
+    $source_env = $request->get_param('source_env');
+
+    // Determine endpoint based on source environment
+    if ($source_env === 'prod') {
+        if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Production endpoint not configured.'
+            ), 400);
+        }
+        $endpoint = PROD_ENDPOINT;
+    } else {
+        if (!defined('LIVE_DEV_ENDPOINT') || empty(LIVE_DEV_ENDPOINT)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Live Dev endpoint not configured.'
+            ), 400);
+        }
+        $endpoint = LIVE_DEV_ENDPOINT;
+    }
+
+    // Build list-menus URL
+    if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
+        $base_url = $matches[1];
+        $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-menus';
+    } else {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Could not determine remote URL.'
+        ), 400);
+    }
+
+    // Fetch menus from remote
+    $response = wp_remote_get($list_url, array(
+        'headers' => array(
+            'X-Firefly-Secret' => FIREFLY_SHARED_SECRET
+        ),
+        'timeout' => 30
+    ));
+
+    if (is_wp_error($response)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to connect to remote: ' . $response->get_error_message()
+        ), 500);
+    }
+
+    $http_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if ($http_code !== 200 || !isset($data['success']) || !$data['success']) {
+        $error_msg = isset($data['message']) ? $data['message'] : 'Unknown error from remote.';
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Remote error: ' . $error_msg
+        ), $http_code);
+    }
+
+    $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
+
+    return new WP_REST_Response(array(
+        'success'      => true,
+        'menus'        => $data['menus'],
+        'count'        => $data['count'],
+        'source_env'   => $source_env,
+        'source_label' => $env_label
+    ), 200);
+}
+
+/**
+ * Pull menu from remote environment (local endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_pull_menu($request) {
+    $remote_menu_id = $request->get_param('remote_menu_id');
+    $local_menu_id = $request->get_param('local_menu_id');
+    $source_env = $request->get_param('source_env');
+
+    // Verify local menu exists
+    $local_menu = wp_get_nav_menu_object($local_menu_id);
+    if (!$local_menu) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Local menu not found.'
+        ), 404);
+    }
+
+    // Determine endpoint based on source environment
+    if ($source_env === 'prod') {
+        if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Production endpoint not configured.'
+            ), 400);
+        }
+        $endpoint = PROD_ENDPOINT;
+    } else {
+        if (!defined('LIVE_DEV_ENDPOINT') || empty(LIVE_DEV_ENDPOINT)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Live Dev endpoint not configured.'
+            ), 400);
+        }
+        $endpoint = LIVE_DEV_ENDPOINT;
+    }
+
+    // Build export-menu URL
+    if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
+        $base_url = $matches[1];
+        $export_url = $base_url . '/wp-json/firefly-plugin/v1/export-menu?menu_id=' . $remote_menu_id;
+    } else {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Could not determine remote URL.'
+        ), 400);
+    }
+
+    // Fetch menu data from remote
+    $response = wp_remote_get($export_url, array(
+        'headers' => array(
+            'X-Firefly-Secret' => FIREFLY_SHARED_SECRET
+        ),
+        'timeout' => 60
+    ));
+
+    if (is_wp_error($response)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to connect to remote: ' . $response->get_error_message()
+        ), 500);
+    }
+
+    $http_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if ($http_code !== 200 || !isset($data['success']) || !$data['success']) {
+        $error_msg = isset($data['message']) ? $data['message'] : 'Unknown error from remote.';
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Remote error: ' . $error_msg
+        ), $http_code);
+    }
+
+    // Load the menu sync handler
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/menu-sync.php';
+
+    // Import the menu into the local menu (full sync - delete existing items first)
+    $result = firefly_projects_import_pulled_menu($local_menu_id, $data);
+
+    $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
+
+    if ($result['success']) {
+        // Save pull timestamp
+        $pull_time = time();
+        $option_key = 'firefly_menu_pull_' . $source_env . '_' . $local_menu_id;
+        update_option($option_key, $pull_time);
+
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => 'Menu pulled successfully from ' . $env_label . '.',
+            'details' => array(
+                'local_menu_id'   => $local_menu_id,
+                'local_menu_name' => $local_menu->name,
+                'remote_menu_name' => $data['menu_data']['name'],
+                'items_pulled'    => $result['items_count'],
+                'source_env'      => $source_env,
+                'pulled_at'       => $pull_time
+            )
+        ), 200);
+    } else {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Pull from ' . $env_label . ' failed: ' . $result['message']
+        ), 500);
+    }
 }

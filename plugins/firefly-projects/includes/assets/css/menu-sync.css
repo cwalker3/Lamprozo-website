@@ -317,3 +317,180 @@
 .firefly-confirm-sync-prod:focus {
     box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f03e3e !important;
 }
+
+/* Section Titles */
+.firefly-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.firefly-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.firefly-section-title {
+    margin: 0 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e1e1e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Pull Section */
+.firefly-pull-info {
+    margin-bottom: 12px;
+}
+
+.firefly-pull-status {
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.firefly-browse-menus-button {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Pull Modal */
+.firefly-pull-modal {
+    max-width: 550px;
+}
+
+.firefly-pull-target-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f0f6fc;
+    border-left: 4px solid #0073aa;
+    margin-bottom: 16px;
+    border-radius: 2px;
+    font-size: 13px;
+}
+
+.firefly-pull-target-info .dashicons {
+    color: #0073aa;
+}
+
+.firefly-pull-env-toggle {
+    margin-bottom: 16px;
+}
+
+.firefly-remote-menus-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.firefly-menus-count {
+    font-size: 12px;
+    color: #757575;
+}
+
+.firefly-remote-menus-list {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
+.firefly-remote-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.15s ease;
+}
+
+.firefly-remote-menu-item:last-child {
+    border-bottom: none;
+}
+
+.firefly-remote-menu-item:hover {
+    background: #f6f7f7;
+}
+
+.firefly-remote-menu-item.selected {
+    background: #f0f6fc;
+    border-left: 3px solid #0073aa;
+    padding-left: 13px;
+}
+
+.firefly-menu-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.firefly-menu-name {
+    font-weight: 500;
+    color: #1e1e1e;
+    font-size: 13px;
+}
+
+.firefly-menu-meta {
+    font-size: 11px;
+    color: #757575;
+}
+
+.firefly-menu-check {
+    display: none;
+    color: #0073aa;
+    font-size: 18px;
+}
+
+.firefly-remote-menu-item.selected .firefly-menu-check {
+    display: block;
+}
+
+.firefly-pull-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #fcf9e8;
+    border-left: 4px solid #dba617;
+    border-radius: 2px;
+    font-size: 13px;
+}
+
+.firefly-pull-warning .dashicons {
+    color: #dba617;
+    flex-shrink: 0;
+}
+
+.firefly-pull-warning span {
+    color: #5d4600;
+}
+
+/* Loading & Empty States */
+.firefly-loading,
+.firefly-empty,
+.firefly-error {
+    padding: 24px 16px;
+    text-align: center;
+    color: #757575;
+    font-size: 13px;
+}
+
+.firefly-error {
+    color: #d63638;
+    background: #fcf0f1;
+}
+
+/* Reload Button */
+.firefly-modal-reload {
+    background: linear-gradient(135deg, #339af0 0%, #228be6 100%) !important;
+    border-color: #228be6 !important;
+}
