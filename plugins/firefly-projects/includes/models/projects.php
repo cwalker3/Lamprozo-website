@@ -537,47 +537,59 @@
             return new WP_Error('zip_error', 'Unable to create zip file.');
         }
 
-        // For production: strip -dev suffix from paths
+        // For production: strip -dev suffix from destination paths
         $strip_dev = ($target_env === 'prod');
         $files_added = 0;
         $skipped_dirs = array();
 
         foreach ($directories as $dir) {
             // Determine source path (where to read from)
+            // For production sync: prefer non-dev folder if it exists, otherwise use -dev folder
             $source_dir = $dir;
+            $dest_dir = $dir; // Destination path in ZIP
+
             if ($strip_dev) {
-                // Strip -dev suffix to read from non-dev folders
-                $source_dir = preg_replace('/-dev(\/|$)/', '$1', $dir);
+                // Try non-dev path first
+                $non_dev_dir = preg_replace('/-dev(\/|$)/', '$1', $dir);
+                $non_dev_absolute = ABSPATH . ltrim($non_dev_dir, '/');
+
+                if (file_exists($non_dev_absolute)) {
+                    // Non-dev folder exists - use it as source
+                    $source_dir = $non_dev_dir;
+                }
+                // else: keep $source_dir as the original -dev path (will read from -dev folder)
+
+                // Destination is always non-dev for production
+                $dest_dir = $non_dev_dir;
             }
 
             $absolute_dir = ABSPATH . ltrim($source_dir, '/');
 
-            // Skip missing directories/files (e.g., no non-dev version exists for prod sync)
+            // Skip missing directories/files
             if (!file_exists($absolute_dir)) {
-                if ($strip_dev && $source_dir !== $dir) {
-                    // Track skipped -dev only items (no non-dev counterpart)
-                    $skipped_dirs[] = $dir;
-                }
+                $skipped_dirs[] = $dir;
                 continue;
             }
 
             // Handle single files from wp-content
-            if (is_file($absolute_dir) && strpos($source_dir, '/wp-content/') !== false) {
-                $relative_path = trim(str_replace('/wp-content/', '', $source_dir), '/');
+            // Use $dest_dir for ZIP path (strips -dev for production), but read from $absolute_dir (source)
+            if (is_file($absolute_dir) && strpos($dest_dir, '/wp-content/') !== false) {
+                $relative_path = trim(str_replace('/wp-content/', '', $dest_dir), '/');
                 $zip->addFile($absolute_dir, $relative_path);
                 $files_added++;
                 continue;
             }
 
-            // Determine if it's a plugin or theme directory
-            if (strpos($source_dir, '/wp-content/plugins/') !== false) {
-                // e.g. /wp-content/plugins/firefly-collective
-                $relative_path = str_replace('/wp-content/plugins/', '', $source_dir);
+            // Determine destination path in ZIP based on $dest_dir (not $source_dir)
+            // This ensures -dev plugins are zipped as non-dev for production
+            if (strpos($dest_dir, '/wp-content/plugins/') !== false) {
+                // e.g. /wp-content/plugins/firefly-mail (even if source is firefly-mail-dev)
+                $relative_path = str_replace('/wp-content/plugins/', '', $dest_dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'plugins/' . $relative_path;
-            } elseif (strpos($source_dir, '/wp-content/themes/') !== false) {
-                // e.g. /wp-content/themes/firefly-collective
-                $relative_path = str_replace('/wp-content/themes/', '', $source_dir);
+            } elseif (strpos($dest_dir, '/wp-content/themes/') !== false) {
+                // e.g. /wp-content/themes/my-theme
+                $relative_path = str_replace('/wp-content/themes/', '', $dest_dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'themes/' . $relative_path;
             } else {
@@ -594,8 +606,8 @@
         if ($files_added === 0) {
             @unlink($zip_path);
             $message = 'No files to sync.';
-            if ($strip_dev && !empty($skipped_dirs)) {
-                $message .= ' The following -dev items have no non-dev counterparts for Production sync: ' . implode(', ', $skipped_dirs);
+            if (!empty($skipped_dirs)) {
+                $message .= ' The following paths were not found: ' . implode(', ', $skipped_dirs);
             }
             return new WP_Error('empty_zip', $message);
         }
