@@ -15,7 +15,13 @@
         targetEnvProd: localStorage.getItem('firefly_pages_sync_env') === 'prod',
         isSyncing: false,
         syncMode: 'safe', // 'safe' or 'mirror'
-        orphanCount: 0
+        orphanCount: 0,
+        // Pull state
+        pullEnvProd: localStorage.getItem('firefly_pages_pull_env') === 'prod',
+        isPulling: false,
+        remotePages: [],
+        selectedPages: {},
+        pullSearchTerm: ''
     };
 
     /**
@@ -47,6 +53,20 @@
      */
     function getEnvClass() {
         return state.targetEnvProd ? 'prod' : 'dev';
+    }
+
+    /**
+     * Get pull environment label
+     */
+    function getPullEnvLabel() {
+        return state.pullEnvProd ? 'Production' : 'Live Dev';
+    }
+
+    /**
+     * Get pull environment class suffix
+     */
+    function getPullEnvClass() {
+        return state.pullEnvProd ? 'prod' : 'dev';
     }
 
     /**
@@ -568,6 +588,488 @@
         return div.innerHTML;
     }
 
+    // ============================================================================
+    // PULL PAGES FUNCTIONALITY
+    // ============================================================================
+
+    /**
+     * Close pull modal
+     */
+    function closePullModal() {
+        $('#firefly-pages-pull-modal').remove();
+        state.remotePages = [];
+        state.selectedPages = {};
+        state.pullSearchTerm = '';
+    }
+
+    /**
+     * Build pull environment toggle HTML
+     */
+    function buildPullEnvToggleHtml() {
+        var isProd = state.pullEnvProd;
+        return '<div class="firefly-env-toggle-container firefly-modal-env-toggle">' +
+            '<div class="firefly-env-toggle-row">' +
+                '<span class="firefly-env-toggle-label' + (!isProd ? ' active' : '') + '">Live Dev</span>' +
+                '<button type="button" role="switch" class="firefly-env-toggle-switch' + (isProd ? ' is-prod' : '') + '" id="firefly-pull-modal-env-toggle">' +
+                    '<span class="firefly-env-toggle-knob"></span>' +
+                '</button>' +
+                '<span class="firefly-env-toggle-label' + (isProd ? ' active' : '') + '">Production</span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    /**
+     * Show pull pages modal
+     */
+    function showPullPagesModal() {
+        var envLabel = getPullEnvLabel();
+        var envClass = getPullEnvClass();
+
+        var modalHtml = '<div id="firefly-pages-pull-modal" class="firefly-sync-modal-overlay">' +
+            '<div class="firefly-sync-modal firefly-pull-modal-wide">' +
+                '<div class="firefly-sync-modal-header">' +
+                    '<h2>Pull Pages from Remote</h2>' +
+                    '<button type="button" class="firefly-modal-close">&times;</button>' +
+                '</div>' +
+                '<div class="firefly-modal-content">' +
+                    // Environment toggle
+                    (config.hasProdEndpoint ? buildPullEnvToggleHtml() : '') +
+                    // Source info
+                    '<div class="firefly-pull-source-info">' +
+                        '<span class="firefly-env-badge firefly-env-' + envClass + '" id="firefly-pull-source-badge">' + envLabel + '</span>' +
+                    '</div>' +
+                    // Search and selection controls
+                    '<div class="firefly-pull-controls">' +
+                        '<input type="text" id="firefly-pull-search" class="regular-text" placeholder="Search pages...">' +
+                        '<div class="firefly-pull-select-controls">' +
+                            '<button type="button" class="button button-small" id="firefly-pull-select-all">Select All</button>' +
+                            '<button type="button" class="button button-small" id="firefly-pull-deselect-all">Deselect All</button>' +
+                            '<span class="firefly-pull-selection-count" id="firefly-pull-selection-count">0 selected</span>' +
+                        '</div>' +
+                    '</div>' +
+                    // Page list container
+                    '<div class="firefly-pull-page-list" id="firefly-pull-page-list">' +
+                        '<div class="firefly-pull-loading">' +
+                            '<span class="spinner is-active"></span>' +
+                            '<span>Loading pages from ' + envLabel + '...</span>' +
+                        '</div>' +
+                    '</div>' +
+                    // Description
+                    '<p class="firefly-sync-description">' +
+                        'Select pages to pull. Content and assets will be copied to your local environment.' +
+                    '</p>' +
+                '</div>' +
+                '<div class="firefly-modal-footer">' +
+                    '<button type="button" class="button firefly-modal-cancel">Cancel</button>' +
+                    '<button type="button" class="button button-primary" id="firefly-confirm-pull" disabled>' +
+                        'Pull Selected Pages' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+        $('body').append(modalHtml);
+
+        // Bind modal events
+        bindPullModalEvents();
+
+        // Load pages
+        loadRemotePages();
+    }
+
+    /**
+     * Bind pull modal events
+     */
+    function bindPullModalEvents() {
+        var $modal = $('#firefly-pages-pull-modal');
+
+        // Close handlers
+        $modal.on('click', '.firefly-modal-close, .firefly-modal-cancel', closePullModal);
+        $modal.on('click', function(e) {
+            if ($(e.target).is('.firefly-sync-modal-overlay')) {
+                closePullModal();
+            }
+        });
+
+        // Environment toggle
+        $modal.on('click', '#firefly-pull-modal-env-toggle, .firefly-modal-env-toggle .firefly-env-toggle-label', function(e) {
+            e.preventDefault();
+            if (state.isPulling) return;
+
+            var $this = $(this);
+            if ($this.hasClass('firefly-env-toggle-label')) {
+                var isProdLabel = $this.text() === 'Production';
+                if (isProdLabel === state.pullEnvProd) return;
+            }
+
+            // Toggle state
+            state.pullEnvProd = !state.pullEnvProd;
+            localStorage.setItem('firefly_pages_pull_env', state.pullEnvProd ? 'prod' : 'dev');
+
+            // Update UI
+            updatePullModalEnvUI();
+
+            // Reload pages
+            loadRemotePages();
+        });
+
+        // Search
+        var searchTimeout;
+        $modal.on('input', '#firefly-pull-search', function() {
+            clearTimeout(searchTimeout);
+            var term = $(this).val();
+            searchTimeout = setTimeout(function() {
+                state.pullSearchTerm = term;
+                renderPageList();
+            }, 200);
+        });
+
+        // Select All
+        $modal.on('click', '#firefly-pull-select-all', function() {
+            selectAllVisiblePages(true);
+        });
+
+        // Deselect All
+        $modal.on('click', '#firefly-pull-deselect-all', function() {
+            selectAllVisiblePages(false);
+        });
+
+        // Page checkbox
+        $modal.on('change', '.firefly-pull-page-checkbox', function() {
+            var slug = $(this).data('slug');
+            if ($(this).is(':checked')) {
+                state.selectedPages[slug] = true;
+            } else {
+                delete state.selectedPages[slug];
+            }
+            updateSelectionCount();
+        });
+
+        // Confirm pull
+        $modal.on('click', '#firefly-confirm-pull', function() {
+            performBulkPull();
+        });
+    }
+
+    /**
+     * Update pull modal environment UI
+     */
+    function updatePullModalEnvUI() {
+        var $modal = $('#firefly-pages-pull-modal');
+        var envLabel = getPullEnvLabel();
+        var envClass = getPullEnvClass();
+
+        // Update toggle
+        var $switch = $modal.find('#firefly-pull-modal-env-toggle');
+        var $labels = $modal.find('.firefly-modal-env-toggle .firefly-env-toggle-label');
+
+        if (state.pullEnvProd) {
+            $switch.addClass('is-prod');
+            $labels.first().removeClass('active');
+            $labels.last().addClass('active');
+        } else {
+            $switch.removeClass('is-prod');
+            $labels.first().addClass('active');
+            $labels.last().removeClass('active');
+        }
+
+        // Update badge
+        var $badge = $modal.find('#firefly-pull-source-badge');
+        $badge.removeClass('firefly-env-dev firefly-env-prod')
+              .addClass('firefly-env-' + envClass)
+              .text(envLabel);
+    }
+
+    /**
+     * Load pages from remote environment
+     */
+    function loadRemotePages() {
+        var $list = $('#firefly-pull-page-list');
+        var envLabel = getPullEnvLabel();
+
+        // Show loading
+        $list.html(
+            '<div class="firefly-pull-loading">' +
+                '<span class="spinner is-active"></span>' +
+                '<span>Loading pages from ' + envLabel + '...</span>' +
+            '</div>'
+        );
+
+        // Reset state
+        state.remotePages = [];
+        state.selectedPages = {};
+        updateSelectionCount();
+
+        var sourceEnv = state.pullEnvProd ? 'prod' : 'dev';
+
+        $.ajax({
+            url: config.restUrl + 'fetch-remote-pages',
+            method: 'GET',
+            data: {
+                source_env: sourceEnv,
+                post_type: 'page'
+            },
+            headers: { 'X-WP-Nonce': config.nonce },
+            success: function(response) {
+                if (response.success) {
+                    state.remotePages = response.pages || [];
+                    renderPageList();
+                } else {
+                    $list.html(
+                        '<div class="notice notice-error"><p>' + escapeHtml(response.message || 'Failed to load pages.') + '</p></div>'
+                    );
+                }
+            },
+            error: function(xhr) {
+                var message = 'Failed to connect to remote.';
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.message) message = resp.message;
+                } catch (e) {}
+                $list.html(
+                    '<div class="notice notice-error"><p>' + escapeHtml(message) + '</p></div>'
+                );
+            }
+        });
+    }
+
+    /**
+     * Render the page list based on search filter
+     */
+    function renderPageList() {
+        var $list = $('#firefly-pull-page-list');
+        var searchTerm = state.pullSearchTerm.toLowerCase();
+
+        // Filter pages
+        var filteredPages = state.remotePages.filter(function(page) {
+            if (!searchTerm) return true;
+            return (page.title && page.title.toLowerCase().indexOf(searchTerm) !== -1) ||
+                   (page.slug && page.slug.toLowerCase().indexOf(searchTerm) !== -1);
+        });
+
+        if (filteredPages.length === 0) {
+            $list.html(
+                '<div class="firefly-pull-no-pages">' +
+                    (searchTerm ? 'No pages match your search.' : 'No pages available on remote.') +
+                '</div>'
+            );
+            return;
+        }
+
+        var html = '';
+        filteredPages.forEach(function(page) {
+            var isChecked = state.selectedPages[page.slug] ? ' checked' : '';
+            var statusClass = page.status === 'publish' ? 'publish' : 'draft';
+            var statusLabel = page.status === 'publish' ? 'Published' : 'Draft';
+            var modifiedDate = page.modified ? formatDate(Math.floor(new Date(page.modified).getTime() / 1000)) : '';
+
+            html += '<div class="firefly-pull-page-item">' +
+                '<label class="firefly-pull-page-label">' +
+                    '<input type="checkbox" class="firefly-pull-page-checkbox" data-slug="' + escapeHtml(page.slug) + '"' + isChecked + '>' +
+                    '<div class="firefly-pull-page-info">' +
+                        '<div class="firefly-pull-page-header">' +
+                            '<span class="firefly-pull-page-title">' + escapeHtml(page.title || '(No title)') + '</span>' +
+                            '<span class="firefly-pull-page-status firefly-pull-page-status-' + statusClass + '">' + statusLabel + '</span>' +
+                        '</div>' +
+                        '<div class="firefly-pull-page-meta">' +
+                            '<code>/' + escapeHtml(page.slug) + '</code>' +
+                            (modifiedDate ? '<span class="firefly-pull-page-date">Modified: ' + modifiedDate + '</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                '</label>' +
+            '</div>';
+        });
+
+        $list.html(html);
+    }
+
+    /**
+     * Select or deselect all visible pages
+     */
+    function selectAllVisiblePages(select) {
+        var searchTerm = state.pullSearchTerm.toLowerCase();
+
+        state.remotePages.forEach(function(page) {
+            var matches = !searchTerm ||
+                (page.title && page.title.toLowerCase().indexOf(searchTerm) !== -1) ||
+                (page.slug && page.slug.toLowerCase().indexOf(searchTerm) !== -1);
+
+            if (matches) {
+                if (select) {
+                    state.selectedPages[page.slug] = true;
+                } else {
+                    delete state.selectedPages[page.slug];
+                }
+            }
+        });
+
+        // Update checkboxes
+        $('#firefly-pull-page-list .firefly-pull-page-checkbox').each(function() {
+            var slug = $(this).data('slug');
+            $(this).prop('checked', !!state.selectedPages[slug]);
+        });
+
+        updateSelectionCount();
+    }
+
+    /**
+     * Update the selection count display
+     */
+    function updateSelectionCount() {
+        var count = Object.keys(state.selectedPages).length;
+        $('#firefly-pull-selection-count').text(count + ' selected');
+        $('#firefly-confirm-pull').prop('disabled', count === 0);
+    }
+
+    /**
+     * Perform bulk pull of selected pages
+     */
+    function performBulkPull() {
+        var selectedSlugs = Object.keys(state.selectedPages);
+        if (selectedSlugs.length === 0) return;
+
+        state.isPulling = true;
+
+        var $modal = $('#firefly-pages-pull-modal');
+        var $content = $modal.find('.firefly-modal-content');
+        var $footer = $modal.find('.firefly-modal-footer');
+        var envLabel = getPullEnvLabel();
+        var sourceEnv = state.pullEnvProd ? 'prod' : 'dev';
+
+        // Show progress UI
+        $content.html(
+            '<div class="firefly-sync-progress">' +
+                '<h4>Pulling ' + selectedSlugs.length + ' page(s) from ' + envLabel + '...</h4>' +
+                '<div class="firefly-progress-bar">' +
+                    '<div class="firefly-progress-fill' + (state.pullEnvProd ? ' is-prod' : '') + '" id="firefly-pull-progress" style="width: 0%"></div>' +
+                '</div>' +
+                '<p class="firefly-progress-text" id="firefly-pull-progress-text">Starting pull...</p>' +
+            '</div>'
+        );
+        $footer.html('<button type="button" class="button firefly-modal-cancel" disabled>Please wait...</button>');
+
+        // Pull pages one by one
+        var results = {
+            total: selectedSlugs.length,
+            success: 0,
+            failed: 0,
+            errors: []
+        };
+        var currentIndex = 0;
+
+        function pullNextPage() {
+            if (currentIndex >= selectedSlugs.length) {
+                // All done
+                showPullResults(results);
+                return;
+            }
+
+            var slug = selectedSlugs[currentIndex];
+            var page = state.remotePages.find(function(p) { return p.slug === slug; });
+            var pageTitle = page ? page.title : slug;
+
+            // Update progress
+            var progress = Math.round(((currentIndex + 1) / selectedSlugs.length) * 100);
+            $('#firefly-pull-progress').css('width', progress + '%');
+            $('#firefly-pull-progress-text').text('Pulling: ' + pageTitle + ' (' + (currentIndex + 1) + '/' + selectedSlugs.length + ')');
+
+            $.ajax({
+                url: config.restUrl + 'pull-page',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    post_slug: slug,
+                    source_env: sourceEnv
+                }),
+                headers: { 'X-WP-Nonce': config.nonce },
+                success: function(response) {
+                    if (response.success) {
+                        results.success++;
+                    } else {
+                        results.failed++;
+                        results.errors.push({
+                            title: pageTitle,
+                            slug: slug,
+                            error: response.message || 'Unknown error'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    results.failed++;
+                    var message = 'Request failed';
+                    try {
+                        var resp = JSON.parse(xhr.responseText);
+                        if (resp.message) message = resp.message;
+                    } catch (e) {}
+                    results.errors.push({
+                        title: pageTitle,
+                        slug: slug,
+                        error: message
+                    });
+                },
+                complete: function() {
+                    currentIndex++;
+                    pullNextPage();
+                }
+            });
+        }
+
+        pullNextPage();
+    }
+
+    /**
+     * Show pull results
+     */
+    function showPullResults(results) {
+        state.isPulling = false;
+
+        var $modal = $('#firefly-pages-pull-modal');
+        var $content = $modal.find('.firefly-modal-content');
+        var $footer = $modal.find('.firefly-modal-footer');
+
+        var success = results.failed === 0;
+        var statusClass = success ? 'notice-success' : (results.success > 0 ? 'notice-warning' : 'notice-error');
+        var message = 'Pulled ' + results.success + ' of ' + results.total + ' page(s).';
+
+        var html = '<div class="notice ' + statusClass + ' firefly-sync-result">' +
+            '<p><strong>' + message + '</strong></p>' +
+        '</div>';
+
+        html += '<div class="firefly-bulk-results">' +
+            '<table class="firefly-sync-table">' +
+                '<tr><th>Pulled</th><td>' + results.success + ' of ' + results.total + '</td></tr>' +
+                '<tr><th>Failed</th><td>' + results.failed + '</td></tr>' +
+            '</table>';
+
+        // Show errors if any
+        if (results.errors.length > 0) {
+            html += '<div class="firefly-sync-errors">' +
+                '<h4>Errors:</h4>' +
+                '<ul>';
+            results.errors.forEach(function(err) {
+                html += '<li><strong>' + escapeHtml(err.title) + '</strong> <code>' + escapeHtml(err.slug) + '</code>: ' + escapeHtml(err.error) + '</li>';
+            });
+            html += '</ul></div>';
+        }
+
+        html += '</div>';
+
+        // Auto-refresh if any pages were pulled successfully
+        if (results.success > 0) {
+            html += '<p class="firefly-refresh-notice">Refreshing page list...</p>';
+            $content.html(html);
+            $footer.html('<button type="button" class="button firefly-modal-cancel" disabled>Please wait...</button>');
+
+            // Refresh after a short delay to show the results
+            setTimeout(function() {
+                window.location.reload();
+            }, 1500);
+        } else {
+            $content.html(html);
+            $footer.html('<button type="button" class="button button-primary firefly-modal-cancel">Close</button>');
+        }
+    }
+
     /**
      * Initialize
      */
@@ -614,6 +1116,12 @@
         $(document).on('click', '#firefly-sync-all-pages', function(e) {
             e.preventDefault();
             showBulkSyncModal();
+        });
+
+        // Pull pages button
+        $(document).on('click', '#firefly-pull-pages', function(e) {
+            e.preventDefault();
+            showPullPagesModal();
         });
     }
 

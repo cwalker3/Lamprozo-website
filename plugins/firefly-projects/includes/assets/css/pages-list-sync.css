@@ -486,12 +486,208 @@
 }
 
 /* ====================================
+   Toolbar Buttons Container
+   ==================================== */
+
+.firefly-toolbar-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+/* ====================================
+   Pull Modal - Wider version
+   ==================================== */
+
+.firefly-pull-modal-wide {
+    max-width: 600px;
+}
+
+/* ====================================
+   Pull Source Info
+   ==================================== */
+
+.firefly-pull-source-info {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+/* ====================================
+   Pull Controls (Search + Selection)
+   ==================================== */
+
+.firefly-pull-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#firefly-pull-search {
+    flex: 1;
+    min-width: 200px;
+}
+
+.firefly-pull-select-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.firefly-pull-selection-count {
+    font-size: 12px;
+    color: #757575;
+    margin-left: 8px;
+}
+
+/* ====================================
+   Pull Page List
+   ==================================== */
+
+.firefly-pull-page-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    background: #fff;
+}
+
+.firefly-pull-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 20px;
+    color: #757575;
+}
+
+.firefly-pull-loading .spinner {
+    float: none;
+    margin: 0;
+}
+
+.firefly-pull-no-pages {
+    padding: 40px 20px;
+    text-align: center;
+    color: #757575;
+}
+
+/* ====================================
+   Pull Page Item
+   ==================================== */
+
+.firefly-pull-page-item {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.firefly-pull-page-item:last-child {
+    border-bottom: none;
+}
+
+.firefly-pull-page-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    margin: 0;
+}
+
+.firefly-pull-page-label:hover {
+    background: #f9f9f9;
+}
+
+.firefly-pull-page-checkbox {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.firefly-pull-page-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.firefly-pull-page-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.firefly-pull-page-title {
+    font-weight: 500;
+    color: #1e1e1e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.firefly-pull-page-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.firefly-pull-page-status-publish {
+    background: #d4edda;
+    color: #155724;
+}
+
+.firefly-pull-page-status-draft {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.firefly-pull-page-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+}
+
+.firefly-pull-page-meta code {
+    font-size: 11px;
+    color: #757575;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.firefly-pull-page-date {
+    color: #999;
+}
+
+/* ====================================
+   Refresh Notice
+   ==================================== */
+
+.firefly-refresh-notice {
+    text-align: center;
+    color: #757575;
+    font-style: italic;
+    margin-top: 16px;
+}
+
+/* ====================================
    Responsive
    ==================================== */
 
 @media (max-width: 782px) {
     .firefly-pages-toolbar {
         flex-wrap: wrap;
+    }
+
+    .firefly-toolbar-buttons {
+        flex-wrap: wrap;
+        width: 100%;
     }
 
     .firefly-sync-modal {
@@ -501,5 +697,18 @@
     .firefly-modal-content,
     .firefly-modal-footer {
         padding: 12px 16px;
+    }
+
+    .firefly-pull-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #firefly-pull-search {
+        width: 100%;
+    }
+
+    .firefly-pull-select-controls {
+        justify-content: space-between;
     }
 }

@@ -1042,9 +1042,14 @@ function firefly_projects_pages_sync_toolbar() {
             </div>
         </div>
         <?php endif; ?>
-        <button type="button" class="button button-primary" id="firefly-sync-all-pages">
-            <?php printf(__('Sync All Pages (%d)', 'firefly-projects'), $page_count); ?>
-        </button>
+        <div class="firefly-toolbar-buttons">
+            <button type="button" class="button button-primary" id="firefly-sync-all-pages">
+                <?php printf(__('Sync All Pages (%d)', 'firefly-projects'), $page_count); ?>
+            </button>
+            <button type="button" class="button" id="firefly-pull-pages">
+                <?php _e('Pull from Remote', 'firefly-projects'); ?>
+            </button>
+        </div>
     </div>
     <?php
 }
