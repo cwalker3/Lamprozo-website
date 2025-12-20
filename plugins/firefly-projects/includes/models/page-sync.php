@@ -468,18 +468,10 @@ function firefly_projects_handle_incoming_page($request) {
 
     // Process assets if included
     if ($has_assets && $zip_file && file_exists($zip_file)) {
-        // Determine asset directory based on target environment
-        // Live Dev uses: uploads-dev/pages/{slug}/
-        // Production uses: uploads/pages/{slug}/
+        // Store assets in uploads/pages/{slug}/
+        // Each environment (local, dev, prod) has its own separate WordPress installation
         $upload_dir = wp_upload_dir();
-
-        if ($target_env === 'prod') {
-            // Production: store in regular uploads
-            $page_assets_dir = trailingslashit($upload_dir['basedir']) . 'pages/' . $post_data['post_name'];
-        } else {
-            // Live Dev: store in uploads-dev
-            $page_assets_dir = dirname($upload_dir['basedir']) . '/uploads-dev/pages/' . $post_data['post_name'];
-        }
+        $page_assets_dir = trailingslashit($upload_dir['basedir']) . 'pages/' . $post_data['post_name'];
 
         // Create directory if needed
         if (!file_exists($page_assets_dir)) {

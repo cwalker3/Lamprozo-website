@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalFileCount: 0, // Track total files for all-files detection
                 showSyncModal: false, // Control modal visibility
                 showSelfSyncModal: false, // Control self-sync modal
+                selfSyncToProd: false, // false = dev, true = prod for self-sync
                 showDevSuffixModal: false, // Control dev suffix modal
                 savedPartialSelections: new Set(), // Store selections when switching to Full Sync
                 backupHistory: [],
@@ -200,7 +201,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 showDeleteModal: false,
                 deleteBackup: null,
                 targetEnvProd: false, // false = dev, true = prod
-                hasProdEndpoint: false // Whether PROD_ENDPOINT is configured
+                hasProdEndpoint: false, // Whether PROD_ENDPOINT is configured
+                // Bootstrap wp-dev environment
+                bootstrapStatus: 'checking', // 'checking', 'exists', 'not-exists', 'error', 'success'
+                bootstrapError: '',
+                isBootstrapping: false,
+                showBootstrapModal: false,
+                bootstrapForm: {
+                    subdomain: '',
+                    dbName: '',
+                    dbUser: '',
+                    dbPassword: '',
+                    dbHost: 'localhost',
+                    tablePrefix: 'wp_'
+                }
             };
         },
         computed: {
@@ -224,6 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             targetEnv() {
                 return this.targetEnvProd ? 'prod' : 'dev';
+            },
+            isBootstrapFormValid() {
+                return this.bootstrapForm.dbName.trim() !== '' &&
+                       this.bootstrapForm.dbUser.trim() !== '' &&
+                       this.bootstrapForm.dbPassword.trim() !== '' &&
+                       this.bootstrapForm.dbHost.trim() !== '' &&
+                       this.bootstrapForm.subdomain.trim() !== '';
             }
         },
         watch: {
@@ -686,6 +707,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.isSyncingSelf = true;
                 this.message = '';
 
+                const targetEnv = this.selfSyncToProd ? 'prod' : 'dev';
+
                 try {
                     const url = `${this.apiUrl}sync-self`;
                     const response = await fetch(url, {
@@ -696,14 +719,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             'X-WP-Nonce': this.nonce
                         },
                         body: JSON.stringify({
-                            sync_mode: 'partial'
+                            sync_mode: 'partial',
+                            target_env: targetEnv
                         })
                     });
 
                     const data = await response.json();
 
                     if (data.success) {
-                        this.message = 'Firefly Projects plugin synced successfully!';
+                        const envName = this.selfSyncToProd ? 'Production' : 'Live Dev';
+                        this.message = `Firefly Projects plugin synced to ${envName} successfully!`;
                         this.messageType = 'success';
                         setTimeout(() => this.dismissMessage(), 5000);
                     } else {
@@ -768,6 +793,112 @@ document.addEventListener('DOMContentLoaded', () => {
                 } finally {
                     this.isAddingDevSuffix = false;
                 }
+            },
+            // Bootstrap methods
+            async checkDevExists() {
+                this.bootstrapStatus = 'checking';
+                this.bootstrapError = '';
+
+                try {
+                    // Check if wp-dev exists on production
+                    // Handle both /update-project and /update_project endpoint formats
+                    const prodUrl = window.projectData.prodEndpoint.replace(/\/update[-_]project$/, '/check-dev-exists');
+                    const checkResponse = await fetch(prodUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Firefly-Secret': window.projectData.sharedSecret
+                        },
+                        body: JSON.stringify({})
+                    });
+
+                    const checkData = await checkResponse.json();
+
+                    if (checkData.exists) {
+                        this.bootstrapStatus = 'exists';
+                    } else {
+                        this.bootstrapStatus = 'not-exists';
+                    }
+                } catch (error) {
+                    this.bootstrapStatus = 'error';
+                    this.bootstrapError = error.message || 'Failed to check wp-dev status';
+                    console.error('[Firefly Projects Error] checkDevExists:', error);
+                }
+            },
+            cancelBootstrap() {
+                this.showBootstrapModal = false;
+            },
+            async performBootstrap() {
+                this.showBootstrapModal = false;
+                this.isBootstrapping = true;
+                this.bootstrapError = '';
+
+                try {
+                    // Step 1: Generate the WP bundle locally
+                    this.message = 'Generating WordPress bundle...';
+                    this.messageType = 'success';
+
+                    const generateUrl = `${this.apiUrl}generate-wp-bundle`;
+                    const generateResponse = await fetch(generateUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({
+                            db_name: this.bootstrapForm.dbName,
+                            db_user: this.bootstrapForm.dbUser,
+                            db_password: this.bootstrapForm.dbPassword,
+                            db_host: this.bootstrapForm.dbHost,
+                            table_prefix: this.bootstrapForm.tablePrefix,
+                            dev_subdomain: this.bootstrapForm.subdomain
+                        })
+                    });
+
+                    const generateData = await generateResponse.json();
+
+                    if (!generateData.success) {
+                        throw new Error(generateData.message || 'Failed to generate bundle');
+                    }
+
+                    // Step 2: Send the bundle to production
+                    this.message = 'Sending bundle to production...';
+
+                    // Handle both /update-project and /update_project endpoint formats
+                    const prodUrl = window.projectData.prodEndpoint.replace(/\/update[-_]project$/, '/bootstrap-dev');
+                    const bootstrapResponse = await fetch(prodUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Firefly-Secret': window.projectData.sharedSecret
+                        },
+                        body: JSON.stringify({
+                            wp_bundle: generateData.wp_bundle,
+                            plugin_bundle: generateData.plugin_bundle,
+                            wp_config: generateData.wp_config
+                        })
+                    });
+
+                    const bootstrapData = await bootstrapResponse.json();
+
+                    if (!bootstrapData.success) {
+                        throw new Error(bootstrapData.message || 'Failed to bootstrap wp-dev');
+                    }
+
+                    this.bootstrapStatus = 'success';
+                    this.message = 'wp-dev environment created successfully!';
+                    this.messageType = 'success';
+
+                } catch (error) {
+                    this.bootstrapStatus = 'error';
+                    this.bootstrapError = error.message || 'Failed to bootstrap wp-dev';
+                    this.message = 'Bootstrap failed: ' + this.bootstrapError;
+                    this.messageType = 'error';
+                    console.error('[Firefly Projects Error] performBootstrap:', error);
+                } finally {
+                    this.isBootstrapping = false;
+                }
             }
         },
         mounted() {
@@ -798,6 +929,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedTargetEnv = sessionStorage.getItem('firefly_target_env');
             if (savedTargetEnv === 'prod') {
                 this.targetEnvProd = true;
+            }
+
+            // Auto-check if wp-dev exists on production
+            if (window.projectData.prodEndpoint && window.projectData.sharedSecret) {
+                this.checkDevExists();
             }
 
             // Restore saved partial selections

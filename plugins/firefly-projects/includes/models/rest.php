@@ -11,6 +11,45 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Add CORS headers for cross-origin REST API requests
+ * This allows the local dev site to call bootstrap endpoints on production
+ */
+add_action('rest_api_init', function() {
+    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+    add_filter('rest_pre_serve_request', function($value) {
+        $origin = get_http_origin();
+
+        // Allow requests from any origin for firefly-plugin endpoints
+        // The shared secret provides authentication
+        if ($origin) {
+            header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+            header('Access-Control-Allow-Headers: X-Firefly-Secret, Content-Type, X-WP-Nonce');
+            header('Access-Control-Allow-Credentials: true');
+        }
+
+        return $value;
+    });
+}, 15);
+
+/**
+ * Handle preflight OPTIONS requests for CORS
+ */
+add_action('init', function() {
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        $origin = get_http_origin();
+        if ($origin) {
+            header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+            header('Access-Control-Allow-Headers: X-Firefly-Secret, Content-Type, X-WP-Nonce');
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Max-Age: 86400');
+        }
+        exit(0);
+    }
+});
+
+/**
  * Verify REST request permissions for admin-level endpoints
  *
  * @param WP_REST_Request $request The REST request object
@@ -101,17 +140,6 @@ function firefly_plugin_register_rest_endpoints() {
         array(
             'methods'             => 'POST',
             'callback'            => 'firefly_collective_delete_backup',
-            'permission_callback' => 'firefly_plugin_verify_rest_admin'
-        )
-    );
-
-    // Projects: Add -dev suffix to plugins/themes
-    register_rest_route(
-        'firefly-plugin/v1',
-        '/add-dev-suffix',
-        array(
-            'methods'             => 'POST',
-            'callback'            => 'firefly_collective_add_dev_suffix',
             'permission_callback' => 'firefly_plugin_verify_rest_admin'
         )
     );
@@ -437,13 +465,13 @@ function firefly_plugin_register_rest_endpoints() {
         )
     );
 
-    // Asset Processing: Process page assets for dev environment (local site only)
+    // Asset Processing: Process page assets for local environment (local site only)
     register_rest_route(
         'firefly-plugin/v1',
         '/process-page-assets',
         array(
             'methods'             => 'POST',
-            'callback'            => 'firefly_projects_process_page_assets',
+            'callback'            => 'firefly_projects_process_page_assets_callback',
             'permission_callback' => 'firefly_plugin_verify_rest_admin',
             'args'                => array(
                 'post_id' => array(
@@ -480,6 +508,39 @@ function firefly_plugin_register_rest_endpoints() {
                     'description'       => 'Post type to fetch: page or post'
                 )
             )
+        )
+    );
+
+    // Bootstrap: Check if wp-dev exists on production (local calls this)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/check-dev-exists',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_check_dev_exists',
+            'permission_callback' => '__return_true' // Uses shared secret authentication
+        )
+    );
+
+    // Bootstrap: Receive WP bundle and create wp-dev (production endpoint)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/bootstrap-dev',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_bootstrap_dev',
+            'permission_callback' => '__return_true' // Uses shared secret authentication
+        )
+    );
+
+    // Bootstrap: Generate WP bundle for sending (local endpoint)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/generate-wp-bundle',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_generate_wp_bundle',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin'
         )
     );
 }
@@ -1130,14 +1191,14 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         update_post_meta($post_id, $key, $value);
     }
 
-    // Process assets - save to uploads-dev and create mappings
+    // Process assets - save to uploads/pages and create mappings
     $mappings = array();
     $assets_saved = 0;
 
-    // Create dev directory
-    $dev_dir = firefly_projects_get_dev_asset_filesystem_path($page_slug);
-    if (!file_exists($dev_dir)) {
-        wp_mkdir_p($dev_dir);
+    // Create page assets directory
+    $assets_dir = firefly_projects_get_page_asset_filesystem_path($page_slug);
+    if (!file_exists($assets_dir)) {
+        wp_mkdir_p($assets_dir);
     }
 
     foreach ($assets as $asset) {
@@ -1145,12 +1206,12 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         $filename = sanitize_file_name($asset['filename']);
         $content = base64_decode($asset['content']);
 
-        $dev_path = $dev_dir . '/' . $filename;
-        $dev_url = '/wp-content/uploads-dev/pages/' . $page_slug . '/' . $filename;
+        $local_path = $assets_dir . '/' . $filename;
+        $local_url = '/wp-content/uploads/pages/' . $page_slug . '/' . $filename;
 
         // Save file
-        if (file_put_contents($dev_path, $content)) {
-            $mappings[$original_url] = $dev_url;
+        if (file_put_contents($local_path, $content)) {
+            $mappings[$original_url] = $local_url;
             $assets_saved++;
         }
     }
@@ -1158,10 +1219,10 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     // Determine asset origin based on source environment
     $asset_origin = ($source_env === 'prod') ? 'production' : 'dev';
 
-    // If pulling from production, URLs need rewriting to dev paths
-    // If pulling from dev, URLs may already be dev paths (check remote_asset_map)
+    // If pulling from production, URLs need rewriting to local paths
+    // If pulling from dev, URLs may already be local paths (check remote_asset_map)
     if ($source_env === 'prod') {
-        // Rewrite content URLs to dev paths
+        // Rewrite content URLs to local paths
         $new_content = firefly_projects_rewrite_content_urls($post_data['post_content'], $mappings, 'to_dev');
 
         // Update post with rewritten content
@@ -1174,20 +1235,20 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         firefly_projects_save_asset_map($post_id, array(
             'asset_origin' => $asset_origin,
             'mappings'     => $mappings,
-            'dev_created'  => array()
+            'local_created'  => array()
         ));
     } else {
-        // From dev - content may already have dev URLs
+        // From dev - content may already have local URLs
         // Import the remote asset map if it exists
         if (!empty($remote_asset_map) && !empty($remote_asset_map['mappings'])) {
             firefly_projects_save_asset_map($post_id, $remote_asset_map);
         } else {
-            // No existing map - these are dev-created assets
-            $dev_created = array_values($mappings);
+            // No existing map - these are locally-created assets
+            $local_created = array_values($mappings);
             firefly_projects_save_asset_map($post_id, array(
-                'asset_origin' => 'dev',
+                'asset_origin' => 'local',
                 'mappings'     => array(),
-                'dev_created'  => $dev_created
+                'local_created'  => $local_created
             ));
         }
     }
@@ -1198,8 +1259,8 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         $featured = $data['featured_image'];
         $filename = sanitize_file_name($featured['filename']);
 
-        // Save to uploads-dev directory
-        $featured_path = $dev_dir . '/' . $filename;
+        // Save to page assets directory
+        $featured_path = $assets_dir . '/' . $filename;
         $featured_content = base64_decode($featured['content']);
 
         if (file_put_contents($featured_path, $featured_content)) {
@@ -1261,19 +1322,19 @@ function firefly_projects_import_pulled_page($data, $source_env) {
 }
 
 /**
- * Process page assets for dev environment (create mappings, copy assets)
+ * Process page assets for local environment (create mappings, copy assets)
  *
  * @param WP_REST_Request $request The REST request object
  * @return WP_REST_Response
  */
-function firefly_projects_process_page_assets($request) {
+function firefly_projects_process_page_assets_callback($request) {
     $post_id = $request->get_param('post_id');
 
     // Load asset mapping functions
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/asset-mapping.php';
 
     // Process the page
-    $result = firefly_projects_process_page_for_dev($post_id, 'production');
+    $result = firefly_projects_process_page_assets($post_id, 'production');
 
     if ($result['success']) {
         return new WP_REST_Response(array(
@@ -1648,5 +1709,410 @@ function firefly_projects_pull_menu($request) {
             'success' => false,
             'message' => 'Pull from ' . $env_label . ' failed: ' . $result['message']
         ), 500);
+    }
+}
+
+/**
+ * ============================================================================
+ * BOOTSTRAP DEV ENVIRONMENT
+ * ============================================================================
+ */
+
+/**
+ * Verify shared secret for bootstrap endpoints
+ *
+ * @param WP_REST_Request $request
+ * @return bool|WP_Error
+ */
+function firefly_projects_verify_bootstrap_secret($request) {
+    $secret = $request->get_header('X-Firefly-Secret');
+
+    if (empty($secret)) {
+        return new WP_Error('missing_secret', 'Missing authentication header', array('status' => 401));
+    }
+
+    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
+        return new WP_Error('not_configured', 'Shared secret not configured on this site', array('status' => 500));
+    }
+
+    if ($secret !== FIREFLY_SHARED_SECRET) {
+        return new WP_Error('invalid_secret', 'Invalid authentication', array('status' => 403));
+    }
+
+    return true;
+}
+
+/**
+ * Check if wp-dev directory exists (called by local on production)
+ *
+ * @param WP_REST_Request $request
+ * @return WP_REST_Response
+ */
+function firefly_projects_check_dev_exists($request) {
+    // Verify shared secret
+    $auth = firefly_projects_verify_bootstrap_secret($request);
+    if (is_wp_error($auth)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => $auth->get_error_message()
+        ), $auth->get_error_data()['status']);
+    }
+
+    // Check for wp-dev directory inside ABSPATH (same level as wp-content)
+    $wp_dev_path = ABSPATH . 'wp-dev';
+
+    $exists = is_dir($wp_dev_path);
+
+    return new WP_REST_Response(array(
+        'success' => true,
+        'exists' => $exists,
+        'path' => $exists ? $wp_dev_path : null,
+        'suggested_path' => $wp_dev_path,
+        'abspath' => ABSPATH
+    ), 200);
+}
+
+/**
+ * Bootstrap dev environment - receive WP bundle and create wp-dev
+ *
+ * @param WP_REST_Request $request
+ * @return WP_REST_Response
+ */
+function firefly_projects_bootstrap_dev($request) {
+    // Verify shared secret
+    $auth = firefly_projects_verify_bootstrap_secret($request);
+    if (is_wp_error($auth)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => $auth->get_error_message()
+        ), $auth->get_error_data()['status']);
+    }
+
+    // Get parameters
+    $wp_config_content = $request->get_param('wp_config');
+    $target_folder = $request->get_param('target_folder') ?: 'wp-dev';
+    $wp_bundle_base64 = $request->get_param('wp_bundle');
+    $plugin_bundle_base64 = $request->get_param('plugin_bundle');
+
+    if (empty($wp_config_content)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'wp_config content is required'
+        ), 400);
+    }
+
+    // Determine target path - put wp-dev inside the document root (same level as wp-content)
+    $target_path = ABSPATH . sanitize_file_name($target_folder);
+
+    // Check if already exists
+    if (is_dir($target_path)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Target directory already exists: ' . $target_folder
+        ), 400);
+    }
+
+    // Create target directory
+    if (!wp_mkdir_p($target_path)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to create directory: ' . $target_path
+        ), 500);
+    }
+
+    $extracted_files = 0;
+
+    // Handle WP bundle if provided (base64 encoded)
+    if (!empty($wp_bundle_base64)) {
+        $wp_zip_content = base64_decode($wp_bundle_base64);
+        $temp_zip_path = $target_path . '/temp-wp.zip';
+
+        if (file_put_contents($temp_zip_path, $wp_zip_content)) {
+            $zip = new ZipArchive();
+            if ($zip->open($temp_zip_path) === true) {
+                $zip->extractTo($target_path);
+                $extracted_files = $zip->numFiles;
+                $zip->close();
+            }
+            @unlink($temp_zip_path);
+        }
+    }
+
+    // Write wp-config.php
+    $wp_config_path = $target_path . '/wp-config.php';
+    if (file_put_contents($wp_config_path, $wp_config_content) === false) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to write wp-config.php'
+        ), 500);
+    }
+
+    // Create wp-content directories if they don't exist
+    wp_mkdir_p($target_path . '/wp-content/plugins');
+    wp_mkdir_p($target_path . '/wp-content/themes');
+    wp_mkdir_p($target_path . '/wp-content/uploads');
+
+    // Handle firefly-projects plugin bundle if provided
+    if (!empty($plugin_bundle_base64)) {
+        $plugin_zip_content = base64_decode($plugin_bundle_base64);
+        $temp_plugin_path = $target_path . '/temp-plugin.zip';
+
+        if (file_put_contents($temp_plugin_path, $plugin_zip_content)) {
+            $plugin_zip = new ZipArchive();
+            if ($plugin_zip->open($temp_plugin_path) === true) {
+                $plugin_zip->extractTo($target_path . '/wp-content/plugins');
+                $plugin_zip->close();
+            }
+            @unlink($temp_plugin_path);
+        }
+    }
+
+    return new WP_REST_Response(array(
+        'success' => true,
+        'message' => 'Dev environment created successfully',
+        'path' => $target_path,
+        'files_extracted' => $extracted_files
+    ), 200);
+}
+
+/**
+ * Generate WP bundle for bootstrap (called on local)
+ *
+ * @param WP_REST_Request $request
+ * @return WP_REST_Response
+ */
+function firefly_projects_generate_wp_bundle($request) {
+    // Get parameters
+    $db_name = sanitize_text_field($request->get_param('db_name'));
+    $db_user = sanitize_text_field($request->get_param('db_user'));
+    $db_password = $request->get_param('db_password'); // Don't sanitize password
+    $db_host = sanitize_text_field($request->get_param('db_host')) ?: 'localhost';
+    $table_prefix = sanitize_text_field($request->get_param('table_prefix')) ?: 'wp_';
+    $dev_subdomain = sanitize_text_field($request->get_param('dev_subdomain'));
+
+    if (empty($db_name) || empty($db_user) || empty($db_password)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Database name, user, and password are required'
+        ), 400);
+    }
+
+    // Generate security salts
+    $salts = firefly_projects_generate_salts();
+
+    // Get shared secret from local config
+    $shared_secret = defined('FIREFLY_SHARED_SECRET') ? FIREFLY_SHARED_SECRET : '';
+
+    // Generate wp-config.php content
+    $wp_config = firefly_projects_generate_wp_config(
+        $db_name,
+        $db_user,
+        $db_password,
+        $db_host,
+        $table_prefix,
+        $salts,
+        $shared_secret,
+        $dev_subdomain
+    );
+
+    // Create temp directory for ZIP
+    $upload_dir = wp_upload_dir();
+    $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
+    if (!file_exists($temp_dir)) {
+        wp_mkdir_p($temp_dir);
+    }
+
+    // Create WordPress core ZIP
+    $wp_zip_path = $temp_dir . '/wp-core-' . time() . '.zip';
+    $wp_zip = new ZipArchive();
+
+    if ($wp_zip->open($wp_zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to create ZIP file'
+        ), 500);
+    }
+
+    // Add WordPress core files
+    $wp_core_files = array(
+        'wp-admin',
+        'wp-includes',
+        'index.php',
+        'wp-activate.php',
+        'wp-blog-header.php',
+        'wp-comments-post.php',
+        'wp-cron.php',
+        'wp-links-opml.php',
+        'wp-load.php',
+        'wp-login.php',
+        'wp-mail.php',
+        'wp-settings.php',
+        'wp-signup.php',
+        'wp-trackback.php',
+        'xmlrpc.php'
+    );
+
+    foreach ($wp_core_files as $file) {
+        $path = ABSPATH . $file;
+        if (is_dir($path)) {
+            firefly_projects_add_dir_to_zip($wp_zip, $path, $file);
+        } elseif (is_file($path)) {
+            $wp_zip->addFile($path, $file);
+        }
+    }
+
+    // Add wp-content structure (empty directories)
+    $wp_zip->addEmptyDir('wp-content');
+    $wp_zip->addEmptyDir('wp-content/plugins');
+    $wp_zip->addEmptyDir('wp-content/themes');
+    $wp_zip->addEmptyDir('wp-content/uploads');
+
+    $wp_zip->close();
+
+    // Create firefly-projects plugin ZIP
+    $plugin_zip_path = $temp_dir . '/firefly-projects-' . time() . '.zip';
+    $plugin_zip = new ZipArchive();
+
+    if ($plugin_zip->open($plugin_zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+        $plugin_dir = FIREFLY_PROJECTS_PLUGIN_DIR;
+        firefly_projects_add_dir_to_zip($plugin_zip, $plugin_dir, 'firefly-projects');
+        $plugin_zip->close();
+    }
+
+    // Read ZIPs as base64 for transport
+    $wp_bundle_base64 = base64_encode(file_get_contents($wp_zip_path));
+    $plugin_bundle_base64 = base64_encode(file_get_contents($plugin_zip_path));
+
+    // Clean up temp files
+    @unlink($wp_zip_path);
+    @unlink($plugin_zip_path);
+
+    return new WP_REST_Response(array(
+        'success' => true,
+        'wp_config' => $wp_config,
+        'wp_bundle' => $wp_bundle_base64,
+        'plugin_bundle' => $plugin_bundle_base64,
+        'wp_bundle_size' => strlen($wp_bundle_base64),
+        'plugin_bundle_size' => strlen($plugin_bundle_base64)
+    ), 200);
+}
+
+/**
+ * Generate WordPress salts
+ *
+ * @return array
+ */
+function firefly_projects_generate_salts() {
+    $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
+    $salts = array();
+    $keys = array('AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT');
+
+    foreach ($keys as $key) {
+        $salt = '';
+        for ($i = 0; $i < 64; $i++) {
+            $salt .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        $salts[$key] = $salt;
+    }
+
+    return $salts;
+}
+
+/**
+ * Generate wp-config.php content
+ *
+ * @param string $db_name
+ * @param string $db_user
+ * @param string $db_password
+ * @param string $db_host
+ * @param string $table_prefix
+ * @param array $salts
+ * @param string $shared_secret
+ * @param string $dev_subdomain
+ * @return string
+ */
+function firefly_projects_generate_wp_config($db_name, $db_user, $db_password, $db_host, $table_prefix, $salts, $shared_secret, $dev_subdomain = '') {
+    $config = "<?php
+/**
+ * WordPress Configuration for Dev Environment
+ * Generated by Firefly Projects Bootstrap
+ */
+
+// ** MySQL settings ** //
+define('DB_NAME', '{$db_name}');
+define('DB_USER', '{$db_user}');
+define('DB_PASSWORD', '{$db_password}');
+define('DB_HOST', '{$db_host}');
+define('DB_CHARSET', 'utf8mb4');
+define('DB_COLLATE', '');
+
+// ** Authentication Unique Keys and Salts ** //
+define('AUTH_KEY',         '{$salts['AUTH_KEY']}');
+define('SECURE_AUTH_KEY',  '{$salts['SECURE_AUTH_KEY']}');
+define('LOGGED_IN_KEY',    '{$salts['LOGGED_IN_KEY']}');
+define('NONCE_KEY',        '{$salts['NONCE_KEY']}');
+define('AUTH_SALT',        '{$salts['AUTH_SALT']}');
+define('SECURE_AUTH_SALT', '{$salts['SECURE_AUTH_SALT']}');
+define('LOGGED_IN_SALT',   '{$salts['LOGGED_IN_SALT']}');
+define('NONCE_SALT',       '{$salts['NONCE_SALT']}');
+
+// ** Table Prefix ** //
+\$table_prefix = '{$table_prefix}';
+
+// ** Firefly Projects Configuration ** //
+define('FIREFLY_LIVE_DEV', true);
+define('FIREFLY_SHARED_SECRET', '{$shared_secret}');
+
+// ** Debugging ** //
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+
+";
+
+    // Add site URL if subdomain provided
+    if (!empty($dev_subdomain)) {
+        $config .= "// ** Site URLs ** //
+define('WP_HOME', 'https://{$dev_subdomain}');
+define('WP_SITEURL', 'https://{$dev_subdomain}');
+
+";
+    }
+
+    $config .= "// ** Absolute path to the WordPress directory ** //
+if (!defined('ABSPATH')) {
+    define('ABSPATH', __DIR__ . '/');
+}
+
+// ** Explicitly set wp-content directory to prevent using parent site's wp-content ** //
+define('WP_CONTENT_DIR', ABSPATH . 'wp-content');
+define('WP_CONTENT_URL', WP_HOME . '/wp-content');
+
+// ** Sets up WordPress vars and included files ** //
+require_once ABSPATH . 'wp-settings.php';
+";
+
+    return $config;
+}
+
+/**
+ * Recursively add directory to ZIP
+ *
+ * @param ZipArchive $zip
+ * @param string $dir
+ * @param string $base
+ */
+function firefly_projects_add_dir_to_zip($zip, $dir, $base) {
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::LEAVES_ONLY
+    );
+
+    foreach ($files as $file) {
+        if (!$file->isDir()) {
+            $file_path = $file->getRealPath();
+            $relative_path = $base . '/' . substr($file_path, strlen($dir) + 1);
+            $zip->addFile($file_path, $relative_path);
+        }
     }
 }

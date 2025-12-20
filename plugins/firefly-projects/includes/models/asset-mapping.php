@@ -118,9 +118,9 @@ function firefly_projects_normalize_asset_url($url) {
         return false;
     }
 
-    // Skip already-dev URLs when detecting for initial mapping
+    // Skip page-specific asset URLs when detecting for initial mapping
     // (we want original URLs only)
-    if (strpos($url, '/uploads-dev/') !== false) {
+    if (strpos($url, '/uploads/pages/') !== false) {
         return false;
     }
 
@@ -145,29 +145,29 @@ function firefly_projects_normalize_asset_url($url) {
 }
 
 /**
- * Get the dev path for an asset
+ * Get the local path for a page asset
  *
  * @param string $original_url The original asset URL
  * @param string $page_slug The page slug for organization
- * @return string The dev path
+ * @return string The local asset path
  */
-function firefly_projects_get_dev_asset_path($original_url, $page_slug) {
+function firefly_projects_get_page_asset_path($original_url, $page_slug) {
     $filename = basename(parse_url($original_url, PHP_URL_PATH));
     // Sanitize filename
     $filename = sanitize_file_name($filename);
-    return '/wp-content/uploads-dev/pages/' . $page_slug . '/' . $filename;
+    return '/wp-content/uploads/pages/' . $page_slug . '/' . $filename;
 }
 
 /**
- * Get the filesystem path for a dev asset
+ * Get the filesystem path for a page asset
  *
  * @param string $page_slug The page slug
  * @param string $filename The asset filename
  * @return string The filesystem path
  */
-function firefly_projects_get_dev_asset_filesystem_path($page_slug, $filename = '') {
+function firefly_projects_get_page_asset_filesystem_path($page_slug, $filename = '') {
     $upload_dir = wp_upload_dir();
-    $base_path = dirname($upload_dir['basedir']) . '/uploads-dev/pages/' . $page_slug;
+    $base_path = $upload_dir['basedir'] . '/pages/' . $page_slug;
 
     if ($filename) {
         return $base_path . '/' . sanitize_file_name($filename);
@@ -176,30 +176,30 @@ function firefly_projects_get_dev_asset_filesystem_path($page_slug, $filename = 
 }
 
 /**
- * Copy/download an asset to the dev folder
+ * Copy/download an asset to the page assets folder
  *
  * @param string $url The original asset URL
  * @param string $page_slug The page slug
- * @return array|false Array with 'dev_path' and 'dev_url' or false on failure
+ * @return array|false Array with 'local_path' and 'local_url' or false on failure
  */
-function firefly_projects_copy_asset_to_dev($url, $page_slug) {
+function firefly_projects_copy_asset_to_page($url, $page_slug) {
     $filename = basename(parse_url($url, PHP_URL_PATH));
     $filename = sanitize_file_name($filename);
 
-    // Create dev directory if needed
-    $dev_dir = firefly_projects_get_dev_asset_filesystem_path($page_slug);
-    if (!file_exists($dev_dir)) {
-        wp_mkdir_p($dev_dir);
+    // Create page assets directory if needed
+    $assets_dir = firefly_projects_get_page_asset_filesystem_path($page_slug);
+    if (!file_exists($assets_dir)) {
+        wp_mkdir_p($assets_dir);
     }
 
-    $dev_filesystem_path = $dev_dir . '/' . $filename;
-    $dev_url = '/wp-content/uploads-dev/pages/' . $page_slug . '/' . $filename;
+    $local_filesystem_path = $assets_dir . '/' . $filename;
+    $local_url = '/wp-content/uploads/pages/' . $page_slug . '/' . $filename;
 
     // Skip if already exists
-    if (file_exists($dev_filesystem_path)) {
+    if (file_exists($local_filesystem_path)) {
         return array(
-            'dev_path' => $dev_filesystem_path,
-            'dev_url'  => $dev_url
+            'local_path' => $local_filesystem_path,
+            'local_url'  => $local_url
         );
     }
 
@@ -208,10 +208,10 @@ function firefly_projects_copy_asset_to_dev($url, $page_slug) {
 
     if ($source_path && file_exists($source_path)) {
         // Local file - copy it
-        if (copy($source_path, $dev_filesystem_path)) {
+        if (copy($source_path, $local_filesystem_path)) {
             return array(
-                'dev_path' => $dev_filesystem_path,
-                'dev_url'  => $dev_url
+                'local_path' => $local_filesystem_path,
+                'local_url'  => $local_url
             );
         }
     } elseif (strpos($url, 'http') === 0) {
@@ -219,10 +219,10 @@ function firefly_projects_copy_asset_to_dev($url, $page_slug) {
         $response = wp_remote_get($url, array('timeout' => 30));
         if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
             $content = wp_remote_retrieve_body($response);
-            if (file_put_contents($dev_filesystem_path, $content)) {
+            if (file_put_contents($local_filesystem_path, $content)) {
                 return array(
-                    'dev_path' => $dev_filesystem_path,
-                    'dev_url'  => $dev_url
+                    'local_path' => $local_filesystem_path,
+                    'local_url'  => $local_url
                 );
             }
         }
@@ -347,13 +347,13 @@ function firefly_projects_save_asset_map($post_id, $map) {
 }
 
 /**
- * Process a page for dev environment - detect assets, copy, rewrite
+ * Process a page for local environment - detect assets, copy, rewrite
  *
  * @param int $post_id The post ID
  * @param string $origin Where the content came from: 'production', 'dev', or 'local'
  * @return array Result with success status and updated content
  */
-function firefly_projects_process_page_for_dev($post_id, $origin = 'production') {
+function firefly_projects_process_page_assets($post_id, $origin = 'production') {
     $post = get_post($post_id);
     if (!$post) {
         return array('success' => false, 'message' => 'Post not found');
@@ -385,11 +385,11 @@ function firefly_projects_process_page_for_dev($post_id, $origin = 'production')
             continue;
         }
 
-        // Copy to dev location
-        $result = firefly_projects_copy_asset_to_dev($asset_url, $page_slug);
+        // Copy to local page assets folder
+        $result = firefly_projects_copy_asset_to_page($asset_url, $page_slug);
 
         if ($result) {
-            $new_mappings[$asset_url] = $result['dev_url'];
+            $new_mappings[$asset_url] = $result['local_url'];
             $processed++;
         } else {
             $failed++;
@@ -450,37 +450,38 @@ function firefly_projects_prepare_content_for_production($post_id) {
         );
     }
 
-    // If origin is dev, we need to create production paths and sync assets
-    if ($map['asset_origin'] === 'dev' || !empty($map['dev_created'])) {
-        $prod_mappings = array();
+    // If origin is local, we need to create remote paths and sync assets
+    if ($map['asset_origin'] === 'local' || !empty($map['local_created'])) {
+        $remote_mappings = array();
         $assets_to_sync = array();
 
-        // For dev-created assets, create production paths
-        foreach ($map['dev_created'] as $dev_url) {
-            $filename = basename($dev_url);
-            $prod_url = '/wp-content/uploads/pages/' . $post->post_name . '/' . $filename;
-            $prod_mappings[$dev_url] = $prod_url;
+        // For locally-created assets, create remote paths
+        $local_created = isset($map['local_created']) ? $map['local_created'] : (isset($map['dev_created']) ? $map['dev_created'] : array());
+        foreach ($local_created as $local_url) {
+            $filename = basename($local_url);
+            $remote_url = '/wp-content/uploads/pages/' . $post->post_name . '/' . $filename;
+            $remote_mappings[$local_url] = $remote_url;
 
-            // Get the dev file path for syncing
-            $dev_path = firefly_projects_get_dev_asset_filesystem_path($post->post_name, $filename);
-            if (file_exists($dev_path)) {
+            // Get the local file path for syncing
+            $local_path = firefly_projects_get_page_asset_filesystem_path($post->post_name, $filename);
+            if (file_exists($local_path)) {
                 $assets_to_sync[] = array(
-                    'dev_url'   => $dev_url,
-                    'prod_url'  => $prod_url,
-                    'dev_path'  => $dev_path,
-                    'filename'  => $filename
+                    'local_url'  => $local_url,
+                    'remote_url' => $remote_url,
+                    'local_path' => $local_path,
+                    'filename'   => $filename
                 );
             }
         }
 
-        // Rewrite dev URLs to prod URLs
-        $content = firefly_projects_rewrite_content_urls($content, $prod_mappings, 'to_dev');
+        // Rewrite local URLs to remote URLs
+        $content = firefly_projects_rewrite_content_urls($content, $remote_mappings, 'to_dev');
 
         return array(
             'success'        => true,
             'content'        => $content,
             'assets_to_sync' => $assets_to_sync,
-            'new_prod_urls'  => count($prod_mappings)
+            'new_remote_urls' => count($remote_mappings)
         );
     }
 
@@ -493,20 +494,22 @@ function firefly_projects_prepare_content_for_production($post_id) {
 }
 
 /**
- * Register a dev-created asset (for new uploads on local/live dev)
+ * Register a locally-created asset (for new uploads)
  *
  * @param int $post_id The post ID
- * @param string $dev_url The dev URL of the new asset
+ * @param string $local_url The local URL of the new asset
  * @return bool Success
  */
-function firefly_projects_register_dev_asset($post_id, $dev_url) {
+function firefly_projects_register_local_asset($post_id, $local_url) {
     $map = firefly_projects_get_asset_map($post_id);
 
-    if (!in_array($dev_url, $map['dev_created'])) {
-        $map['dev_created'][] = $dev_url;
+    $local_created = isset($map['local_created']) ? $map['local_created'] : array();
+    if (!in_array($local_url, $local_created)) {
+        $local_created[] = $local_url;
+        $map['local_created'] = $local_created;
 
         if (empty($map['asset_origin'])) {
-            $map['asset_origin'] = 'dev';
+            $map['asset_origin'] = 'local';
         } elseif ($map['asset_origin'] === 'production') {
             $map['asset_origin'] = 'mixed';
         }
@@ -518,38 +521,38 @@ function firefly_projects_register_dev_asset($post_id, $dev_url) {
 }
 
 /**
- * Get all dev assets for a page (for syncing)
+ * Get all page assets for syncing
  *
  * @param int $post_id The post ID
- * @return array List of dev assets with paths
+ * @return array List of page assets with paths
  */
-function firefly_projects_get_dev_assets_for_sync($post_id) {
+function firefly_projects_get_page_assets_for_sync($post_id) {
     $post = get_post($post_id);
     if (!$post) {
         return array();
     }
 
     $page_slug = $post->post_name;
-    $dev_dir = firefly_projects_get_dev_asset_filesystem_path($page_slug);
+    $assets_dir = firefly_projects_get_page_asset_filesystem_path($page_slug);
 
-    if (!is_dir($dev_dir)) {
+    if (!is_dir($assets_dir)) {
         return array();
     }
 
     $assets = array();
-    $files = scandir($dev_dir);
+    $files = scandir($assets_dir);
 
     foreach ($files as $file) {
         if ($file === '.' || $file === '..') {
             continue;
         }
 
-        $file_path = $dev_dir . '/' . $file;
+        $file_path = $assets_dir . '/' . $file;
         if (is_file($file_path)) {
             $assets[] = array(
                 'filename'  => $file,
                 'path'      => $file_path,
-                'url'       => '/wp-content/uploads-dev/pages/' . $page_slug . '/' . $file,
+                'url'       => '/wp-content/uploads/pages/' . $page_slug . '/' . $file,
                 'size'      => filesize($file_path)
             );
         }

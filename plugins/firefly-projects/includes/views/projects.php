@@ -14,14 +14,127 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 <p class="description">Select individual files and folders to sync to your live environment.</p>
 
 <div id="project-file-selector" v-cloak>
+    <!-- Bootstrap Dev Environment Section - only show if wp-dev doesn't exist -->
+    <div v-if="bootstrapStatus === 'not-exists' || bootstrapStatus === 'error' || bootstrapStatus === 'success'" class="firefly-bootstrap-section">
+        <h2>Bootstrap Dev Environment</h2>
+        <p class="description">Set up a new wp-dev WordPress installation on your production server.</p>
+
+        <div v-if="bootstrapStatus === 'not-exists'" class="bootstrap-form-container">
+            <div class="bootstrap-form">
+                <p class="form-intro"><strong>wp-dev does not exist.</strong> Fill in the database credentials to create it:</p>
+
+                <div class="form-row">
+                    <label for="bootstrap-subdomain">Dev Site URL:</label>
+                    <input type="text" id="bootstrap-subdomain" v-model="bootstrapForm.subdomain" placeholder="dev.yourdomain.com" :disabled="isBootstrapping" />
+                    <span class="form-hint">Full domain for the dev site (e.g., test1.fireflycollective.org)</span>
+                </div>
+
+                <div class="form-row">
+                    <label for="bootstrap-db-name">Database Name:</label>
+                    <input type="text" id="bootstrap-db-name" v-model="bootstrapForm.dbName" placeholder="wp_dev" :disabled="isBootstrapping" />
+                </div>
+
+                <div class="form-row">
+                    <label for="bootstrap-db-user">Database User:</label>
+                    <input type="text" id="bootstrap-db-user" v-model="bootstrapForm.dbUser" :disabled="isBootstrapping" />
+                </div>
+
+                <div class="form-row">
+                    <label for="bootstrap-db-password">Database Password:</label>
+                    <input type="password" id="bootstrap-db-password" v-model="bootstrapForm.dbPassword" :disabled="isBootstrapping" />
+                </div>
+
+                <div class="form-row">
+                    <label for="bootstrap-db-host">Database Host:</label>
+                    <input type="text" id="bootstrap-db-host" v-model="bootstrapForm.dbHost" placeholder="localhost" :disabled="isBootstrapping" />
+                </div>
+
+                <div class="form-row">
+                    <label for="bootstrap-table-prefix">Table Prefix:</label>
+                    <input type="text" id="bootstrap-table-prefix" v-model="bootstrapForm.tablePrefix" placeholder="wp_" :disabled="isBootstrapping" />
+                </div>
+
+                <button @click="showBootstrapModal = true" class="action-button primary" :disabled="isBootstrapping || !isBootstrapFormValid">
+                    <span v-if="!isBootstrapping">Bootstrap wp-dev Environment</span>
+                    <span v-else>Bootstrapping...</span>
+                </button>
+            </div>
+        </div>
+
+        <div v-if="bootstrapStatus === 'error'" class="bootstrap-status bootstrap-error">
+            <span class="status-icon">&#10007;</span> {{ bootstrapError }}
+            <button @click="checkDevExists" class="action-button small">Try Again</button>
+        </div>
+
+        <div v-if="bootstrapStatus === 'success'" class="bootstrap-status bootstrap-success">
+            <span class="status-icon">&#10003;</span> wp-dev environment created successfully!
+            <p class="success-details">
+                <strong>Next steps:</strong><br>
+                1. Set up your subdomain pointing to wp-dev/<br>
+                2. Run the WordPress installer at https://{{ bootstrapForm.subdomain }}/<br>
+                3. Activate the Firefly Projects plugin
+            </p>
+        </div>
+    </div>
+
+    <!-- Bootstrap Confirmation Modal -->
+    <div v-if="showBootstrapModal" class="modal-overlay" @click.self="cancelBootstrap">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Confirm Bootstrap</h2>
+                <button class="modal-close" @click="cancelBootstrap">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-warning">
+                    <span class="warning-icon">&#9888;</span>
+                    <strong>Create wp-dev Environment</strong>
+                </div>
+                <div class="modal-details">
+                    <p><strong>This will:</strong></p>
+                    <ul>
+                        <li>Create a <code>wp-dev/</code> folder on production</li>
+                        <li>Copy WordPress core files</li>
+                        <li>Install Firefly Projects plugin</li>
+                        <li>Generate wp-config.php with your database settings</li>
+                    </ul>
+                    <p><strong>Database:</strong> {{ bootstrapForm.dbName }} @ {{ bootstrapForm.dbHost }}</p>
+                    <p><strong>Dev Site URL:</strong> https://{{ bootstrapForm.subdomain }}</p>
+                    <p class="modal-description">
+                        Make sure your database exists and the credentials are correct before proceeding.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button @click="cancelBootstrap" class="modal-button modal-button-cancel">
+                    Cancel
+                </button>
+                <button @click="performBootstrap" class="modal-button modal-button-confirm">
+                    Create wp-dev
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Self-Sync Section for Firefly Projects Plugin -->
     <div class="firefly-self-sync-section">
         <h2>Sync Firefly Projects Plugin</h2>
-        <p class="description">Sync the Firefly Projects plugin itself to your Live Dev environment.</p>
-        <button @click="showSelfSyncModal = true" class="action-button primary" :disabled="isSyncingSelf">
-            <span v-if="!isSyncingSelf">Sync Firefly Projects</span>
-            <span v-else>Syncing...</span>
-        </button>
+        <p class="description">Sync the Firefly Projects plugin itself to a remote environment.</p>
+
+        <div class="self-sync-controls">
+            <div class="env-toggle-container">
+                <span class="env-label" :class="{ active: !selfSyncToProd }">Dev</span>
+                <label class="env-toggle-switch">
+                    <input type="checkbox" v-model="selfSyncToProd" :disabled="isSyncingSelf">
+                    <span class="env-toggle-slider"></span>
+                </label>
+                <span class="env-label" :class="{ active: selfSyncToProd }">Prod</span>
+            </div>
+
+            <button @click="showSelfSyncModal = true" class="action-button primary" :disabled="isSyncingSelf">
+                <span v-if="!isSyncingSelf">Sync Firefly Projects</span>
+                <span v-else>Syncing...</span>
+            </button>
+        </div>
     </div>
 
     <!-- Self-Sync Confirmation Modal -->
@@ -38,9 +151,9 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                 </div>
                 <div class="modal-details">
                     <p><strong>Target:</strong> /wp-content/plugins/firefly-projects</p>
-                    <p><strong>Mode:</strong> Partial Sync</p>
+                    <p><strong>Environment:</strong> <span :class="selfSyncToProd ? 'env-prod' : 'env-dev'" class="backup-env">{{ selfSyncToProd ? 'Production' : 'Dev' }}</span></p>
                     <p class="modal-description">
-                        This will sync the Firefly Projects plugin to your Live Dev environment.
+                        This will sync the Firefly Projects plugin to your <strong>{{ selfSyncToProd ? 'Production' : 'Live Dev' }}</strong> environment.
                         This is useful when you've made changes to the plugin itself.
                     </p>
                 </div>
@@ -66,80 +179,6 @@ if (!isset($projects_data) || !is_array($projects_data)) {
 
         <div v-if="isLoadingFiles" class="loading-indicator">
             <span>Loading project files...</span>
-        </div>
-    </div>
-
-    <!-- Warning: Project needs -dev suffix -->
-    <div v-if="currentProjectNeedsDev" class="dev-suffix-warning">
-        <div class="warning-header">
-            <span class="warning-icon">⚠️</span>
-            <strong>Action Required: Add -dev Suffix to Plugins/Themes</strong>
-        </div>
-        <p>The following plugins/themes in this project do not have the <code>-dev</code> suffix:</p>
-        <ul class="dev-suffix-list">
-            <li v-for="item in currentProjectNeedsDev" :key="item.folder">
-                <strong>{{ item.folder }}</strong> ({{ item.type }})
-                →
-                <strong>{{ item.folder }}-dev</strong>
-            </li>
-        </ul>
-        <p>
-            <strong>Why is this important?</strong> The <code>-dev</code> suffix ensures your syncs target development versions
-            on Live Dev, never the production versions. This prevents accidentally overwriting live code.
-        </p>
-        <button @click="showDevSuffixModal = true" class="action-button primary" :disabled="isAddingDevSuffix">
-            <span v-if="!isAddingDevSuffix">Add -dev Suffix Now</span>
-            <span v-else>Processing...</span>
-        </button>
-    </div>
-
-    <!-- Add -dev Suffix Confirmation Modal -->
-    <div v-if="showDevSuffixModal" class="modal-overlay" @click.self="cancelDevSuffix">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h2>Confirm -dev Suffix Addition</h2>
-                <button class="modal-close" @click="cancelDevSuffix">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="modal-warning">
-                    <span class="warning-icon">⚠️</span>
-                    <strong>This will rename folders on your server</strong>
-                </div>
-                <div class="modal-details">
-                    <p><strong>The following folders will be renamed:</strong></p>
-                    <table class="dev-suffix-table">
-                        <thead>
-                            <tr>
-                                <th>Current Name</th>
-                                <th></th>
-                                <th>New Name</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="item in currentProjectNeedsDev" :key="item.folder">
-                                <td><code>{{ item.folder }}</code></td>
-                                <td>→</td>
-                                <td><code>{{ item.folder }}-dev</code></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="modal-description">
-                        <strong>What happens next:</strong><br>
-                        1. Folders will be renamed to include <code>-dev</code> suffix<br>
-                        2. Your <code>projects.json</code> will be automatically updated<br>
-                        3. You'll need to reactivate the renamed plugins/themes in WordPress admin<br>
-                        4. Future syncs will target these <code>-dev</code> versions
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button @click="cancelDevSuffix" class="modal-button modal-button-cancel">
-                    Cancel
-                </button>
-                <button @click="confirmDevSuffix" class="modal-button modal-button-confirm modal-button-danger">
-                    Rename Folders
-                </button>
-            </div>
         </div>
     </div>
 

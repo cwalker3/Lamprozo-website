@@ -35,15 +35,21 @@
             return;
         }
 
+        // Cache busting using file modification time
+        $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/projects.css';
+        $js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/project-file-selector.js';
+        $css_version = file_exists($css_file) ? filemtime($css_file) : FIREFLY_PROJECTS_VERSION;
+        $js_version = file_exists($js_file) ? filemtime($js_file) : FIREFLY_PROJECTS_VERSION;
+
         // Enqueue CSS
-        wp_enqueue_style('firefly-projects-css', FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/projects.css', array(), FIREFLY_PROJECTS_VERSION);
+        wp_enqueue_style('firefly-projects-css', FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/projects.css', array(), $css_version);
 
         // Enqueue Vue.js 3 from CDN
         $vue_url = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js';
         wp_enqueue_script('vue-js', $vue_url, array(), '3', true);
 
         // Enqueue file selector Vue.js application
-        wp_enqueue_script('firefly-project-file-selector-js', FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/project-file-selector.js', array('vue-js'), FIREFLY_PROJECTS_VERSION, true);
+        wp_enqueue_script('firefly-project-file-selector-js', FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/project-file-selector.js', array('vue-js'), $js_version, true);
 
         $nonce = wp_create_nonce('wp_rest');
         $is_admin = current_user_can('manage_options') ? 'true' : 'false';
@@ -55,32 +61,23 @@
         $projects_json_path = firefly_projects_get_json_path();
         $projects = firefly_projects_load_projects();
 
-        // Check which projects need -dev suffixes
-        $projects_needing_dev = array();
-        foreach ($projects as $project) {
-            if (isset($project['name'])) {
-                $missing_dev = firefly_projects_needs_dev_suffix($project['name']);
-                if ($missing_dev !== false) {
-                    $projects_needing_dev[$project['name']] = $missing_dev;
-                }
-            }
-        }
-
         // Add project data for Vue app BEFORE the script loads
         $projects_json = json_encode($projects);
-        $projects_needing_dev_json = json_encode($projects_needing_dev);
         $has_prod_endpoint = defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT) ? 'true' : 'false';
+        $prod_endpoint = defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT) ? PROD_ENDPOINT : '';
+        $shared_secret = defined('FIREFLY_SHARED_SECRET') ? FIREFLY_SHARED_SECRET : '';
         $inline_script = "
         // Initialize project data for Vue app
         window.projectData = {
             projects: {$projects_json},
-            projectsNeedingDev: {$projects_needing_dev_json},
             apiUrl: '{$api_url}',
             nonce: '{$nonce}',
             isAdmin: {$is_admin},
             adminUrl: '" . admin_url('admin.php?page=firefly-projects') . "',
             pluginUrl: '" . FIREFLY_PROJECTS_PLUGIN_URL . "',
-            hasProdEndpoint: {$has_prod_endpoint}
+            hasProdEndpoint: {$has_prod_endpoint},
+            prodEndpoint: '{$prod_endpoint}',
+            sharedSecret: '{$shared_secret}'
         };
         ";
         wp_add_inline_script('firefly-project-file-selector-js', $inline_script, 'before');
@@ -510,12 +507,8 @@
     /**
      * Zip directories from local site, placing files under plugins/ or themes/ as needed.
      *
-     * For Production syncs (target_env === 'prod'):
-     * - Strips -dev suffix from source paths (reads from non-dev folders)
-     * - Strips -dev suffix from destination paths (zips as non-dev)
-     *
-     * For Live Dev syncs (target_env === 'dev'):
-     * - Uses paths as-is (with -dev suffix)
+     * Each environment (local, dev, prod) is a separate WordPress installation,
+     * so paths are used as-is without any suffix manipulation.
      *
      * @param string $project_name The project name
      * @param array  $directories  Array of directory/file paths from projects.json
@@ -537,33 +530,11 @@
             return new WP_Error('zip_error', 'Unable to create zip file.');
         }
 
-        // For production: strip -dev suffix from destination paths
-        $strip_dev = ($target_env === 'prod');
         $files_added = 0;
         $skipped_dirs = array();
 
         foreach ($directories as $dir) {
-            // Determine source path (where to read from)
-            // For production sync: prefer non-dev folder if it exists, otherwise use -dev folder
-            $source_dir = $dir;
-            $dest_dir = $dir; // Destination path in ZIP
-
-            if ($strip_dev) {
-                // Try non-dev path first
-                $non_dev_dir = preg_replace('/-dev(\/|$)/', '$1', $dir);
-                $non_dev_absolute = ABSPATH . ltrim($non_dev_dir, '/');
-
-                if (file_exists($non_dev_absolute)) {
-                    // Non-dev folder exists - use it as source
-                    $source_dir = $non_dev_dir;
-                }
-                // else: keep $source_dir as the original -dev path (will read from -dev folder)
-
-                // Destination is always non-dev for production
-                $dest_dir = $non_dev_dir;
-            }
-
-            $absolute_dir = ABSPATH . ltrim($source_dir, '/');
+            $absolute_dir = ABSPATH . ltrim($dir, '/');
 
             // Skip missing directories/files
             if (!file_exists($absolute_dir)) {
@@ -572,24 +543,20 @@
             }
 
             // Handle single files from wp-content
-            // Use $dest_dir for ZIP path (strips -dev for production), but read from $absolute_dir (source)
-            if (is_file($absolute_dir) && strpos($dest_dir, '/wp-content/') !== false) {
-                $relative_path = trim(str_replace('/wp-content/', '', $dest_dir), '/');
+            if (is_file($absolute_dir) && strpos($dir, '/wp-content/') !== false) {
+                $relative_path = trim(str_replace('/wp-content/', '', $dir), '/');
                 $zip->addFile($absolute_dir, $relative_path);
                 $files_added++;
                 continue;
             }
 
-            // Determine destination path in ZIP based on $dest_dir (not $source_dir)
-            // This ensures -dev plugins are zipped as non-dev for production
-            if (strpos($dest_dir, '/wp-content/plugins/') !== false) {
-                // e.g. /wp-content/plugins/firefly-mail (even if source is firefly-mail-dev)
-                $relative_path = str_replace('/wp-content/plugins/', '', $dest_dir);
+            // Determine destination path in ZIP
+            if (strpos($dir, '/wp-content/plugins/') !== false) {
+                $relative_path = str_replace('/wp-content/plugins/', '', $dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'plugins/' . $relative_path;
-            } elseif (strpos($dest_dir, '/wp-content/themes/') !== false) {
-                // e.g. /wp-content/themes/my-theme
-                $relative_path = str_replace('/wp-content/themes/', '', $dest_dir);
+            } elseif (strpos($dir, '/wp-content/themes/') !== false) {
+                $relative_path = str_replace('/wp-content/themes/', '', $dir);
                 $relative_path = trim($relative_path, '/');
                 $root_folder   = 'themes/' . $relative_path;
             } else {
@@ -1008,113 +975,6 @@
     }
 
     /**
-     * REST handler: Add -dev suffix to plugins/themes in Live Dev environment
-     * Renames folders and updates projects.json
-     */
-    function firefly_collective_add_dev_suffix(WP_REST_Request $request) {
-        if (!current_user_can('manage_options')) {
-            return new WP_Error('forbidden', 'Insufficient permissions', array('status' => 403));
-        }
-
-        $project_name = sanitize_text_field($request->get_param('project_name'));
-
-        if (empty($project_name)) {
-            return new WP_Error('missing_param', 'Project name is required', array('status' => 400));
-        }
-
-        // Find the project
-        $project = firefly_projects_find_project($project_name);
-
-        if (!$project) {
-            return new WP_Error('not_found', 'Project not found', array('status' => 404));
-        }
-
-        $files = isset($project['files']) ? $project['files'] : array();
-
-        if (empty($files)) {
-            return new WP_Error('no_files', 'No files in project', array('status' => 400));
-        }
-
-        $renamed = array();
-        $errors = array();
-        $updated_files = array();
-
-        foreach ($files as $path) {
-            $path = ltrim($path, '/');
-
-            // Skip if already has -dev suffix
-            if (preg_match('/-dev\/?$/', $path)) {
-                $updated_files[] = '/' . $path;
-                continue;
-            }
-
-            // Only process plugins and themes
-            if (!preg_match('#^wp-content/(plugins|themes)/([^/]+)#', $path, $matches)) {
-                $updated_files[] = '/' . $path;
-                continue;
-            }
-
-            $type = $matches[1]; // 'plugins' or 'themes'
-            $folder_name = $matches[2];
-            $new_folder_name = $folder_name . '-dev';
-
-            $old_path = ABSPATH . 'wp-content/' . $type . '/' . $folder_name;
-            $new_path = ABSPATH . 'wp-content/' . $type . '/' . $new_folder_name;
-
-            // Check if old path exists
-            if (!file_exists($old_path)) {
-                $errors[] = "Folder not found: {$folder_name}";
-                $updated_files[] = '/' . $path;
-                continue;
-            }
-
-            // Check if new path already exists
-            if (file_exists($new_path)) {
-                $errors[] = "{$new_folder_name} already exists";
-                $updated_files[] = '/wp-content/' . $type . '/' . $new_folder_name;
-                continue;
-            }
-
-            // Rename the folder
-            if (rename($old_path, $new_path)) {
-                $renamed[] = array(
-                    'old' => $folder_name,
-                    'new' => $new_folder_name,
-                    'type' => $type
-                );
-                $updated_files[] = '/wp-content/' . $type . '/' . $new_folder_name;
-            } else {
-                $errors[] = "Failed to rename {$folder_name}";
-                $updated_files[] = '/' . $path;
-            }
-        }
-
-        // Update projects.json with new paths
-        if (!empty($renamed)) {
-            $all_projects = firefly_projects_load_projects();
-
-            foreach ($all_projects as $key => $proj) {
-                if ($proj['name'] === $project_name) {
-                    $all_projects[$key]['files'] = $updated_files;
-                    break;
-                }
-            }
-
-            // Save updated projects.json
-            $projects_json_path = firefly_projects_get_json_path();
-            file_put_contents($projects_json_path, json_encode($all_projects, JSON_PRETTY_PRINT));
-        }
-
-        return array(
-            'success' => true,
-            'message' => 'Suffix added successfully',
-            'renamed' => $renamed,
-            'errors' => $errors,
-            'updated_files' => $updated_files
-        );
-    }
-
-    /**
      * REST handler: Sync firefly-projects plugin itself
      */
     function firefly_collective_sync_self(WP_REST_Request $request) {
@@ -1127,12 +987,28 @@
             $sync_mode = 'partial';
         }
 
+        // Get target environment (dev or prod)
+        $target_env = sanitize_text_field($request->get_param('target_env'));
+        if (empty($target_env) || !in_array($target_env, array('dev', 'prod'), true)) {
+            $target_env = 'dev';
+        }
+
+        // Determine endpoint based on target environment
+        if ($target_env === 'prod') {
+            if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+                return new WP_Error('config_error', 'Production endpoint not configured. Please set PROD_ENDPOINT in wp-config.php.', array('status' => 400));
+            }
+            $endpoint = PROD_ENDPOINT;
+        } else {
+            if (!defined('LIVE_DEV_ENDPOINT') || empty(LIVE_DEV_ENDPOINT)) {
+                return new WP_Error('config_error', 'Live Dev endpoint not configured. Please set LIVE_DEV_ENDPOINT in wp-config.php.', array('status' => 400));
+            }
+            $endpoint = LIVE_DEV_ENDPOINT;
+        }
+
         // Hardcoded path for firefly-projects plugin (no -dev version)
         $plugin_path = '/wp-content/plugins/firefly-projects';
         $directories = array($plugin_path);
-
-        // Self-sync always goes to Live Dev
-        $target_env = 'dev';
 
         // Create ZIP
         $zip_path = firefly_collective_zip_contents('firefly-projects', $directories, $target_env);
@@ -1151,7 +1027,7 @@
         );
 
         // Send to remote
-        $response = firefly_collective_send_project_update($zip_path, 'firefly-projects', LIVE_DEV_ENDPOINT, $sync_mode);
+        $response = firefly_collective_send_project_update($zip_path, 'firefly-projects', $endpoint, $sync_mode);
         if (is_wp_error($response)) {
             return $response;
         }
@@ -1159,8 +1035,9 @@
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
 
+        $env_name = $target_env === 'prod' ? 'Production' : 'Live Dev';
         return array(
             'success' => true,
-            'message' => 'Firefly Projects plugin synced successfully'
+            'message' => "Firefly Projects plugin synced to {$env_name} successfully"
         );
     }
