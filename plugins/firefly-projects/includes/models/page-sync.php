@@ -195,9 +195,9 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     } else {
         // LIVE DEV SYNC
         // Content already has dev URLs (from local editing)
-        // Get dev assets to sync
+        // Get page assets to sync
         if ($include_assets) {
-            $assets_to_sync = firefly_projects_get_dev_assets_for_sync($post->ID);
+            $assets_to_sync = firefly_projects_get_page_assets_for_sync($post->ID);
         }
     }
 
