@@ -1124,6 +1124,22 @@ function firefly_projects_export_page($request) {
         }
     }
 
+    // Check if this page has special WordPress roles (home page, posts page)
+    $page_role = null;
+    if ($post->post_type === 'page') {
+        $show_on_front = get_option('show_on_front');
+        if ($show_on_front === 'page') {
+            $page_on_front = get_option('page_on_front');
+            $page_for_posts = get_option('page_for_posts');
+
+            if ($page_on_front && $page_on_front == $post->ID) {
+                $page_role = 'front_page';
+            } elseif ($page_for_posts && $page_for_posts == $post->ID) {
+                $page_role = 'posts_page';
+            }
+        }
+    }
+
     return new WP_REST_Response(array(
         'success' => true,
         'post_data' => array(
@@ -1139,7 +1155,8 @@ function firefly_projects_export_page($request) {
         'meta_data'      => $meta_data,
         'assets'         => $asset_data,
         'asset_map'      => $asset_map,
-        'featured_image' => $featured_image
+        'featured_image' => $featured_image,
+        'page_role'      => $page_role
     ), 200);
 }
 
@@ -1293,6 +1310,19 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         }
     }
 
+    // Set page role if specified (front page or posts page)
+    $page_role = isset($data['page_role']) ? $data['page_role'] : null;
+    if ($page_role && $post_data['post_type'] === 'page') {
+        // Ensure WordPress is set to use a static front page
+        update_option('show_on_front', 'page');
+
+        if ($page_role === 'front_page') {
+            update_option('page_on_front', $post_id);
+        } elseif ($page_role === 'posts_page') {
+            update_option('page_for_posts', $post_id);
+        }
+    }
+
     // Save pull timestamp
     $pull_time = time();
     if ($source_env === 'prod') {
@@ -1316,7 +1346,8 @@ function firefly_projects_import_pulled_page($data, $source_env) {
             'assets_pulled'      => $assets_saved,
             'featured_image_set' => $featured_image_set,
             'source_env'         => $source_env,
-            'is_update'          => $existing_post ? true : false
+            'is_update'          => $existing_post ? true : false,
+            'page_role'          => $page_role
         )
     );
 }

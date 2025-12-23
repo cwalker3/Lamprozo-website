@@ -222,6 +222,22 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         'post_parent'  => $post->post_parent,
     );
 
+    // Check if this page has special WordPress roles (home page, posts page)
+    $page_role = null;
+    if ($post->post_type === 'page') {
+        $show_on_front = get_option('show_on_front');
+        if ($show_on_front === 'page') {
+            $page_on_front = get_option('page_on_front');
+            $page_for_posts = get_option('page_for_posts');
+
+            if ($page_on_front && $page_on_front == $post->ID) {
+                $page_role = 'front_page';
+            } elseif ($page_for_posts && $page_for_posts == $post->ID) {
+                $page_role = 'posts_page';
+            }
+        }
+    }
+
     // Get featured image data if exists
     $featured_image = null;
     $featured_image_path = null;
@@ -280,6 +296,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             'target_env'     => $target_env,
             'asset_map'      => $asset_map,
             'featured_image' => $featured_image,
+            'page_role'      => $page_role,
             'assets'         => array_map(function($a) {
                 return array(
                     'url'      => isset($a['url']) ? $a['url'] : '',
@@ -299,7 +316,8 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         'target_env'     => $target_env,
         'asset_map'      => $asset_map,
         'featured_image' => $featured_image,
-        'has_assets'     => !empty($assets_to_sync) || $featured_image_path
+        'has_assets'     => !empty($assets_to_sync) || $featured_image_path,
+        'page_role'      => $page_role
     );
 
     // Send request
@@ -410,6 +428,7 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($manifest['target_env']) ? $manifest['target_env'] : 'dev';
         $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
         $featured_image = isset($manifest['featured_image']) ? $manifest['featured_image'] : null;
+        $page_role = isset($manifest['page_role']) ? $manifest['page_role'] : null;
 
         // Handle uploaded zip file
         $files = $request->get_file_params();
@@ -423,6 +442,7 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($body['target_env']) ? $body['target_env'] : 'dev';
         $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
         $featured_image = isset($body['featured_image']) ? $body['featured_image'] : null;
+        $page_role = isset($body['page_role']) ? $body['page_role'] : null;
         $zip_file = null;
     }
 
@@ -539,11 +559,24 @@ function firefly_projects_handle_incoming_page($request) {
         }
     }
 
+    // Set page role if specified (front page or posts page)
+    if ($page_role && $post_data['post_type'] === 'page') {
+        // Ensure WordPress is set to use a static front page
+        update_option('show_on_front', 'page');
+
+        if ($page_role === 'front_page') {
+            update_option('page_on_front', $post_id);
+        } elseif ($page_role === 'posts_page') {
+            update_option('page_for_posts', $post_id);
+        }
+    }
+
     $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
     $type_label = ($post_data['post_type'] === 'post') ? 'Post' : 'Page';
 
     return array(
         'success' => true,
-        'message' => ($existing_post ? $type_label . ' updated' : $type_label . ' created') . ' successfully on ' . $env_label . '.'
+        'message' => ($existing_post ? $type_label . ' updated' : $type_label . ' created') . ' successfully on ' . $env_label . '.',
+        'page_role' => $page_role
     );
 }

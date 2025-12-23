@@ -26,11 +26,21 @@ function firefly_projects_package_menu($menu_id) {
 
     $items = wp_get_nav_menu_items($menu_id);
 
+    // Get theme locations this menu is assigned to
+    $locations = get_nav_menu_locations();
+    $assigned_locations = array();
+    foreach ($locations as $location => $assigned_menu_id) {
+        if ($assigned_menu_id == $menu_id) {
+            $assigned_locations[] = $location;
+        }
+    }
+
     $package = array(
         'menu_data' => array(
             'name'        => $menu->name,
             'slug'        => $menu->slug,
-            'description' => $menu->description
+            'description' => $menu->description,
+            'locations'   => $assigned_locations
         ),
         'items' => array()
     );
@@ -327,12 +337,22 @@ function firefly_projects_handle_incoming_menu($request) {
         }
     }
 
+    // Assign menu to theme locations if specified
+    if (!empty($menu_data['locations'])) {
+        $current_locations = get_nav_menu_locations();
+        foreach ($menu_data['locations'] as $location) {
+            $current_locations[$location] = $menu_id;
+        }
+        set_theme_mod('nav_menu_locations', $current_locations);
+    }
+
     return array(
         'success' => true,
         'message' => ($menu ? 'Menu updated' : 'Menu created') . ' successfully.',
         'details' => array(
             'menu_id'     => $menu_id,
-            'items_count' => count($items)
+            'items_count' => count($items),
+            'locations'   => isset($menu_data['locations']) ? $menu_data['locations'] : array()
         )
     );
 }
@@ -352,6 +372,7 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
         );
     }
 
+    $menu_data = $data['menu_data'];
     $items = $data['items'];
 
     // Verify local menu exists
@@ -438,9 +459,19 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
         }
     }
 
+    // Assign menu to theme locations if specified in the pulled data
+    if (!empty($menu_data['locations'])) {
+        $current_locations = get_nav_menu_locations();
+        foreach ($menu_data['locations'] as $location) {
+            $current_locations[$location] = $local_menu_id;
+        }
+        set_theme_mod('nav_menu_locations', $current_locations);
+    }
+
     return array(
         'success'     => true,
         'message'     => 'Menu items replaced successfully.',
-        'items_count' => count($items)
+        'items_count' => count($items),
+        'locations'   => isset($menu_data['locations']) ? $menu_data['locations'] : array()
     );
 }
