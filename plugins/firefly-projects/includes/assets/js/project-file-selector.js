@@ -867,6 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Handle both /update-project and /update_project endpoint formats
                     const prodUrl = window.projectData.prodEndpoint.replace(/\/update[-_]project$/, '/bootstrap-dev');
+                    console.log(prodUrl);
                     const bootstrapResponse = await fetch(prodUrl, {
                         method: 'POST',
                         headers: {

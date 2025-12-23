@@ -89,6 +89,39 @@ function firefly_projects_asset_url_to_path($url) {
 }
 
 /**
+ * Extract assets from content and return with local file paths
+ * Used for syncing assets at their original upload locations
+ *
+ * @param string $content The post content
+ * @return array List of assets with url, path, filename, and original_url
+ */
+function firefly_projects_extract_assets_with_paths($content) {
+    $assets = array();
+    $asset_urls = firefly_projects_extract_assets($content);
+
+    foreach ($asset_urls as $url) {
+        $local_path = firefly_projects_asset_url_to_path($url);
+
+        if ($local_path && file_exists($local_path)) {
+            // Determine the relative path within wp-content/uploads
+            $upload_dir = wp_upload_dir();
+            $relative_path = str_replace($upload_dir['basedir'], '', $local_path);
+            $relative_path = ltrim($relative_path, '/\\');
+
+            $assets[] = array(
+                'url'          => $url,
+                'path'         => $local_path,
+                'filename'     => basename($local_path),
+                'relative_path' => $relative_path,  // e.g., "2024/11/portfolio-swrr.webp"
+                'size'         => filesize($local_path)
+            );
+        }
+    }
+
+    return $assets;
+}
+
+/**
  * Package page content and assets for sync
  *
  * @param WP_Post $post The post object
@@ -194,10 +227,26 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         }
     } else {
         // LIVE DEV SYNC
-        // Content already has dev URLs (from local editing)
-        // Get page assets to sync
+        // Get page assets to sync - both from pages folder AND original upload paths
         if ($include_assets) {
+            // First get any assets already in the pages folder
             $assets_to_sync = firefly_projects_get_page_assets_for_sync($post->ID);
+
+            // Also extract assets from content at their original paths
+            $content_assets = firefly_projects_extract_assets_with_paths($post->post_content);
+            foreach ($content_assets as $asset) {
+                // Avoid duplicates
+                $already_included = false;
+                foreach ($assets_to_sync as $existing) {
+                    if (basename($existing['path']) === basename($asset['path'])) {
+                        $already_included = true;
+                        break;
+                    }
+                }
+                if (!$already_included) {
+                    $assets_to_sync[] = $asset;
+                }
+            }
         }
     }
 
@@ -289,7 +338,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             $zip->addFile($featured_image_path, 'featured/' . basename($featured_image_path));
         }
 
-        // Add manifest
+        // Add manifest with relative paths for proper extraction
         $manifest = array(
             'post_data'      => $post_data,
             'meta_data'      => $meta_data,
@@ -299,8 +348,9 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             'page_role'      => $page_role,
             'assets'         => array_map(function($a) {
                 return array(
-                    'url'      => isset($a['url']) ? $a['url'] : '',
-                    'filename' => isset($a['filename']) ? $a['filename'] : basename($a['path'])
+                    'url'           => isset($a['url']) ? $a['url'] : '',
+                    'filename'      => isset($a['filename']) ? $a['filename'] : basename($a['path']),
+                    'relative_path' => isset($a['relative_path']) ? $a['relative_path'] : ''
                 );
             }, $assets_to_sync)
         );
@@ -488,12 +538,11 @@ function firefly_projects_handle_incoming_page($request) {
 
     // Process assets if included
     if ($has_assets && $zip_file && file_exists($zip_file)) {
-        // Store assets in uploads/pages/{slug}/
-        // Each environment (local, dev, prod) has its own separate WordPress installation
         $upload_dir = wp_upload_dir();
-        $page_assets_dir = trailingslashit($upload_dir['basedir']) . 'pages/' . $post_data['post_name'];
+        $uploads_base = $upload_dir['basedir'];
 
-        // Create directory if needed
+        // Also create page-specific directory as fallback
+        $page_assets_dir = trailingslashit($uploads_base) . 'pages/' . $post_data['post_name'];
         if (!file_exists($page_assets_dir)) {
             wp_mkdir_p($page_assets_dir);
         }
@@ -505,15 +554,38 @@ function firefly_projects_handle_incoming_page($request) {
             $manifest_json = $zip->getFromName('manifest.json');
             $zip_manifest = json_decode($manifest_json, true);
 
-            // Extract assets
+            // Build a lookup of filename -> relative_path from manifest
+            $asset_paths = array();
+            if (isset($zip_manifest['assets']) && is_array($zip_manifest['assets'])) {
+                foreach ($zip_manifest['assets'] as $asset_info) {
+                    if (!empty($asset_info['relative_path'])) {
+                        $asset_paths[$asset_info['filename']] = $asset_info['relative_path'];
+                    }
+                }
+            }
+
+            // Extract assets to their original paths
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $filename = $zip->getNameIndex($i);
                 if (strpos($filename, 'assets/') === 0 && $filename !== 'assets/') {
                     $asset_name = basename($filename);
-                    $destination = $page_assets_dir . '/' . $asset_name;
-
-                    // Extract file
                     $content = $zip->getFromIndex($i);
+
+                    // Check if we have a relative path for this asset
+                    if (isset($asset_paths[$asset_name]) && !empty($asset_paths[$asset_name])) {
+                        // Extract to original path (e.g., /uploads/2024/11/image.webp)
+                        $destination = $uploads_base . '/' . $asset_paths[$asset_name];
+                        $destination_dir = dirname($destination);
+
+                        // Create directory structure if needed
+                        if (!file_exists($destination_dir)) {
+                            wp_mkdir_p($destination_dir);
+                        }
+                    } else {
+                        // Fallback to page-specific directory
+                        $destination = $page_assets_dir . '/' . $asset_name;
+                    }
+
                     file_put_contents($destination, $content);
                 }
             }

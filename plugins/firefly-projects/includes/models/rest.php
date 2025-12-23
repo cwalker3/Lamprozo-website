@@ -1898,6 +1898,10 @@ function firefly_projects_bootstrap_dev($request) {
         }
     }
 
+    // Set proper permissions for web server access
+    // Directories need 755 (rwxr-xr-x), files need 644 (rw-r--r--)
+    firefly_projects_fix_permissions_recursive($target_path);
+
     return new WP_REST_Response(array(
         'success' => true,
         'message' => 'Dev environment created successfully',
@@ -2134,6 +2138,9 @@ require_once ABSPATH . 'wp-settings.php';
  * @param string $base
  */
 function firefly_projects_add_dir_to_zip($zip, $dir, $base) {
+    // Normalize directory path - remove trailing slash for consistent substr calculation
+    $dir = rtrim($dir, '/\\');
+
     $files = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::LEAVES_ONLY
@@ -2142,8 +2149,33 @@ function firefly_projects_add_dir_to_zip($zip, $dir, $base) {
     foreach ($files as $file) {
         if (!$file->isDir()) {
             $file_path = $file->getRealPath();
+            // +1 to skip the directory separator after the base dir
             $relative_path = $base . '/' . substr($file_path, strlen($dir) + 1);
             $zip->addFile($file_path, $relative_path);
+        }
+    }
+}
+
+/**
+ * Recursively fix permissions for web server access
+ * Sets directories to 755 and files to 644
+ *
+ * @param string $path The path to fix permissions for
+ */
+function firefly_projects_fix_permissions_recursive($path) {
+    // Fix the root directory first
+    @chmod($path, 0755);
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        if ($item->isDir()) {
+            @chmod($item->getRealPath(), 0755);
+        } else {
+            @chmod($item->getRealPath(), 0644);
         }
     }
 }
