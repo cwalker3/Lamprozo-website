@@ -1774,7 +1774,8 @@ function firefly_projects_verify_bootstrap_secret($request) {
 }
 
 /**
- * Check if wp-dev directory exists (called by local on production)
+ * Check if wp-dev directory exists with a valid WordPress installation
+ * An empty directory or directory without wp-config.php is treated as "not exists"
  *
  * @param WP_REST_Request $request
  * @return WP_REST_Response
@@ -1792,15 +1793,44 @@ function firefly_projects_check_dev_exists($request) {
     // Check for wp-dev directory inside ABSPATH (same level as wp-content)
     $wp_dev_path = ABSPATH . 'wp-dev';
 
-    $exists = is_dir($wp_dev_path);
+    $dir_exists = is_dir($wp_dev_path);
+    $has_wp_config = file_exists($wp_dev_path . '/wp-config.php');
+    $is_empty = $dir_exists && firefly_projects_is_directory_empty($wp_dev_path);
+
+    // Consider it as "exists" only if it has a wp-config.php (valid WP installation)
+    $exists = $dir_exists && $has_wp_config;
 
     return new WP_REST_Response(array(
         'success' => true,
         'exists' => $exists,
+        'dir_exists' => $dir_exists,
+        'is_empty' => $is_empty,
+        'has_wp_config' => $has_wp_config,
         'path' => $exists ? $wp_dev_path : null,
         'suggested_path' => $wp_dev_path,
         'abspath' => ABSPATH
     ), 200);
+}
+
+/**
+ * Check if a directory is empty
+ *
+ * @param string $dir Directory path
+ * @return bool True if empty or only contains . and ..
+ */
+function firefly_projects_is_directory_empty($dir) {
+    if (!is_dir($dir)) {
+        return true;
+    }
+    $handle = opendir($dir);
+    while (false !== ($entry = readdir($handle))) {
+        if ($entry !== '.' && $entry !== '..') {
+            closedir($handle);
+            return false;
+        }
+    }
+    closedir($handle);
+    return true;
 }
 
 /**
@@ -1835,20 +1865,25 @@ function firefly_projects_bootstrap_dev($request) {
     // Determine target path - put wp-dev inside the document root (same level as wp-content)
     $target_path = ABSPATH . sanitize_file_name($target_folder);
 
-    // Check if already exists
+    // Check if directory exists and has a valid WordPress installation
     if (is_dir($target_path)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Target directory already exists: ' . $target_folder
-        ), 400);
-    }
-
-    // Create target directory
-    if (!wp_mkdir_p($target_path)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Failed to create directory: ' . $target_path
-        ), 500);
+        // If wp-config.php exists, this is a valid installation - don't overwrite
+        if (file_exists($target_path . '/wp-config.php')) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'A WordPress installation already exists in: ' . $target_folder
+            ), 400);
+        }
+        // Directory exists but is empty or incomplete - proceed with bootstrap
+        // (hosting provider may have pre-created the folder for the subdomain)
+    } else {
+        // Create target directory
+        if (!wp_mkdir_p($target_path)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Failed to create directory: ' . $target_path
+            ), 500);
+        }
     }
 
     $extracted_files = 0;
