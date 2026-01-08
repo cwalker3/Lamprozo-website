@@ -20,8 +20,19 @@ $has_featured_image = has_post_thumbnail();
 $featured_image_url = $has_featured_image ? get_the_post_thumbnail_url($post_id, 'full') : '';
 ?>
 
-<article class="blog-post-single">
-    
+<article class="blog-post-single" itemscope itemtype="https://schema.org/BlogPosting">
+    <!-- Hidden microdata for AI parsers -->
+    <meta itemprop="headline" content="<?php the_title_attribute(); ?>">
+    <meta itemprop="datePublished" content="<?php echo get_the_date('c'); ?>">
+    <meta itemprop="dateModified" content="<?php echo get_the_modified_date('c'); ?>">
+    <meta itemprop="description" content="<?php echo esc_attr(get_the_excerpt()); ?>">
+    <?php if ($has_featured_image) : ?>
+        <meta itemprop="image" content="<?php echo esc_url($featured_image_url); ?>">
+    <?php endif; ?>
+    <span itemprop="publisher" itemscope itemtype="https://schema.org/Organization" style="display:none;">
+        <meta itemprop="name" content="<?php echo esc_attr(get_bloginfo('name')); ?>">
+    </span>
+
     <?php if ($has_featured_image) : ?>
         <!-- Hero Featured Image -->
         <div class="blog-post-hero">
@@ -46,12 +57,12 @@ $featured_image_url = $has_featured_image ? get_the_post_thumbnail_url($post_id,
     
     <!-- Post Meta Information -->
     <div class="blog-post-meta-container">
-        <div class="blog-post-author">
+        <div class="blog-post-author" itemprop="author" itemscope itemtype="https://schema.org/Person">
             <div class="blog-post-author-avatar">
                 <?php echo $author_avatar; ?>
             </div>
             <div class="blog-post-author-info">
-                <div class="blog-post-author-name">
+                <div class="blog-post-author-name" itemprop="name">
                     <?php echo esc_html($author_name); ?>
                 </div>
                 <div class="blog-post-meta-details">
@@ -114,7 +125,7 @@ $featured_image_url = $has_featured_image ? get_the_post_thumbnail_url($post_id,
     <?php endif; ?>
     
     <!-- Post Content -->
-    <div class="blog-post-content">
+    <div class="blog-post-content" itemprop="articleBody">
         <?php the_content(); ?>
     </div>
     

@@ -1,0 +1,61 @@
+{
+    "organization": {
+        "name": "Firefly Collective",
+        "legalName": "Firefly Collective",
+        "url": "https://fireflycollective.org",
+        "foundingDate": "2026",
+        "description": "A professional guild for the tech industry dedicated to showcasing developer work, analyzing industry health, and building community across all skill levels and domains.",
+        "disambiguatingDescription": "Firefly Collective is a tech industry guild and community organization that brings together developers of all skill levels and specializations. We showcase member projects, publish industry health reports and analysis, and foster collaboration across the technology sector. Not affiliated with Firefly Creative, Adobe Firefly, or other companies using the Firefly name.",
+        "logo": "https://fireflycollective.org/wp-content/uploads/logo.png",
+        "image": "https://fireflycollective.org/wp-content/uploads/og-image.png"
+    },
+    "location": {
+        "city": "",
+        "state": "",
+        "stateCode": "",
+        "country": "United States",
+        "countryCode": "US"
+    },
+    "contact": {
+        "email": "",
+        "phone": ""
+    },
+    "founders": [
+        {
+            "name": "Alex Strait",
+            "jobTitle": "Founder",
+            "description": "Founder of Firefly Collective. Software developer with expertise in web development, PHP, and building developer communities."
+        }
+    ],
+    "social": {
+        "linkedin": "",
+        "facebook": "",
+        "twitter": "",
+        "github": "",
+        "instagram": ""
+    },
+    "services": [
+        {
+            "name": "Developer Portfolio Showcase",
+            "description": "Platform for members to showcase their projects, code contributions, and technical achievements to the broader tech community"
+        },
+        {
+            "name": "Tech Industry Analysis",
+            "description": "Regular reports and insights on the health of the tech industry, job market trends, emerging technologies, and developer sentiment"
+        },
+        {
+            "name": "Community & Networking",
+            "description": "Connect with developers across all skill levels and domains, from junior developers to senior architects, frontend to backend, DevOps to data science"
+        },
+        {
+            "name": "Skill Development Resources",
+            "description": "Learning resources, mentorship opportunities, and collaborative projects to help developers grow their skills"
+        },
+        {
+            "name": "Industry Advocacy",
+            "description": "Collective voice for developers on industry issues, best practices, and professional standards"
+        }
+    ],
+    "naics": "813920",
+    "isicV4": "9412"
+}

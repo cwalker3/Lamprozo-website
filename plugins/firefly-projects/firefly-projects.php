@@ -34,6 +34,7 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/functions.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/rest.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
 
 /**
  * Activation hook - Create necessary directories
@@ -183,11 +184,69 @@ function firefly_projects_enqueue_gutenberg_assets() {
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_gutenberg_assets');
 
 /**
+ * Enqueue GEO Settings panel and FAQ block assets
+ * Loads on ALL environments (Local Dev, Live Dev, Production) for blog posts
+ */
+function firefly_projects_enqueue_geo_assets() {
+    // Determine current post type
+    global $post;
+    $current_post_type = '';
+    if ($post) {
+        $current_post_type = $post->post_type;
+    } elseif (isset($_GET['post'])) {
+        $current_post_type = get_post_type($_GET['post']);
+    } elseif (isset($_GET['post_type'])) {
+        $current_post_type = $_GET['post_type'];
+    }
+
+    // Only load for posts
+    if ($current_post_type !== 'post') {
+        return;
+    }
+
+    $geo_js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/geo-post-panel.js';
+    $faq_js_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/faq-block.js';
+    $geo_css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/geo-post.css';
+
+    $geo_version = file_exists($geo_js_file) ? filemtime($geo_js_file) : FIREFLY_PROJECTS_VERSION;
+
+    // GEO Settings sidebar panel
+    wp_enqueue_script(
+        'firefly-geo-post-panel',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/geo-post-panel.js',
+        array('wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'wp-i18n'),
+        $geo_version,
+        true
+    );
+
+    // FAQ block
+    wp_enqueue_script(
+        'firefly-faq-block',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/faq-block.js',
+        array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-data'),
+        file_exists($faq_js_file) ? filemtime($faq_js_file) : FIREFLY_PROJECTS_VERSION,
+        true
+    );
+
+    // GEO styles
+    wp_enqueue_style(
+        'firefly-geo-post',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/geo-post.css',
+        array(),
+        file_exists($geo_css_file) ? filemtime($geo_css_file) : FIREFLY_PROJECTS_VERSION
+    );
+}
+add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_geo_assets');
+
+/**
  * Register post meta for REST API access
  * Allows Gutenberg to read last sync timestamps per environment
  */
 function firefly_projects_register_meta() {
     $post_types = array('page', 'post');
+
+    // Register GEO meta fields for posts
+    firefly_projects_register_geo_meta();
 
     foreach ($post_types as $post_type) {
         // Last sync to Live Dev

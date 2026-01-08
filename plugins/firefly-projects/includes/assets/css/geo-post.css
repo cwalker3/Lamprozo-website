@@ -1,0 +1,288 @@
+/**
+ * Firefly Projects - GEO Post Settings Styles
+ * Sidebar panel and FAQ block styling
+ */
+
+/* ============================================
+   SIDEBAR PANEL STYLES
+   ============================================ */
+
+.firefly-geo-panel .components-panel__body {
+    border-top: 1px solid #e0e0e0;
+}
+
+.geo-section {
+    margin-bottom: 16px;
+}
+
+.geo-section:last-child {
+    margin-bottom: 0;
+}
+
+/* Word counter */
+.geo-word-count {
+    font-size: 12px;
+    color: #757575;
+    text-align: right;
+    margin-top: -8px;
+    margin-bottom: 8px;
+}
+
+.geo-word-count.over-limit {
+    color: #d63638;
+    font-weight: 600;
+}
+
+.geo-over-limit textarea {
+    border-color: #d63638 !important;
+}
+
+/* Panel body description */
+.geo-panel-description {
+    font-size: 12px;
+    color: #757575;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+.geo-panel-body .components-panel__body-title {
+    margin-bottom: 0;
+}
+
+/* Repeater styles */
+.geo-repeater-item {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.geo-repeater-item .components-base-control {
+    margin-bottom: 8px;
+}
+
+.geo-repeater-item .components-base-control:last-of-type {
+    margin-bottom: 0;
+}
+
+.geo-remove-btn {
+    margin-top: 8px !important;
+}
+
+.geo-add-btn {
+    margin-top: 4px;
+}
+
+.geo-tip {
+    font-size: 11px;
+    color: #757575;
+    margin: 12px 0 0 0;
+    padding: 8px;
+    background: #fff8e5;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+/* ============================================
+   FAQ BLOCK EDITOR STYLES
+   ============================================ */
+
+.firefly-faq-block-editor {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.faq-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.faq-block-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.faq-count {
+    font-size: 12px;
+    color: #757575;
+    background: #f0f0f1;
+    padding: 4px 8px;
+    border-radius: 10px;
+}
+
+.faq-empty-state {
+    color: #757575;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
+.faq-editor-item {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.faq-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.faq-item-number {
+    font-weight: 600;
+    color: #1e1e1e;
+    font-size: 14px;
+}
+
+.faq-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.faq-item-actions .components-button {
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+}
+
+.faq-add-wrapper {
+    text-align: center;
+    padding-top: 8px;
+}
+
+.faq-add-btn {
+    min-width: 150px;
+}
+
+/* ============================================
+   FAQ BLOCK FRONTEND STYLES
+   ============================================ */
+
+.firefly-faq-block {
+    margin: 32px 0;
+    max-width: 800px;
+}
+
+.firefly-faq-block .faq-heading {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.firefly-faq-block .faq-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.firefly-faq-block .faq-question {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 16px 20px;
+    background: #f9f9f9;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-size: 1em;
+    font-weight: 500;
+    color: #1e1e1e;
+    transition: background-color 0.2s ease;
+}
+
+.firefly-faq-block .faq-question:hover {
+    background: #f0f0f1;
+}
+
+.firefly-faq-block .faq-question:focus {
+    outline: 2px solid #007cba;
+    outline-offset: -2px;
+}
+
+.firefly-faq-block .faq-question-text {
+    flex: 1;
+    padding-right: 16px;
+}
+
+.firefly-faq-block .faq-icon {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.firefly-faq-block .faq-icon::before,
+.firefly-faq-block .faq-icon::after {
+    content: '';
+    position: absolute;
+    background: #1e1e1e;
+    transition: transform 0.2s ease;
+}
+
+.firefly-faq-block .faq-icon::before {
+    width: 100%;
+    height: 2px;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+}
+
+.firefly-faq-block .faq-icon::after {
+    width: 2px;
+    height: 100%;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+}
+
+.firefly-faq-block .faq-question[aria-expanded="true"] .faq-icon::after {
+    transform: translateX(-50%) rotate(90deg);
+}
+
+.firefly-faq-block .faq-answer {
+    padding: 0 20px 20px 20px;
+    line-height: 1.6;
+}
+
+.firefly-faq-block .faq-answer[hidden] {
+    display: none;
+}
+
+.firefly-faq-block .faq-answer p:first-child {
+    margin-top: 0;
+}
+
+.firefly-faq-block .faq-answer p:last-child {
+    margin-bottom: 0;
+}
+
+/* Full width alignment */
+.firefly-faq-block.alignwide {
+    max-width: none;
+}
+
+.firefly-faq-block.alignfull {
+    max-width: none;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding-left: 20px;
+    padding-right: 20px;
+}

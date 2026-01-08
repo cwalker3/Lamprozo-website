@@ -1,0 +1,690 @@
+/**
+ * GEO Admin Styles
+ * Vue.js-based admin interface for GEO configuration
+ */
+
+/* Hide Vue template flash */
+[v-cloak] {
+    display: none !important;
+}
+
+/* Main container */
+.geo-admin-wrap {
+    max-width: 1200px;
+    margin: 20px 20px 20px 0;
+}
+
+.geo-admin-wrap h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.geo-admin-wrap h1 .dashicons {
+    font-size: 30px;
+    width: 30px;
+    height: 30px;
+}
+
+/* Header actions */
+.geo-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.geo-header-actions .button-group {
+    display: flex;
+    gap: 10px;
+}
+
+/* Tab navigation */
+.geo-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #c3c4c7;
+    padding-bottom: 0;
+}
+
+.geo-tab {
+    padding: 10px 20px;
+    background: #f0f0f1;
+    border: 1px solid #c3c4c7;
+    border-bottom: 2px solid #c3c4c7;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #50575e;
+    transition: background 0.2s ease, color 0.2s ease;
+    margin-bottom: -2px;
+}
+
+.geo-tab:hover {
+    background: #fff;
+    color: #2271b1;
+}
+
+.geo-tab.active {
+    background: #fff;
+    color: #1d2327;
+    border-bottom: 2px solid #fff;
+    font-weight: 600;
+}
+
+/* Content panels */
+.geo-content {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 0 4px 4px 4px;
+    padding: 20px;
+}
+
+.geo-panel {
+    display: none;
+}
+
+.geo-panel.active {
+    display: block;
+}
+
+/* Form sections */
+.geo-section {
+    margin-bottom: 30px;
+}
+
+.geo-section:last-child {
+    margin-bottom: 0;
+}
+
+.geo-section h3 {
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 16px;
+    color: #1d2327;
+}
+
+/* Form fields */
+.geo-field {
+    margin-bottom: 20px;
+}
+
+.geo-field:last-child {
+    margin-bottom: 0;
+}
+
+.geo-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #1d2327;
+}
+
+.geo-field .description {
+    font-size: 12px;
+    color: #646970;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+.geo-field input[type="text"],
+.geo-field input[type="url"],
+.geo-field input[type="email"],
+.geo-field input[type="tel"],
+.geo-field textarea {
+    width: 100%;
+    max-width: 600px;
+    padding: 8px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.geo-field input:focus,
+.geo-field textarea:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.geo-field textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Two-column layout for some fields */
+.geo-field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.geo-field-row .geo-field {
+    margin-bottom: 0;
+}
+
+/* Dynamic lists (founders, services) */
+.geo-list {
+    margin-bottom: 20px;
+}
+
+.geo-list-item {
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.geo-list-item:hover {
+    border-color: #c3c4c7;
+}
+
+.geo-list-item .geo-field {
+    margin-bottom: 15px;
+}
+
+.geo-list-item .geo-field:last-of-type {
+    margin-bottom: 0;
+}
+
+.geo-list-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.geo-list-item-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #50575e;
+}
+
+.geo-list-item .remove-btn {
+    background: none;
+    border: none;
+    color: #d63638;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 18px;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.geo-list-item .remove-btn:hover {
+    opacity: 1;
+}
+
+.geo-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 16px;
+    background: #f0f0f1;
+    border: 1px dashed #c3c4c7;
+    border-radius: 4px;
+    color: #2271b1;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.geo-add-btn:hover {
+    background: #fff;
+    border-color: #2271b1;
+}
+
+/* Save button area */
+.geo-actions {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.geo-actions .button-primary {
+    padding: 8px 24px;
+    height: auto;
+    font-size: 14px;
+}
+
+.geo-actions .button-secondary {
+    color: #d63638;
+    border-color: #d63638;
+}
+
+.geo-actions .button-secondary:hover {
+    background: #d63638;
+    color: #fff;
+}
+
+/* Loading state */
+.geo-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #646970;
+}
+
+.geo-loading .spinner {
+    float: none;
+    margin: 0 10px 0 0;
+}
+
+/* Saving state */
+.geo-saving {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Notifications */
+.geo-notification {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    max-width: 400px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.geo-notification.success {
+    background: #00a32a;
+    color: #fff;
+}
+
+.geo-notification.error {
+    background: #d63638;
+    color: #fff;
+}
+
+.geo-notification.info {
+    background: #72aee6;
+    color: #fff;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Preview panel */
+.geo-preview-toggle {
+    margin-bottom: 20px;
+}
+
+.geo-preview-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.geo-preview-panel {
+    margin-top: 20px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.geo-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #f0f0f1;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.geo-preview-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #1d2327;
+}
+
+.geo-preview-content {
+    background: #1d2327;
+    padding: 15px;
+    max-height: 500px;
+    overflow: auto;
+}
+
+.geo-preview-content pre {
+    margin: 0;
+    font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #e0e0e0;
+}
+
+/* JSON syntax highlighting */
+.geo-preview-content .json-key {
+    color: #9cdcfe;
+}
+
+.geo-preview-content .json-string {
+    color: #ce9178;
+}
+
+.geo-preview-content .json-number {
+    color: #b5cea8;
+}
+
+.geo-preview-content .json-boolean {
+    color: #569cd6;
+}
+
+.geo-preview-content .json-null {
+    color: #569cd6;
+}
+
+/* Preview loading */
+.geo-preview-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #a0a0a0;
+}
+
+/* Reset confirmation modal */
+.geo-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+}
+
+.geo-modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.geo-modal h3 {
+    margin: 0 0 15px 0;
+    color: #d63638;
+}
+
+.geo-modal p {
+    margin: 0 0 20px 0;
+    color: #50575e;
+}
+
+.geo-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .geo-admin-wrap {
+        margin-right: 10px;
+    }
+    
+    .geo-tabs {
+        flex-direction: column;
+    }
+    
+    .geo-tab {
+        border-radius: 4px;
+        border: 1px solid #c3c4c7;
+        margin-bottom: 5px;
+    }
+    
+    .geo-tab.active {
+        border-bottom: 1px solid #c3c4c7;
+    }
+    
+    .geo-field-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .geo-header-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .geo-header-actions .button-group {
+        justify-content: center;
+    }
+}
+
+/* WordPress admin overrides */
+.geo-admin-wrap .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.geo-admin-wrap .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+}
+
+/* Field validation states */
+.geo-field.has-error input,
+.geo-field.has-error textarea {
+    border-color: #d63638;
+}
+
+.geo-field .error-message {
+    color: #d63638;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+/* Social icons */
+.geo-social-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.geo-social-field .social-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #646970;
+}
+
+.geo-social-field input {
+    flex: 1;
+}
+
+
+/* ========================================
+   Sync Section Styles
+   ======================================== */
+
+.geo-sync-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.geo-sync-section.geo-sync-disabled {
+    background: #f6f7f7;
+}
+
+.geo-sync-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #c3c4c7;
+    background: #f6f7f7;
+}
+
+.geo-sync-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.geo-sync-header h3 .dashicons {
+    color: #2271b1;
+}
+
+.geo-sync-content {
+    padding: 20px;
+}
+
+.geo-sync-info {
+    margin-bottom: 20px;
+}
+
+.geo-sync-info p {
+    margin: 0;
+    color: #646970;
+    font-size: 13px;
+}
+
+/* Environment toggle */
+.geo-env-toggle {
+    margin-bottom: 20px;
+}
+
+.geo-toggle-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.geo-toggle-switch {
+    display: flex;
+    gap: 10px;
+}
+
+.geo-toggle-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 20px;
+    border: 2px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.geo-toggle-btn:hover {
+    border-color: #2271b1;
+    background: #f6f7f7;
+}
+
+.geo-toggle-btn.active {
+    border-color: #2271b1;
+    background: #f0f6fc;
+    color: #2271b1;
+}
+
+.geo-toggle-btn .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    margin-bottom: 5px;
+}
+
+.geo-toggle-btn small {
+    font-size: 11px;
+    color: #646970;
+    font-weight: 400;
+    margin-top: 3px;
+}
+
+.geo-toggle-btn.active small {
+    color: #2271b1;
+}
+
+/* Sync actions */
+.geo-sync-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.geo-sync-actions .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.geo-sync-note {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.geo-sync-note .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #72aee6;
+}
+
+.geo-sync-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #996800;
+    background: #fcf9e8;
+    padding: 12px 15px;
+    border-radius: 4px;
+    margin: 0;
+}
+
+.geo-sync-warning .dashicons {
+    color: #996800;
+}

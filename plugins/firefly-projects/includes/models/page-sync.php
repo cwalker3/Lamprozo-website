@@ -147,9 +147,11 @@ function firefly_projects_package_page($post, $include_assets = true) {
 
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
+    // Whitelist underscore-prefixed keys that should sync
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq');
     foreach ($meta as $key => $values) {
-        // Skip internal meta keys
-        if (strpos($key, '_') === 0 && !in_array($key, array('_thumbnail_id'))) {
+        // Skip internal meta keys (except whitelisted ones)
+        if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
         }
         $package['meta_data'][$key] = $values[0];
@@ -253,8 +255,10 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     // Package post data
     $meta = get_post_meta($post->ID);
     $meta_data = array();
+    // Whitelist underscore-prefixed keys that should sync
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq');
     foreach ($meta as $key => $values) {
-        if (strpos($key, '_') === 0 && !in_array($key, array('_thumbnail_id'))) {
+        if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
         }
         $meta_data[$key] = $values[0];
