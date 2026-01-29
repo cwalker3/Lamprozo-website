@@ -20,7 +20,7 @@
                 'nav',          'util',
                 'encrypt',      'profile',
                 'app',          'customize',
-                'semantic');
+                'semantic',     'schema');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";
