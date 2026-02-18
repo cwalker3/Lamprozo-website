@@ -25,6 +25,7 @@
 
 .projects-table td {
     background-color: var(--mainColor);
+    color: white;
 }
 
 /* Define specific widths for each column */

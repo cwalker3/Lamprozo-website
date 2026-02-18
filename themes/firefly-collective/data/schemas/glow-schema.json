@@ -1,0 +1,62 @@
+{
+    "template": "glow",
+    "version": "1.0.0",
+    "description": "Minimal template with essential pages only",
+    "pages": [
+        {
+            "slug": "home",
+            "title": "Home",
+            "snippet": "home-glow.html",
+            "required": true,
+            "set_as": "front_page",
+            "in_menu": true,
+            "menu_order": 1
+        },
+        {
+            "slug": "blog",
+            "title": "Blog",
+            "snippet": "blog-glow.html",
+            "required": true,
+            "set_as": "posts_page",
+            "in_menu": true,
+            "menu_order": 2
+        },
+        {
+            "slug": "contact",
+            "title": "Contact",
+            "snippet": "contact-glow.html",
+            "required": true,
+            "in_menu": true,
+            "menu_order": 3
+        },
+        {
+            "slug": "template",
+            "title": "Template",
+            "snippet": "template-glow.html",
+            "in_menu": false
+        }
+    ],
+    "posts": [
+        {
+            "slug": "hello-world",
+            "title": "Hello World",
+            "snippet": "hello-world.html",
+            "category": "uncategorized"
+        }
+    ],
+    "categories": [
+        {
+            "slug": "uncategorized",
+            "name": "Uncategorized",
+            "required": true
+        }
+    ],
+    "tags": [],
+    "menu": {
+        "name": "Main Menu",
+        "custom_links": []
+    },
+    "options": {
+        "show_on_front": "page"
+    }
+}

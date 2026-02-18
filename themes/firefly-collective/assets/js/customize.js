@@ -2,199 +2,324 @@
 
 (function() {
     'use strict';
-    
-    // URL preservation variables
-    var currentPreviewUrl = null;
+
     var refreshTimeout = null;
-    
-    // Function to store and refresh to current URL
-    function refreshPreviewToCurrentUrl() {
-        // Clear any existing timeout
+
+    // Force-reload the Customizer preview iframe.
+    // WordPress's refresh() relies on a 'ready' handshake from customize-preview.js
+    // inside the iframe. If that handshake fails, the old iframe stays visible.
+    // This bypasses that by directly reloading the iframe src.
+    function refreshPreview() {
         if (refreshTimeout) {
             clearTimeout(refreshTimeout);
         }
-        
-        // Get the ACTUAL current URL from the preview iframe
-        try {
-            var previewFrame = document.querySelector('#customize-preview iframe');
-            if (previewFrame && previewFrame.contentWindow) {
-                currentPreviewUrl = previewFrame.contentWindow.location.href;
-            } else {
-                // Fallback to WordPress customizer URL
-                currentPreviewUrl = wp.customize.previewer.previewUrl.get();
-            }
-        } catch (e) {
-            // Cross-origin access might be blocked, fallback
-            console.warn('Could not access iframe URL, using fallback:', e);
-            currentPreviewUrl = wp.customize.previewer.previewUrl.get();
-        }
-        
-        // Set a timeout to ensure the API call has completed
         refreshTimeout = setTimeout(function() {
-            // Refresh to the stored URL to maintain current page
-            wp.customize.previewer.previewUrl.set(currentPreviewUrl);
-            wp.customize.previewer.refresh();
-        }, 150);
-    }
-    
-    // Function to handle template option refreshes (for template-level use)
-    function handleTemplateOptionRefresh() {
-        refreshPreviewToCurrentUrl();
-    }
-    
-    // Function to disable/enable publish button
-        function togglePublishButton(disable) {
-        var publishButton = document.querySelector('#save');
-        // Try multiple selectors for the gear icon
-        var gearButton = document.querySelector('#publish-settings');
-        
-        if (publishButton) {
-            if (disable) {
-                publishButton.disabled = true;
-                publishButton.style.opacity = '0.5';
-                publishButton.title = 'Publishing is disabled while in Landing options';
+            var iframe = document.querySelector('#customize-preview iframe');
+            if (iframe) {
+                var previewUrl = wp.customize.settings.url.preview;
+                var params = new URLSearchParams(iframe.src.split('?')[1] || '');
+                var channel = params.get('customize_messenger_channel');
+                var uuid = params.get('customize_changeset_uuid');
+
+                var newUrl = previewUrl
+                    + (previewUrl.indexOf('?') === -1 ? '?' : '&')
+                    + 'customize_messenger_channel=' + encodeURIComponent(channel || '')
+                    + '&customize_changeset_uuid=' + encodeURIComponent(uuid || '')
+                    + '&_=' + Date.now();
+
+                console.log('[FF] Reloading iframe:', newUrl);
+                iframe.src = newUrl;
             } else {
+                console.log('[FF] No iframe found, using wp.customize.previewer.refresh()');
+                wp.customize.previewer.refresh();
+            }
+        }, 200);
+    }
+
+    // -----------------------------------------------------------------------
+    //  Publish button management
+    // -----------------------------------------------------------------------
+
+    var templateOptionsChanged = false;
+    var originalOptionValues = {};
+
+    function checkTemplateOptionsChanged() {
+        var data = window.fireflyTemplateOptions;
+        if (!data) return false;
+
+        var currentTemplate = wp.customize('firefly_collective_active_template').get();
+        var tmplData = data.templates[currentTemplate];
+        if (!tmplData) return false;
+
+        var hasChanges = false;
+        tmplData.options.forEach(function(key) {
+            var settingId = 'template_' + key;
+            var setting = wp.customize(settingId);
+            if (setting && originalOptionValues[key] !== undefined) {
+                if (setting.get() !== originalOptionValues[key]) {
+                    hasChanges = true;
+                }
+            }
+        });
+
+        templateOptionsChanged = hasChanges;
+        updatePublishButtonState();
+        return hasChanges;
+    }
+
+    function updatePublishButtonState() {
+        var publishButton = document.querySelector('#save');
+        var gearButton = document.querySelector('#publish-settings');
+        var landingSection = wp.customize.section('firefly_collective_landing');
+        var isInLandingSection = landingSection && landingSection.expanded.get();
+
+        var shouldEnable = templateOptionsChanged || !isInLandingSection;
+
+        if (publishButton) {
+            if (shouldEnable) {
                 publishButton.disabled = false;
                 publishButton.style.opacity = '1';
                 publishButton.title = '';
+            } else {
+                publishButton.disabled = true;
+                publishButton.style.opacity = '0.5';
+                publishButton.title = 'Publishing is disabled while in Landing options';
             }
         }
-        
+
         if (gearButton) {
-            if (disable) {
-                gearButton.disabled = true;
-                gearButton.style.opacity = '0.5';
-                gearButton.title = 'Settings are disabled while in Landing options';
-                gearButton.style.pointerEvents = 'none';
-            } else {
+            if (shouldEnable) {
                 gearButton.disabled = false;
                 gearButton.style.opacity = '1';
                 gearButton.title = '';
                 gearButton.style.pointerEvents = 'auto';
+            } else {
+                gearButton.disabled = true;
+                gearButton.style.opacity = '0.5';
+                gearButton.title = 'Settings are disabled while in Landing options';
+                gearButton.style.pointerEvents = 'none';
             }
         }
     }
-    
-    // Wait for customizer to be ready
+
+    // -----------------------------------------------------------------------
+    //  Template option controls: show/hide + value sync on template switch
+    // -----------------------------------------------------------------------
+
+    function updateTemplateOptionControls(newTemplate) {
+        var data = window.fireflyTemplateOptions;
+        if (!data) return;
+
+        var allKeys = data.allOptionKeys || [];
+        var tmplData = data.templates[newTemplate] || { options: [], values: {}, sections: [] };
+        var activeKeys = tmplData.options;
+        var activeSections = tmplData.sections || [];
+        var allSections = data.allSections || [];
+
+        // Hide/show custom sections based on template
+        allSections.forEach(function(sectionId) {
+            var section = wp.customize.section(sectionId);
+            if (section) {
+                section.active.set(activeSections.indexOf(sectionId) !== -1);
+            }
+        });
+
+        // Hide controls not in new template, show those that are
+        allKeys.forEach(function(key) {
+            var control = wp.customize.control('template_' + key);
+            if (control) {
+                var isActive = activeKeys.indexOf(key) !== -1;
+                control.active.set(isActive);
+            }
+        });
+
+        // Update control values to the new template's saved values
+        activeKeys.forEach(function(key) {
+            var setting = wp.customize('template_' + key);
+            if (setting && tmplData.values[key] !== undefined) {
+                setting.set(tmplData.values[key]);
+            }
+        });
+
+        // Reset original values for change tracking
+        originalOptionValues = {};
+        activeKeys.forEach(function(key) {
+            var setting = wp.customize('template_' + key);
+            if (setting) {
+                originalOptionValues[key] = setting.get();
+            }
+        });
+
+        templateOptionsChanged = false;
+        updatePublishButtonState();
+    }
+
+    // -----------------------------------------------------------------------
+    //  Bind template option change listeners
+    // -----------------------------------------------------------------------
+
+    function bindTemplateOptionListeners() {
+        var data = window.fireflyTemplateOptions;
+        if (!data) return;
+
+        var allKeys = data.allOptionKeys || [];
+
+        allKeys.forEach(function(key) {
+            var settingId = 'template_' + key;
+
+            wp.customize(settingId, function(setting) {
+                setting.bind(function(newValue) {
+                    // Update preview via REST
+                    fetch('/wp-json/custom-api/v1/change-template-option-preview', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            option_key: key,
+                            option_value: newValue
+                        })
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(respData) {
+                        if (respData.success) {
+                            checkTemplateOptionsChanged();
+                            refreshPreview();
+                        } else {
+                            console.error('[FF] Failed to update option preview:', respData);
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error('[FF] Error updating option preview:', err);
+                    });
+                });
+            });
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    //  Customizer ready
+    // -----------------------------------------------------------------------
+
     wp.customize.bind('ready', function() {
-        
-        // Store initial preview URL and listen for changes
-        currentPreviewUrl = wp.customize.previewer.previewUrl.get();
-        
-        // Listen for preview URL changes to keep our stored URL current
-        wp.customize.previewer.previewUrl.bind(function(newUrl) {
-            currentPreviewUrl = newUrl
-        });
-        
-        // Expose the global function for template-level customize.js
-        window.fireflyTemplateRefresh = handleTemplateOptionRefresh;
-        
-        // Listen for template selector changes
-        wp.customize('firefly_collective_active_template', function(setting) {
-            setting.bind(function(newTemplate) {
-                
-                // Make API call to update temp template
-                fetch('/wp-json/custom-api/v1/change-template-temp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        template: newTemplate
-                    })
-                })
-                .then(response => {
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        
-                        // Use URL-preserving refresh instead of direct refresh
-                        refreshPreviewToCurrentUrl();
-                    } else {
-                        console.error('Failed to update template temp:', data);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating template temp:', error);
-                });
-            });
-        });
-        
-        // Listen for landing style changes
-        wp.customize('firefly_collective_landing_style', function(setting) {
-            setting.bind(function(newLandingStyle) {
-                
-                // Make API call to update landing style preview
-                fetch('/wp-json/custom-api/v1/change-landing-style-preview', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        landing_style: newLandingStyle
-                    })
-                })
-                .then(response => {
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        
-                        // Use URL-preserving refresh instead of direct refresh
-                        refreshPreviewToCurrentUrl();
-                    } else {
-                        console.error('Failed to update landing style preview:', data);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating landing style preview:', error);
-                });
-            });
-        });
-        
-        // Handle publish button state based on active section
-        var landingSection = wp.customize.section('firefly_collective_landing');
-        
-        if (landingSection) {
-            // Listen for when landing section is expanded
-            landingSection.expanded.bind(function(isExpanded) {
-                if (isExpanded) {
-                    // Landing section is open - disable publish
-                    togglePublishButton(true);
-                } else {
-                    // Landing section is closed - enable publish
-                    togglePublishButton(false);
+
+        // Store initial option values for change tracking
+        var data = window.fireflyTemplateOptions;
+        if (data) {
+            var currentTemplate = wp.customize('firefly_collective_active_template').get();
+            var tmplData = data.templates[currentTemplate] || { options: [], values: {} };
+
+            // Set initial control values from server data
+            tmplData.options.forEach(function(key) {
+                var setting = wp.customize('template_' + key);
+                if (setting && tmplData.values[key] !== undefined) {
+                    setting.set(tmplData.values[key]);
                 }
             });
+
+            // Record originals after a tick (so set() calls settle)
+            setTimeout(function() {
+                tmplData.options.forEach(function(key) {
+                    var setting = wp.customize('template_' + key);
+                    if (setting) {
+                        originalOptionValues[key] = setting.get();
+                    }
+                });
+            }, 100);
+
+            // Hide controls for options not in the current template
+            updateTemplateOptionControls(currentTemplate);
         }
-        
-        // Also listen for other sections being expanded to re-enable publish
+
+        // Bind listeners for template option changes
+        bindTemplateOptionListeners();
+
+        // Template selector: update temp, toggle controls, refresh preview.
+        wp.customize('firefly_collective_active_template', function(setting) {
+            setting.bind(function(newTemplate) {
+                // 1. Toggle controls for the new template
+                updateTemplateOptionControls(newTemplate);
+
+                // 2. Suppress Customizer's own preview refresh during template switch
+                var origRefresh = wp.customize.previewer.refresh;
+                wp.customize.previewer.refresh = function() {};
+
+                // 3. Update temp via REST (also resets preview options)
+                fetch('/wp-json/custom-api/v1/change-template-temp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template: newTemplate })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(respData) {
+                    // Restore Customizer refresh before our own refresh
+                    wp.customize.previewer.refresh = origRefresh;
+                    if (respData.success) {
+                        refreshPreview();
+                    } else {
+                        console.error('[FF] Failed to update temp:', respData);
+                    }
+                })
+                .catch(function(err) {
+                    wp.customize.previewer.refresh = origRefresh;
+                    console.error('[FF] REST error:', err);
+                    refreshPreview();
+                });
+            });
+        });
+
+        // Landing style changes
+        wp.customize('firefly_collective_landing_style', function(setting) {
+            setting.bind(function(newLandingStyle) {
+                fetch('/wp-json/custom-api/v1/change-landing-style-preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landing_style: newLandingStyle })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(respData) {
+                    if (respData.success) {
+                        refreshPreview();
+                    } else {
+                        console.error('Failed to update landing style preview:', respData);
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Error updating landing style preview:', err);
+                });
+            });
+        });
+
+        // Publish button state based on active section
+        var landingSection = wp.customize.section('firefly_collective_landing');
+
+        if (landingSection) {
+            landingSection.expanded.bind(function() {
+                updatePublishButtonState();
+            });
+        }
+
         wp.customize.section.each(function(section) {
             if (section.id !== 'firefly_collective_landing') {
                 section.expanded.bind(function(isExpanded) {
                     if (isExpanded) {
-                        // Any other section is open - enable publish
-                        togglePublishButton(false);
+                        updatePublishButtonState();
                     }
                 });
             }
         });
 
-        // Force the landing style dropdown to show the correct preview value
+        // Force landing style dropdown to correct value
         setTimeout(function() {
             var landingStyleSetting = wp.customize('firefly_collective_landing_style');
             if (landingStyleSetting) {
-                // Get the current preview value via API
                 fetch('/wp-json/custom-api/v1/get-landing-style-preview')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.preview_style) {
-                        landingStyleSetting.set(data.preview_style);
+                .then(function(r) { return r.json(); })
+                .then(function(respData) {
+                    if (respData.success && respData.preview_style) {
+                        landingStyleSetting.set(respData.preview_style);
                     }
                 })
-                .catch(error => {
-                    console.error('Error getting landing style preview:', error);
+                .catch(function(err) {
+                    console.error('Error getting landing style preview:', err);
                 });
             }
         }, 500);
@@ -204,38 +329,7 @@
         if (editButton) {
             editButton.addEventListener('click', function(e) {
                 e.preventDefault();
-                
-                var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
-                
-                fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        preview_style: currentPreviewStyle
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Temporarily disable beforeunload warning
-                        window.onbeforeunload = null;
-                        // Also try to disable WordPress customizer's beforeunload
-                        if (wp.customize && wp.customize.state) {
-                            wp.customize.state('saved').set(true);
-                        }
-                        // Redirect to Gutenberg in current window
-                        window.location.href = data.edit_url;
-                    } else {
-                        console.error('Failed to get edit URL:', data);
-                        alert('Unable to open editor. Please try again.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Unable to open editor. Please try again.');
-                });
+                openGutenbergEditor();
             });
         }
 
@@ -243,56 +337,50 @@
         setTimeout(function() {
             var editControl = wp.customize.control('firefly_collective_edit_landing_button');
             if (editControl) {
-                // Create button element
                 var button = document.createElement('button');
                 button.textContent = 'Edit in Gutenberg';
                 button.className = 'button button-secondary';
                 button.style.width = '100%';
                 button.style.marginTop = '10px';
-                
-                // Insert button after the control
+
                 var controlElement = editControl.container[0];
                 controlElement.appendChild(button);
-                
-                // Add click handler
+
                 button.addEventListener('click', function(e) {
                     e.preventDefault();
-                    
-                    var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
-                    
-                    fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            preview_style: currentPreviewStyle
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Temporarily disable beforeunload warning
-                            window.onbeforeunload = null;
-                            // Also try to disable WordPress customizer's beforeunload
-                            if (wp.customize && wp.customize.state) {
-                                wp.customize.state('saved').set(true);
-                            }
-                            // Redirect to Gutenberg in current window
-                            window.location.href = data.edit_url;
-                        } else {
-                            console.error('Failed to get edit URL:', data);
-                            alert('Unable to open editor. Please try again.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Unable to open editor. Please try again.');
-                    });
+                    openGutenbergEditor();
                 });
             }
         }, 500);
-        
+
     });
-    
+
+    // Helper: open Gutenberg editor for landing page
+    function openGutenbergEditor() {
+        var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
+
+        fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preview_style: currentPreviewStyle })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                window.onbeforeunload = null;
+                if (wp.customize && wp.customize.state) {
+                    wp.customize.state('saved').set(true);
+                }
+                window.location.href = data.edit_url;
+            } else {
+                console.error('Failed to get edit URL:', data);
+                alert('Unable to open editor. Please try again.');
+            }
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            alert('Unable to open editor. Please try again.');
+        });
+    }
+
 })();

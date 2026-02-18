@@ -35,12 +35,16 @@ function firefly_projects_package_menu($menu_id) {
         }
     }
 
+    // Get template meta if available
+    $template = get_term_meta($menu_id, '_firefly_template', true);
+
     $package = array(
         'menu_data' => array(
             'name'        => $menu->name,
             'slug'        => $menu->slug,
             'description' => $menu->description,
-            'locations'   => $assigned_locations
+            'locations'   => $assigned_locations,
+            'template'    => $template ? $template : ''
         ),
         'items' => array()
     );
@@ -268,8 +272,15 @@ function firefly_projects_handle_incoming_menu($request) {
         }
     }
 
+    // Set template meta if provided
+    if (!empty($menu_data['template'])) {
+        update_term_meta($menu_id, '_firefly_template', $menu_data['template']);
+    }
+
     // Map menu_order to new item ID for parent resolution
     $order_to_id = array();
+    $template_warnings = array();
+    $menu_template = !empty($menu_data['template']) ? $menu_data['template'] : '';
 
     // First pass: create all menu items
     foreach ($items as $item) {
@@ -291,6 +302,14 @@ function firefly_projects_handle_incoming_menu($request) {
             // Try to find post by slug
             $post = get_page_by_path($item['object_slug'], OBJECT, $item['object']);
             if ($post) {
+                // Check if page template matches menu template (warning only, not blocking)
+                if ($menu_template) {
+                    $page_template = get_post_meta($post->ID, '_firefly_template', true);
+                    if ($page_template && $page_template !== $menu_template) {
+                        $template_warnings[] = "Page '{$item['object_slug']}' belongs to template '{$page_template}' but menu is for template '{$menu_template}'";
+                    }
+                }
+
                 $item_data['menu-item-type'] = 'post_type';
                 $item_data['menu-item-object'] = $item['object'];
                 $item_data['menu-item-object-id'] = $post->ID;
@@ -346,7 +365,7 @@ function firefly_projects_handle_incoming_menu($request) {
         set_theme_mod('nav_menu_locations', $current_locations);
     }
 
-    return array(
+    $result = array(
         'success' => true,
         'message' => ($menu ? 'Menu updated' : 'Menu created') . ' successfully.',
         'details' => array(
@@ -355,6 +374,13 @@ function firefly_projects_handle_incoming_menu($request) {
             'locations'   => isset($menu_data['locations']) ? $menu_data['locations'] : array()
         )
     );
+
+    // Add template warnings if any
+    if (!empty($template_warnings)) {
+        $result['warnings'] = $template_warnings;
+    }
+
+    return $result;
 }
 
 /**
@@ -382,6 +408,11 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
             'success' => false,
             'message' => 'Local menu not found.'
         );
+    }
+
+    // Set template meta if provided
+    if (!empty($menu_data['template'])) {
+        update_term_meta($local_menu_id, '_firefly_template', $menu_data['template']);
     }
 
     // Delete ALL existing menu items (full sync)

@@ -185,63 +185,46 @@ function initOverlayMenu() {
     // Overlay menu uses pure CSS for dropdowns - no JavaScript needed!
 }
 
-// IMPROVED: Shared function to handle authentication-based menu item visibility
+// Shared function to handle authentication-based menu item visibility
 function handleAuthMenuVisibility(selector) {
-    // Make sure navData exists before using it
-    if (typeof navData !== 'undefined' && navData.auth_id) {
-        // User is logged IN - Use array-based approach to avoid nth-last-of-type issues
-        const allTopLevelItems = document.querySelectorAll(selector);
-        const topLevelArray = Array.from(allTopLevelItems).filter(item => {
-            // Only target direct children, not submenu items
-            return !item.closest('.sub-menu');
-        });
-        
-        if (topLevelArray.length >= 5) {
-            const signupBtn = topLevelArray[topLevelArray.length - 5];      // 5th from last
-            const orderHistoryBtn = topLevelArray[topLevelArray.length - 4]; // 4th from last
-            const dashboardBtn = topLevelArray[topLevelArray.length - 3];    // 3rd from last
-            const logoutBtn = topLevelArray[topLevelArray.length - 2];       // 2nd from last
-            const loginBtn = topLevelArray[topLevelArray.length - 1];        // last
-            
-            // Hide signup and login, show authenticated user items
-            if (signupBtn) signupBtn.style.display = 'none';
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (orderHistoryBtn) orderHistoryBtn.style.display = 'list-item';
-            if (dashboardBtn) dashboardBtn.style.display = 'list-item';
-            if (logoutBtn) logoutBtn.style.display = 'list-item';
-        }
-    } else {
-        // User is logged OUT - Use array-based approach to avoid nth-last-of-type issues
-        const allTopLevelItems = document.querySelectorAll(selector);
-        const topLevelArray = Array.from(allTopLevelItems).filter(item => {
-            // Only target direct children, not submenu items
-            return !item.closest('.sub-menu');
-        });
-        
-        if (topLevelArray.length >= 5) {
-            const signupBtn = topLevelArray[topLevelArray.length - 5];      // 5th from last
-            const orderHistoryBtn = topLevelArray[topLevelArray.length - 4]; // 4th from last
-            const dashboardBtn = topLevelArray[topLevelArray.length - 3];    // 3rd from last
-            const logoutBtn = topLevelArray[topLevelArray.length - 2];       // 2nd from last
-            const loginBtn = topLevelArray[topLevelArray.length - 1];        // last
-            
-            // Show signup and login, hide authenticated user items
-            if (signupBtn) signupBtn.style.display = 'list-item';
-            if (loginBtn) loginBtn.style.display = 'list-item';
-            if (orderHistoryBtn) orderHistoryBtn.style.display = 'none';
-            if (dashboardBtn) dashboardBtn.style.display = 'none';
-            if (logoutBtn) logoutBtn.style.display = 'none';
-        }
-    }
-    
-    // CRITICAL: Ensure all submenu items remain visible regardless of authentication
-    const allSubMenuItems = document.querySelectorAll('.sub-menu li');
-    allSubMenuItems.forEach(item => {
-        // Force all submenu items to be visible
-        item.style.display = 'list-item';
-        item.style.visibility = 'visible';
-        item.style.opacity = '1';
+    // Get all top-level menu items
+    const allTopLevelItems = document.querySelectorAll(selector);
+    const topLevelArray = Array.from(allTopLevelItems).filter(item => {
+        // Only target direct children, not submenu items
+        return !item.closest('.sub-menu');
     });
+
+    // Find specific menu items by their text content
+    let loginBtn = null;
+    let signupBtn = null;
+    let backToWebsiteBtn = null;
+
+    topLevelArray.forEach(item => {
+        const text = item.textContent.trim();
+        if (text === 'Log In' || text === 'Login') {
+            loginBtn = item;
+        } else if (text === 'Signup' || text === 'Sign Up') {
+            signupBtn = item;
+        } else if (text === 'Back to Website') {
+            backToWebsiteBtn = item;
+        }
+    });
+
+    // Use CSS classes instead of inline styles so !important rules work correctly
+    if (typeof navData !== 'undefined' && navData.auth_id) {
+        // User is logged IN — hide login/signup
+        if (loginBtn) loginBtn.classList.add('auth-hide');
+        if (signupBtn) signupBtn.classList.add('auth-hide');
+        if (backToWebsiteBtn) backToWebsiteBtn.classList.remove('auth-hide');
+    } else {
+        // User is logged OUT — hide back-to-website
+        if (loginBtn) loginBtn.classList.remove('auth-hide');
+        if (signupBtn) signupBtn.classList.remove('auth-hide');
+        if (backToWebsiteBtn) backToWebsiteBtn.classList.add('auth-hide');
+    }
+
+    // Mark auth check as complete so CSS can show menu items
+    document.body.classList.add('auth-checked');
 }
 
 // Close overlay submenus when clicking outside (optional enhancement)

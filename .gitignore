@@ -16,6 +16,8 @@ plugins/*
 
 # Ignore everything in plugin templates except "default"
 plugins/firefly-collective/templates/*
+!plugins/firefly-collective/templates/firefly/
+!plugins/firefly-collective/templates/firefly/**
 !plugins/firefly-collective/templates/default/
 !plugins/firefly-collective/templates/default/**
 !plugins/firefly-collective/templates/glow/
@@ -31,11 +33,19 @@ themes/*
 themes/firefly-collective/templates/*
 !themes/firefly-collective/templates/default/
 !themes/firefly-collective/templates/default/**
+!themes/firefly-collective/templates/firefly/
+!themes/firefly-collective/templates/firefly/**
 !themes/firefly-collective/templates/glow/
 !themes/firefly-collective/templates/glow/**
 
-# Ignore MD files within directories (but allow root-level MD files)
-**/**/*.md
+# Template schemas - only track core templates (firefly, default, glow)
+themes/firefly-collective/data/schemas/*
+!themes/firefly-collective/data/schemas/firefly-schema.json
+!themes/firefly-collective/data/schemas/default-schema.json
+!themes/firefly-collective/data/schemas/glow-schema.json
+
+# Template configurations - user-created templates
+plugins/firefly-collective/templates.json
 
 # Uploads directory
 !uploads/

@@ -148,7 +148,7 @@ function firefly_projects_package_page($post, $include_assets = true) {
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
     foreach ($meta as $key => $values) {
         // Skip internal meta keys (except whitelisted ones)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -256,7 +256,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $meta = get_post_meta($post->ID);
     $meta_data = array();
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
     foreach ($meta as $key => $values) {
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
@@ -350,6 +350,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             'asset_map'      => $asset_map,
             'featured_image' => $featured_image,
             'page_role'      => $page_role,
+            'tracked_links'  => $tracked_links,
             'assets'         => array_map(function($a) {
                 return array(
                     'url'           => isset($a['url']) ? $a['url'] : '',
@@ -363,6 +364,12 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         $zip->close();
     }
 
+    // Get tracked links for this post
+    $tracked_links = array();
+    if (function_exists('firefly_link_tracking_get_post_links_for_sync')) {
+        $tracked_links = firefly_link_tracking_get_post_links_for_sync($post->ID);
+    }
+
     // Prepare request body
     $body = array(
         'post_data'      => $post_data,
@@ -371,7 +378,8 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         'asset_map'      => $asset_map,
         'featured_image' => $featured_image,
         'has_assets'     => !empty($assets_to_sync) || $featured_image_path,
-        'page_role'      => $page_role
+        'page_role'      => $page_role,
+        'tracked_links'  => $tracked_links
     );
 
     // Send request
@@ -428,7 +436,9 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         }
 
         $http_code = wp_remote_retrieve_response_code($response);
-        $response = wp_remote_retrieve_body($response);
+        $response_body = wp_remote_retrieve_body($response);
+
+        $response = $response_body;
     }
 
     // Parse response
@@ -483,6 +493,7 @@ function firefly_projects_handle_incoming_page($request) {
         $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
         $featured_image = isset($manifest['featured_image']) ? $manifest['featured_image'] : null;
         $page_role = isset($manifest['page_role']) ? $manifest['page_role'] : null;
+        $tracked_links = isset($manifest['tracked_links']) ? $manifest['tracked_links'] : array();
 
         // Handle uploaded zip file
         $files = $request->get_file_params();
@@ -497,6 +508,7 @@ function firefly_projects_handle_incoming_page($request) {
         $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
         $featured_image = isset($body['featured_image']) ? $body['featured_image'] : null;
         $page_role = isset($body['page_role']) ? $body['page_role'] : null;
+        $tracked_links = isset($body['tracked_links']) ? $body['tracked_links'] : array();
         $zip_file = null;
     }
 
@@ -538,6 +550,11 @@ function firefly_projects_handle_incoming_page($request) {
     // Save asset map if provided
     if (!empty($asset_map)) {
         update_post_meta($post_id, '_firefly_asset_map', $asset_map);
+    }
+
+    // Sync tracked links if provided
+    if (!empty($tracked_links) && function_exists('firefly_link_tracking_sync_incoming_links')) {
+        firefly_link_tracking_sync_incoming_links($post_id, $tracked_links);
     }
 
     // Process assets if included

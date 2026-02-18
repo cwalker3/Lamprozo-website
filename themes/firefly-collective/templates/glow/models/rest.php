@@ -118,11 +118,6 @@
             'permission_callback' => 'safe_verify_request'
         ));
 
-        register_rest_route('custom-api/v1', '/change-template-option-preview', array(
-			'methods'             => 'POST',
-			'callback'            => 'handle_change_option_preview',
-			'permission_callback' => 'safe_verify_request'
-		));
     }
 }
     add_action('rest_api_init', 'register_custom_api_endpoints');

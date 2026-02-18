@@ -63,6 +63,18 @@
             )
         );
 
+        register_rest_route('custom-api/v1', '/cancel-referral-submission', array(
+            'methods'             => 'POST',
+            'callback'            => 'cancel_referral_submission',
+            'permission_callback' => 'verify_rest_nonce'
+        ));
+
+        register_rest_route('custom-api/v1', '/mark-referral-as-paid', array(
+            'methods'             => 'POST',
+            'callback'            => 'mark_referral_as_paid',
+            'permission_callback' => 'verify_rest_nonce'
+        ));
+
         register_rest_route(
             'custom-api/v1',
             '/place-order',

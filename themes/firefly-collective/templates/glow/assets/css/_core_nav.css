@@ -163,10 +163,9 @@ body > nav li {
     list-style: none;
 }
 
-body > nav ul > li:nth-last-of-type(4),
-body > nav ul > li:nth-last-of-type(3),
-body > nav ul > li:nth-last-of-type(2) {
-    display: none;
+/* Authentication-based Menu Items - handled by JavaScript via auth-hide class */
+body > nav ul > li.auth-hide {
+    display: none !important;
 }
 
 /* Generic Submenu Fixes - Handles Unlimited Nesting Levels */

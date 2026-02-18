@@ -355,6 +355,11 @@ body.auth-checked > nav ul li {
 	display: list-item !important;
 }
 
+/* Hide auth-specific items (login/signup when logged in, etc.) */
+body.auth-checked > nav ul > li.auth-hide {
+	display: none !important;
+}
+
 #profile-button {
 	background: var(--mainColorTransparent, rgba(255, 255, 255, 0.1));
 	border: 1px solid rgba(255, 255, 255, 0.2);

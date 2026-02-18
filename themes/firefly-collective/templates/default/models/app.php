@@ -134,11 +134,16 @@
     }
 
 	function app_setup_nav() {
+		global $active_template;
 		$app_menu_name = 'App Menu';
 		$menu_obj  = wp_get_nav_menu_object($app_menu_name);
 		if (! $menu_obj) {
 			$menu_id  = wp_create_nav_menu($app_menu_name);
 			$new_menu = true;
+			// Set template scope
+			if (!is_wp_error($menu_id) && $active_template) {
+				update_term_meta($menu_id, '_firefly_template', $active_template);
+			}
 		} else {
 			$menu_id  = $menu_obj->term_id;
 			$new_menu = false;

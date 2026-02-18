@@ -543,6 +543,54 @@ function firefly_plugin_register_rest_endpoints() {
             'permission_callback' => 'firefly_plugin_verify_rest_admin'
         )
     );
+
+    // Template Schema Sync: Sync template schema to remote (local site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/sync-template-schema',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_sync_template_schema',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'template' => array(
+                    'required'          => true,
+                    'type'              => 'string',
+                    'sanitize_callback' => 'sanitize_text_field',
+                    'description'       => 'The template name to sync (e.g., firefly, default, glow)'
+                ),
+                'target_env' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'dev',
+                    'enum'              => array('dev', 'prod'),
+                    'description'       => 'Target environment: dev (Live Dev) or prod (Production)'
+                )
+            )
+        )
+    );
+
+    // Template Schema Sync: Handle incoming schema sync (remote site only)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/receive-template-schema',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_receive_template_schema',
+            'permission_callback' => '__return_true' // Uses shared secret authentication
+        )
+    );
+
+    // Template Schema Sync: List available templates (both local and remote)
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/list-template-schemas',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_list_schemas_endpoint',
+            'permission_callback' => '__return_true' // Uses shared secret for remote, admin for local
+        )
+    );
 }
 add_action('rest_api_init', 'firefly_plugin_register_rest_endpoints');
 
@@ -1492,13 +1540,15 @@ function firefly_projects_list_menus($request) {
 
     foreach ($menus as $menu) {
         $items = wp_get_nav_menu_items($menu->term_id);
+        $template = get_term_meta($menu->term_id, '_firefly_template', true);
         $menu_list[] = array(
             'id'          => $menu->term_id,
             'name'        => $menu->name,
             'slug'        => $menu->slug,
             'description' => $menu->description,
             'count'       => $menu->count,
-            'items_count' => $items ? count($items) : 0
+            'items_count' => $items ? count($items) : 0,
+            'template'    => $template ? $template : ''
         );
     }
 
@@ -1774,8 +1824,7 @@ function firefly_projects_verify_bootstrap_secret($request) {
 }
 
 /**
- * Check if wp-dev directory exists with a valid WordPress installation
- * An empty directory or directory without wp-config.php is treated as "not exists"
+ * Check if wp-dev directory exists (called by local on production)
  *
  * @param WP_REST_Request $request
  * @return WP_REST_Response
@@ -1793,44 +1842,15 @@ function firefly_projects_check_dev_exists($request) {
     // Check for wp-dev directory inside ABSPATH (same level as wp-content)
     $wp_dev_path = ABSPATH . 'wp-dev';
 
-    $dir_exists = is_dir($wp_dev_path);
-    $has_wp_config = file_exists($wp_dev_path . '/wp-config.php');
-    $is_empty = $dir_exists && firefly_projects_is_directory_empty($wp_dev_path);
-
-    // Consider it as "exists" only if it has a wp-config.php (valid WP installation)
-    $exists = $dir_exists && $has_wp_config;
+    $exists = is_dir($wp_dev_path);
 
     return new WP_REST_Response(array(
         'success' => true,
         'exists' => $exists,
-        'dir_exists' => $dir_exists,
-        'is_empty' => $is_empty,
-        'has_wp_config' => $has_wp_config,
         'path' => $exists ? $wp_dev_path : null,
         'suggested_path' => $wp_dev_path,
         'abspath' => ABSPATH
     ), 200);
-}
-
-/**
- * Check if a directory is empty
- *
- * @param string $dir Directory path
- * @return bool True if empty or only contains . and ..
- */
-function firefly_projects_is_directory_empty($dir) {
-    if (!is_dir($dir)) {
-        return true;
-    }
-    $handle = opendir($dir);
-    while (false !== ($entry = readdir($handle))) {
-        if ($entry !== '.' && $entry !== '..') {
-            closedir($handle);
-            return false;
-        }
-    }
-    closedir($handle);
-    return true;
 }
 
 /**
@@ -1865,25 +1885,20 @@ function firefly_projects_bootstrap_dev($request) {
     // Determine target path - put wp-dev inside the document root (same level as wp-content)
     $target_path = ABSPATH . sanitize_file_name($target_folder);
 
-    // Check if directory exists and has a valid WordPress installation
+    // Check if already exists
     if (is_dir($target_path)) {
-        // If wp-config.php exists, this is a valid installation - don't overwrite
-        if (file_exists($target_path . '/wp-config.php')) {
-            return new WP_REST_Response(array(
-                'success' => false,
-                'message' => 'A WordPress installation already exists in: ' . $target_folder
-            ), 400);
-        }
-        // Directory exists but is empty or incomplete - proceed with bootstrap
-        // (hosting provider may have pre-created the folder for the subdomain)
-    } else {
-        // Create target directory
-        if (!wp_mkdir_p($target_path)) {
-            return new WP_REST_Response(array(
-                'success' => false,
-                'message' => 'Failed to create directory: ' . $target_path
-            ), 500);
-        }
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Target directory already exists: ' . $target_folder
+        ), 400);
+    }
+
+    // Create target directory
+    if (!wp_mkdir_p($target_path)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Failed to create directory: ' . $target_path
+        ), 500);
     }
 
     $extracted_files = 0;
@@ -2213,4 +2228,152 @@ function firefly_projects_fix_permissions_recursive($path) {
             @chmod($item->getRealPath(), 0644);
         }
     }
+}
+
+/**
+ * ============================================================================
+ * TEMPLATE SCHEMA SYNC ENDPOINTS
+ * ============================================================================
+ */
+
+/**
+ * Sync template schema to remote site
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_sync_template_schema($request) {
+    $template = $request->get_param('template');
+    $target_env = $request->get_param('target_env');
+
+    // Load the template schema sync handler
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/template-schema-sync.php';
+
+    // Check if template schema system is available
+    if (!firefly_projects_is_template_schema_available()) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Template schema system not available. Firefly theme may not be active.'
+        ), 400);
+    }
+
+    // Check configuration based on target environment
+    if ($target_env === 'prod') {
+        if (!defined('PROD_ENDPOINT') || empty(PROD_ENDPOINT)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Production endpoint not configured. Please set PROD_ENDPOINT in wp-config.php.'
+            ), 400);
+        }
+    } else {
+        if (!firefly_projects_is_configured()) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Plugin not configured. Please set FIREFLY_SHARED_SECRET and LIVE_DEV_ENDPOINT in wp-config.php.'
+            ), 400);
+        }
+    }
+
+    // Perform the sync
+    $result = firefly_projects_perform_template_schema_sync($template, $target_env);
+
+    if ($result['success']) {
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => $result['message'],
+            'details' => isset($result['details']) ? $result['details'] : null
+        ), 200);
+    } else {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => $result['message']
+        ), 500);
+    }
+}
+
+/**
+ * Receive template schema from local site (remote endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_receive_template_schema($request) {
+    // Verify shared secret
+    $provided_secret = $request->get_header('X-Firefly-Secret');
+
+    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Shared secret not configured on remote.'
+        ), 500);
+    }
+
+    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Invalid shared secret.'
+        ), 403);
+    }
+
+    // Load the template schema sync handler
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/template-schema-sync.php';
+
+    // Process the incoming schema
+    $result = firefly_projects_handle_incoming_template_schema($request);
+
+    if ($result['success']) {
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => $result['message'],
+            'details' => isset($result['details']) ? $result['details'] : null
+        ), 200);
+    } else {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => $result['message']
+        ), 500);
+    }
+}
+
+/**
+ * List available template schemas (endpoint)
+ *
+ * @param WP_REST_Request $request The REST request object
+ * @return WP_REST_Response
+ */
+function firefly_projects_list_schemas_endpoint($request) {
+    // Check if this is a remote call (shared secret) or local call (admin)
+    $provided_secret = $request->get_header('X-Firefly-Secret');
+
+    if ($provided_secret) {
+        // Remote call - verify shared secret
+        if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Shared secret not configured on remote.'
+            ), 500);
+        }
+
+        if ($provided_secret !== FIREFLY_SHARED_SECRET) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Invalid shared secret.'
+            ), 403);
+        }
+    } else {
+        // Local call - verify admin
+        if (!current_user_can('manage_options')) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => 'Unauthorized.'
+            ), 403);
+        }
+    }
+
+    // Load the template schema sync handler
+    require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/template-schema-sync.php';
+
+    $result = firefly_projects_list_template_schemas();
+
+    return new WP_REST_Response($result, 200);
 }

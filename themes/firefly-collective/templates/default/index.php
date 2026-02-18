@@ -16,6 +16,7 @@
     // Get the slug for the page
     $pageSlug = '';
     if (is_single()) {
+        $pageFound = true;
         $pageSlug = 'blog-post';
     } elseif (is_page()) {
         $pageFound = true;

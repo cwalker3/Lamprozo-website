@@ -85,18 +85,18 @@
         $logo_class_attr = !empty($logo_classes) ? ' class="' . implode(' ', $logo_classes) . '"' : '';
     ?>
 
-    <header role="banner" itemscope itemtype="https://schema.org/WPHeader">
+    <header>
         <div id="nav-bar"<?php echo $navbar_attr; ?>></div>
 
-        <div id="logo-name"<?php echo $logo_class_attr; ?> itemscope itemtype="https://schema.org/Organization">
+        <div id="logo-name"<?php echo $logo_class_attr; ?>>
             <div id="site-logo">
-                <a href="/" itemprop="url">
-                    <img src="<?php echo esc_url( $template_path_web . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>" itemprop="logo">
+                <a href="/">
+                    <img src="<?php echo esc_url( $template_path_web . '/images/logo.webp' ); ?>" alt="<?php echo esc_attr( get_bloginfo('name') ); ?>">
                 </a>
             </div>
             <div id="site-name">
                 <a href="/">
-                    <span itemprop="name"><?php echo esc_html( get_bloginfo('name') ); ?></span>
+                    <?php echo esc_html( get_bloginfo('name') ); ?>
                 </a>
             </div>
         </div>
@@ -105,7 +105,7 @@
     <!-- Consolidated Overlay Menu System -->
     <?php if ($use_any_overlay && !$is_web_app): ?>
         <div id="overlay-menu-container" class="<?php echo $use_front_overlay ? 'front-page' : 'inner-page'; ?><?php echo $add_user_nav ? ' user-nav' : ''; ?>">
-            <nav id="overlay-nav" role="navigation" aria-label="Main Navigation" itemscope itemtype="https://schema.org/SiteNavigationElement">
+            <nav id="overlay-nav">
                 <?php
                     wp_nav_menu( array(
                         'theme_location'  => 'website-menu',
@@ -170,7 +170,7 @@
     </div>
     <?php endif; ?>
 
-    <nav role="navigation" aria-label="<?php echo $is_web_app ? 'App Navigation' : 'Site Navigation'; ?>" itemscope itemtype="https://schema.org/SiteNavigationElement">
+    <nav>
         <?php
             wp_nav_menu( array(
                 'theme_location'  => $nav,
@@ -180,7 +180,7 @@
         ?>
     </nav>
 
-    <main role="main" id="main-content">
+    <main>
         <div id="contact-sticky">
             <h3>Looking to Connect?</h3>
             <a href="/contact">Contact Us</a>

@@ -1,18 +1,18 @@
 {
     "organization": {
-        "name": "Firefly Collective",
-        "legalName": "Firefly Collective",
-        "url": "https://fireflycollective.org",
-        "foundingDate": "2026",
-        "description": "A professional guild for the tech industry dedicated to showcasing developer work, analyzing industry health, and building community across all skill levels and domains.",
-        "disambiguatingDescription": "Firefly Collective is a tech industry guild and community organization that brings together developers of all skill levels and specializations. We showcase member projects, publish industry health reports and analysis, and foster collaboration across the technology sector. Not affiliated with Firefly Creative, Adobe Firefly, or other companies using the Firefly name.",
-        "logo": "https://fireflycollective.org/wp-content/uploads/logo.png",
-        "image": "https://fireflycollective.org/wp-content/uploads/og-image.png"
+        "name": "Firefly Creative, LLC",
+        "legalName": "Firefly Creative, LLC",
+        "url": "https://fireflycreative.co",
+        "foundingDate": "2022",
+        "description": "Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses.",
+        "disambiguatingDescription": "Firefly Creative, LLC is a Redding, California-based digital agency specializing in custom WordPress development, web design, and digital strategy. Founded by Alex and Anna Strait in 2022. Not affiliated with Adobe Firefly or other companies using the Firefly name.",
+        "logo": "https://fireflycreative.co/wp-content/uploads/logo.png",
+        "image": "https://fireflycreative.co/wp-content/uploads/og-image.png"
     },
     "location": {
-        "city": "",
-        "state": "",
-        "stateCode": "",
+        "city": "Redding",
+        "state": "California",
+        "stateCode": "CA",
         "country": "United States",
         "countryCode": "US"
     },
@@ -23,8 +23,13 @@
     "founders": [
         {
             "name": "Alex Strait",
-            "jobTitle": "Founder",
-            "description": "Founder of Firefly Collective. Software developer with expertise in web development, PHP, and building developer communities."
+            "jobTitle": "Co-Founder & Lead Developer",
+            "description": "Co-founder of Firefly Creative, LLC with expertise in custom WordPress development, PHP programming, and web application architecture."
+        },
+        {
+            "name": "Anna Strait",
+            "jobTitle": "Co-Founder",
+            "description": "Co-founder of Firefly Creative, LLC."
         }
     ],
     "social": {
@@ -36,26 +41,26 @@
     },
     "services": [
         {
-            "name": "Developer Portfolio Showcase",
-            "description": "Platform for members to showcase their projects, code contributions, and technical achievements to the broader tech community"
+            "name": "Custom WordPress Development",
+            "description": "Bespoke WordPress themes and plugins built from scratch, not modified templates"
         },
         {
-            "name": "Tech Industry Analysis",
-            "description": "Regular reports and insights on the health of the tech industry, job market trends, emerging technologies, and developer sentiment"
+            "name": "Web Application Development",
+            "description": "Full-stack web applications using modern PHP and JavaScript frameworks"
         },
         {
-            "name": "Community & Networking",
-            "description": "Connect with developers across all skill levels and domains, from junior developers to senior architects, frontend to backend, DevOps to data science"
+            "name": "AI Integration & RAG Systems",
+            "description": "Custom AI solutions including Retrieval-Augmented Generation (RAG) systems, chatbot development, and LLM integration for business applications"
         },
         {
-            "name": "Skill Development Resources",
-            "description": "Learning resources, mentorship opportunities, and collaborative projects to help developers grow their skills"
+            "name": "E-commerce Solutions",
+            "description": "Custom shopping experiences and WooCommerce development"
         },
         {
-            "name": "Industry Advocacy",
-            "description": "Collective voice for developers on industry issues, best practices, and professional standards"
+            "name": "Digital Strategy",
+            "description": "Strategic planning for digital presence and web technology"
         }
     ],
-    "naics": "813920",
-    "isicV4": "9412"
+    "naics": "541511",
+    "isicV4": "6201"
 }

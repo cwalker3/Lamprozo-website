@@ -180,8 +180,8 @@ function firefly_projects_enqueue_gutenberg_assets() {
         'prodSite' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT) ? parse_url(PROD_ENDPOINT, PHP_URL_HOST) : '',
         'isLocalDev' => firefly_projects_is_local_dev()
     ));
+
 }
-add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_gutenberg_assets');
 
 /**
  * Enqueue GEO Settings panel and FAQ block assets
@@ -236,6 +236,7 @@ function firefly_projects_enqueue_geo_assets() {
         file_exists($geo_css_file) ? filemtime($geo_css_file) : FIREFLY_PROJECTS_VERSION
     );
 }
+add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_gutenberg_assets');
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_geo_assets');
 
 /**

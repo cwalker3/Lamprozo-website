@@ -1,66 +1,45 @@
 <?php
+/**
+ * Default Template - Pages Model
+ *
+ * Uses the schema-driven system to define and create pages.
+ */
 
-    // theme/models/pages.php
+/**
+ * Get the page structure for this template.
+ * Used by nav.php and other components that need page info.
+ */
+function get_theme_pages_structure() {
+    global $active_template;
+    return firefly_get_schema_pages($active_template);
+}
 
-	// Define the page structure that both pages.php and nav.php will use
-	function get_theme_pages_structure() {
-		global $active_template;
+/**
+ * Create pages from schema on theme activation.
+ */
+function custom_theme_setup_pages() {
+    global $active_template;
 
-        $landing_page_style 	 =  firefly_collective_get_landing_style();
-        $landing_page_contents   =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing.html');
-		$landing_page_contents   .= file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/landing-secondary.html');
-		$template_page_contents  =  file_get_contents(get_template_directory() 	. '/templates/' . $active_template . '/snippets/template.html');
-		
-		// Load banner template
-		$banner_template = file_get_contents(get_template_directory() . '/templates/' . $active_template . '/snippets/page-banner.html');
-		
-		// Create banners for each page
-		$blog_banner = str_replace('{{PAGE_TITLE}}', 'Blog', $banner_template);
-		$contact_banner = str_replace('{{PAGE_TITLE}}', 'Contact', $banner_template);
-		$signup_banner = str_replace('{{PAGE_TITLE}}', 'Sign Up', $banner_template);
-		$order_history_banner = str_replace('{{PAGE_TITLE}}', 'Order History', $banner_template);
-		$dashboard_banner = str_replace('{{PAGE_TITLE}}', 'Dashboard', $banner_template);
+    // Create pages from schema
+    $page_ids = firefly_create_template_pages($active_template);
 
-		return array(
-			'home'              => array('title' => 'Home',             'content' => $landing_page_contents),
-			'app'               => array('title' => 'App',              'content' => 'This is the PWA front end page.'),
-			'blog'              => array('title' => 'Blog',             'content' => $blog_banner),
-			'contact'           => array('title' => 'Contact',          'content' => $contact_banner),
-			'signup'            => array('title' => 'Signup',           'content' => $signup_banner),
-			'order-history'     => array('title' => 'Order History',    'content' => $order_history_banner),
-			'dashboard'         => array('title' => 'Dashboard',        'content' => $dashboard_banner),
-			'template'          => array('title' => 'Template',        	'content' => $template_page_contents),
-		);
-	}
+    // Create categories from schema
+    firefly_create_template_categories($active_template);
 
-	function custom_theme_setup_pages() {
-		$pages = get_theme_pages_structure();
+    // Create posts from schema
+    firefly_create_template_posts($active_template);
 
-		// Create pages if they don't exist
-		$page_ids = array();
-		foreach ($pages as $slug => $data) {
-			$page = get_page_by_path($slug);
-			if (! $page) {
-				$page_id = wp_insert_post(array(
-					'post_title'   => $data['title'],
-					'post_content' => $data['content'],
-					'post_status'  => 'publish',
-					'post_type'    => 'page',
-					'post_name'    => $slug,
-				));
-				$page_ids[$slug] = $page_id;
-			} else {
-				$page_ids[$slug] = $page->ID;
-			}
-		}
+    // Set WordPress front page and posts page options
+    $front_page_id = isset($page_ids['home']) ? $page_ids['home'] : 0;
+    $posts_page_id = isset($page_ids['blog']) ? $page_ids['blog'] : 0;
 
-		// Set front page and posts page
-		if (! empty($page_ids['home'])) {
-			update_option('show_on_front', 'page');
-			update_option('page_on_front', $page_ids['home']);
-		}
-		if (! empty($page_ids['blog'])) {
-			update_option('page_for_posts', $page_ids['blog']);
-		}
-	}
-	add_action('after_switch_theme', 'custom_theme_setup_pages');
+    if ($front_page_id) {
+        update_option('show_on_front', 'page');
+        update_option('page_on_front', $front_page_id);
+    }
+
+    if ($posts_page_id) {
+        update_option('page_for_posts', $posts_page_id);
+    }
+}
+add_action('after_switch_theme', 'custom_theme_setup_pages');

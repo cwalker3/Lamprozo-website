@@ -9,12 +9,12 @@
 
     global $template_path;
 
-    // Load models - customize MUST be loaded first for template system
-    $models = array(  
-                'init',         'view',         
-                'pages',        'nav',
-                'customize',    'rest',
-                'mail',         'contact');
+    // Load models
+    $models = array(
+                'init',         'view',
+                'pages',        'rest',
+                'mail',         'blogs',
+                'contact',      'util');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";

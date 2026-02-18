@@ -2,6 +2,11 @@
  * Firefly Analytics Dashboard Styles
  */
 
+/* Hide uncompiled Vue templates */
+[v-cloak] {
+    display: none !important;
+}
+
 /* Overview Cards */
 .analytics-overview {
     display: grid;

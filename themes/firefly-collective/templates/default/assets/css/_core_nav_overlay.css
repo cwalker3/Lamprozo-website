@@ -314,8 +314,10 @@ header.element-disable #logo-name.logo-left {
     margin-top: 32px;
 }
 
-/* Authentication-based Menu Items - Now handled by JavaScript */
-/* Removed position-based hiding to prevent interference with legitimate menu items */
+/* Authentication-based Menu Items - handled by JavaScript via auth-hide class */
+.overlay-menu > li.auth-hide {
+	display: none !important;
+}
 
 /* Accessibility Enhancements */
 .overlay-menu a:focus {

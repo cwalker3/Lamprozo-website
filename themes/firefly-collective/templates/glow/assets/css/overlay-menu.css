@@ -181,11 +181,9 @@
     margin-top: 32px;
 }
 
-/* Authentication-based Menu Items (same logic as hamburger menu) */
-.overlay-menu > li:nth-last-of-type(4),
-.overlay-menu > li:nth-last-of-type(3),
-.overlay-menu > li:nth-last-of-type(2) {
-    display: none;
+/* Authentication-based Menu Items - handled by JavaScript via auth-hide class */
+.overlay-menu > li.auth-hide {
+    display: none !important;
 }
 
 /* Accessibility Enhancements */

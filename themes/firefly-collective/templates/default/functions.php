@@ -9,7 +9,7 @@
 
     global $template_path;
 
-    // Load models - customize MUST be loaded first for template system
+    // Load models
     $models = array(
                 'init',         'rest',
                 'user',         'meta',
@@ -17,10 +17,9 @@
                 'signin',       'blogs',
                 'bookings',     'mail',
                 'view',         'pages',
-                'nav',          'util',
+                'util',
                 'encrypt',      'profile',
-                'app',          'customize',
-                'semantic',     'schema');
+                'app');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";

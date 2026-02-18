@@ -1365,7 +1365,7 @@
             </head>
             <body>
                 <div class='invoice-header'>
-                    <div class='company-name'>Firefly Collective</div>
+                    <div class='company-name'>Firefly Creative</div>
                     <div>Order Invoice #{$invoice_number}</div>
                     <div class='status-badge' style='background-color: {$status_color};'>
                         Status: {$status_formatted}
@@ -1421,8 +1421,8 @@
                 
                 <div class='invoice-footer'>
                     <div class='contact-info'>
-                        Firefly Collective<br>
-                        Email: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a>
+                        Firefly Creative<br>
+                        Email: <a href='mailto:donotreply@fireflycreative.io'>donotreply@fireflycreative.io</a>
                     </div>
                 </div>
             </body>
@@ -1431,8 +1431,8 @@
         
         // Set headers for HTML mail
         $headers = array(
-            'From: Firefly Collective <donotreply@fireflycollective.org>',
-            'Reply-To: donotreply@fireflycollective.org',
+            'From: Firefly Creative <donotreply@fireflycreative.io>',
+            'Reply-To: donotreply@fireflycreative.io',
             'Content-Type: text/html; charset=UTF-8',
         );
 
@@ -1453,7 +1453,7 @@
             </head>
             <body>
                 <div class='invoice-header'>
-                    <div class='company-name'>Firefly Collective</div>
+                    <div class='company-name'>Firefly Creative</div>
                     <div>Order Invoice #{$invoice_number}</div>
                     <div class='status-badge' style='background-color: {$status_color};'>
                         Status: {$status_formatted}

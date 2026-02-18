@@ -90,7 +90,15 @@
 .ffc-table-container {
     margin-top: 20px;
     overflow-x: auto;
-    max-width: 100%;
+    width: 100%;
+    max-width: calc(100vw - 40px); /* Account for app margins */
+}
+
+/* Make sure parent containers don't hide overflow */
+#ffc-orders-app,
+main,
+.content {
+    overflow-x: visible !important;
 }
 
 .ffc-orders-table {
@@ -325,7 +333,7 @@ td.ffc-total-price > button {
 }
 
 .ffc-pagination-info {
-    color: #666;
+    color: white;
 }
 
 .ffc-pagination-controls {

@@ -77,6 +77,11 @@
             'template_path' => $template_path_web
         ));
 
+        // Nav js data for auth menu visibility
+        wp_localize_script('core-nav-js', 'navData', array(
+            'auth_id' => isset($_COOKIE['auth_id']) ? $_COOKIE['auth_id'] : ''
+        ));
+
         // Get dynamic asset paths
         $assets = get_view_assets($current_view, $theme_path, $backend_plugin_path_web);
 

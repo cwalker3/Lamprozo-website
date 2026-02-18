@@ -11,7 +11,25 @@
     define('FIREFLY_COLLECTIVE_TEMPLATE_OPTION', 'firefly_collective_active_template');
     define('FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION', 'firefly_collective_active_template_temp');
     define('FIREFLY_COLLECTIVE_TEMPLATES_DIR', get_template_directory() . '/templates');
-    
+
+    // Include template content scoping
+    require_once get_template_directory() . '/models/template-scoping.php';
+
+    // Include schema-driven template system
+    require_once get_template_directory() . '/models/template-schema.php';
+    require_once get_template_directory() . '/models/template-nav.php';
+
+    // Include snippet sync (saves content to snippet files on publish)
+    require_once get_template_directory() . '/models/template-snippets.php';
+
+    // Include centralised template options (Customizer registration, save, preview, CSS)
+    require_once get_template_directory() . '/models/template-options.php';
+
+    // Include admin UI for template scoping (only in admin)
+    if (is_admin()) {
+        require_once get_template_directory() . '/models/template-scoping-admin.php';
+    }
+
     global $nonce;
     $nonce = wp_create_nonce('wp_rest');
 
@@ -39,21 +57,57 @@
                file_exists($template_path . '/footer.php');
     }
 
+    /**
+     * Early sync: when the Customizer iframe loads via POST, WordPress includes
+     * the current setting values as JSON in $_POST['customized']. Read the
+     * template setting from there and update the temp option BEFORE
+     * get_active_template() is called, so functions.php loads the right template.
+     */
+    $__ff_is_iframe = (
+        isset($_GET['customize_messenger_channel']) ||
+        isset($_GET['customize_changeset_uuid']) ||
+        (isset($_SERVER['HTTP_SEC_FETCH_DEST']) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe')
+    );
+
+    if ($__ff_is_iframe && !empty($_POST['customized'])) {
+        $__ff_customized = json_decode(wp_unslash($_POST['customized']), true);
+        if (is_array($__ff_customized) && isset($__ff_customized[FIREFLY_COLLECTIVE_TEMPLATE_OPTION])) {
+            $__ff_synced = sanitize_file_name($__ff_customized[FIREFLY_COLLECTIVE_TEMPLATE_OPTION]);
+            if (firefly_collective_plugin_template_exists($__ff_synced)) {
+                update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $__ff_synced);
+            }
+        }
+    }
+
+    unset($__ff_is_iframe, $__ff_customized, $__ff_synced);
+
     function handle_change_template_temp( WP_REST_Request $request ) {
         $template_name = sanitize_text_field( $request->get_param( 'template' ) );
-        
+
         if ( empty( $template_name ) ) {
             return new WP_Error( 'missing_template', 'Template name is required', array( 'status' => 400 ) );
         }
-        
+
         // Validate template exists using plugin function
         if ( ! firefly_collective_plugin_template_exists( $template_name ) ) {
             return new WP_Error( 'invalid_template', 'Template does not exist', array( 'status' => 400 ) );
         }
-        
+
         // Update temp option
         update_option( FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template_name );
-        
+
+        // Ensure template content exists for preview (creates from schema if missing)
+        if ( function_exists( 'firefly_ensure_template_content' ) ) {
+            firefly_ensure_template_content( $template_name );
+        }
+
+        // Reset preview options for the new template to match its live values
+        $options = firefly_get_template_options( $template_name );
+        foreach ( $options as $key => $config ) {
+            $live = firefly_get_template_option( $key, false, $template_name );
+            firefly_set_template_option( $key, $live, $template_name, true );
+        }
+
         return rest_ensure_response( array(
             'success' => true,
             'template' => $template_name
@@ -89,6 +143,28 @@
 		// Initialize landing style preview to match current landing style
 		update_option(FIREFLY_COLLECTIVE_LANDING_STYLE_PREVIEW_OPTION, FIREFLY_COLLECTIVE_DEFAULT_LANDING_STYLE);
 		
+		// Ensure all template content (pages, posts, categories, menu) exists
+		firefly_ensure_template_content(FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+
+		// Assign website menu to theme location
+		$menu_id = get_option('firefly_menu_' . FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+		if ($menu_id) {
+			$locations = get_theme_mod('nav_menu_locations', array());
+			$locations['website-menu'] = $menu_id;
+			set_theme_mod('nav_menu_locations', $locations);
+		}
+
+		// Set front page and posts page
+		$front_page = get_option('firefly_front_page_' . FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+		$posts_page = get_option('firefly_posts_page_' . FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+		if ($front_page) {
+			update_option('show_on_front', 'page');
+			update_option('page_on_front', $front_page);
+		}
+		if ($posts_page) {
+			update_option('page_for_posts', $posts_page);
+		}
+
 		// Flush rewrite rules if needed
 		flush_rewrite_rules();
 	}
@@ -100,19 +176,17 @@
      * @return string The active template name
      */
     function firefly_collective_get_active_template() {
-        $is_in_iframe = in_customizer_iframe();
-        
         // Use temp template when in customizer iframe
-        if ($is_in_iframe) {
+        if (in_customizer_iframe()) {
             $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         } else {
             $template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
         }
-        
+
         // Validate template exists, fallback to default if not
         if (!firefly_collective_template_exists($template)) {
             $template = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
-            if ($is_in_iframe) {
+            if (in_customizer_iframe()) {
                 update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $template);
             } else {
                 update_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, $template);
@@ -272,45 +346,15 @@
     }
 
     /**
-     * Reset temp template to live template when NOT in customizer
-     * This ensures fresh start when entering customizer
-     * DISABLED - The customizer system will handle this properly
+     * Reset temp template to published value when the Customizer panel loads.
+     * This runs on the admin side (not in the iframe) so the iframe gets a
+     * fresh start matching the published template every time the Customizer opens.
      */
-    function firefly_collective_maybe_reset_temp_template() {
-        // COMPLETELY DISABLE AUTO-RESET - let the customizer handle it
-        return;
-        
-        // Don't reset during AJAX requests (customizer uses AJAX)
-        if (wp_doing_ajax()) {
-            return;
-        }
-        
-        // Don't reset during admin requests (including customizer saves)
-        if (is_admin()) {
-            return;
-        }
-        
-        // Don't reset during REST API requests (customizer uses REST API)
-        if (defined('REST_REQUEST') && REST_REQUEST) {
-            return;
-        }
-        
-        // Only reset if we're NOT in the customizer iframe
-        if (!in_customizer_iframe() && !is_customize_preview()) {
-            // Check if we need to reset (not in an active customizer session)
-            if (!isset($_GET['customize_changeset_uuid']) && !isset($_POST['customize_changeset_uuid'])) {
-                $current_live_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-                $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION);
-                
-                // Only update if different to avoid unnecessary database writes
-                if ($temp_template !== $current_live_template) {
-                    error_log("Resetting temp template from {$temp_template} to {$current_live_template}");
-                    update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $current_live_template);
-                }
-            }
-        }
+    function firefly_collective_reset_temp_on_customizer_load() {
+        $published = get_option(FIREFLY_COLLECTIVE_TEMPLATE_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
+        update_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, $published);
     }
-    add_action('init', 'firefly_collective_maybe_reset_temp_template', 1);
+    add_action('customize_controls_init', 'firefly_collective_reset_temp_on_customizer_load');
 
     /**
      * Add template selector to WordPress Customizer
@@ -1287,3 +1331,65 @@
 
         return $show;
     }, PHP_INT_MAX);
+
+    /**
+     * Register customizer-related REST endpoints at theme level.
+     * These must be available regardless of which template is active.
+     */
+    function firefly_register_customizer_endpoints() {
+        register_rest_route('custom-api/v1', '/change-template-temp', array(
+            'methods'             => 'POST',
+            'callback'            => 'handle_change_template_temp',
+            'permission_callback' => 'firefly_customizer_permission_check'
+        ));
+
+        register_rest_route('custom-api/v1', '/change-landing-style-preview', array(
+            'methods'             => 'POST',
+            'callback'            => 'handle_change_landing_style_preview',
+            'permission_callback' => 'firefly_customizer_permission_check'
+        ));
+
+        register_rest_route('custom-api/v1', '/get-landing-style-preview', array(
+            'methods'             => 'GET',
+            'callback'            => 'handle_get_landing_style_preview',
+            'permission_callback' => 'firefly_customizer_permission_check'
+        ));
+
+        register_rest_route('custom-api/v1', '/edit-landing-in-gutenberg', array(
+            'methods'             => 'POST',
+            'callback'            => 'handle_edit_landing_in_gutenberg',
+            'permission_callback' => 'firefly_customizer_permission_check'
+        ));
+
+        register_rest_route('custom-api/v1', '/change-template-option-preview', array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_handle_template_option_preview',
+            'permission_callback' => 'firefly_customizer_permission_check'
+        ));
+    }
+    add_action('rest_api_init', 'firefly_register_customizer_endpoints');
+
+    /**
+     * Permission check for customizer endpoints.
+     */
+    function firefly_customizer_permission_check(WP_REST_Request $request) {
+        // Allow if user can customize
+        if (is_user_logged_in() && current_user_can('customize')) {
+            return true;
+        }
+
+        // Check logged in cookie
+        if (!empty($_COOKIE[LOGGED_IN_COOKIE])) {
+            $cookie_value = sanitize_text_field($_COOKIE[LOGGED_IN_COOKIE]);
+            $user_id = wp_validate_auth_cookie($cookie_value, 'logged_in');
+
+            if ($user_id) {
+                wp_set_current_user($user_id);
+                if (user_can($user_id, 'customize')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }

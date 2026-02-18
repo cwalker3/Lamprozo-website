@@ -2,11 +2,12 @@
 
     // template/models/init.php
 
-    // Register Navigation Menu
-    function register_website_menu() {
+    // Register Navigation Menus
+    function register_website_menus() {
         register_nav_menu('website-menu', __('Main Website Menu', 'firefly-collective'));
+        register_nav_menu('app-menu', __('App Menu', 'firefly-collective'));
     }
-    add_action('init', 'register_website_menu');
+    add_action('init', 'register_website_menus');
 
     // Add Theme Support for Post Thumbnails
     add_theme_support('post-thumbnails');

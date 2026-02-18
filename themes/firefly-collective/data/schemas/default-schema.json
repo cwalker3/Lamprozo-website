@@ -1,0 +1,112 @@
+{
+    "template": "default",
+    "version": "1.0.0",
+    "description": "Standard template with banner-style pages for professional sites",
+    "pages": [
+        {
+            "slug": "home",
+            "title": "Home",
+            "snippet": "home-default.html",
+            "required": true,
+            "set_as": "front_page",
+            "in_menu": true,
+            "menu_order": 1
+        },
+        {
+            "slug": "blog",
+            "title": "Blog",
+            "snippet": "blog-default.html",
+            "required": true,
+            "set_as": "posts_page",
+            "in_menu": true,
+            "menu_order": 3,
+            "view": true
+        },
+        {
+            "slug": "contact",
+            "title": "Contact",
+            "snippet": "contact-default.html",
+            "required": true,
+            "in_menu": true,
+            "menu_order": 4,
+            "view": true
+        },
+        {
+            "slug": "app",
+            "title": "App",
+            "snippet": "app-default.html",
+            "view": true,
+            "in_menu": true,
+            "menu_order": 2
+        },
+        {
+            "slug": "signup",
+            "title": "Signup",
+            "snippet": "signup-default.html",
+            "view": true,
+            "in_menu": true,
+            "menu_order": 5
+        },
+        {
+            "slug": "request-an-appointment",
+            "title": "Request an Appointment",
+            "snippet": "page-banner.html",
+            "content_replace": {"{{PAGE_TITLE}}": "Request an Appointment"},
+            "view": true,
+            "in_menu": false
+        },
+        {
+            "slug": "order-history",
+            "title": "Order History",
+            "snippet": "order-history-default.html",
+            "view": true,
+            "in_menu": false
+        },
+        {
+            "slug": "dashboard",
+            "title": "Dashboard",
+            "snippet": "dashboard-default.html",
+            "view": true,
+            "in_menu": false
+        },
+        {
+            "slug": "logout",
+            "title": "Logout",
+            "snippet": "page-banner.html",
+            "content_replace": {"{{PAGE_TITLE}}": "Logout"},
+            "view": true,
+            "in_menu": false
+        },
+        {
+            "slug": "template",
+            "title": "Template",
+            "snippet": "template-default.html",
+            "in_menu": false
+        }
+    ],
+    "posts": [
+        {
+            "slug": "hello-world",
+            "title": "Hello World",
+            "snippet": "hello-world.html",
+            "category": "uncategorized"
+        }
+    ],
+    "categories": [
+        {
+            "slug": "uncategorized",
+            "name": "Uncategorized",
+            "required": true
+        }
+    ],
+    "tags": [],
+    "menu": {
+        "name": "Main Menu",
+        "custom_links": [
+            {"title": "Log In", "url": "/ffc-login"}
+        ]
+    },
+    "options": {
+        "show_on_front": "page"
+    }
+}

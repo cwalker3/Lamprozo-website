@@ -24,6 +24,20 @@
             case '':
                 // Front page only
                 break;
+
+            case 'blog':
+                $assets['css'][]    = $template_path . '/assets/css/blog.css';
+                $assets['js'][]     = $template_path . '/assets/js/blog.js';
+                break;
+
+            case 'blog-post':
+                $assets['css'][]    = $template_path . '/assets/css/blog-post.css';
+                break;
+
+            case 'contact':
+                $assets['css'][]    = $template_path . '/assets/css/contact.css';
+                $assets['js'][]     = $template_path . '/assets/js/contact.js';
+                break;
         }
 
         return $assets;
@@ -46,7 +60,7 @@
             $view = sanitize_title($aCmd[0]);
 
             // Valid custom URLs
-            $valid_views = array();
+            $valid_views = array('contact');
             
             if (in_array($view, $valid_views)) {
                 // Check if the view file exists

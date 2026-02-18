@@ -16,6 +16,7 @@
     // Get the slug for the page
     $pageSlug = '';
     if (is_single()) {
+        $pageFound = true;
         $pageSlug = 'blog-post';
     } elseif (is_page()) {
         $pageFound = true;
@@ -65,7 +66,7 @@
         echo apply_filters('the_content', $content);
     } else {
         $view = sanitize_file_name($view ?: '404');
-        $view_path = get_template_directory() . '/templates/' . '/' . $active_template . '/views/' . $view . '.php';
+        $view_path = get_template_directory() . '/templates/' . $active_template . '/views/' . $view . '.php';
         if (!file_exists($view_path)) {
             $view_path = $template_path . '/views/404.php';
         }

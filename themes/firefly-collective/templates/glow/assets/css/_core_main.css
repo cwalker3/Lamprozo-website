@@ -36,6 +36,15 @@ p {
     margin-top: 15vh;
 }
 
+/* Remove top margin when view starts with a banner cover block */
+#view-content:has(> .wp-block-cover:first-child) {
+    margin-top: 0 !important;
+}
+
+#view-content > .wp-block-cover:first-child.height-preset-half {
+    margin-top: 0 !important;
+}
+
 main:not(:has(.home)) {
     min-height: 1000px;
 }

@@ -281,6 +281,12 @@ h2 {
     }
 }
 
+@media (max-height: 800px) {
+    #bookings-settings-window {
+        top: 40%;
+    }
+}
+
 @media (max-width: 800px) {
     #bookings-settings-window {
         width: 80vw;

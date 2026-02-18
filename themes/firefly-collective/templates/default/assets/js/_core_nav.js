@@ -194,7 +194,7 @@ function initOverlayMenu() {
     // Overlay menu uses pure CSS for dropdowns - no JavaScript needed!
 }
 
-// IMPROVED: Shared function to handle authentication-based menu item visibility
+// Shared function to handle authentication-based menu item visibility
 function handleAuthMenuVisibility(selector) {
     // Get all top-level menu items
     const allTopLevelItems = document.querySelectorAll(selector);
@@ -219,27 +219,21 @@ function handleAuthMenuVisibility(selector) {
         }
     });
 
-    // Make sure navData exists before using it
+    // Use CSS classes instead of inline styles so !important rules work correctly
     if (typeof navData !== 'undefined' && navData.auth_id) {
-        // User is logged IN
-        if (loginBtn) loginBtn.style.display = 'none';
-        if (signupBtn) signupBtn.style.display = 'none';
-        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'list-item';
+        // User is logged IN — hide login/signup
+        if (loginBtn) loginBtn.classList.add('auth-hide');
+        if (signupBtn) signupBtn.classList.add('auth-hide');
+        if (backToWebsiteBtn) backToWebsiteBtn.classList.remove('auth-hide');
     } else {
-        // User is logged OUT
-        if (loginBtn) loginBtn.style.display = 'list-item';
-        if (signupBtn) signupBtn.style.display = 'list-item';
-        if (backToWebsiteBtn) backToWebsiteBtn.style.display = 'none';
+        // User is logged OUT — hide back-to-website
+        if (loginBtn) loginBtn.classList.remove('auth-hide');
+        if (signupBtn) signupBtn.classList.remove('auth-hide');
+        if (backToWebsiteBtn) backToWebsiteBtn.classList.add('auth-hide');
     }
-    
-    // CRITICAL: Ensure all submenu items remain visible regardless of authentication
-    const allSubMenuItems = document.querySelectorAll('.sub-menu li');
-    allSubMenuItems.forEach(item => {
-        // Force all submenu items to be visible
-        item.style.display = 'list-item';
-        item.style.visibility = 'visible';
-        item.style.opacity = '1';
-    });
+
+    // Mark auth check as complete so CSS can show menu items
+    document.body.classList.add('auth-checked');
 }
 
 // Close overlay submenus when clicking outside (optional enhancement)

@@ -9,6 +9,8 @@
 
 ?>
 
+<h1>Order History</h1>
+
 <?php echo apply_filters('the_content', $postContent); ?>
 
 <div class="wrap" id="ffc-orders-app" v-cloak>
