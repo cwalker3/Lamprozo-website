@@ -93,6 +93,24 @@ function firefly_load_snippet_content($template, $content_def, $type = 'pages') 
         $content = $content_def['content'];
     }
 
+    // Absolutize relative URLs so Gutenberg block validation passes.
+    // Export strips the domain; import must restore it.
+    if (!empty($content)) {
+        $site_url = untrailingslashit(home_url());
+        // Match src="/ href="/ url":"/ (covers HTML attributes and block JSON comments)
+        $content = preg_replace(
+            '#((?:src|href|url)=["\'])(/wp-content/)#',
+            '$1' . $site_url . '$2',
+            $content
+        );
+        // Also handle JSON attributes in block comments: "url":"/wp-content/..."
+        $content = preg_replace(
+            '#("url":")(/wp-content/)#',
+            '$1' . $site_url . '$2',
+            $content
+        );
+    }
+
     return $content;
 }
 
@@ -147,6 +165,29 @@ function firefly_get_scoped_page($base_slug, $template = null) {
         $template
     ));
 
+    // Fallback: check for WordPress dedup suffixes (-2, -3, etc.)
+    if (!$page_id) {
+        $page_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT p.ID FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+             WHERE p.post_type = 'page'
+               AND p.post_name RLIKE CONCAT('^', %s, '-[0-9]+$')
+               AND pm.meta_key = %s
+               AND pm.meta_value = %s
+             ORDER BY p.ID ASC
+             LIMIT 1",
+            $actual_slug,
+            FIREFLY_TEMPLATE_META_KEY,
+            $template
+        ));
+
+        // Fix the slug back to the canonical base slug
+        if ($page_id) {
+            $wpdb->update($wpdb->posts, array('post_name' => $actual_slug), array('ID' => $page_id));
+            clean_post_cache($page_id);
+        }
+    }
+
     return $page_id ? get_post($page_id) : null;
 }
 
@@ -197,28 +238,56 @@ function firefly_create_template_pages($template) {
                 clean_post_cache($page_id);
 
                 update_post_meta($page_id, FIREFLY_TEMPLATE_META_KEY, $template);
-                $page_ids[$base_slug] = $page_id;
+                $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'created');
+            } else {
+                $page_ids[$base_slug] = array('id' => 0, 'status' => 'error', 'error' => $page_id->get_error_message());
             }
         } else {
-            $page_ids[$base_slug] = $existing->ID;
+            $page_id = $existing->ID;
 
-            // If existing page has empty content, update it from snippet
-            if (!empty($data['content']) && empty($existing->post_content)) {
-                wp_update_post(array(
-                    'ID'           => $existing->ID,
-                    'post_content' => $data['content']
-                ));
+            // Always update content from snippet on reimport
+            // Use $wpdb->update instead of wp_update_post to bypass WordPress
+            // slug deduplication — template scoping allows shared slugs.
+            global $wpdb;
+            if (!empty($data['content'])) {
+                $old_hash = md5($existing->post_content);
+                $new_hash = md5($data['content']);
+
+                if ($old_hash !== $new_hash) {
+                    $result = $wpdb->update(
+                        $wpdb->posts,
+                        array('post_content' => $data['content']),
+                        array('ID' => $page_id)
+                    );
+
+                    if ($result === false) {
+                        $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'error', 'error' => $wpdb->last_error);
+                    } else {
+                        $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'updated');
+                    }
+                } else {
+                    $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'unchanged');
+                }
+            } else {
+                $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'empty_snippet');
             }
+
+            // Fix slug if WordPress dedup mangled it
+            if ($existing->post_name !== $actual_slug) {
+                $wpdb->update($wpdb->posts, array('post_name' => $actual_slug), array('ID' => $page_id));
+            }
+            clean_post_cache($page_id);
         }
     }
 
     // Set front page / posts page options per template
     foreach ($pages as $slug => $data) {
-        if (!empty($data['set_as']) && isset($page_ids[$slug])) {
+        $id = isset($page_ids[$slug]['id']) ? $page_ids[$slug]['id'] : 0;
+        if (!empty($data['set_as']) && $id) {
             if ($data['set_as'] === 'front_page') {
-                update_option("firefly_front_page_{$template}", $page_ids[$slug]);
+                update_option("firefly_front_page_{$template}", $id);
             } elseif ($data['set_as'] === 'posts_page') {
-                update_option("firefly_posts_page_{$template}", $page_ids[$slug]);
+                update_option("firefly_posts_page_{$template}", $id);
             }
         }
     }
@@ -384,10 +453,12 @@ function firefly_create_template_posts($template) {
                     }
                 }
 
-                $post_ids[$base_slug] = $post_id;
+                $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'created');
+            } else {
+                $post_ids[$base_slug] = array('id' => 0, 'status' => 'error', 'error' => $post_id->get_error_message());
             }
         } else {
-            $post_ids[$base_slug] = $existing->ID;
+            $post_ids[$base_slug] = array('id' => $existing->ID, 'status' => 'unchanged');
         }
     }
 
@@ -534,14 +605,15 @@ function firefly_ensure_template_content($template) {
         }
     }
 
-    // Create menu if missing or pointing to deleted menu
-    $menu_id = get_option("firefly_menu_{$template}", 0);
-    $menu_exists = $menu_id && wp_get_nav_menu_object($menu_id);
-    if (!$menu_exists) {
-        $menu_id = firefly_create_template_navigation($template);
-        if ($menu_id) {
-            $created['menu'] = $menu_id;
-        }
+    // Always recreate menu from schema to pick up changes
+    $old_menu_id = get_option("firefly_menu_{$template}", 0);
+    if ($old_menu_id && wp_get_nav_menu_object($old_menu_id)) {
+        wp_delete_nav_menu($old_menu_id);
+        delete_option("firefly_menu_{$template}");
+    }
+    $menu_id = firefly_create_template_navigation($template);
+    if ($menu_id) {
+        $created['menu'] = $menu_id;
     }
 
     return $created;
@@ -610,12 +682,14 @@ function firefly_create_template_categories($template) {
 
             if (!is_wp_error($result)) {
                 update_term_meta($result['term_id'], FIREFLY_TEMPLATE_META_KEY, $template);
-                $term_ids[$cat_def['slug']] = $result['term_id'];
+                $term_ids[$cat_def['slug']] = array('id' => $result['term_id'], 'status' => 'created');
+            } else {
+                $term_ids[$cat_def['slug']] = array('id' => 0, 'status' => 'error', 'error' => $result->get_error_message());
             }
         } else {
             // Ensure template meta is set
             update_term_meta($existing->term_id, FIREFLY_TEMPLATE_META_KEY, $template);
-            $term_ids[$cat_def['slug']] = $existing->term_id;
+            $term_ids[$cat_def['slug']] = array('id' => $existing->term_id, 'status' => 'unchanged');
         }
     }
 
@@ -729,10 +803,28 @@ function firefly_handle_activate_template(WP_REST_Request $request) {
         $result['menu'] = $menu_id;
     }
 
-    // Set front page option for this template
-    if (isset($page_ids['home'])) {
-        update_option("firefly_front_page_{$template}", $page_ids['home']);
+    // Set global WP options from per-template options (front page, posts page, menu)
+    $front_page = get_option("firefly_front_page_{$template}");
+    $posts_page = get_option("firefly_posts_page_{$template}");
+
+    if ($front_page) {
+        update_option('show_on_front', 'page');
+        update_option('page_on_front', $front_page);
     }
+
+    if ($posts_page) {
+        update_option('page_for_posts', $posts_page);
+    }
+
+    if ($result['menu']) {
+        $locations = get_theme_mod('nav_menu_locations', array());
+        $locations['website-menu'] = $result['menu'];
+        set_theme_mod('nav_menu_locations', $locations);
+        update_option("firefly_menu_{$template}", $result['menu']);
+    }
+
+    // Set active template
+    update_option('firefly_collective_active_template', $template);
 
     return rest_ensure_response(array(
         'success' => true,
@@ -828,6 +920,9 @@ function firefly_handle_trash_page(WP_REST_Request $request) {
     ));
 }
 
+/**
+ * Handle PHP opcache reset from CLI.
+ */
 function firefly_handle_opcache_reset(WP_REST_Request $request) {
     $reset = false;
     if (function_exists('opcache_reset')) {
@@ -840,6 +935,9 @@ function firefly_handle_opcache_reset(WP_REST_Request $request) {
     ));
 }
 
+/**
+ * Handle page cache clearing from CLI.
+ */
 function firefly_handle_clear_cache(WP_REST_Request $request) {
     $template = sanitize_file_name($request->get_param('template'));
 
