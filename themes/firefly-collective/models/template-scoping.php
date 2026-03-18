@@ -419,15 +419,18 @@ function firefly_filter_front_page_for_customizer($page_id) {
     // Get the temp template's front page
     $temp_front_page = get_option("firefly_front_page_{$temp_template}");
     if ($temp_front_page) {
+        error_log("[CUSTOMIZER] front_page filter: using {$temp_template} front page={$temp_front_page} (original={$page_id})");
         return $temp_front_page;
     }
 
     // If no stored front page, try to find the home page for this template
     $home_page = firefly_get_scoped_page('home', $temp_template);
     if ($home_page) {
+        error_log("[CUSTOMIZER] front_page filter: found scoped home page {$home_page->ID} for {$temp_template}");
         return $home_page->ID;
     }
 
+    error_log("[CUSTOMIZER] front_page filter: NO front page found for {$temp_template}, keeping {$page_id}");
     return $page_id;
 }
 

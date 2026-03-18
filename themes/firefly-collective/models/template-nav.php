@@ -22,28 +22,40 @@ function firefly_create_template_navigation($template) {
     $menu_name = "{$menu_base_name} ({$template})";
     $menu_obj = wp_get_nav_menu_object($menu_name);
 
-    if (!$menu_obj) {
+    if ($menu_obj) {
+        $menu_id = $menu_obj->term_id;
+
+        // Clear existing menu items so we can rebuild from schema
+        $existing_items = wp_get_nav_menu_items($menu_id);
+        if ($existing_items) {
+            foreach ($existing_items as $item) {
+                wp_delete_post($item->ID, true);
+            }
+        }
+    } else {
         $menu_id = wp_create_nav_menu($menu_name);
 
         if (is_wp_error($menu_id)) {
             return 0;
         }
+    }
 
-        // Set template meta on menu term
-        update_term_meta($menu_id, FIREFLY_TEMPLATE_META_KEY, $template);
+    // Set template meta on menu term
+    update_term_meta($menu_id, FIREFLY_TEMPLATE_META_KEY, $template);
 
-        // Get pages from schema
+    // Populate menu items from schema
+    if (isset($menu_config['items']) && is_array($menu_config['items'])) {
+        firefly_process_menu_items($menu_config['items'], $menu_id, $template, 0);
+    } else {
+        // Legacy flat format: build menu from page in_menu/menu_order fields
         $pages = firefly_get_schema_pages($template);
         $menu_position = 1;
 
-        // Add pages to menu in schema order
         foreach ($pages as $base_slug => $data) {
-            // Skip pages not meant for menu
             if (isset($data['in_menu']) && !$data['in_menu']) {
                 continue;
             }
 
-            // Skip specific pages that shouldn't be in menu
             $excluded = array('template');
             if (in_array($base_slug, $excluded)) {
                 continue;
@@ -63,7 +75,7 @@ function firefly_create_template_navigation($template) {
             }
         }
 
-        // Add custom links from schema
+        // Add custom links from schema (legacy format)
         $custom_links = isset($menu_config['custom_links']) ? $menu_config['custom_links'] : array();
         foreach ($custom_links as $link) {
             wp_update_nav_menu_item($menu_id, 0, array(
@@ -75,20 +87,54 @@ function firefly_create_template_navigation($template) {
             ));
             $menu_position++;
         }
-    } else {
-        $menu_id = $menu_obj->term_id;
-
-        // Ensure template meta is set even for existing menus
-        $existing_template = get_term_meta($menu_id, FIREFLY_TEMPLATE_META_KEY, true);
-        if (empty($existing_template)) {
-            update_term_meta($menu_id, FIREFLY_TEMPLATE_META_KEY, $template);
-        }
     }
 
     // Store menu ID for this template
     update_option("firefly_menu_{$template}", $menu_id);
 
     return $menu_id;
+}
+
+/**
+ * Recursively create menu items from a hierarchical items array.
+ * Used by firefly_create_template_navigation() when schema has menu.items.
+ */
+function firefly_process_menu_items($items, $menu_id, $template, $parent_id = 0) {
+    foreach ($items as $item) {
+        $args = array(
+            'menu-item-title'     => $item['title'],
+            'menu-item-status'    => 'publish',
+            'menu-item-position'  => isset($item['menu_order']) ? $item['menu_order'] : 0,
+            'menu-item-parent-id' => $parent_id,
+        );
+
+        $type = isset($item['type']) ? $item['type'] : 'custom';
+
+        if ($type === 'post_type' && !empty($item['page_slug'])) {
+            // Page reference — look up the scoped page
+            $page = firefly_get_scoped_page($item['page_slug'], $template);
+            if ($page) {
+                $args['menu-item-type']      = 'post_type';
+                $args['menu-item-object']    = 'page';
+                $args['menu-item-object-id'] = $page->ID;
+            } else {
+                // Page not found — fall back to custom link to slug
+                $args['menu-item-type'] = 'custom';
+                $args['menu-item-url']  = '/' . $item['page_slug'];
+            }
+        } else {
+            // Custom link
+            $args['menu-item-type'] = 'custom';
+            $args['menu-item-url']  = isset($item['url']) ? $item['url'] : '#';
+        }
+
+        $new_item_id = wp_update_nav_menu_item($menu_id, 0, $args);
+
+        // Recurse into children
+        if (!is_wp_error($new_item_id) && !empty($item['children'])) {
+            firefly_process_menu_items($item['children'], $menu_id, $template, $new_item_id);
+        }
+    }
 }
 
 /**

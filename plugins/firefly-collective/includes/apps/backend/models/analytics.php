@@ -720,6 +720,12 @@ function firefly_analytics_pull_data($request) {
     $tracked_links_table = $wpdb->prefix . 'ffc_tracked_links';
     $link_clicks_table = $wpdb->prefix . 'ffc_link_clicks';
 
+    // Remap template values from remote to local active template
+    // (remote may have a different active template than local)
+    $local_template = function_exists('firefly_collective_get_active_template')
+        ? firefly_collective_get_active_template()
+        : 'firefly';
+
     // Clear existing analytics and click data, but keep tracked link registrations
     $wpdb->query("TRUNCATE TABLE $table_name");
     $wpdb->query("DELETE FROM $link_clicks_table");
@@ -734,7 +740,7 @@ function firefly_analytics_pull_data($request) {
                 'page_title' => $row['page_title'] ?? null,
                 'post_id' => $row['post_id'] ?? null,
                 'post_type' => $row['post_type'] ?? null,
-                'template' => $row['template'] ?? null,
+                'template' => $local_template,
                 'referrer' => $row['referrer'] ?? null,
                 'session_hash' => $row['session_hash'] ?? null,
                 'created_at' => $row['created_at']
@@ -821,10 +827,10 @@ function firefly_analytics_pull_data($request) {
     $admin_activity_table = $wpdb->prefix . 'ffc_admin_activity';
     $admin_imported = 0;
 
-    if (!empty($data['admin_activity'])) {
-        // Clear existing admin activity
-        $wpdb->query("TRUNCATE TABLE $admin_activity_table");
+    // Always clear existing admin activity (even if remote has none)
+    $wpdb->query("TRUNCATE TABLE $admin_activity_table");
 
+    if (!empty($data['admin_activity'])) {
         foreach ($data['admin_activity'] as $row) {
             $result = $wpdb->insert(
                 $admin_activity_table,
@@ -832,7 +838,7 @@ function firefly_analytics_pull_data($request) {
                     'activity_type' => $row['activity_type'],
                     'username' => $row['username'] ?? null,
                     'session_hash' => $row['session_hash'] ?? null,
-                    'template' => $row['template'] ?? null,
+                    'template' => $local_template,
                     'created_at' => $row['created_at']
                 ),
                 array('%s', '%s', '%s', '%s', '%s')

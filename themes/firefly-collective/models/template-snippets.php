@@ -11,6 +11,34 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Relativize URLs in content for domain-agnostic snippets.
+ *
+ * Strips the site URL so paths like https://dev.fireflycollective.org/wp-content/uploads/img.jpg
+ * become /wp-content/uploads/img.jpg — portable across dev/staging/prod.
+ */
+function firefly_relativize_urls($content) {
+    $site_url = untrailingslashit(site_url());
+    $home_url = untrailingslashit(home_url());
+
+    // Build list of URL variants to strip (longest first)
+    $urls = array_unique(array(
+        str_replace('http://', 'https://', $site_url),
+        str_replace('https://', 'http://', $site_url),
+        $site_url,
+        str_replace('http://', 'https://', $home_url),
+        str_replace('https://', 'http://', $home_url),
+        $home_url,
+    ));
+    usort($urls, function($a, $b) { return strlen($b) - strlen($a); });
+
+    foreach ($urls as $url) {
+        $content = str_replace($url, '', $content);
+    }
+
+    return $content;
+}
+
+/**
  * Get the snippet file path for a post
  */
 function firefly_get_snippet_path($post_id, $post_type = 'page') {
@@ -73,9 +101,9 @@ function firefly_save_snippet($post_id) {
         return;
     }
 
-    // Get content
+    // Get content and relativize URLs for domain-agnostic snippets
     $post = get_post($post_id);
-    $content = $post->post_content;
+    $content = firefly_relativize_urls($post->post_content);
 
     // Write to file
     $result = @file_put_contents($snippet_path, $content);
