@@ -46,6 +46,7 @@ themes/firefly-collective/data/schemas/*
 
 # Template configurations - user-created templates
 plugins/firefly-collective/templates.json
+!plugins/firefly-collective/templates.example.json
 
 # Uploads directory
 !uploads/
