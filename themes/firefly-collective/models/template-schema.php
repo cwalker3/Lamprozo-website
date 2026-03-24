@@ -712,6 +712,12 @@ function firefly_register_template_activation_endpoint() {
         'permission_callback' => 'firefly_cli_permission_check'
     ));
 
+    register_rest_route('firefly/v1', '/deactivate-template', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_deactivate_template',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
+
     register_rest_route('firefly/v1', '/create-page', array(
         'methods'             => 'POST',
         'callback'            => 'firefly_handle_create_page',
@@ -830,6 +836,98 @@ function firefly_handle_activate_template(WP_REST_Request $request) {
         'success' => true,
         'message' => "Template '{$template}' activated successfully",
         'created' => $result
+    ));
+}
+
+/**
+ * Handle template deactivation request.
+ * Removes WP content (pages, posts, categories, menu) but keeps files/schema.
+ */
+function firefly_handle_deactivate_template(WP_REST_Request $request) {
+    $template = sanitize_file_name($request->get_param('template'));
+    $switch_to = sanitize_file_name($request->get_param('switch_to'));
+
+    if (empty($template)) {
+        return new WP_Error('missing_template', 'Template name is required', array('status' => 400));
+    }
+
+    $result = array('template' => $template);
+
+    // Delete pages
+    $deleted_pages = firefly_delete_template_pages($template);
+    $result['pages_deleted'] = $deleted_pages;
+
+    // Delete posts scoped to this template
+    $posts = get_posts(array(
+        'post_type'      => 'post',
+        'posts_per_page' => -1,
+        'post_status'    => 'any',
+        'meta_query'     => array(
+            array(
+                'key'     => FIREFLY_TEMPLATE_META_KEY,
+                'value'   => $template,
+                'compare' => '='
+            )
+        ),
+        'firefly_skip_scoping' => true
+    ));
+    $deleted_posts = 0;
+    foreach ($posts as $post) {
+        if (wp_delete_post($post->ID, true)) {
+            $deleted_posts++;
+        }
+    }
+    $result['posts_deleted'] = $deleted_posts;
+
+    // Delete categories scoped to this template
+    $categories = get_terms(array(
+        'taxonomy'   => 'category',
+        'hide_empty' => false,
+        'meta_query' => array(
+            array(
+                'key'     => FIREFLY_TEMPLATE_META_KEY,
+                'value'   => $template,
+                'compare' => '='
+            )
+        )
+    ));
+    $deleted_cats = 0;
+    if (!is_wp_error($categories)) {
+        foreach ($categories as $cat) {
+            if (wp_delete_term($cat->term_id, 'category')) {
+                $deleted_cats++;
+            }
+        }
+    }
+    $result['categories_deleted'] = $deleted_cats;
+
+    // Delete menu
+    $menu_id = get_option("firefly_menu_{$template}", 0);
+    if ($menu_id && wp_get_nav_menu_object($menu_id)) {
+        wp_delete_nav_menu($menu_id);
+        delete_option("firefly_menu_{$template}");
+        $result['menu_deleted'] = true;
+    }
+
+    // Clean up per-template options
+    delete_option("firefly_front_page_{$template}");
+    delete_option("firefly_posts_page_{$template}");
+
+    // Switch to another template if requested or if this was active
+    $active = get_option('firefly_collective_active_template');
+    if ($active === $template) {
+        if (!empty($switch_to)) {
+            update_option('firefly_collective_active_template', $switch_to);
+            // Trigger activation of the new template
+            firefly_on_template_change($template, $switch_to);
+            $result['switched_to'] = $switch_to;
+        }
+    }
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'message' => "Template '{$template}' deactivated",
+        'result'  => $result
     ));
 }
 
