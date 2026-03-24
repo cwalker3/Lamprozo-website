@@ -5,8 +5,6 @@
         "files": [
             "/wp-content/.htaccess",
             "/wp-content/plugins/firefly-collective",
-            "/wp-content/plugins/limit-login-attempts-reloaded",
-            "/wp-content/plugins/wp-mail-smtp",
             "/wp-content/themes/firefly-collective"
         ]
     }
