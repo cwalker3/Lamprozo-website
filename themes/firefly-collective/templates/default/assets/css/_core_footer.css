@@ -3,7 +3,7 @@
 /* Base Footer Structure */
 .site-footer {
     position: relative;
-    margin-top: 5vh;
+    margin-top: 0;
     width: 100%;
     overflow: hidden;
     background: #1a1a1a;
@@ -79,7 +79,7 @@
     left: 0;
     width: 40px;
     height: 2px;
-    background: linear-gradient(90deg, var(--mainColor) 0%, transparent 100%);
+    background: linear-gradient(90deg, #f5c518 0%, transparent 100%);
 }
 
 /* Brand Section */
@@ -132,7 +132,7 @@
 }
 
 .footer-social a:hover {
-    background: var(--mainColor);
+    background: #f5c518;
     transform: translateY(-3px);
 }
 
@@ -186,7 +186,7 @@
 /* Highlight current page in footer */
 .footer-menu .current-menu-item > a,
 .footer-menu .current_page_item > a {
-    color: var(--mainColor);
+    color: #f5c518;
     font-weight: 600;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .footer-contact-list a:hover {
-    color: var(--mainColor);
+    color: #f5c518;
 }
 
 /* Newsletter Section */
@@ -253,14 +253,14 @@
 
 .newsletter-form input[type="email"]:focus {
     outline: none;
-    border-color: var(--mainColor);
+    border-color: #f5c518;
     background: rgba(255, 255, 255, 0.15);
 }
 
 .newsletter-form button {
     padding: 0.75rem 1.5rem;
-    background: var(--mainColor);
-    color: white;
+    background: #f5c518;
+    color: #0a0a0a;
     border: none;
     border-radius: 6px;
     font-family: var(--font-brand);
@@ -272,9 +272,9 @@
 }
 
 .newsletter-form button:hover {
-    background: var(--navBgColor);
+    background: #e0b200;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(56, 111, 181, 0.3);
+    box-shadow: 0 4px 12px rgba(245, 197, 24, 0.3);
 }
 
 /* Footer Bottom */
@@ -311,7 +311,7 @@
 }
 
 .footer-legal a:hover {
-    color: var(--mainColor);
+    color: #f5c518;
 }
 
 .footer-legal .separator {

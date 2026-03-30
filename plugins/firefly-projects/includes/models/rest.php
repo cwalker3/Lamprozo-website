@@ -358,6 +358,13 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'dev',
                     'enum'              => array('dev', 'prod'),
                     'description'       => 'Target environment: dev (Live Dev) or prod (Production)'
+                ),
+                'post_type' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'page',
+                    'enum'              => array('page', 'post'),
+                    'description'       => 'Post type to sync: page or post'
                 )
             )
         )
@@ -378,6 +385,13 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'dev',
                     'enum'              => array('dev', 'prod'),
                     'description'       => 'Target environment to check'
+                ),
+                'post_type' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => 'page',
+                    'enum'              => array('page', 'post'),
+                    'description'       => 'Post type to check orphans for'
                 )
             )
         )
@@ -846,6 +860,7 @@ function firefly_projects_get_menu_sync_status($request) {
 function firefly_projects_sync_all_pages($request) {
     $sync_mode = $request->get_param('sync_mode');
     $target_env = $request->get_param('target_env');
+    $post_type = $request->get_param('post_type') ?: 'page';
 
     // Check configuration based on target environment
     if ($target_env === 'prod') {
@@ -867,17 +882,61 @@ function firefly_projects_sync_all_pages($request) {
     // Load the pages list sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/pages-list-sync.php';
 
-    // Perform the bulk sync
-    $result = firefly_projects_sync_all_pages_handler($sync_mode, $target_env);
-
+    $delete_only = $request->get_param('delete_only');
     $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
+    $type_label = ($post_type === 'post') ? 'posts' : 'pages';
+
+    // Delete-only mode: just handle mirror orphan deletion (syncs done individually by frontend)
+    if ($delete_only) {
+        $local_page_ids = array();
+        $active_template = firefly_get_scoping_template();
+        $posts = get_posts(array(
+            'post_type'      => $post_type,
+            'post_status'    => 'publish',
+            'numberposts'    => -1,
+            'meta_key'       => '_firefly_template',
+            'meta_value'     => $active_template,
+        ));
+        foreach ($posts as $p) {
+            $fpid = get_post_meta($p->ID, '_firefly_page_id', true);
+            if (empty($fpid)) {
+                $tmpl = get_post_meta($p->ID, '_firefly_template', true);
+                if (!empty($tmpl)) {
+                    $fpid = $tmpl . ':' . $p->post_name;
+                }
+            }
+            if ($fpid) {
+                $local_page_ids[] = $fpid;
+            }
+        }
+        $delete_result = firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $post_type);
+
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => sprintf('Deleted %d orphan %s on %s.', $delete_result['deleted'], $type_label, $env_label),
+            'details' => array(
+                'total'         => 0,
+                'synced'        => 0,
+                'failed'        => 0,
+                'deleted'       => $delete_result['deleted'],
+                'errors'        => array(),
+                'deleted_pages' => isset($delete_result['deleted_pages']) ? $delete_result['deleted_pages'] : array(),
+                'target_env'    => $target_env,
+                'sync_mode'     => 'mirror'
+            )
+        ), 200);
+    }
+
+    // Perform the bulk sync
+    $result = firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type);
 
     return new WP_REST_Response(array(
         'success' => true,
         'message' => sprintf(
-            'Synced %d of %d pages to %s.',
+            'Synced %d of %d %s to %s.',
             $result['synced'],
             $result['total'],
+            $type_label,
             $env_label
         ),
         'details' => array(
@@ -901,6 +960,7 @@ function firefly_projects_sync_all_pages($request) {
  */
 function firefly_projects_get_pages_orphan_count($request) {
     $target_env = $request->get_param('target_env');
+    $post_type = $request->get_param('post_type') ?: 'page';
 
     // Check configuration
     if ($target_env === 'prod') {
@@ -924,7 +984,7 @@ function firefly_projects_get_pages_orphan_count($request) {
     // Load the pages list sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/pages-list-sync.php';
 
-    $orphan_count = firefly_projects_get_orphan_count($target_env);
+    $orphan_count = firefly_projects_get_orphan_count($target_env, $post_type);
 
     return new WP_REST_Response(array(
         'success'      => true,
@@ -1145,9 +1205,10 @@ function firefly_projects_export_page($request) {
     // Get post meta
     $meta = get_post_meta($post->ID);
     $meta_data = array();
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
     foreach ($meta as $key => $values) {
-        // Skip internal meta and our mapping meta
-        if (strpos($key, '_') === 0 && $key !== '_thumbnail_id') {
+        // Skip internal meta (except whitelisted keys)
+        if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
         }
         $meta_data[$key] = $values[0];
@@ -1254,6 +1315,15 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     // Save meta data
     foreach ($meta_data as $key => $value) {
         update_post_meta($post_id, $key, $value);
+    }
+
+    // Ensure template assignment for imported pages (covers updates where
+    // auto-assignment doesn't fire and exports that omit _firefly_template)
+    if (!get_post_meta($post_id, '_firefly_template', true)) {
+        $active_template = function_exists('firefly_collective_get_active_template')
+            ? firefly_collective_get_active_template()
+            : get_option('firefly_collective_active_template', 'default');
+        update_post_meta($post_id, '_firefly_template', $active_template);
     }
 
     // Process assets - save to uploads/pages and create mappings

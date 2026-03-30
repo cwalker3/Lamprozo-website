@@ -102,7 +102,7 @@ body > header {
 
 /* Logo Color - Different for Each Page Type */
 #logo-name.logo-left {
-    color: #464646 !important; /* Default dark color for front page */
+    color: #ffffff !important; /* White for front page */
     visibility: visible !important; /* Force visibility */
 }
 
@@ -151,22 +151,22 @@ header.element-disable #logo-name.logo-left {
 
 /* Front Page Menu Item Colors */
 #overlay-menu-container.front-page .overlay-menu > li > a {
-    color: rgb(70, 70, 70);
+    color: #ffffff;
 }
 
 #overlay-menu-container.front-page .overlay-menu > li > a:hover,
 #overlay-menu-container.front-page .overlay-menu > li > a:focus {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
+    background-color: rgba(245, 197, 24, 0.1);
+    color: #f5c518;
     transform: translateY(-1px);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Active page state for front page - subtle indicator */
+/* Active page state for front page */
 #overlay-menu-container.front-page .overlay-menu > li.current-menu-item > a,
 #overlay-menu-container.front-page .overlay-menu > li.current_page_item > a {
-    background-color: rgba(56, 111, 181, 0.15); /* Very subtle blue tint */
-    color: rgb(56, 111, 181); /* Blue text instead of white */
+    background-color: rgba(245, 197, 24, 0.15);
+    color: #f5c518;
     transform: translateY(-1px);
     text-shadow: none;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);

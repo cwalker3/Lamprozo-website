@@ -520,6 +520,7 @@ function firefly_projects_add_page_sync_row_action($actions, $post) {
     return $actions;
 }
 add_filter('page_row_actions', 'firefly_projects_add_page_sync_row_action', 10, 2);
+add_filter('post_row_actions', 'firefly_projects_add_page_sync_row_action', 10, 2);
 
 /**
  * Display sync toolbar on Pages list admin screen
@@ -536,12 +537,15 @@ function firefly_projects_pages_sync_toolbar() {
     }
 
     $screen = get_current_screen();
-    if (!$screen || $screen->id !== 'edit-page') {
+    if (!$screen || !in_array($screen->id, array('edit-page', 'edit-post'))) {
         return;
     }
 
-    $page_count = wp_count_posts('page')->publish;
+    $post_type = $screen->post_type;
+    $is_posts = ($post_type === 'post');
+    $post_count = wp_count_posts($post_type)->publish;
     $has_prod = defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT);
+    $type_label = $is_posts ? 'Posts' : 'Pages';
     ?>
     <div id="firefly-pages-toolbar" class="firefly-pages-toolbar">
         <?php if ($has_prod): ?>
@@ -557,10 +561,10 @@ function firefly_projects_pages_sync_toolbar() {
         <?php endif; ?>
         <div class="firefly-toolbar-buttons">
             <button type="button" class="button button-primary" id="firefly-sync-all-pages">
-                <?php printf(__('Sync All Pages (%d)', 'firefly-projects'), $page_count); ?>
+                <?php printf(__('Sync All %s (%d)', 'firefly-projects'), $type_label, $post_count); ?>
             </button>
             <button type="button" class="button" id="firefly-pull-pages">
-                <?php _e('Pull from Remote', 'firefly-projects'); ?>
+                <?php printf(__('Pull %s from Remote', 'firefly-projects'), $type_label); ?>
             </button>
         </div>
     </div>
@@ -578,7 +582,7 @@ function firefly_projects_enqueue_pages_list_sync_assets($hook) {
     }
 
     $screen = get_current_screen();
-    if (!$screen || $screen->post_type !== 'page') {
+    if (!$screen || !in_array($screen->post_type, array('page', 'post'))) {
         return;
     }
 
@@ -618,15 +622,30 @@ function firefly_projects_enqueue_pages_list_sync_assets($hook) {
     // Enqueue dashicons for warning icon
     wp_enqueue_style('dashicons');
 
-    // Get page count
-    $page_count = wp_count_posts('page')->publish;
+    // Get published items for current post type, scoped to active template
+    $active_template = firefly_get_scoping_template();
+    $posts = get_posts(array(
+        'post_type'   => $screen->post_type,
+        'post_status' => 'publish',
+        'numberposts' => -1,
+        'orderby'     => ($screen->post_type === 'post') ? 'date' : 'menu_order',
+        'order'       => ($screen->post_type === 'post') ? 'DESC' : 'ASC',
+        'meta_key'    => '_firefly_template',
+        'meta_value'  => $active_template,
+    ));
+    $local_posts = array();
+    foreach ($posts as $p) {
+        $local_posts[] = array('id' => $p->ID, 'title' => $p->post_title);
+    }
 
     // Pass configuration to JavaScript
     wp_localize_script('firefly-pages-list-sync', 'fireflyPagesSync', array(
         'restUrl'         => rest_url('firefly-plugin/v1/'),
         'nonce'           => wp_create_nonce('wp_rest'),
         'hasProdEndpoint' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT),
-        'pageCount'       => (int) $page_count
+        'pageCount'       => count($posts),
+        'postType'        => $screen->post_type,
+        'localPosts'      => $local_posts
     ));
 }
 add_action('admin_enqueue_scripts', 'firefly_projects_enqueue_pages_list_sync_assets');

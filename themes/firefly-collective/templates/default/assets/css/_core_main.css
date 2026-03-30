@@ -623,35 +623,27 @@ main:not(:has(.home)) {
 		margin: 0;
 	}
 
-	/* Button styling */
+	/* Button styling - inherits colors from inline styles */
 	.wp-block-cover:first-of-type .wp-block-button__link {
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		color: #ffffff !important;
-		border: none;
-		border-radius: 50px;
 		padding: 1rem 2.5rem;
 		font-size: clamp(1rem, 2vw, 1.125rem);
 		font-weight: 600;
 		text-decoration: none;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.02em;
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		position: relative;
 		overflow: hidden;
-		/* Modern shadow */
-		box-shadow: 
-			0 4px 16px rgba(102, 126, 234, 0.4),
+		box-shadow:
+			0 4px 16px rgba(0, 0, 0, 0.3),
 			0 1px 3px rgba(0, 0, 0, 0.1);
-		/* Remove default WordPress button styles */
-		border-radius: 50px !important;
 	}
 
 	/* Button hover effect */
 	.wp-block-cover:first-of-type .wp-block-button__link:hover {
 		transform: translateY(-2px);
-		background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-		box-shadow: 
-			0 8px 25px rgba(102, 126, 234, 0.6),
+		filter: brightness(1.1);
+		box-shadow:
+			0 8px 25px rgba(0, 0, 0, 0.4),
 			0 3px 10px rgba(0, 0, 0, 0.15);
 	}
 
@@ -777,9 +769,8 @@ main:not(:has(.home)) {
     bottom: 20px;
     right: 20px;
     padding: 1rem 1.5rem;
-    /* Modern gradient background like action buttons */
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
+    background: #f5c518;
+    color: #0a0a0a;
     border: none;
     border-radius: 10px;
     cursor: pointer;
@@ -806,13 +797,12 @@ main:not(:has(.home)) {
 }
 
 #contact-sticky:hover {
-    /* Enhanced hover state */
     transform: translateY(-2px);
-    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-    box-shadow: 
-        0 8px 25px rgba(102, 126, 234, 0.6),
+    background: #e0b200;
+    box-shadow:
+        0 8px 25px rgba(245, 197, 24, 0.4),
         0 3px 10px rgba(0, 0, 0, 0.15);
-    color: #ffffff;
+    color: #0a0a0a;
 }
 
 #contact-sticky:active {

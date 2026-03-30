@@ -39,6 +39,36 @@ function firefly_relativize_urls($content) {
 }
 
 /**
+ * Relativize URLs in rendered content so pages work across
+ * all environments (localhost, dev, production) without mixed content warnings.
+ */
+add_filter( 'the_content', 'firefly_relativize_urls', 99 );
+add_filter( 'the_content_feed', 'firefly_relativize_urls', 99 );
+add_filter( 'wp_get_attachment_url', 'firefly_relativize_urls', 99 );
+add_filter( 'wp_get_attachment_image_src', function( $image ) {
+    if ( is_array( $image ) && ! empty( $image[0] ) ) {
+        $image[0] = firefly_relativize_urls( $image[0] );
+    }
+    return $image;
+}, 99 );
+add_filter( 'wp_calculate_image_srcset', function( $sources ) {
+    if ( is_array( $sources ) ) {
+        foreach ( $sources as &$source ) {
+            $source['url'] = firefly_relativize_urls( $source['url'] );
+        }
+    }
+    return $sources;
+}, 99 );
+
+/**
+ * Catch any remaining absolute URLs in final HTML output.
+ * Runs as an output buffer on template_redirect.
+ */
+add_action( 'template_redirect', function() {
+    ob_start( 'firefly_relativize_urls' );
+} );
+
+/**
  * Get the snippet file path for a post
  */
 function firefly_get_snippet_path($post_id, $post_type = 'page') {
