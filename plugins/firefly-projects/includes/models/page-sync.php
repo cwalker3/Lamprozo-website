@@ -231,6 +231,15 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
                 $assets_to_sync = $prod_result['assets_to_sync'];
             }
         }
+        // No asset map (e.g. content from CLI import) — extract and send assets directly
+        else {
+            if ($include_assets) {
+                $content_assets = firefly_projects_extract_assets_with_paths($post->post_content);
+                foreach ($content_assets as $asset) {
+                    $assets_to_sync[] = $asset;
+                }
+            }
+        }
     } else {
         // LIVE DEV SYNC
         // Get page assets to sync - both from pages folder AND original upload paths

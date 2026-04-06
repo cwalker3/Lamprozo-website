@@ -465,7 +465,33 @@ function firefly_create_template_posts($template) {
                 $post_ids[$base_slug] = array('id' => 0, 'status' => 'error', 'error' => $post_id->get_error_message());
             }
         } else {
-            $post_ids[$base_slug] = array('id' => $existing->ID, 'status' => 'unchanged');
+            $post_id = $existing->ID;
+
+            // Update content from snippet on reimport (same as pages)
+            global $wpdb;
+            if (!empty($data['content'])) {
+                $old_hash = md5($existing->post_content);
+                $new_hash = md5($data['content']);
+
+                if ($old_hash !== $new_hash) {
+                    $result = $wpdb->update(
+                        $wpdb->posts,
+                        array('post_content' => $data['content']),
+                        array('ID' => $post_id)
+                    );
+                    clean_post_cache($post_id);
+
+                    if ($result === false) {
+                        $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'error', 'error' => $wpdb->last_error);
+                    } else {
+                        $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'updated');
+                    }
+                } else {
+                    $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'unchanged');
+                }
+            } else {
+                $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'unchanged');
+            }
         }
     }
 
