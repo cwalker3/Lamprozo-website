@@ -22,6 +22,8 @@ plugins/firefly-collective/templates/*
 !plugins/firefly-collective/templates/default/**
 !plugins/firefly-collective/templates/glow/
 !plugins/firefly-collective/templates/glow/**
+!plugins/firefly-collective/templates/lamprozo/
+!plugins/firefly-collective/templates/lamprozo/**
 
 # Themes directory
 !themes/
@@ -37,12 +39,15 @@ themes/firefly-collective/templates/*
 !themes/firefly-collective/templates/firefly/**
 !themes/firefly-collective/templates/glow/
 !themes/firefly-collective/templates/glow/**
+!themes/firefly-collective/templates/lamprozo/
+!themes/firefly-collective/templates/lamprozo/**
 
 # Template schemas - only track core templates (firefly, default, glow)
 themes/firefly-collective/data/schemas/*
 !themes/firefly-collective/data/schemas/firefly-schema.json
 !themes/firefly-collective/data/schemas/default-schema.json
 !themes/firefly-collective/data/schemas/glow-schema.json
+!themes/firefly-collective/data/schemas/lamprozo-schema.json
 
 # Template configurations - user-created templates
 plugins/firefly-collective/templates.json

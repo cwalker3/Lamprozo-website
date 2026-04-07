@@ -1,0 +1,143 @@
+{
+    "template": "lamprozo",
+    "version": "1.0.0",
+    "description": "Lamprozo template for Firefly Collective",
+    "pages": [
+        {
+            "slug": "about",
+            "title": "About",
+            "snippet": "about.html",
+            "in_menu": false,
+            "menu_order": 0
+        },
+        {
+            "slug": "royal-sapphire",
+            "title": "Royal Sapphire",
+            "snippet": "royal-sapphire.html",
+            "in_menu": false,
+            "menu_order": 0
+        },
+        {
+            "slug": "ancestral-x",
+            "title": "Ancestral X",
+            "snippet": "ancestral-x.html",
+            "in_menu": false,
+            "menu_order": 0
+        },
+        {
+            "slug": "renplat-1d-r",
+            "title": "RenPlat 1D=R",
+            "snippet": "renplat-1d-r.html",
+            "in_menu": false,
+            "menu_order": 0
+        },
+        {
+            "slug": "home",
+            "title": "Home",
+            "snippet": "home.html",
+            "set_as": "front_page",
+            "in_menu": true,
+            "menu_order": 1
+        },
+        {
+            "slug": "challenges",
+            "title": "Challenges",
+            "snippet": "challenges.html",
+            "in_menu": true,
+            "menu_order": 2
+        },
+        {
+            "slug": "sterling-silver",
+            "title": "Sterling Silver",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 3
+        },
+        {
+            "slug": "blog",
+            "title": "Blog",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 4
+        },
+        {
+            "slug": "renegade-platinum",
+            "title": "Renegade Platinum",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 5
+        },
+        {
+            "slug": "videos",
+            "title": "Videos",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 6
+        },
+        {
+            "slug": "clips",
+            "title": "Clips",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 6
+        },
+        {
+            "slug": "platinum-kaizo",
+            "title": "Platinum Kaizo",
+            "view": true,
+            "in_menu": false,
+            "menu_order": 8
+        }
+    ],
+    "posts": [],
+    "categories": [],
+    "menu": {
+        "name": "Main Menu",
+        "items": [
+            {
+                "title": "Home",
+                "type": "custom",
+                "url": "/",
+                "menu_order": 1
+            },
+            {
+                "title": "Challenges",
+                "type": "custom",
+                "url": "/challenges",
+                "menu_order": 2
+            },
+            {
+                "title": "Content",
+                "type": "custom",
+                "url": "#",
+                "menu_order": 3,
+                "children": [
+                    {
+                        "title": "Videos",
+                        "type": "custom",
+                        "url": "/videos",
+                        "menu_order": 4
+                    },
+                    {
+                        "title": "Clips",
+                        "type": "custom",
+                        "url": "/clips",
+                        "menu_order": 5
+                    },
+                    {
+                        "title": "Blog",
+                        "type": "custom",
+                        "url": "/blog",
+                        "menu_order": 6
+                    }
+                ]
+            },
+            {
+                "title": "About",
+                "type": "custom",
+                "url": "/about",
+                "menu_order": 7
+            }
+        ]
+    }
+}

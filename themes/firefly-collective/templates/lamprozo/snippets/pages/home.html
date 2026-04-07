@@ -1,0 +1,38 @@
+<!-- wp:html -->
+<section class="home-hero">
+    <h1 class="hero-title">Lamprozo</h1>
+    <p class="hero-subtitle">Hardcore Pokémon Nuzlockes on Twitch &amp; YouTube</p>
+    <div class="hero-links">
+        <a class="btn btn-twitch" href="https://twitch.tv/lamprozo" target="_blank">Twitch</a>
+        <a class="btn btn-youtube" href="https://www.youtube.com/@Lamprozo1" target="_blank">YouTube</a>
+    </div>
+</section>
+<!-- /wp:html -->
+
+<!-- wp:html -->
+<section class="stream-section">
+    <div class="stream-header">
+        <h2 class="stream-title"><span class="live-dot" id="live-dot"></span>Watch Live</h2>
+    </div>
+    <div class="stream-embed-wrapper">
+        <div id="twitch-embed"></div>
+    </div>
+</section>
+<script>
+(function() {
+    var script = document.createElement('script');
+    script.src = 'https://embed.twitch.tv/embed/v1.js';
+    script.onload = function() {
+        var embed = new Twitch.Embed("twitch-embed", {
+            width: "100%",
+            height: "100%",
+            channel: "lamprozo",
+            layout: "video-with-chat",
+            autoplay: false,
+            parent: [window.location.hostname]
+        });
+    };
+    document.head.appendChild(script);
+})();
+</script>
+<!-- /wp:html -->

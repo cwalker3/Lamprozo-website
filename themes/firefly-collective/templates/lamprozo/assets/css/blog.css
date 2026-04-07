@@ -1,0 +1,110 @@
+/* Blog styles */
+
+.blog-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+}
+
+.blog-header {
+    margin-bottom: 2.5rem;
+}
+
+.blog-title {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.4rem;
+}
+
+.blog-subtitle {
+    color: var(--color-text-muted);
+}
+
+.blog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.blog-card {
+    padding: 1.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    transition: border-color 0.15s;
+}
+
+.blog-card:hover {
+    border-color: var(--color-twitch);
+}
+
+.blog-card__date {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.blog-card__title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0.5rem 0;
+}
+
+.blog-card__title a {
+    text-decoration: none;
+    color: var(--color-text);
+    transition: color 0.15s;
+}
+
+.blog-card__title a:hover {
+    color: var(--color-twitch);
+}
+
+.blog-card__excerpt {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.blog-card__link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-twitch);
+    text-decoration: none;
+}
+
+.blog-card__link:hover {
+    text-decoration: underline;
+}
+
+.blog-pagination {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+}
+
+.btn-page {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: border-color 0.15s;
+}
+
+.btn-page:hover {
+    border-color: var(--color-twitch);
+}
+
+.blog-empty {
+    padding: 3rem;
+    text-align: center;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+}
