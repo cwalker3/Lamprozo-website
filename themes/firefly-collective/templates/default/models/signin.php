@@ -194,7 +194,8 @@
         $scope        = 'email profile';
         $state        = wp_create_nonce('google_auth_state');
 
-        $host = GOOGLE_API_DOMAIN;
+        // Strip port from domain for cookie (browsers reject ports in cookie domains)
+        $host = preg_replace('/:\d+$/', '', GOOGLE_API_DOMAIN);
         $cookie_name  = 'google_auth_state';
         $cookie_value = urlencode($state);
         $max_age      = 300;
@@ -209,7 +210,8 @@
         if (is_ssl()) {
             $cookie_parts[] = "secure";
         }
-        if (!empty($host)) {
+        // Don't set domain for localhost (let browser use default)
+        if (!empty($host) && $host !== 'localhost') {
             $cookie_parts[] = "domain={$host}";
         }
         $cookie_header = implode("; ", $cookie_parts);
@@ -258,15 +260,18 @@
             return $response;
         }
         
-        $host = GOOGLE_API_DOMAIN;
-        setcookie('google_auth_state', 'deleted', [
+        $host = preg_replace('/:\d+$/', '', GOOGLE_API_DOMAIN);
+        $delete_opts = [
             'expires'  => time() - 3600,
             'path'     => '/',
-            'domain'   => $host,
             'secure'   => is_ssl(),
             'httponly' => true,
             'samesite' => 'Lax'
-        ]);
+        ];
+        if (!empty($host) && $host !== 'localhost') {
+            $delete_opts['domain'] = $host;
+        }
+        setcookie('google_auth_state', 'deleted', $delete_opts);
         
         if (empty($code)) {
             $response = new WP_REST_Response('Missing code parameter', 400);
@@ -1026,6 +1031,6 @@
         wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $nonce, true);
         wp_localize_script('auth-js', 'myApi', array(
             'nonce'     => $nonce,
-            'gapiDomain'=> 'https://' . GOOGLE_API_DOMAIN
+            'gapiDomain'=> WP_HOME
         ));
     });

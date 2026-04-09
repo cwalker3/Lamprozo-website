@@ -64,7 +64,7 @@
             'api_url'       => $api_url,
             'themePath'     => $theme_path,
             'maxBlogs'      => 15,
-            'gapiDomain'    => 'https://' . GOOGLE_API_DOMAIN
+            'gapiDomain'    => WP_HOME
         ));
 
         // Nav js data (only if nav handle exists)
@@ -106,7 +106,7 @@
             'themePath'     => $theme_path,
             'template_path' => $template_path_web,
             'maxBlogs'      => 15,
-            'gapiDomain'    => 'https://' . GOOGLE_API_DOMAIN
+            'gapiDomain'    => WP_HOME
         ));
 
         // Get dynamic asset paths

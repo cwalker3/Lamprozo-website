@@ -252,7 +252,7 @@
                     const left = (screen.width - width) / 2;
                     const top = (screen.height - height) / 2;
                     
-                    const gapiEndpoint = myApi.gapiDomain || 'https://' + window.location.hostname;
+                    const gapiEndpoint = myApi.gapiDomain || window.location.origin;
                     window.open(
                         `${gapiEndpoint}/wp-json/custom-api/v1/google-auth-init`,
                         'google-signin',

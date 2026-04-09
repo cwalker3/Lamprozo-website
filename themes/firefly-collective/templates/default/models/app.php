@@ -120,7 +120,7 @@
             'app_page_html'     => $app_page_html,
             'app_page_title'    => $app_page_title,
             'nonce'             => $nonce,
-            'gapiDomain'        => 'https://' . GOOGLE_API_DOMAIN,
+            'gapiDomain'        => WP_HOME,
             'theme_path'        => $theme_path,
             'template_path'     => $template_path,
             'api_url'           => $api_url,
