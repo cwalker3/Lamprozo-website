@@ -2231,6 +2231,10 @@ define('WP_DEBUG_DISPLAY', false);
 define('WP_HOME', 'https://{$dev_subdomain}');
 define('WP_SITEURL', 'https://{$dev_subdomain}');
 
+// ** Cookie/Auth Domain — must match the subdomain so auth cookies stick ** //
+define('DOMAIN', '{$dev_subdomain}');
+define('COOKIE_DOMAIN', '{$dev_subdomain}');
+
 ";
     }
 
