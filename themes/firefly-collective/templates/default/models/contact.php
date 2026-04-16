@@ -12,6 +12,19 @@
             return new WP_Error('invalid_input', __('Please provide valid name, email, and message.', 'firefly-collective'), array('status' => 400));
         }
 
+        // Save to database
+        global $wpdb;
+        $wpdb->insert(
+            $wpdb->prefix . 'ffc_submissions',
+            array(
+                'form_type' => 'contact',
+                'name'      => $name,
+                'email'     => $email,
+                'message'   => $message,
+            ),
+            array('%s', '%s', '%s', '%s')
+        );
+
         // Admin Email
         // ----------------------------------------------------------------------------------------
         $message = nl2br($message);
