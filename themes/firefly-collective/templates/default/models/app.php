@@ -185,7 +185,7 @@
         $theme_path = get_template_directory();
         $theme_path_web = get_template_directory_uri();
         $active_template = firefly_collective_get_active_template();
-        $plugin_path = ABSPATH . 'wp-content/themes/firefly-collective/templates/' . $active_template;
+        $plugin_path = ABSPATH . 'wp-content/plugins/firefly-collective/templates/' . $active_template;
         $nonce = wp_create_nonce('wp_rest');
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
 

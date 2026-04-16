@@ -4,13 +4,12 @@
  * Orders Management JavaScript
  */
 
-// Progressive web app check
-if (typeof isPWA === undefined) isPWA = ordersData.isPWA;
-isPWA = Boolean(Number(isPWA));
+// Use window property (not `var`/`let`) so re-evaluation of this script never throws "already declared"
+window.isPWA = !!document.getElementById('app-root');
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if Vue is loaded and we're on the orders page
-    if (typeof Vue !== 'undefined' && document.getElementById('ffc-orders-app') && !isPWA) {
+    // Non-PWA (standard /order-history page) auto-mounts. In PWA mode, app.js calls initOrdersApp() after injecting markup.
+    if (typeof Vue !== 'undefined' && document.getElementById('ffc-orders-app') && !window.isPWA) {
         initOrdersApp();
     }
 });
@@ -18,11 +17,15 @@ document.addEventListener('DOMContentLoaded', function() {
 function initOrdersApp() {
     const { createApp, ref, computed, onMounted, watch } = Vue;
 
-    if (isPWA || websiteApp) {
-        ordersData = { 
+    // In PWA mode, ordersData is not localized by wp_localize_script — synthesize it from window globals set by app.js
+    if (typeof ordersData === 'undefined' || !ordersData) {
+        ordersData = {
             nonce: window.nonce,
-            apiUrl: window.api_url
-        }
+            apiUrl: window.api_url,
+            auth_id: window.auth_id,
+            currentUserIsAdmin: false,
+            onlinePaymentsEnabled: '1'
+        };
     }
 
     createApp({
