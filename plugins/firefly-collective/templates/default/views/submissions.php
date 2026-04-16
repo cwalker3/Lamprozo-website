@@ -25,6 +25,7 @@
                 <select v-model="filters.form_type" @change="fetchSubmissions()">
                     <option value="">All Types</option>
                     <option value="contact">Contact</option>
+                    <option value="newsletter">Newsletter</option>
                     <option value="quote">Quote Request</option>
                 </select>
             </div>
@@ -102,7 +103,7 @@
                     <td>{{ item.id }}</td>
                     <td>
                         <span class="ffc-type-badge" :class="'ffc-type-' + item.form_type">
-                            {{ item.form_type === 'quote' ? 'Quote' : 'Contact' }}
+                            {{ formatType(item.form_type) }}
                         </span>
                     </td>
                     <td><strong>{{ item.name }}</strong></td>
@@ -151,7 +152,7 @@
             <div class="ffc-modal-header">
                 <h2>
                     <span class="ffc-type-badge" :class="'ffc-type-' + currentItem.form_type">
-                        {{ currentItem.form_type === 'quote' ? 'Quote Request' : 'Contact' }}
+                        {{ formatType(currentItem.form_type, true) }}
                     </span>
                     from {{ currentItem.name }}
                 </h2>

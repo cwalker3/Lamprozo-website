@@ -277,6 +277,20 @@
     box-shadow: 0 4px 12px rgba(245, 197, 24, 0.3);
 }
 
+.newsletter-message {
+    min-height: 1.25rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.newsletter-message.success {
+    color: #8fd19e;
+}
+
+.newsletter-message.error {
+    color: #f08080;
+}
+
 /* Footer Bottom */
 .footer-bottom {
     margin-top: 2rem;

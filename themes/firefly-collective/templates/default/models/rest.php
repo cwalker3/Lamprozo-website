@@ -8,6 +8,12 @@
             'callback'            => 'handle_contact_form_submission',
             'permission_callback' => 'verify_rest_nonce',
         ));
+
+        register_rest_route('custom-api/v1', '/submit-newsletter', array(
+            'methods'             => 'POST',
+            'callback'            => 'handle_newsletter_signup',
+            'permission_callback' => 'verify_rest_nonce',
+        ));
         
         register_rest_route('custom-api/v1', '/submit-signup', array(
             'methods'             => 'POST',

@@ -228,6 +228,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 return msg.replace(/\n/g, '<br>');
             }
 
+            function formatType(type, long) {
+                if (!type) return '—';
+                if (type === 'quote') return long ? 'Quote Request' : 'Quote';
+                return type.charAt(0).toUpperCase() + type.slice(1);
+            }
+
             // Lifecycle
             onMounted(() => {
                 fetchSubmissions();
@@ -262,7 +268,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 resetFilters,
                 debouncedSearch,
                 formatDate,
-                formatMessage
+                formatMessage,
+                formatType
             };
         }
     }).mount('#ffc-submissions-app');
