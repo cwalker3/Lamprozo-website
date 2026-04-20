@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showDevSuffixModal: false, // Control dev suffix modal
                 savedPartialSelections: new Set(), // Store selections when switching to Full Sync
                 backupHistory: [],
+                activeBackupId: '',
                 isLoadingHistory: false,
                 isRestoring: false,
                 showRestoreModal: false,
@@ -228,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return this.totalFileCount > 0 && this.selectedPaths.size === this.totalFileCount;
             },
             checkboxesDisabled() {
-                return this.syncMode === 'full';
+                return this.syncMode === 'full' || this.isSyncing || this.isRestoring;
             },
             currentProjectNeedsDev() {
                 if (!this.selectedProject || !this.projectsNeedingDev) {
@@ -560,6 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (data.success) {
                         this.backupHistory = data.backups || [];
+                        this.activeBackupId = data.active_backup_id || '';
                     }
                 } catch (error) {
                     console.error('[Firefly Projects Error] loadBackupHistory:', error);

@@ -586,13 +586,20 @@
 
         error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Zip created: ' . $zip_path);
 
-        // Save backup before sending
+        // Count files actually in the zip (recursive) rather than top-level directories
+        $zipped_file_count = count($directories);
+        $zip_reader = new ZipArchive();
+        if ($zip_reader->open($zip_path) === true) {
+            $zipped_file_count = $zip_reader->numFiles;
+            $zip_reader->close();
+        }
+
         $backup = firefly_collective_add_backup(
             $project_name,
             $zip_path,
             $sync_mode,
-            count($directories), // total files in project
-            count($directories)  // files actually selected (same for full sync, subset for partial)
+            $zipped_file_count,
+            $zipped_file_count
         );
 
         error_log('[Firefly Projects Debug] firefly_collective_local_update_project - Backup saved: ' . $backup['id']);

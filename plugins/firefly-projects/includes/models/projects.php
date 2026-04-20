@@ -356,6 +356,18 @@
     }
 
     /**
+     * Get/set the backup ID matching the remote's current state, used to toggle
+     * the top entry's action between Rollback (when active) and Reapply (when not).
+     */
+    function firefly_collective_get_active_backup_id($project_name) {
+        return get_option('firefly_projects_active_backup_' . sanitize_key($project_name), '');
+    }
+
+    function firefly_collective_set_active_backup_id($project_name, $backup_id) {
+        update_option('firefly_projects_active_backup_' . sanitize_key($project_name), $backup_id);
+    }
+
+    /**
      * Add a new backup and rotate (keep last 5)
      */
     function firefly_collective_add_backup($project_name, $zip_path, $sync_mode, $file_count, $selected_count, $target_env = 'dev') {
@@ -483,20 +495,29 @@
             return $zip_path;
         }
 
-        // Save backup before sending (include target_env)
+        // Count files actually in the zip (recursive) rather than top-level directories
+        $zipped_file_count = count($directories);
+        $zip_reader = new ZipArchive();
+        if ($zip_reader->open($zip_path) === true) {
+            $zipped_file_count = $zip_reader->numFiles;
+            $zip_reader->close();
+        }
+
         $backup = firefly_collective_add_backup(
             $project_name,
             $zip_path,
             $sync_mode,
-            count($directories), // total files in project
-            count($directories), // files actually selected (same for full sync, subset for partial)
-            $target_env          // target environment
+            $zipped_file_count,
+            $zipped_file_count,
+            $target_env
         );
 
         $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode);
         if (is_wp_error($response)) {
             return $response;
         }
+
+        firefly_collective_set_active_backup_id($project_name, $backup['id']);
 
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
@@ -842,7 +863,8 @@
         return array(
             'success' => true,
             'project' => $project_name,
-            'backups' => $backups
+            'backups' => $backups,
+            'active_backup_id' => firefly_collective_get_active_backup_id($project_name)
         );
     }
 
@@ -909,6 +931,8 @@
         if (is_wp_error($response)) {
             return $response;
         }
+
+        firefly_collective_set_active_backup_id($project_name, $backup['id']);
 
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
