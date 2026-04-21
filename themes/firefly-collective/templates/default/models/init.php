@@ -293,8 +293,30 @@
         add_theme_support('align-wide');
     });
 
-    // Enqueue editor styles with cache-busting based on file modification time
+    // Enqueue editor styles with cache-busting based on file modification time.
+    //
+    // editor-style.css is a banner-focused stylesheet designed for content
+    // pages in the default template (contact, signup, dashboard, etc.) that
+    // lead with a wp:cover block. It adds aggressive padding/margin rules
+    // to EVERY .wp-block which clash with custom landing-style pages.
+    //
+    // A page can opt out via EITHER:
+    //   1. Post meta `_firefly_skip_banner_editor_css` = '1'
+    //   2. Being the home page (post_name === 'home')
+    //
+    // Landing/marketing pages should opt out and provide their own editor
+    // parity CSS (see templates/default/models/editor-preview.php for the
+    // home-page pattern).
     add_action('enqueue_block_editor_assets', function () {
+        $post_id = isset($_GET['post']) ? (int) $_GET['post'] : 0;
+        if ($post_id) {
+            $post = get_post($post_id);
+            if ($post) {
+                if ($post->post_name === 'home') return;
+                if (get_post_meta($post_id, '_firefly_skip_banner_editor_css', true) === '1') return;
+            }
+        }
+
         $editor_style_path = get_template_directory() . '/editor-style.css';
         $version = file_exists($editor_style_path) ? filemtime($editor_style_path) : '1.0.0';
 
