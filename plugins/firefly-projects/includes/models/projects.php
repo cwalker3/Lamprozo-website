@@ -368,6 +368,118 @@
     }
 
     /**
+     * Build a "time-travel" rollback ZIP so that restoring to a partial-sync
+     * target actually undoes every change made since that target, rather than
+     * just re-sending the target's files.
+     *
+     * Why this exists:
+     *   A partial-sync backup only contains the handful of files that were
+     *   synced in that sync. Re-sending backup N-1's ZIP to "undo" backup N's
+     *   partial sync does nothing to files that were in N's ZIP but not in
+     *   N-1's — they stay in the N state on remote. That's the rollback bug
+     *   exposed by git-mode's per-file partial syncs.
+     *
+     * Strategy:
+     *   1. Split backups into NEWER (before the target in the list, since the
+     *      list is newest-first) and HISTORY (target + older).
+     *   2. Collect every file path that appears in any NEWER backup — those
+     *      are the files whose remote state has drifted away from the target.
+     *   3. For each such path, find the first HISTORY backup (newest first)
+     *      whose ZIP contains that path; use that version as the rollback
+     *      content. If no HISTORY backup has it, the file was first introduced
+     *      after the target and can't be reverted by overwrite alone — we
+     *      report it so the user knows it still exists on remote.
+     *   4. Package the chosen contents into a fresh ZIP and return its path.
+     *
+     * Returns either:
+     *   array( 'zip_path' => string, 'reverted' => array, 'unrevertable' => array )
+     *   or a WP_Error. 'zip_path' is null if there was nothing to revert.
+     */
+    function firefly_collective_build_rollback_zip($project_name, $target_backup_id) {
+        $backups = firefly_collective_load_backups_metadata($project_name);
+        $backup_dir = firefly_collective_get_backup_dir($project_name);
+
+        $target_index = null;
+        foreach ($backups as $i => $b) {
+            if ($b['id'] === $target_backup_id) { $target_index = $i; break; }
+        }
+        if ($target_index === null) {
+            return new WP_Error('target_not_found', 'Target backup not found for rollback.', array('status' => 404));
+        }
+
+        // Newest-first ordering: indices 0..target_index-1 are NEWER than the target.
+        $newer   = array_slice($backups, 0, $target_index);
+        $history = array_slice($backups, $target_index);
+
+        if (empty($newer)) {
+            return array('zip_path' => null, 'reverted' => array(), 'unrevertable' => array());
+        }
+
+        // Collect all paths touched by any sync newer than the target.
+        $changed_paths = array();
+        foreach ($newer as $fb) {
+            $fb_zip = trailingslashit($backup_dir) . $fb['zip_filename'];
+            if (!file_exists($fb_zip)) continue;
+            $z = new ZipArchive();
+            if ($z->open($fb_zip) === true) {
+                for ($i = 0; $i < $z->numFiles; $i++) {
+                    $name = $z->getNameIndex($i);
+                    if ($name !== false && substr($name, -1) !== '/') {
+                        $changed_paths[$name] = true;
+                    }
+                }
+                $z->close();
+            }
+        }
+
+        if (empty($changed_paths)) {
+            return array('zip_path' => null, 'reverted' => array(), 'unrevertable' => array());
+        }
+
+        // For each changed path, grab the newest version present at target-time or earlier.
+        $reverted = array();
+        $unrevertable = array();
+        foreach (array_keys($changed_paths) as $path) {
+            $found = false;
+            foreach ($history as $hb) {
+                $hb_zip = trailingslashit($backup_dir) . $hb['zip_filename'];
+                if (!file_exists($hb_zip)) continue;
+                $z = new ZipArchive();
+                if ($z->open($hb_zip) === true) {
+                    $content = $z->getFromName($path);
+                    $z->close();
+                    if ($content !== false) {
+                        $reverted[$path] = $content;
+                        $found = true;
+                        break;
+                    }
+                }
+            }
+            if (!$found) $unrevertable[] = $path;
+        }
+
+        if (empty($reverted)) {
+            return array('zip_path' => null, 'reverted' => array(), 'unrevertable' => $unrevertable);
+        }
+
+        $rollback_zip_path = trailingslashit(get_temp_dir()) . 'firefly_rollback_' . sanitize_key($project_name) . '_' . time() . '.zip';
+        $out = new ZipArchive();
+        if ($out->open($rollback_zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return new WP_Error('zip_create_failed', 'Could not create rollback ZIP.', array('status' => 500));
+        }
+        foreach ($reverted as $path => $content) {
+            $out->addFromString($path, $content);
+        }
+        $out->close();
+
+        return array(
+            'zip_path'     => $rollback_zip_path,
+            'reverted'     => array_keys($reverted),
+            'unrevertable' => $unrevertable,
+        );
+    }
+
+    /**
      * Add a new backup and rotate (keep last 5)
      */
     function firefly_collective_add_backup($project_name, $zip_path, $sync_mode, $file_count, $selected_count, $target_env = 'dev') {
@@ -926,7 +1038,33 @@
             $env_label = 'Live Dev';
         }
 
-        $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode);
+        // For partial-sync targets that aren't the topmost (active) backup, just
+        // re-sending the target's ZIP won't undo changes made to other files by
+        // newer syncs. Build a time-travel ZIP instead: for every file modified
+        // after the target, pick its newest-at-target version and ship that.
+        // Full-sync targets don't need this — their ZIP is a complete snapshot.
+        $is_topmost = isset($backups[0]['id']) && $backups[0]['id'] === $backup['id'];
+        $rollback_result = null;
+
+        if ($sync_mode === 'partial' && !$is_topmost) {
+            $rollback_result = firefly_collective_build_rollback_zip($project_name, $backup['id']);
+            if (is_wp_error($rollback_result)) return $rollback_result;
+        }
+
+        if ($rollback_result !== null && !empty($rollback_result['zip_path'])) {
+            $send_zip = $rollback_result['zip_path'];
+            $send_mode = 'partial';
+        } else {
+            $send_zip = $zip_path;
+            $send_mode = $sync_mode;
+        }
+
+        $response = firefly_collective_send_project_update($send_zip, $project_name, $endpoint, $send_mode);
+
+        // Clean up any temp rollback ZIP regardless of outcome.
+        if ($rollback_result !== null && !empty($rollback_result['zip_path']) && file_exists($rollback_result['zip_path'])) {
+            @unlink($rollback_result['zip_path']);
+        }
 
         if (is_wp_error($response)) {
             return $response;
@@ -937,10 +1075,24 @@
         // Clean up temp directory
         firefly_collective_cleanup_temp_dir();
 
+        $reverted_count = ($rollback_result && !empty($rollback_result['reverted'])) ? count($rollback_result['reverted']) : 0;
+        $unrevertable   = ($rollback_result && !empty($rollback_result['unrevertable'])) ? $rollback_result['unrevertable'] : array();
+
+        $message = 'Successfully restored to ' . $env_label . ' from backup: ' . $backup['timestamp'];
+        if ($reverted_count > 0) {
+            $message .= ' (' . $reverted_count . ' file' . ($reverted_count === 1 ? '' : 's') . ' reverted)';
+        }
+        if (!empty($unrevertable)) {
+            $message .= ' — ' . count($unrevertable) . ' file(s) could not be reverted (no prior version available): ' . implode(', ', array_slice($unrevertable, 0, 5));
+            if (count($unrevertable) > 5) $message .= ' …';
+        }
+
         return array(
-            'success' => true,
-            'message' => 'Successfully restored to ' . $env_label . ' from backup: ' . $backup['timestamp'],
-            'backup' => $backup
+            'success'      => true,
+            'message'      => $message,
+            'backup'       => $backup,
+            'reverted'     => $rollback_result ? $rollback_result['reverted'] : array(),
+            'unrevertable' => $unrevertable,
         );
     }
 

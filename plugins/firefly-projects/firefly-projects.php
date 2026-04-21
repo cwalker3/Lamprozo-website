@@ -34,6 +34,7 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/functions.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/rest.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/git-mode.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
 
 /**

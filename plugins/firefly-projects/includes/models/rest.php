@@ -155,6 +155,34 @@ function firefly_plugin_register_rest_endpoints() {
         )
     );
 
+    // Git Mode: read git repo status + user toggle
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/git-status',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_git_status_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+        )
+    );
+
+    // Git Mode: persist the user's on/off preference
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/git-mode',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_git_mode_toggle_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'enabled' => array(
+                    'required' => true,
+                    'type'     => 'boolean',
+                ),
+            ),
+        )
+    );
+
     // Page Sync: Sync page content to remote site (local site only)
     register_rest_route(
         'firefly-plugin/v1',

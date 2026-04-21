@@ -192,7 +192,42 @@ if (!isset($projects_data) || !is_array($projects_data)) {
     </div>
 
     <div v-if="selectedProject && fileTree.length > 0 && !isLoadingFiles" class="file-selector-wrapper">
-        <div class="sync-mode-selector">
+
+        <!-- Git Mode toggle — only shown when wp-content/.git exists on the server -->
+        <div v-if="gitModeAvailable" class="git-mode-bar" :class="{ 'is-on': gitModeEnabled }">
+            <label class="git-mode-toggle">
+                <input type="checkbox"
+                       v-model="gitModeEnabled"
+                       @change="onGitModeToggle"
+                       :disabled="isSyncing || isRestoring" />
+                <span class="git-mode-switch" aria-hidden="true"></span>
+                <span class="git-mode-text">
+                    <strong>Git Auto-Detect</strong>
+                    <span class="git-mode-hint" v-if="gitModeEnabled && gitChangedFiles.length">
+                        {{ gitChangedFiles.length }} file{{ gitChangedFiles.length === 1 ? '' : 's' }} auto-selected
+                        <span v-if="gitStatusCounts.modified" class="git-count-chip git-badge-modified">{{ gitStatusCounts.modified }} modified</span>
+                        <span v-if="gitStatusCounts.staged"   class="git-count-chip git-badge-staged">{{ gitStatusCounts.staged }} staged</span>
+                        <span v-if="gitStatusCounts.untracked" class="git-count-chip git-badge-untracked">{{ gitStatusCounts.untracked }} new</span>
+                    </span>
+                    <span class="git-mode-hint" v-else-if="gitModeEnabled">
+                        No local changes detected — nothing to sync
+                    </span>
+                    <span class="git-mode-hint" v-else>
+                        Toggle on to auto-select files modified in git
+                    </span>
+                </span>
+            </label>
+            <button v-if="gitModeEnabled"
+                    @click="refreshGitStatus"
+                    class="git-mode-refresh"
+                    :disabled="isSyncing || isRestoring || isLoadingGitStatus"
+                    :title="'Re-read git status'">
+                <span v-if="isLoadingGitStatus">Refreshing…</span>
+                <span v-else>↻ Refresh</span>
+            </button>
+        </div>
+
+        <div class="sync-mode-selector" v-if="!gitModeEnabled">
             <label><strong>Sync Mode:</strong></label>
             <label class="sync-mode-option">
                 <input type="radio" v-model="syncMode" value="partial" :disabled="isSyncing || isRestoring" />
@@ -246,6 +281,8 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                     :selected-paths="selectedPaths"
                     :expanded-paths="expandedPaths"
                     :checkboxes-disabled="checkboxesDisabled"
+                    :git-status-map="gitStatusMap"
+                    :git-mode-enabled="gitModeEnabled"
                     @update="handleUpdate"
                 />
             </ul>

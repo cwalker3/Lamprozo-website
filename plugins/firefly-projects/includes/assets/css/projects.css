@@ -595,6 +595,195 @@
     border-radius: 5px;
 }
 
+/* ==================================================================
+   Git Mode toggle
+   ================================================================== */
+
+.git-mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 16px 0;
+    padding: 14px 18px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-left: 4px solid #c3c6c9;
+    border-radius: 5px;
+    transition: border-color 160ms ease, background 160ms ease;
+}
+
+.git-mode-bar.is-on {
+    background: #f0f7fb;
+    border-color: #b9d8ec;
+    border-left-color: #2271b1;
+}
+
+.git-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    cursor: pointer;
+    user-select: none;
+}
+
+.git-mode-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.git-mode-switch {
+    position: relative;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 24px;
+    background: #c3c6c9;
+    border-radius: 24px;
+    transition: background 180ms ease;
+}
+
+.git-mode-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform 180ms ease;
+}
+
+.git-mode-bar.is-on .git-mode-switch {
+    background: #2271b1;
+}
+
+.git-mode-bar.is-on .git-mode-switch::after {
+    transform: translateX(18px);
+}
+
+.git-mode-toggle input:focus-visible + .git-mode-switch {
+    outline: 2px solid #2271b1;
+    outline-offset: 2px;
+}
+
+.git-mode-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+}
+
+.git-mode-text strong {
+    font-size: 14px;
+    color: #1d2327;
+}
+
+.git-mode-hint {
+    font-size: 12px;
+    color: #646970;
+}
+
+.git-mode-bar.is-on .git-mode-hint {
+    color: #2271b1;
+}
+
+.git-mode-refresh {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1px solid #2271b1;
+    color: #2271b1;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+}
+
+.git-mode-refresh:hover:not(:disabled) {
+    background: #2271b1;
+    color: #fff;
+}
+
+.git-mode-refresh:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+/* Header count chips shown inside the git-mode label */
+.git-count-chip {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+
+/* Per-file status badges inside the file tree */
+.git-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+    vertical-align: middle;
+}
+
+.git-badge-modified,
+.git-count-chip.git-badge-modified {
+    background: #fff4d6;
+    color: #8a6100;
+    border: 1px solid #f0c869;
+}
+
+.git-badge-staged,
+.git-count-chip.git-badge-staged {
+    background: #dff5e1;
+    color: #1e6b2a;
+    border: 1px solid #8cd49a;
+}
+
+.git-badge-untracked,
+.git-count-chip.git-badge-untracked {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+/* Row highlight for files with a git status (subtle left-border accent) */
+.file-tree-node.git-modified  { border-left: 3px solid #f0c869; margin-left: -3px; padding-left: 0; }
+.file-tree-node.git-staged    { border-left: 3px solid #8cd49a; margin-left: -3px; padding-left: 0; }
+.file-tree-node.git-untracked { border-left: 3px solid #93c5fd; margin-left: -3px; padding-left: 0; }
+
+/* Dim files that have no git status AND aren't checked, when git mode is
+   on. Clicking the checkbox un-dims the row (the is-dimmed class is only
+   applied while unchecked). Transition keeps the dim/brighten feel fluid. */
+.file-tree-item.is-dimmed > .file-tree-node {
+    opacity: 0.35;
+    transition: opacity 180ms ease;
+}
+
+.file-tree-item > .file-tree-node {
+    transition: opacity 180ms ease;
+}
+
+/* Hover a dimmed row to preview what's there before you click */
+.file-tree-item.is-dimmed > .file-tree-node:hover {
+    opacity: 0.7;
+}
+
 .sync-mode-selector > label:first-child {
     display: block;
     margin-bottom: 12px;
