@@ -1,0 +1,20 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/template-card",
+    "title": "Firefly: Template Card",
+    "category": "firefly",
+    "icon": "layout",
+    "description": "A card in the templates gallery: name, tag, ship-time, and accent color.",
+    "keywords": ["template", "gallery", "card"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "name":    { "type": "string", "default": "template-name" },
+        "tag":     { "type": "string", "default": "category" },
+        "days":    { "type": "string", "default": "N" },
+        "accent":  { "type": "string", "default": "#f5b544" },
+        "url":     { "type": "string", "default": "#" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

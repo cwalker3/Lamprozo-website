@@ -589,6 +589,14 @@ function firefly_projects_handle_incoming_page($request) {
         'menu_order'   => isset($post_data['menu_order']) ? $post_data['menu_order'] : 0,
     );
 
+    // wp_insert_post / wp_update_post internally call wp_unslash() on their
+    // input — they expect PRE-SLASHED data. Our $post_data came straight
+    // from JSON decode (unslashed), so we must wp_slash() here or WP will
+    // strip legitimate backslashes inside block-attribute JSON such as
+    // "heading":"...\u003cspan\u003e..." — turning \u003c into the literal
+    // string "u003c" on the live site.
+    $wp_post_data = wp_slash($wp_post_data);
+
     if ($existing_post) {
         $wp_post_data['ID'] = $existing_post->ID;
         $post_id = wp_update_post($wp_post_data, true);

@@ -1,0 +1,16 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/overline",
+    "title": "Firefly: Overline",
+    "category": "firefly",
+    "icon": "tag",
+    "description": "Tiny uppercase mono label, usually above a section heading.",
+    "keywords": ["overline", "eyebrow", "label"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "text": { "type": "string", "default": "Overline label" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

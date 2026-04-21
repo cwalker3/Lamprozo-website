@@ -1,0 +1,20 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/trust-bar",
+    "title": "Firefly: Trust Bar",
+    "category": "firefly",
+    "icon": "awards",
+    "description": "The \"Built on Firefly\" site list. Edit each site name and page count.",
+    "keywords": ["trust", "logos", "sites"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "label": { "type": "string", "default": "Built on Firefly" },
+        "sites": {
+            "type":    "string",
+            "default": "glow.fire|62 pages; outdoor-artisans|14 pages; lains-carpet-care|9 pages; alexstrait.com|11 pages; lamprozo|7 pages"
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

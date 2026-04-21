@@ -19,6 +19,9 @@
     // Load template functions
     require_once $template_path . '/functions.php';
 
+    // Load custom Gutenberg blocks (framework-level, shared across templates)
+    require_once get_template_directory() . '/blocks/register.php';
+
     // Inject analytics tracking script (all templates)
     add_action('wp_footer', function() {
         if (is_admin()) return;

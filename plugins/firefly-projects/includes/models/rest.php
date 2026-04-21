@@ -1298,6 +1298,11 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         'menu_order'   => isset($post_data['menu_order']) ? $post_data['menu_order'] : 0,
     );
 
+    // wp_insert_post/wp_update_post internally call wp_unslash — must slash
+    // first or block-attribute JSON escapes (\u003c, \u0022) lose their
+    // backslashes and render as literal "u003c" on the live site.
+    $wp_post_data = wp_slash($wp_post_data);
+
     if ($existing_post) {
         $wp_post_data['ID'] = $existing_post->ID;
         $post_id = wp_update_post($wp_post_data, true);
@@ -1360,11 +1365,11 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         // Rewrite content URLs to local paths
         $new_content = firefly_projects_rewrite_content_urls($post_data['post_content'], $mappings, 'to_dev');
 
-        // Update post with rewritten content
-        wp_update_post(array(
+        // Update post with rewritten content (wp_slash to preserve block-attr backslashes)
+        wp_update_post(wp_slash(array(
             'ID'           => $post_id,
             'post_content' => $new_content
-        ));
+        )));
 
         // Save asset map
         firefly_projects_save_asset_map($post_id, array(

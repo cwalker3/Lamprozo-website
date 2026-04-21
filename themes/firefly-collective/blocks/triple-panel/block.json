@@ -1,0 +1,14 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/triple-panel",
+    "title": "Firefly: Triple Panel Demo",
+    "category": "firefly",
+    "icon": "columns",
+    "description": "The animated three-contributor demo panel (Gutenberg + CLI + VS Code converging on one live site). Decorative — renders the fixed design.",
+    "keywords": ["triple", "demo", "panel", "hero"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {},
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

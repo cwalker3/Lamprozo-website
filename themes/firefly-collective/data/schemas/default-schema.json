@@ -29,12 +29,6 @@
             "snippet": "template.html"
         },
         {
-            "slug": "home",
-            "title": "Home",
-            "snippet": "home.html",
-            "set_as": "front_page"
-        },
-        {
             "slug": "app",
             "title": "App",
             "snippet": "app.html"
@@ -54,6 +48,14 @@
             "slug": "signup",
             "title": "Signup",
             "snippet": "signup.html"
+        },
+        {
+            "slug": "home",
+            "title": "Home",
+            "snippet": "home.html",
+            "set_as": "front_page",
+            "menu_order": 1,
+            "in_menu": false
         }
     ],
     "posts": [

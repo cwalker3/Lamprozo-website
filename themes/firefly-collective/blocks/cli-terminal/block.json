@@ -1,0 +1,14 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/cli-terminal",
+    "title": "Firefly: CLI Terminal Demo",
+    "category": "firefly",
+    "icon": "arrow-right-alt",
+    "description": "Animated terminal that loops `firefly views create pricing` output. Decorative.",
+    "keywords": ["terminal", "cli", "demo"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {},
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}
