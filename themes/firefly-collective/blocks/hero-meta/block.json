@@ -1,0 +1,17 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/hero-meta",
+    "title": "Firefly: Hero Meta",
+    "category": "firefly",
+    "icon": "info",
+    "description": "The small meta row under hero CTAs (live-status dot + tech stack line).",
+    "keywords": ["hero", "meta", "status"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "status": { "type": "string", "default": "Live on 40%+ of the web via WordPress" },
+        "tech":   { "type": "string", "default": "stripe · oauth · pwa · mvc · claude.md" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

@@ -9,9 +9,11 @@
 
 ?>
 
+<?php if (is_admin()): ?>
 <h1>Order History</h1>
-
-<?php echo apply_filters('the_content', $postContent); ?>
+<?php else: ?>
+<?php echo apply_filters('the_content', $postContent ?? ''); ?>
+<?php endif; ?>
 
 <div class="wrap" id="ffc-orders-app" v-cloak>
 

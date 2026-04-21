@@ -1,0 +1,19 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/substrate-logos",
+    "title": "Firefly: Substrate Logos",
+    "category": "firefly",
+    "icon": "networking",
+    "description": "A row of small tech pill labels (e.g., WordPress · Stripe · Docker). Edit pills via sidebar.",
+    "keywords": ["logos", "substrate", "tech"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "items": {
+            "type": "string",
+            "default": "WordPress 6.9 · Gutenberg · PHP 8.3 · Stripe · Docker · rclone backup · ngrok / cloudflared · claude.md"
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

@@ -1,0 +1,35 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/pillar",
+    "title": "Firefly: Pillar",
+    "category": "firefly",
+    "icon": "screenoptions",
+    "description": "A capability card with icon, title, description, and meta label. Used in the Flex MVC capabilities grid.",
+    "keywords": ["pillar", "capability", "feature", "card"],
+    "supports": {
+        "inserter": true,
+        "reusable": true,
+        "html": false
+    },
+    "attributes": {
+        "iconName": {
+            "type": "string",
+            "default": "schema"
+        },
+        "title": {
+            "type": "string",
+            "default": ""
+        },
+        "description": {
+            "type": "string",
+            "default": ""
+        },
+        "meta": {
+            "type": "string",
+            "default": ""
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

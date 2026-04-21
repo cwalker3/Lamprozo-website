@@ -61,10 +61,11 @@
                     </ul>
                     <div class="footer-newsletter">
                         <h4><?php esc_html_e('Stay Updated'); ?></h4>
-                        <form class="newsletter-form" action="#" method="post">
-                            <input type="email" placeholder="<?php esc_attr_e('Your email'); ?>" required>
+                        <form class="newsletter-form" id="newsletter-form" method="post">
+                            <input type="email" name="email" placeholder="<?php esc_attr_e('Your email'); ?>" required>
                             <button type="submit"><?php esc_html_e('Subscribe'); ?></button>
                         </form>
+                        <div class="newsletter-message" id="newsletter-message" role="status" aria-live="polite"></div>
                     </div>
                 </div>
             </div>
@@ -87,5 +88,42 @@
     </footer>
 
     <?php wp_footer(); ?>
+    <script>
+    (function(){
+        var form = document.getElementById('newsletter-form');
+        var msg  = document.getElementById('newsletter-message');
+        if (!form || !msg) return;
+
+        form.addEventListener('submit', function(e){
+            e.preventDefault();
+            var input = form.querySelector('input[name="email"]');
+            var btn   = form.querySelector('button[type="submit"]');
+            var email = (input.value || '').trim();
+            if (!email) return;
+
+            msg.textContent = '';
+            msg.className   = 'newsletter-message';
+            btn.disabled = true;
+
+            fetch(myApi.api_url + 'submit-newsletter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': myApi.nonce },
+                body: JSON.stringify({ email: email })
+            })
+            .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, body: d }; }); })
+            .then(function(res){
+                btn.disabled = false;
+                msg.textContent = (res.body && res.body.message) || (res.ok ? 'Subscribed.' : 'Something went wrong.');
+                msg.className   = 'newsletter-message ' + (res.ok ? 'success' : 'error');
+                if (res.ok) form.reset();
+            })
+            .catch(function(){
+                btn.disabled = false;
+                msg.textContent = 'Network error. Please try again.';
+                msg.className   = 'newsletter-message error';
+            });
+        });
+    })();
+    </script>
 </body>
 </html>

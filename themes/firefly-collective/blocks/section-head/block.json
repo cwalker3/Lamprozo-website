@@ -1,0 +1,35 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/section-head",
+    "title": "Firefly: Section Head",
+    "category": "firefly",
+    "icon": "heading",
+    "description": "Overline label, H2 heading, optional lead paragraph. Used at the top of every marketing section.",
+    "keywords": ["section", "head", "heading", "title"],
+    "supports": {
+        "inserter": true,
+        "reusable": true,
+        "html": false
+    },
+    "attributes": {
+        "overline": {
+            "type": "string",
+            "default": "Overline label"
+        },
+        "heading": {
+            "type": "string",
+            "default": "Section heading"
+        },
+        "lead": {
+            "type": "string",
+            "default": ""
+        },
+        "centered": {
+            "type": "boolean",
+            "default": false
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

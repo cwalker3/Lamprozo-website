@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/contributor-card",
+    "title": "Firefly: Contributor Card",
+    "category": "firefly",
+    "icon": "admin-users",
+    "description": "A card describing one audience/contributor (no-coder, developer, or AI agent) with number, title, description, and tool chips.",
+    "keywords": ["card", "contributor", "audience"],
+    "supports": {
+        "inserter": true,
+        "reusable": true,
+        "html": false
+    },
+    "attributes": {
+        "number": {
+            "type": "string",
+            "default": "01"
+        },
+        "audience": {
+            "type": "string",
+            "default": "Audience"
+        },
+        "title": {
+            "type": "string",
+            "default": ""
+        },
+        "description": {
+            "type": "string",
+            "default": ""
+        },
+        "chips": {
+            "type": "string",
+            "default": "chip one · chip two · chip three"
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

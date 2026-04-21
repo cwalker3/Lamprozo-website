@@ -35,7 +35,83 @@ function firefly_relativize_urls($content) {
         $content = str_replace($url, '', $content);
     }
 
+    // Catch any remaining absolute URLs pointing to internal WordPress paths,
+    // regardless of domain. Handles content from other environments.
+    // Matches /wp-content/, /wp-includes/, and /wp-admin/ asset paths.
+    $content = preg_replace('#https?://[^/\s"\']+(/wp-(?:content|includes|admin)/)#', '$1', $content);
+
     return $content;
+}
+
+/**
+ * Relativize URLs in rendered content so pages work across
+ * all environments (localhost, dev, production) without mixed content warnings.
+ */
+add_filter( 'the_content', 'firefly_relativize_urls', 99 );
+add_filter( 'the_content_feed', 'firefly_relativize_urls', 99 );
+add_filter( 'wp_get_attachment_url', 'firefly_relativize_urls', 99 );
+add_filter( 'wp_get_attachment_image_src', function( $image ) {
+    if ( is_array( $image ) && ! empty( $image[0] ) ) {
+        $image[0] = firefly_relativize_urls( $image[0] );
+    }
+    return $image;
+}, 99 );
+add_filter( 'wp_calculate_image_srcset', function( $sources ) {
+    if ( is_array( $sources ) ) {
+        foreach ( $sources as &$source ) {
+            $source['url'] = firefly_relativize_urls( $source['url'] );
+        }
+    }
+    return $sources;
+}, 99 );
+
+/**
+ * Catch any remaining absolute URLs in final HTML output.
+ * Runs as an output buffer on template_redirect.
+ */
+add_action( 'template_redirect', function() {
+    ob_start( 'firefly_relativize_urls' );
+} );
+
+/**
+ * Look up the snippet filename from the schema for a given post.
+ * Returns the snippet basename (e.g. "home.html") if found, or null.
+ */
+function firefly_get_schema_snippet($template, $post_id, $post_type) {
+    $schema_path = get_template_directory() . '/data/schemas/' . $template . '-schema.json';
+    if ( ! file_exists( $schema_path ) ) {
+        return null;
+    }
+
+    $schema = json_decode( file_get_contents( $schema_path ), true );
+    if ( ! $schema ) {
+        return null;
+    }
+
+    $key = ( $post_type === 'post' ) ? 'posts' : 'pages';
+    if ( ! isset( $schema[ $key ] ) ) {
+        return null;
+    }
+
+    // Match by post ID's current slug OR by WordPress-deduplicated slug
+    $slug = get_post_field( 'post_name', $post_id );
+    foreach ( $schema[ $key ] as $entry ) {
+        if ( $entry['slug'] === $slug ) {
+            return $entry['snippet'];
+        }
+    }
+
+    // Also try matching by stripping the "-2", "-3" etc. suffix that WordPress adds
+    $base_slug = preg_replace( '/-\d+$/', '', $slug );
+    if ( $base_slug !== $slug ) {
+        foreach ( $schema[ $key ] as $entry ) {
+            if ( $entry['slug'] === $base_slug ) {
+                return $entry['snippet'];
+            }
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -58,6 +134,12 @@ function firefly_get_snippet_path($post_id, $post_type = 'page') {
     // Ensure directory exists
     if (!is_dir($template_dir)) {
         wp_mkdir_p($template_dir);
+    }
+
+    // Use the schema's snippet filename if it exists (handles WordPress slug deduplication)
+    $schema_snippet = firefly_get_schema_snippet( $template, $post_id, $post_type );
+    if ( $schema_snippet ) {
+        return $template_dir . '/' . $schema_snippet;
     }
 
     return $template_dir . '/' . $slug . '.html';
@@ -269,13 +351,14 @@ function firefly_update_schema_entry($post_id, $post_type, $template) {
         $schema[$key] = array();
     }
 
-    // Check if entry exists
+    // Check if entry exists — also match base slug to handle WordPress deduplication
+    // (e.g. slug "home-2" should match schema entry "home")
     $found = false;
+    $base_slug = preg_replace( '/-\d+$/', '', $slug );
     foreach ($schema[$key] as $index => $entry) {
-        if ($entry['slug'] === $slug) {
-            // Update existing entry
+        if ( $entry['slug'] === $slug || ( $base_slug !== $slug && $entry['slug'] === $base_slug ) ) {
+            // Update existing entry — preserve the schema's slug and snippet name
             $schema[$key][$index]['title'] = $title;
-            $schema[$key][$index]['snippet'] = $slug . '.html';
 
             if ($post_type === 'page') {
                 $schema[$key][$index]['menu_order'] = $menu_order;
@@ -462,6 +545,20 @@ function firefly_handle_slug_change($post_id, $post_after, $post_before) {
     $template = get_post_meta($post_id, '_firefly_template', true);
     if (empty($template)) {
         return;
+    }
+
+    // If the new slug looks like WordPress deduplication (e.g. "home-2") and
+    // the schema already has an entry for the old slug, skip the rename.
+    // WordPress enforces globally unique slugs, but snippets are template-scoped.
+    $schema_snippet = firefly_get_schema_snippet( $template, $post_id, $post_type );
+    if ( $schema_snippet ) {
+        $schema_slug = str_replace( '.html', '', $schema_snippet );
+        $new_slug = $post_after->post_name;
+        // The schema already tracks this post under a different slug — don't rename
+        if ( $schema_slug !== $new_slug ) {
+            error_log( "Firefly: Ignoring WordPress slug deduplication {$schema_slug} -> {$new_slug} (template '{$template}' snippets are scoped)" );
+            return;
+        }
     }
 
     $type_dir = ($post_type === 'post') ? 'posts' : 'pages';

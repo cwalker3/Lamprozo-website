@@ -170,7 +170,7 @@ if (!isset($projects_data) || !is_array($projects_data)) {
     </div>
     <div class="project-selector-container">
         <label for="project-select">Select Project:</label>
-        <select id="project-select" v-model="selectedProject" @change="loadProjectFiles" :disabled="isLoadingFiles || isSyncing">
+        <select id="project-select" v-model="selectedProject" @change="loadProjectFiles" :disabled="isLoadingFiles || isSyncing || isRestoring">
             <option value="">-- Choose a Project --</option>
             <option v-for="project in projects" :key="project.name" :value="project.name">
                 {{ project.name }} - {{ project.description }}
@@ -192,16 +192,51 @@ if (!isset($projects_data) || !is_array($projects_data)) {
     </div>
 
     <div v-if="selectedProject && fileTree.length > 0 && !isLoadingFiles" class="file-selector-wrapper">
-        <div class="sync-mode-selector">
+
+        <!-- Git Mode toggle — only shown when wp-content/.git exists on the server -->
+        <div v-if="gitModeAvailable" class="git-mode-bar" :class="{ 'is-on': gitModeEnabled }">
+            <label class="git-mode-toggle">
+                <input type="checkbox"
+                       v-model="gitModeEnabled"
+                       @change="onGitModeToggle"
+                       :disabled="isSyncing || isRestoring" />
+                <span class="git-mode-switch" aria-hidden="true"></span>
+                <span class="git-mode-text">
+                    <strong>Git Auto-Detect</strong>
+                    <span class="git-mode-hint" v-if="gitModeEnabled && gitChangedFiles.length">
+                        {{ gitChangedFiles.length }} file{{ gitChangedFiles.length === 1 ? '' : 's' }} auto-selected
+                        <span v-if="gitStatusCounts.modified" class="git-count-chip git-badge-modified">{{ gitStatusCounts.modified }} modified</span>
+                        <span v-if="gitStatusCounts.staged"   class="git-count-chip git-badge-staged">{{ gitStatusCounts.staged }} staged</span>
+                        <span v-if="gitStatusCounts.untracked" class="git-count-chip git-badge-untracked">{{ gitStatusCounts.untracked }} new</span>
+                    </span>
+                    <span class="git-mode-hint" v-else-if="gitModeEnabled">
+                        No local changes detected — nothing to sync
+                    </span>
+                    <span class="git-mode-hint" v-else>
+                        Toggle on to auto-select files modified in git
+                    </span>
+                </span>
+            </label>
+            <button v-if="gitModeEnabled"
+                    @click="refreshGitStatus"
+                    class="git-mode-refresh"
+                    :disabled="isSyncing || isRestoring || isLoadingGitStatus"
+                    :title="'Re-read git status'">
+                <span v-if="isLoadingGitStatus">Refreshing…</span>
+                <span v-else>↻ Refresh</span>
+            </button>
+        </div>
+
+        <div class="sync-mode-selector" v-if="!gitModeEnabled">
             <label><strong>Sync Mode:</strong></label>
             <label class="sync-mode-option">
-                <input type="radio" v-model="syncMode" value="partial" :disabled="isSyncing" />
+                <input type="radio" v-model="syncMode" value="partial" :disabled="isSyncing || isRestoring" />
                 <span class="sync-mode-label">
                     <strong>Partial Sync</strong> (update selected files only, keep other files on remote)
                 </span>
             </label>
             <label class="sync-mode-option">
-                <input type="radio" v-model="syncMode" value="full" :disabled="isSyncing" />
+                <input type="radio" v-model="syncMode" value="full" :disabled="isSyncing || isRestoring" />
                 <span class="sync-mode-label">
                     <strong>Full Sync</strong> (mirror exactly, delete files not in selection)
                 </span>
@@ -215,13 +250,13 @@ if (!isset($projects_data) || !is_array($projects_data)) {
         </div>
 
         <div class="file-selector-actions">
-            <button @click="selectAllFiles" class="action-button" :disabled="isSyncing || syncMode === 'full'">
+            <button @click="selectAllFiles" class="action-button" :disabled="isSyncing || isRestoring || syncMode === 'full'">
                 Select All
             </button>
-            <button @click="deselectAllFiles" class="action-button" :disabled="isSyncing || syncMode === 'full'">
+            <button @click="deselectAllFiles" class="action-button" :disabled="isSyncing || isRestoring || syncMode === 'full'">
                 Deselect All
             </button>
-            <button @click="syncSelectedFiles" class="action-button primary" :disabled="!hasSelection || isSyncing">
+            <button @click="syncSelectedFiles" class="action-button primary" :disabled="!hasSelection || isSyncing || isRestoring">
                 <span v-if="!isSyncing">Sync Selected Files ({{ selectedCount }})</span>
                 <span v-else>Syncing...</span>
             </button>
@@ -230,7 +265,7 @@ if (!isset($projects_data) || !is_array($projects_data)) {
             <div class="env-toggle-container" v-if="hasProdEndpoint">
                 <span class="env-label" :class="{ active: targetEnv === 'dev' }">Live Dev</span>
                 <label class="env-toggle-switch">
-                    <input type="checkbox" v-model="targetEnvProd" :disabled="isSyncing" />
+                    <input type="checkbox" v-model="targetEnvProd" :disabled="isSyncing || isRestoring" />
                     <span class="env-toggle-slider"></span>
                 </label>
                 <span class="env-label" :class="{ active: targetEnv === 'prod' }">Production</span>
@@ -246,6 +281,8 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                     :selected-paths="selectedPaths"
                     :expanded-paths="expandedPaths"
                     :checkboxes-disabled="checkboxesDisabled"
+                    :git-status-map="gitStatusMap"
+                    :git-mode-enabled="gitModeEnabled"
                     @update="handleUpdate"
                 />
             </ul>
@@ -266,7 +303,7 @@ if (!isset($projects_data) || !is_array($projects_data)) {
         </button>
 
         <div v-if="backupHistory.length > 0" class="backup-list">
-            <div v-for="backup in backupHistory" :key="backup.id" class="backup-item">
+            <div v-for="(backup, backupIndex) in backupHistory" :key="backup.id" class="backup-item">
                 <div class="backup-info">
                     <div class="backup-header">
                         <strong>{{ formatTimestamp(backup.timestamp) }}</strong>
@@ -286,7 +323,24 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                     </div>
                 </div>
                 <div class="backup-actions">
-                    <button @click="confirmRestore(backup)"
+                    <template v-if="backupIndex === 0">
+                        <button v-if="!activeBackupId || activeBackupId === backup.id"
+                                @click="confirmRestore(backupHistory[1])"
+                                class="restore-button"
+                                :disabled="isRestoring || isDeletingBackup || backupHistory.length < 2"
+                                :title="backupHistory.length < 2 ? 'No earlier sync to roll back to' : 'Undo this sync by restoring the previous one'">
+                            Rollback
+                        </button>
+                        <button v-else
+                                @click="confirmRestore(backup)"
+                                class="restore-button"
+                                :disabled="isRestoring || isDeletingBackup"
+                                title="Reapply this sync (currently rolled back)">
+                            Reapply
+                        </button>
+                    </template>
+                    <button v-else
+                            @click="confirmRestore(backup)"
                             class="restore-button" :disabled="isRestoring || isDeletingBackup">
                         Restore
                     </button>

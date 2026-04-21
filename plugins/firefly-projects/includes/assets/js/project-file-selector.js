@@ -25,11 +25,19 @@ document.addEventListener('DOMContentLoaded', () => {
             checkboxesDisabled: {
                 type: Boolean,
                 required: true
+            },
+            gitStatusMap: {
+                type: Object,
+                default: () => ({})
+            },
+            gitModeEnabled: {
+                type: Boolean,
+                default: false
             }
         },
         template: `
-            <li class="file-tree-item">
-                <div class="file-tree-node" :class="{ 'is-directory': node.type === 'directory' }">
+            <li class="file-tree-item" :class="{ 'is-dimmed': isDimmedByGitMode }">
+                <div class="file-tree-node" :class="{ 'is-directory': node.type === 'directory', ['git-' + gitStatus]: gitStatus }">
                     <span v-if="node.type === 'directory'"
                           class="toggle-icon"
                           @click="toggleExpanded">
@@ -50,6 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label :for="'file-' + node.path" class="file-label">
                         <span class="file-icon">{{ node.type === 'directory' ? '📁' : '📄' }}</span>
                         <span class="file-name">{{ node.name }}</span>
+                        <span v-if="gitStatus" :class="'git-badge git-badge-' + gitStatus" :title="gitBadgeTitle">
+                            {{ gitBadgeLabel }}
+                        </span>
                         <span v-if="node.type === 'file'" class="file-meta">
                             ({{ formatFileSize(node.size) }}, {{ node.modified }})
                         </span>
@@ -65,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         :selected-paths="selectedPaths"
                         :expanded-paths="expandedPaths"
                         :checkboxes-disabled="checkboxesDisabled"
+                        :git-status-map="gitStatusMap"
+                        :git-mode-enabled="gitModeEnabled"
                         @update="$emit('update')"
                     />
                 </ul>
@@ -87,6 +100,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
 
                 return checkedChildren.length > 0 && checkedChildren.length < this.node.children.length;
+            },
+            // Per-file git status classification: 'staged' | 'modified' | 'untracked' | ''
+            gitStatus() {
+                if (this.node.type !== 'file') return '';
+                return this.gitStatusMap[this.node.path] || '';
+            },
+            gitBadgeLabel() {
+                return {
+                    staged:    'staged',
+                    modified:  'modified',
+                    untracked: 'new'
+                }[this.gitStatus] || '';
+            },
+            gitBadgeTitle() {
+                return {
+                    staged:    'Staged for commit',
+                    modified:  'Modified, not staged',
+                    untracked: 'New file, not tracked'
+                }[this.gitStatus] || '';
+            },
+            // When git mode is on, dim files that have no git status AND
+            // aren't manually checked — keeps focus on the changes. Users
+            // can still click-check a dimmed file (it un-dims while checked,
+            // re-dims when unchecked).
+            isDimmedByGitMode() {
+                if (!this.gitModeEnabled) return false;
+                if (this.node.type !== 'file') return false;
+                if (this.gitStatus) return false;
+                if (this.isChecked) return false;
+                return true;
             }
         },
         methods: {
@@ -193,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showDevSuffixModal: false, // Control dev suffix modal
                 savedPartialSelections: new Set(), // Store selections when switching to Full Sync
                 backupHistory: [],
+                activeBackupId: '',
                 isLoadingHistory: false,
                 isRestoring: false,
                 showRestoreModal: false,
@@ -214,7 +258,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     dbPassword: '',
                     dbHost: 'localhost',
                     tablePrefix: 'wp_'
-                }
+                },
+                // Git Mode state
+                gitModeAvailable: false,    // wp-content/.git exists on server
+                gitModeEnabled: false,      // user toggle (persisted in user_meta)
+                gitChangedFiles: [],        // absolute file paths in project scope
+                gitStatusMap: {},           // { "/wp-content/x": "staged" | "modified" | "untracked" }
+                gitStatusCounts: { staged: 0, modified: 0, untracked: 0 },
+                isLoadingGitStatus: false
             };
         },
         computed: {
@@ -228,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return this.totalFileCount > 0 && this.selectedPaths.size === this.totalFileCount;
             },
             checkboxesDisabled() {
-                return this.syncMode === 'full';
+                return this.syncMode === 'full' || this.isSyncing || this.isRestoring;
             },
             currentProjectNeedsDev() {
                 if (!this.selectedProject || !this.projectsNeedingDev) {
@@ -401,6 +452,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             // Load backup history for this project
                             this.loadBackupHistory();
+
+                            // Refresh git status for this project (no-op if unavailable)
+                            this.fetchGitStatus();
                         } else {
                             this.message = 'No files found for this project.';
                             this.messageType = 'error';
@@ -560,12 +614,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (data.success) {
                         this.backupHistory = data.backups || [];
+                        this.activeBackupId = data.active_backup_id || '';
                     }
                 } catch (error) {
                     console.error('[Firefly Projects Error] loadBackupHistory:', error);
                 } finally {
                     this.isLoadingHistory = false;
                 }
+            },
+
+            // -----------------------------------------------------------
+            // Git Mode
+            // -----------------------------------------------------------
+
+            /** Pull git status + user toggle state from the server. */
+            async fetchGitStatus() {
+                if (!this.apiUrl) return;
+                this.isLoadingGitStatus = true;
+                try {
+                    const qs = this.selectedProject
+                        ? '?project_name=' + encodeURIComponent(this.selectedProject)
+                        : '';
+                    const resp = await fetch(`${this.apiUrl}git-status${qs}`, {
+                        credentials: 'same-origin',
+                        headers: { 'X-WP-Nonce': this.nonce }
+                    });
+                    const data = await resp.json();
+
+                    this.gitModeAvailable = !!data.git_available;
+                    this.gitModeEnabled   = !!data.git_mode_enabled && this.gitModeAvailable;
+                    this.gitChangedFiles  = Array.isArray(data.in_scope_files) ? data.in_scope_files : [];
+                    this.gitStatusMap     = (data.status_map && typeof data.status_map === 'object') ? data.status_map : {};
+                    this.gitStatusCounts  = Object.assign({ staged: 0, modified: 0, untracked: 0 }, data.status_counts || {});
+
+                    if (this.gitModeEnabled) {
+                        this.applyGitSelection();
+                    }
+                } catch (err) {
+                    console.error('[Firefly Projects] fetchGitStatus failed:', err);
+                } finally {
+                    this.isLoadingGitStatus = false;
+                }
+            },
+
+            /** Given a list of file paths, compute every ancestor directory
+             *  path ("/wp-content/a/b/c/file.php" → "/wp-content/a", "/a/b",
+             *  "/a/b/c") so those folders can be expanded in the tree. */
+            _collectAncestorPaths(filePaths) {
+                const ancestors = new Set();
+                for (const p of filePaths) {
+                    const parts = p.split('/').filter(Boolean);
+                    let cur = '';
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        cur += '/' + parts[i];
+                        ancestors.add(cur);
+                    }
+                }
+                return ancestors;
+            },
+
+            /** User clicked the git-mode toggle — persist + apply. */
+            async onGitModeToggle() {
+                // v-model already updated this.gitModeEnabled before this fires.
+                const desired = this.gitModeEnabled;
+
+                try {
+                    const resp = await fetch(`${this.apiUrl}git-mode`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': this.nonce
+                        },
+                        body: JSON.stringify({ enabled: desired })
+                    });
+                    const data = await resp.json();
+                    if (!data.success) throw new Error('toggle rejected');
+                } catch (err) {
+                    console.error('[Firefly Projects] onGitModeToggle failed:', err);
+                    // Revert optimistic state on failure
+                    this.gitModeEnabled = !desired;
+                    return;
+                }
+
+                if (desired) {
+                    // Stash current manual selection so we can restore it when
+                    // the user turns git mode off.
+                    this.savedPartialSelections = new Set(this.selectedPaths);
+                    await this.fetchGitStatus();  // refreshes selection + forces partial
+                } else {
+                    // Restore the user's pre-git-mode manual selection.
+                    this.selectedPaths = new Set(this.savedPartialSelections);
+                }
+            },
+
+            /** Manual re-read of git status (user clicks refresh). */
+            async refreshGitStatus() {
+                await this.fetchGitStatus();
+            },
+
+            /** Apply the current gitChangedFiles list as the selection,
+             *  auto-expand parent folders of each selected file so they're
+             *  visible in the tree, and lock sync mode to partial. */
+            applyGitSelection() {
+                this.syncMode = 'partial';
+                this.selectedPaths = new Set(this.gitChangedFiles);
+                const ancestors = this._collectAncestorPaths(this.gitChangedFiles);
+                const merged = new Set(this.expandedPaths);
+                ancestors.forEach(p => merged.add(p));
+                this.expandedPaths = merged;
             },
             confirmRestore(backup) {
                 this.restoreBackup = backup;
@@ -908,6 +1065,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             this.loadProjects();
+
+            // Probe git-mode availability + user preference on page load
+            // so the toggle renders correctly even before a project is picked.
+            this.fetchGitStatus();
 
             // Restore expansion state from session storage
             const savedExpanded = sessionStorage.getItem('firefly_expanded_paths');

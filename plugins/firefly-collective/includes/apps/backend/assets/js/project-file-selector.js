@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return this.totalFileCount > 0 && this.selectedPaths.size === this.totalFileCount;
             },
             checkboxesDisabled() {
-                return this.syncMode === 'full';
+                return this.syncMode === 'full' || this.isSyncing || this.isRestoring;
             }
         },
         watch: {

@@ -25,6 +25,12 @@
                 // Front page only
                 break;
 
+            case 'home':
+                $assets['css'][]    = $template_path . '/assets/css/home.css';
+                $assets['js'][]     = $template_path . '/assets/js/motion-helpers.js';
+                $assets['js'][]     = $template_path . '/assets/js/home.js';
+                break;
+
             case 'blog':
                 $assets['css'][]    = $template_path . '/assets/css/blog.css';
                 $assets['js'][]     = $template_path . '/assets/js/blog.js';
@@ -94,6 +100,10 @@
         // For single blog posts
         if ( is_single() ) return 'blog-post';
         if ( is_home() ) return 'blog';
+        if ( is_front_page() ) {
+            $home_view = get_template_directory() . '/templates/' . $active_template . '/views/home.php';
+            if ( file_exists( $home_view ) ) return 'home';
+        }
 
         // Check if the first segment exists
         if (isset($aCmd[0])) {
@@ -101,6 +111,7 @@
 
             // Valid custom URLs
             $valid_views = array(
+                                'home',
                                 'app',
                                 'contact',
                                 'signup',

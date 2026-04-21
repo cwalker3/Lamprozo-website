@@ -4,83 +4,57 @@
     "description": "Standard template with banner-style pages for professional sites",
     "pages": [
         {
-            "slug": "home",
-            "title": "Home",
-            "snippet": "home-default.html",
-            "required": true,
-            "set_as": "front_page",
-            "in_menu": true,
-            "menu_order": 1
-        },
-        {
-            "slug": "blog",
-            "title": "Blog",
-            "snippet": "blog-default.html",
-            "required": true,
-            "set_as": "posts_page",
-            "in_menu": true,
-            "menu_order": 3,
-            "view": true
-        },
-        {
-            "slug": "contact",
-            "title": "Contact",
-            "snippet": "contact-default.html",
-            "required": true,
-            "in_menu": true,
-            "menu_order": 4,
-            "view": true
-        },
-        {
-            "slug": "app",
-            "title": "App",
-            "snippet": "app-default.html",
-            "view": true,
-            "in_menu": true,
-            "menu_order": 2
-        },
-        {
-            "slug": "signup",
-            "title": "Signup",
-            "snippet": "signup-default.html",
-            "view": true,
-            "in_menu": true,
-            "menu_order": 5
-        },
-        {
-            "slug": "request-an-appointment",
-            "title": "Request an Appointment",
-            "snippet": "page-banner.html",
-            "content_replace": {"{{PAGE_TITLE}}": "Request an Appointment"},
-            "view": true,
-            "in_menu": false
-        },
-        {
-            "slug": "order-history",
-            "title": "Order History",
-            "snippet": "order-history-default.html",
-            "view": true,
-            "in_menu": false
-        },
-        {
             "slug": "dashboard",
             "title": "Dashboard",
-            "snippet": "dashboard-default.html",
-            "view": true,
-            "in_menu": false
+            "snippet": "dashboard.html"
         },
         {
             "slug": "logout",
             "title": "Logout",
-            "snippet": "page-banner.html",
-            "content_replace": {"{{PAGE_TITLE}}": "Logout"},
-            "view": true,
-            "in_menu": false
+            "snippet": "logout.html"
+        },
+        {
+            "slug": "order-history",
+            "title": "Order History",
+            "snippet": "order-history.html"
+        },
+        {
+            "slug": "request-an-appointment",
+            "title": "Request an Appointment",
+            "snippet": "request-an-appointment.html"
         },
         {
             "slug": "template",
             "title": "Template",
-            "snippet": "template-default.html",
+            "snippet": "template.html"
+        },
+        {
+            "slug": "app",
+            "title": "App",
+            "snippet": "app.html"
+        },
+        {
+            "slug": "blog",
+            "title": "Blog",
+            "snippet": "blog.html",
+            "set_as": "posts_page"
+        },
+        {
+            "slug": "contact",
+            "title": "Contact",
+            "snippet": "contact.html"
+        },
+        {
+            "slug": "signup",
+            "title": "Signup",
+            "snippet": "signup.html"
+        },
+        {
+            "slug": "home",
+            "title": "Home",
+            "snippet": "home.html",
+            "set_as": "front_page",
+            "menu_order": 1,
             "in_menu": false
         }
     ],
@@ -95,15 +69,49 @@
     "categories": [
         {
             "slug": "uncategorized",
-            "name": "Uncategorized",
-            "required": true
+            "name": "Uncategorized"
         }
     ],
     "tags": [],
     "menu": {
         "name": "Main Menu",
-        "custom_links": [
-            {"title": "Log In", "url": "/ffc-login"}
+        "items": [
+            {
+                "title": "",
+                "type": "post_type",
+                "menu_order": 1,
+                "page_slug": "home"
+            },
+            {
+                "title": "",
+                "type": "post_type",
+                "menu_order": 2,
+                "page_slug": "app"
+            },
+            {
+                "title": "",
+                "type": "post_type",
+                "menu_order": 3,
+                "page_slug": "blog"
+            },
+            {
+                "title": "",
+                "type": "post_type",
+                "menu_order": 4,
+                "page_slug": "contact"
+            },
+            {
+                "title": "",
+                "type": "post_type",
+                "menu_order": 5,
+                "page_slug": "signup"
+            },
+            {
+                "title": "Log In",
+                "type": "custom",
+                "menu_order": 6,
+                "url": "/ffc-login"
+            }
         ]
     },
     "options": {

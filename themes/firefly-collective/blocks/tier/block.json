@@ -1,0 +1,17 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/tier",
+    "title": "Firefly: Pricing Tier",
+    "category": "firefly",
+    "icon": "tag",
+    "description": "A single pricing tier row with a name and a price.",
+    "keywords": ["price", "tier", "plan"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "name":  { "type": "string", "default": "Tier" },
+        "price": { "type": "string", "default": "$0" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

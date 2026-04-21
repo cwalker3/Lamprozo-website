@@ -403,12 +403,13 @@ function firefly_projects_process_page_assets($post_id, $origin = 'production') 
     // Rewrite content
     $new_content = firefly_projects_rewrite_content_urls($content, $map['mappings'], 'to_dev');
 
-    // Update post if content changed
+    // Update post if content changed (wp_slash so block-attribute JSON
+    // escape sequences survive wp_update_post's internal wp_unslash).
     if ($new_content !== $content) {
-        wp_update_post(array(
+        wp_update_post(wp_slash(array(
             'ID'           => $post_id,
             'post_content' => $new_content
-        ));
+        )));
     }
 
     // Save map

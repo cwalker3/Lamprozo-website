@@ -31,7 +31,7 @@ error_log('[Firefly Debug View] JSON encode error: ' . json_last_error_msg());
 <div id="project-file-selector" v-cloak>
     <div class="project-selector-container">
         <label for="project-select">Select Project:</label>
-        <select id="project-select" v-model="selectedProject" @change="loadProjectFiles" :disabled="isLoadingFiles || isSyncing">
+        <select id="project-select" v-model="selectedProject" @change="loadProjectFiles" :disabled="isLoadingFiles || isSyncing || isRestoring">
             <option value="">-- Choose a Project --</option>
             <option v-for="project in projects" :key="project.name" :value="project.name">
                 {{ project.name }} - {{ project.description }}
@@ -57,13 +57,13 @@ error_log('[Firefly Debug View] JSON encode error: ' . json_last_error_msg());
         <div class="sync-mode-selector">
             <label><strong>Sync Mode:</strong></label>
             <label class="sync-mode-option">
-                <input type="radio" v-model="syncMode" value="partial" :disabled="isSyncing" />
+                <input type="radio" v-model="syncMode" value="partial" :disabled="isSyncing || isRestoring" />
                 <span class="sync-mode-label">
                     <strong>Partial Sync</strong> (update selected files only, keep other files on remote)
                 </span>
             </label>
             <label class="sync-mode-option">
-                <input type="radio" v-model="syncMode" value="full" :disabled="isSyncing" />
+                <input type="radio" v-model="syncMode" value="full" :disabled="isSyncing || isRestoring" />
                 <span class="sync-mode-label">
                     <strong>Full Sync</strong> (mirror exactly, delete files not in selection)
                 </span>
@@ -77,13 +77,13 @@ error_log('[Firefly Debug View] JSON encode error: ' . json_last_error_msg());
         </div>
 
         <div class="file-selector-actions">
-            <button @click="selectAllFiles" class="action-button" :disabled="isSyncing || syncMode === 'full'">
+            <button @click="selectAllFiles" class="action-button" :disabled="isSyncing || isRestoring || syncMode === 'full'">
                 Select All
             </button>
-            <button @click="deselectAllFiles" class="action-button" :disabled="isSyncing || syncMode === 'full'">
+            <button @click="deselectAllFiles" class="action-button" :disabled="isSyncing || isRestoring || syncMode === 'full'">
                 Deselect All
             </button>
-            <button @click="syncSelectedFiles" class="action-button primary" :disabled="!hasSelection || isSyncing">
+            <button @click="syncSelectedFiles" class="action-button primary" :disabled="!hasSelection || isSyncing || isRestoring">
                 <span v-if="!isSyncing">Sync Selected Files ({{ selectedCount }})</span>
                 <span v-else>Syncing...</span>
             </button>

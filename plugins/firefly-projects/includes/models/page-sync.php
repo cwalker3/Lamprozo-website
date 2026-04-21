@@ -148,7 +148,7 @@ function firefly_projects_package_page($post, $include_assets = true) {
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
     foreach ($meta as $key => $values) {
         // Skip internal meta keys (except whitelisted ones)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -208,7 +208,11 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $env_label = ($target_env === 'prod') ? 'Production' : 'Live Dev';
 
     // Prepare content and assets based on target environment
+    // Relativize URLs so content is domain-agnostic during sync
     $content_to_sync = $post->post_content;
+    if ( function_exists( 'firefly_relativize_urls' ) ) {
+        $content_to_sync = firefly_relativize_urls( $content_to_sync );
+    }
     $assets_to_sync = array();
 
     if ($target_env === 'prod') {
@@ -225,6 +229,15 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             if ($prod_result['success']) {
                 $content_to_sync = $prod_result['content'];
                 $assets_to_sync = $prod_result['assets_to_sync'];
+            }
+        }
+        // No asset map (e.g. content from CLI import) — extract and send assets directly
+        else {
+            if ($include_assets) {
+                $content_assets = firefly_projects_extract_assets_with_paths($post->post_content);
+                foreach ($content_assets as $asset) {
+                    $assets_to_sync[] = $asset;
+                }
             }
         }
     } else {
@@ -256,12 +269,19 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $meta = get_post_meta($post->ID);
     $meta_data = array();
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
     foreach ($meta as $key => $values) {
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
         }
         $meta_data[$key] = $values[0];
+    }
+
+    // Ensure _firefly_page_id is always present (compute from template + slug if missing)
+    if (empty($meta_data['_firefly_page_id']) && !empty($meta_data['_firefly_template'])) {
+        $meta_data['_firefly_page_id'] = $meta_data['_firefly_template'] . ':' . $post->post_name;
+        // Backfill locally too
+        update_post_meta($post->ID, '_firefly_page_id', $meta_data['_firefly_page_id']);
     }
 
     $post_data = array(
@@ -512,8 +532,51 @@ function firefly_projects_handle_incoming_page($request) {
         $zip_file = null;
     }
 
-    // Find existing post by slug and type
-    $existing_post = get_page_by_path($post_data['post_name'], OBJECT, $post_data['post_type']);
+    // Debug logger
+    $sync_log = function($msg) {
+        file_put_contents(WP_CONTENT_DIR . '/sync-debug.log', date('Y-m-d H:i:s') . " {$msg}\n", FILE_APPEND);
+    };
+
+    // Find existing post by _firefly_page_id meta (stable cross-environment identifier)
+    $existing_post = null;
+    $firefly_page_id = isset($meta_data['_firefly_page_id']) ? $meta_data['_firefly_page_id'] : '';
+
+    $sync_log("INCOMING slug={$post_data['post_name']} fpid={$firefly_page_id} tmpl=" . (isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : 'NONE'));
+
+    if (!empty($firefly_page_id)) {
+        $found = get_posts(array(
+            'post_type'            => $post_data['post_type'],
+            'post_status'          => 'any',
+            'numberposts'          => 1,
+            'meta_key'             => '_firefly_page_id',
+            'meta_value'           => $firefly_page_id,
+            'firefly_skip_scoping' => true,
+        ));
+        if (!empty($found)) {
+            $existing_post = $found[0];
+            $sync_log("  FOUND by fpid: ID={$existing_post->ID} slug={$existing_post->post_name}");
+        } else {
+            $sync_log("  NO MATCH by fpid={$firefly_page_id}");
+        }
+    }
+
+    // Fallback to slug lookup for backwards compatibility
+    if (!$existing_post) {
+        $fallback = get_page_by_path($post_data['post_name'], OBJECT, $post_data['post_type']);
+        if ($fallback) {
+            $fallback_template = get_post_meta($fallback->ID, '_firefly_template', true);
+            $incoming_template = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
+            // Only use fallback if templates match (or fallback has no template)
+            if (empty($fallback_template) || $fallback_template === $incoming_template) {
+                $existing_post = $fallback;
+                $sync_log("  SLUG FALLBACK: ID={$fallback->ID} slug={$fallback->post_name} tmpl={$fallback_template}");
+            } else {
+                $sync_log("  SLUG FALLBACK REJECTED: ID={$fallback->ID} tmpl={$fallback_template} != incoming {$incoming_template} — will create new");
+            }
+        } else {
+            $sync_log("  NO MATCH — will create new");
+        }
+    }
 
     // Prepare post data for insert/update
     $wp_post_data = array(
@@ -526,21 +589,33 @@ function firefly_projects_handle_incoming_page($request) {
         'menu_order'   => isset($post_data['menu_order']) ? $post_data['menu_order'] : 0,
     );
 
+    // wp_insert_post / wp_update_post internally call wp_unslash() on their
+    // input — they expect PRE-SLASHED data. Our $post_data came straight
+    // from JSON decode (unslashed), so we must wp_slash() here or WP will
+    // strip legitimate backslashes inside block-attribute JSON such as
+    // "heading":"...\u003cspan\u003e..." — turning \u003c into the literal
+    // string "u003c" on the live site.
+    $wp_post_data = wp_slash($wp_post_data);
+
     if ($existing_post) {
-        // Update existing post
         $wp_post_data['ID'] = $existing_post->ID;
         $post_id = wp_update_post($wp_post_data, true);
+        $sync_log("  UPDATED ID={$post_id}");
     } else {
-        // Create new post
         $post_id = wp_insert_post($wp_post_data, true);
+        $sync_log("  CREATED ID={$post_id}");
     }
 
     if (is_wp_error($post_id)) {
+        $sync_log("  ERROR: " . $post_id->get_error_message());
         return array(
             'success' => false,
             'message' => 'Failed to save post: ' . $post_id->get_error_message()
         );
     }
+
+    $final_slug = get_post_field('post_name', $post_id);
+    $sync_log("  DONE ID={$post_id} final_slug={$final_slug}");
 
     // Update meta data
     foreach ($meta_data as $key => $value) {

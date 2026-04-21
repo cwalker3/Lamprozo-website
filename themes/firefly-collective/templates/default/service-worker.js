@@ -19,9 +19,10 @@ const DYNAMIC_CACHE   =   `${CACHE_PREFIX}dynamic`;
 const API_CACHE       =   `${CACHE_PREFIX}api`;
 const METADATA_CACHE  =   `${CACHE_PREFIX}metadata`;
 const themePath       =   '/wp-content/themes/firefly-collective';
-const activeTemplate  =   'default';
-const plugin_path     =   `/wp-content/themes/firefly-collective/templates/${activeTemplate}`;
-const templatePath    =   `${themePath}/templates/${activeTemplate}`;
+const pluginPath      =   '/wp-content/plugins/firefly-collective';
+let   activeTemplate  =   'default';
+let   templatePath    =   `${themePath}/templates/${activeTemplate}`;
+let   plugin_path     =   `${pluginPath}/templates/${activeTemplate}`;
 
 // Cache duration (1 hour in milliseconds)
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -44,10 +45,9 @@ const CORE_THEME_ASSETS = [
   templatePath    +   '/assets/js/app.js',
   templatePath    +   '/manifest.json',
 
-  templatePath +   '/assets/css/nav.css',
   templatePath +   '/assets/css/calendar.css',
   templatePath +   '/assets/js/signup.js',
-  
+
   plugin_path  +   '/assets/css/orders.css',
   plugin_path  +   '/assets/js/orders.js',
 ];
@@ -59,7 +59,6 @@ function getCoreTemplateAssets() {
     `${templatePath}/assets/css/_core_main.css`,
     `${templatePath}/assets/css/_core_animations.css`,
     `${templatePath}/assets/css/_core_nav.css`,
-    `${templatePath}/assets/css/_core_default.css`,
     `${templatePath}/assets/js/_core_main.js`,
     `${templatePath}/assets/js/_core_nav.js`,
   ];
@@ -79,7 +78,6 @@ function getTemplateAssets() {
     `${templatePath}/assets/js/signup.js`,
     `${templatePath}/assets/js/calendar.js`,
     `${templatePath}/assets/js/request-an-appointment.js`,
-    `${templatePath}/assets/css/default.css`,
   ];
   
   return commonAssets;
@@ -731,9 +729,11 @@ self.addEventListener('message', event => {
   // Handle template change
   if (message && message.action === 'setActiveTemplate') {
     activeTemplate = message.template || 'default';
+    templatePath   = `${themePath}/templates/${activeTemplate}`;
+    plugin_path    = `${pluginPath}/templates/${activeTemplate}`;
     templateAssetsList = message.assets || null;
     swLog(`Active template set to: ${activeTemplate}`);
-    
+
     // Cache assets for the new template
     event.waitUntil(cacheTemplateAssets(activeTemplate));
   }

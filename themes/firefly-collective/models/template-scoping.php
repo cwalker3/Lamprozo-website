@@ -60,6 +60,64 @@ function firefly_is_valid_template($template) {
 }
 
 // =============================================================================
+// SLUG DEDUPLICATION OVERRIDE
+// =============================================================================
+
+/**
+ * Allow duplicate post slugs across templates.
+ *
+ * WordPress enforces globally unique slugs via wp_unique_post_slug().
+ * Since templates scope content independently, two templates can safely
+ * share the same slug (e.g. both have "home"). This filter short-circuits
+ * the deduplication when the "conflict" is with a page from a different template.
+ */
+add_filter( 'wp_unique_post_slug', 'firefly_allow_cross_template_slugs', 10, 6 );
+
+function firefly_allow_cross_template_slugs( $slug, $post_id, $post_status, $post_type, $post_parent, $original_slug ) {
+    // Only act when WordPress actually changed the slug
+    if ( $slug === $original_slug ) {
+        return $slug;
+    }
+
+    // Only handle pages and posts
+    if ( ! in_array( $post_type, array( 'page', 'post' ), true ) ) {
+        return $slug;
+    }
+
+    // Get this post's template
+    $template = get_post_meta( $post_id, FIREFLY_TEMPLATE_META_KEY, true );
+    if ( empty( $template ) ) {
+        return $slug;
+    }
+
+    // Check if any post using the original slug belongs to the SAME template
+    global $wpdb;
+    $conflict_in_same_template = $wpdb->get_var( $wpdb->prepare(
+        "SELECT p.ID FROM {$wpdb->posts} p
+         INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+         WHERE p.post_name = %s
+           AND p.post_type = %s
+           AND p.ID != %d
+           AND pm.meta_key = %s
+           AND pm.meta_value = %s
+         LIMIT 1",
+        $original_slug,
+        $post_type,
+        $post_id,
+        FIREFLY_TEMPLATE_META_KEY,
+        $template
+    ) );
+
+    // If no conflict within the same template, keep the original slug
+    if ( ! $conflict_in_same_template ) {
+        return $original_slug;
+    }
+
+    // Conflict is within the same template — let WordPress deduplicate
+    return $slug;
+}
+
+// =============================================================================
 // QUERY FILTERING
 // =============================================================================
 

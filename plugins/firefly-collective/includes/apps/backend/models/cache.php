@@ -24,6 +24,11 @@ if (!defined('ABSPATH')) exit;
 add_action('init', 'firefly_collective_cache_serve', 1);
 
 function firefly_collective_cache_serve() {
+    // Skip if advanced-cache.php drop-in already handled this request
+    if (defined('WP_CACHE') && WP_CACHE) {
+        return;
+    }
+
     // Only serve cache for non-logged-in, non-admin requests
     if (firefly_collective_cache_should_exclude()) {
         return;
@@ -83,6 +88,13 @@ function firefly_collective_cache_start() {
 
     // Start output buffering with callback
     ob_start('firefly_collective_cache_save');
+
+    // Ensure buffer is flushed on shutdown
+    register_shutdown_function(function() {
+        if (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+    });
 }
 
 /**
@@ -121,6 +133,14 @@ function firefly_collective_cache_save($html) {
 
     // Set permissions
     @chmod($cache_path, 0644);
+
+    // Write active template name for advanced-cache.php drop-in
+    $template_cache_file = WP_CONTENT_DIR . '/cache/firefly-collective/.active-template';
+    $template_cache_dir = dirname($template_cache_file);
+    if (!is_dir($template_cache_dir)) {
+        wp_mkdir_p($template_cache_dir);
+    }
+    file_put_contents($template_cache_file, $template);
 
     // Add HTML comment with cache info
     $html = firefly_collective_cache_add_signature($html, $template);
@@ -415,6 +435,9 @@ function firefly_collective_cache_delete_template($template) {
     if (is_dir($cache_dir)) {
         firefly_collective_cache_delete_directory($cache_dir);
     }
+
+    // Also purge nginx proxy cache
+    firefly_collective_cache_purge_nginx();
 }
 
 /**
@@ -433,6 +456,20 @@ function firefly_collective_cache_clear_all() {
     foreach ($templates as $template_dir) {
         firefly_collective_cache_delete_directory($template_dir);
     }
+
+    // Also purge nginx proxy cache
+    firefly_collective_cache_purge_nginx();
+}
+
+/**
+ * Purge nginx proxy cache
+ * Runs on the host via a small purge script that Docker can trigger
+ */
+function firefly_collective_cache_purge_nginx() {
+    // Touch a flag file that a host-level cron or inotify watch can pick up
+    // The flag file lives in the bind-mounted wordpress directory (accessible to both container and host)
+    $flag = ABSPATH . '.nginx-cache-purge';
+    file_put_contents($flag, time());
 }
 
 /**
