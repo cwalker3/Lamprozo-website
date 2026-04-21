@@ -116,7 +116,11 @@
                 }
 
                 /* Kill editor-style.css's padding-inline: 2.5vw on layout
-                   wrappers that should be flush with their container. */
+                   wrappers that should be flush with their container.
+                   (Do NOT include .triple, .triple-output, .contrib-card,
+                   .pillar, .quote-card, .price-cta, .tier, .cli-box here —
+                   those are visually-distinct cards/containers with their
+                   own intentional padding from home.css.) */
                 .editor-styles-wrapper.page-home .hero-inner,
                 .editor-styles-wrapper.page-home .hero-copy,
                 .editor-styles-wrapper.page-home .cli-inner,
@@ -128,9 +132,7 @@
                 .editor-styles-wrapper.page-home .tmpl-grid,
                 .editor-styles-wrapper.page-home .price-copy,
                 .editor-styles-wrapper.page-home .price-list,
-                .editor-styles-wrapper.page-home .trust-grid,
-                .editor-styles-wrapper.page-home .triple,
-                .editor-styles-wrapper.page-home .triple-output {
+                .editor-styles-wrapper.page-home .trust-grid {
                     padding-inline: 0 !important;
                 }
 
