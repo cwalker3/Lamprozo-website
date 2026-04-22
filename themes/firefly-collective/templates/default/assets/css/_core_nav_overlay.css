@@ -405,21 +405,19 @@ header.element-disable #logo-name.logo-left {
     }
 
     /* Hamburger + logo share the same 10vh band and are vertically centered
-       within it so the icon lines up with the site title on mobile. */
+       within it so the icon lines up with the site title on mobile. The
+       hamburger button is 24px tall (three stacked bars), so its vertical
+       center sits at `5vh` → `top: calc(5vh - 12px)`. */
     #hamburger {
         display: block !important;
         position: fixed !important;
-        top: calc(5vh - 17px) !important;
+        top: calc(5vh - 12px) !important;
         left: 4vw !important;
         z-index: 10 !important;
     }
 
     #close-nav-btn {
         display: none !important;
-        position: fixed !important;
-        top: calc(5vh - 17px) !important;
-        left: 4vw !important;
-        z-index: 10 !important;
     }
     
     /* Ensure element-disable doesn't hide hamburger/close buttons */
@@ -431,12 +429,6 @@ header.element-disable #logo-name.logo-left {
         display: none !important;
     }
     
-    /* Show close button when menu is open */
-    body.menu-open #hamburger {
-        display: none !important;
-    }
-    
-    body.menu-open #close-nav-btn {
-        display: block !important;
-    }
+    /* Hamburger stays visible when the menu is open — the bars morph into
+       an X via `body.menu-open #hamburger .bar-*` in _core_nav.css. */
 }

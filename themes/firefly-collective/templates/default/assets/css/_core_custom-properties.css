@@ -55,4 +55,19 @@
     --font-size-logo: 2rem;
     --font-size-nav: 1.3rem;
     --font-size-nav-mobile: 1.15rem;
+
+    /* "Glowing in the dark" tokens — shared with home.css and any UI
+       chrome (nav, hamburger overlay) so the whole template reads as
+       one dark-amber system, not just the landing page. */
+    --ff-bg: #0a0a0b;
+    --ff-surface: #141416;
+    --ff-surface-2: #1a1a1d;
+    --ff-fg: #fafaf7;
+    --ff-fg-muted: rgba(250, 250, 247, 0.56);
+    --ff-fg-dim: rgba(250, 250, 247, 0.38);
+    --ff-amber: #f5b544;
+    --ff-amber-soft: rgba(245, 181, 68, 0.12);
+    --ff-amber-ring: rgba(245, 181, 68, 0.28);
+    --ff-border: rgba(255, 255, 255, 0.08);
+    --ff-border-strong: rgba(255, 255, 255, 0.14);
 }
