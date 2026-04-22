@@ -129,8 +129,12 @@
             ));
         }
 
-        // Dashboard
-        if (determine_view() === 'dashboard') {
+        // Dashboard — only set up JS data when the feature-configurator
+        // plugin is actually loaded. The default/landing template doesn't
+        // ship that plugin, so every function call in this block would
+        // fatal. Using get_features_options_addons as the presence marker
+        // since it's the entry point the dashboard JS ultimately depends on.
+        if (determine_view() === 'dashboard' && function_exists('get_features_options_addons')) {
             $features_options_addons = get_features_options_addons();
             global $theme_path, $is_campaign_mode;
             $theme_path = get_template_directory_uri();
