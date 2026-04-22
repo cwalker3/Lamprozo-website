@@ -252,7 +252,17 @@ body > nav .sub-menu li[style*="visibility: hidden"] {
 	}
 
 	#logo-name img {
-		max-height: 3.5vh;
+		max-height: 4.5vh;
+	}
+
+	#logo-name {
+		font-size: 1.4rem;
+		gap: 0.5rem;
+		white-space: nowrap;
+	}
+
+	#site-name a {
+		white-space: nowrap;
 	}
 
 	#wpadminbar {
