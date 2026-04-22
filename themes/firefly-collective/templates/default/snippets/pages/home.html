@@ -29,7 +29,7 @@
 <!-- /wp:group -->
 
 <!-- wp:group {"tagName":"section","className":"trust","layout":{"type":"default"}} -->
-<section class="wp-block-group trust"><!-- wp:firefly/trust-bar {"label":"Built on Firefly","sites":"glow.fire|62 pages; outdoor-artisans|14 pages; lains-carpet-care|9 pages; alexstrait.com|11 pages; lamprozo|7 pages"} /--></section>
+<section class="wp-block-group trust"><!-- wp:firefly/trust-bar /--></section>
 <!-- /wp:group -->
 
 <!-- wp:group {"tagName":"section","className":"three-contrib","layout":{"type":"default"}} -->
@@ -37,7 +37,7 @@
 <div class="wp-block-group container"><!-- wp:firefly/section-head {"overline":"The Flex MVC difference","heading":"Three surfaces. \u003cspan class=\u0022serif\u0022\u003eOne codebase.\u003c/span\u003e","lead":"Most platforms pick a lane — visual editor OR developer framework OR AI code generator. Firefly gives every contributor the interface they want, over the same source of truth."} /-->
 
 <!-- wp:group {"className":"grid reveal-stagger","layout":{"type":"default"}} -->
-<div class="wp-block-group grid reveal-stagger"><!-- wp:firefly/contributor-card {"number":"01","audience":"No-coders","title":"Gutenberg WYSIWYG","description":"Real content editors in the browser. Every save syncs back to a portable HTML snippet file — no database lock-in, no forked content.","chips":"wp-admin · gutenberg · snippets"} /-->
+<div class="wp-block-group grid reveal-stagger"><!-- wp:firefly/contributor-card {"audience":"No-coders","title":"Gutenberg WYSIWYG","description":"Real content editors in the browser. Every save syncs back to a portable HTML snippet file — no database lock-in, no forked content.","chips":"wp-admin · gutenberg · snippets"} /-->
 
 <!-- wp:firefly/contributor-card {"number":"02","audience":"Developers","title":"PHP, the flexible way","description":"Flex MVC means views can hold logic, models can hold views, and controllers are optional. Choose the split per feature — stop fighting the framework.","chips":"php / mvc · rest api · stripe"} /-->
 
@@ -46,12 +46,12 @@
 <!-- /wp:group --></section>
 <!-- /wp:group -->
 
-<!-- wp:group {"tagName":"section","className":"pillars","anchor":"pillars","layout":{"type":"default"}} -->
-<section class="wp-block-group pillars" id="pillars"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<!-- wp:group {"tagName":"section","className":"pillars","layout":{"type":"default"}} -->
+<section id="pillars" class="wp-block-group pillars"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
 <div class="wp-block-group container"><!-- wp:firefly/section-head {"overline":"Built-in primitives","heading":"Everything an enterprise web app needs. Shipped by default."} /-->
 
 <!-- wp:group {"className":"pillar-grid reveal-stagger","layout":{"type":"default"}} -->
-<div class="wp-block-group pillar-grid reveal-stagger"><!-- wp:firefly/pillar {"iconName":"schema","title":"Schema-driven content","description":"A single JSON defines every page, post, menu, and option. Source-controlled, diff-able, deploy-able with one command.","meta":"data/schemas/*.json"} /-->
+<div class="wp-block-group pillar-grid reveal-stagger"><!-- wp:firefly/pillar {"title":"Schema-driven content","description":"A single JSON defines every page, post, menu, and option. Source-controlled, diff-able, deploy-able with one command.","meta":"data/schemas/*.json"} /-->
 
 <!-- wp:firefly/pillar {"iconName":"scoping","title":"Multi-template scoping","description":"Run multiple independent sites in one WordPress install. Queries, media, and menus auto-scope to the active template — same slug, different sites.","meta":"_firefly_template meta"} /-->
 
@@ -72,7 +72,7 @@
 <div class="wp-block-group cli-inner"><!-- wp:group {"className":"cli-copy reveal","layout":{"type":"default"}} -->
 <div class="wp-block-group cli-copy reveal"><!-- wp:firefly/overline {"text":"Agent-native"} /-->
 
-<!-- wp:heading {"level":2} -->
+<!-- wp:heading -->
 <h2 class="wp-block-heading">One command. <span class="serif">Seven steps.</span> Under a second.</h2>
 <!-- /wp:heading -->
 
@@ -105,7 +105,7 @@
 <p><strong style="color:var(--ff-fg);">Not another rewrite.</strong> Firefly rides on the platform that runs <em class="serif">40%+ of the web</em>. Your content, your users, your plugins — they all come with you.</p>
 <!-- /wp:paragraph -->
 
-<!-- wp:firefly/substrate-logos {"items":"WordPress 6.9 · Gutenberg · PHP 8.3 · Stripe · Docker · rclone backup · ngrok / cloudflared · claude.md"} /--></div>
+<!-- wp:firefly/substrate-logos /--></div>
 <!-- /wp:group --></div>
 <!-- /wp:group --></section>
 <!-- /wp:group -->
@@ -120,7 +120,9 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:quote -->
-<blockquote class="wp-block-quote"><p>One developer scaffolded the template via CLI, the CEO edited copy in Gutenberg, and Claude Code wired the bookings flow. What would have been a six-month build shipped in under a week — and is still being edited by non-developers in production.</p><cite>— Placeholder quote · replace with real customer proof</cite></blockquote>
+<blockquote class="wp-block-quote"><!-- wp:paragraph -->
+<p>One developer scaffolded the template via CLI, the CEO edited copy in Gutenberg, and Claude Code wired the bookings flow. What would have been a six-month build shipped in under a week — and is still being edited by non-developers in production.</p>
+<!-- /wp:paragraph --><cite>— Placeholder quote · replace with real customer proof</cite></blockquote>
 <!-- /wp:quote --></div>
 <!-- /wp:group --></div>
 <!-- /wp:group --></section>
@@ -131,17 +133,17 @@
 <div class="wp-block-group container"><!-- wp:firefly/section-head {"overline":"Production, not prototypes","heading":"Templates shipping on Firefly today."} /-->
 
 <!-- wp:group {"className":"tmpl-grid reveal-stagger","layout":{"type":"default"}} -->
-<div class="wp-block-group tmpl-grid reveal-stagger"><!-- wp:firefly/template-card {"name":"glow.fire","tag":"agency","days":"9","accent":"#f5b544"} /-->
+<div class="wp-block-group tmpl-grid reveal-stagger"><!-- wp:firefly/template-card {"name":"glow.fire","tag":"agency","days":"9"} /-->
 
 <!-- wp:firefly/template-card {"name":"outdoor-artisans","tag":"services","days":"5","accent":"#9fe870"} /-->
 
 <!-- wp:firefly/template-card {"name":"lains-carpet-care","tag":"local services","days":"4","accent":"#4aa3e8"} /-->
 
-<!-- wp:firefly/template-card {"name":"alexstrait.com","tag":"personal","days":"3","accent":"#f5b544"} /-->
+<!-- wp:firefly/template-card {"name":"alexstrait.com","tag":"personal","days":"3"} /-->
 
 <!-- wp:firefly/template-card {"name":"lamprozo","tag":"portfolio","days":"6","accent":"#9fe870"} /-->
 
-<!-- wp:firefly/template-card {"name":"firefly-collective","tag":"framework","days":"—","accent":"#f5b544"} /--></div>
+<!-- wp:firefly/template-card {"name":"firefly-collective","tag":"framework","days":"—"} /--></div>
 <!-- /wp:group --></div>
 <!-- /wp:group --></section>
 <!-- /wp:group -->
@@ -187,7 +189,7 @@
 <div class="wp-block-group container"><!-- wp:group {"className":"reveal","layout":{"type":"default"}} -->
 <div class="wp-block-group reveal"><!-- wp:firefly/overline {"text":"Get started"} /-->
 
-<!-- wp:heading {"level":2} -->
+<!-- wp:heading -->
 <h2 class="wp-block-heading">Ship real web apps. <span class="serif">With help from every kind of teammate.</span></h2>
 <!-- /wp:heading -->
 
