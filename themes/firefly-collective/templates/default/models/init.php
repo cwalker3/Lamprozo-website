@@ -13,6 +13,24 @@
     add_theme_support('post-thumbnails');
 
     /**
+     * Tag every page rendered through this template with the `firefly-page`
+     * body class so the shared design system in _core_design.css applies.
+     * The PWA SPA at /app is excluded since it ships its own chrome.
+     *
+     * See templates/default/DESIGN.md for the body-class contract.
+     */
+    function firefly_default_add_body_class( $classes ) {
+        if ( function_exists('determine_view') && determine_view() === 'app' ) {
+            return $classes;
+        }
+        if ( ! in_array('firefly-page', $classes, true) ) {
+            $classes[] = 'firefly-page';
+        }
+        return $classes;
+    }
+    add_filter('body_class', 'firefly_default_add_body_class', 5);
+
+    /**
      * Enqueue core template assets (files starting with _core_)
      */
     function enqueue_core_assets($template_name, $theme_path, $version) {

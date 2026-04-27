@@ -1,418 +1,18 @@
 /* theme/templates/default/assets/css/home.css
-   Firefly landing page — 2026 dense-editorial dark aesthetic.
-   Palette: near-black + off-white + firefly-amber + phosphor-green.
-   Type: Geist (body/UI) + Instrument Serif italic (display accent) + Geist Mono (code/labels).
+   Home-page-only layout. The shared design system (palette, typography,
+   buttons, layout primitives, generic block CSS) lives in
+   _core_design.css and applies to any page that gets the .firefly-page
+   body class. This file owns the bits that are unique to the landing
+   page: the hero glow + triple-panel demo, the CLI terminal, and the
+   per-section background tints that match the landing's narrative.
+
+   All selectors scope under body.firefly-page.page-home so nothing
+   leaks if these classes happen to appear on another page.
 */
-
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
-
-/* ---------- Tokens ---------- */
-
-.home-page {
-    --ff-bg: #0a0a0b;
-    --ff-surface: #141416;
-    --ff-surface-2: #1a1a1d;
-    --ff-fg: #fafaf7;
-    --ff-fg-muted: rgba(250, 250, 247, 0.56);
-    --ff-fg-dim: rgba(250, 250, 247, 0.38);
-    --ff-amber: #f5b544;
-    --ff-amber-soft: rgba(245, 181, 68, 0.12);
-    --ff-amber-ring: rgba(245, 181, 68, 0.28);
-    --ff-green: #9fe870;
-    --ff-green-soft: rgba(159, 232, 112, 0.12);
-    --ff-slate: #2a3440;
-    --ff-border: rgba(255, 255, 255, 0.08);
-    --ff-border-strong: rgba(255, 255, 255, 0.14);
-
-    --ff-font-sans: 'Geist', system-ui, -apple-system, sans-serif;
-    --ff-font-serif: 'Instrument Serif', Georgia, serif;
-    --ff-font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-
-    --ff-radius-sm: 6px;
-    --ff-radius: 10px;
-    --ff-radius-lg: 16px;
-
-    --ff-section-y: clamp(5rem, 8vw, 8rem);
-    --ff-gutter: clamp(1.25rem, 5vw, 3.5rem);
-    --ff-container: 1240px;
-
-    color-scheme: dark;
-}
-
-/* ---------- Page reset (scoped) ---------- */
-
-html:has(body.page-home),
-body.page-home {
-    background: #0a0a0b !important;
-    background-color: #0a0a0b !important;
-}
-
-body.page-home {
-    color: var(--ff-fg);
-    font-family: var(--ff-font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
-    overflow-x: hidden;
-}
-
-body.page-home main,
-body.page-home main .content,
-body.page-home main > .content {
-    /* kill existing .content indentation/padding from the regular theme */
-    padding: 0 !important;
-    max-width: none !important;
-}
-
-/* Hide theme chrome that doesn't belong on the landing */
-body.page-home #contact-sticky {
-    display: none !important;
-}
-
-/* Existing header stays, but make the logo-name readable over dark hero */
-body.page-home #logo-name {
-    color: var(--ff-fg);
-}
-body.page-home #logo-name a {
-    color: var(--ff-fg);
-}
-
-.home-page {
-    font-size: 16px;
-    line-height: 1.55;
-    position: relative;
-    isolation: isolate;
-}
-
-.home-page * { box-sizing: border-box; }
-
-/* ---------- Gutenberg block overrides ----------
-   The landing content is authored as Gutenberg blocks so no-coders can
-   edit it. These overrides neutralize WP's default block layout styles
-   so our design system wins. */
-
-/* Nuke the default .wp-block max-width that WP 6.x applies to every
-   block. Without this, nested grid children (like pillars, contributor
-   cards) respect the global content-size and end up unequal. */
-.home-page .wp-block,
-.editor-styles-wrapper.page-home .wp-block {
-    max-width: none !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-}
-
-.home-page .wp-block-group {
-    margin-block: 0;
-}
-
-.home-page .wp-block-heading {
-    margin: 0;
-}
-
-.home-page :where(.wp-block-group.container) {
-    max-width: var(--ff-container);
-    margin-inline: auto !important;
-}
-
-.home-page .is-layout-flow > *,
-.home-page .is-layout-constrained > * {
-    margin-block: 0;
-}
-
-.home-page .wp-block-quote {
-    border: none;
-    margin: 0;
-    padding: 0;
-    font-style: normal;
-}
-
-.home-page .wp-block-quote p {
-    margin: 0;
-}
-
-.home-page .wp-block-quote cite {
-    display: block;
-    margin-top: 1.5rem;
-    font-style: normal;
-    font-family: var(--ff-font-mono);
-    font-size: 0.8125rem;
-    color: var(--ff-fg-muted);
-    letter-spacing: 0.02em;
-}
-
-/* Paragraphs created by Gutenberg should inherit our paragraph styles */
-.home-page .wp-block-group > p {
-    color: var(--ff-fg-muted);
-    line-height: 1.65;
-}
-
-/* Keep the hero-copy tight stacking */
-.home-page .hero-copy {
-    gap: 1.75rem;
-}
-.home-page .hero-copy > * + * {
-    margin-top: 0;
-}
-
-.home-page a {
-    color: inherit;
-    text-decoration: none;
-    transition: color 180ms ease;
-}
-
-.home-page img, .home-page svg {
-    max-width: 100%;
-    display: block;
-}
-
-/* Container gutter — compound selector (0,3,1) so it beats the framework
-   editor-style.css .wp-block:not(.wp-cover) { padding-inline: 2.5vw }
-   rule that loads in the Gutenberg editor iframe. */
-.home-page .container,
-.home-page div.container,
-.home-page .wp-block-group.container,
-.home-page section.wp-block-group > .wp-block-group.container {
-    width: 100%;
-    max-width: var(--ff-container);
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding-left: var(--ff-gutter) !important;
-    padding-right: var(--ff-gutter) !important;
-    box-sizing: border-box;
-}
-
-/* ---------- Grain overlay (SVG feTurbulence) ---------- */
-
-.home-page::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0.08;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-}
-
-/* ---------- Typography ---------- */
-
-.home-page h1, .home-page h2, .home-page h3, .home-page h4 {
-    font-family: var(--ff-font-sans);
-    font-weight: 500;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    margin: 0;
-    color: var(--ff-fg);
-}
-
-.home-page h1 { font-size: clamp(2.5rem, 5.8vw, 4.75rem); font-weight: 500; }
-.home-page h2 { font-size: clamp(1.875rem, 3.6vw, 2.875rem); font-weight: 500; }
-.home-page h3 { font-size: clamp(1.25rem, 1.8vw, 1.5rem); font-weight: 500; }
-.home-page h4 { font-size: 1.0625rem; font-weight: 500; letter-spacing: -0.015em; }
-
-.home-page .serif {
-    font-family: var(--ff-font-serif);
-    font-style: italic;
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    color: var(--ff-amber);
-}
-
-.home-page .mono {
-    font-family: var(--ff-font-mono);
-    font-feature-settings: 'ss01', 'cv01';
-}
-
-.home-page .overline {
-    font-family: var(--ff-font-mono);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ff-fg-muted);
-}
-
-.home-page .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: var(--ff-font-mono);
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ff-amber);
-    padding: 0.375rem 0.75rem;
-    border: 1px solid var(--ff-amber-ring);
-    background: var(--ff-amber-soft);
-    border-radius: 999px;
-}
-
-.home-page .eyebrow::before {
-    content: '';
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--ff-amber);
-    box-shadow: 0 0 8px var(--ff-amber);
-}
-
-.home-page p {
-    color: var(--ff-fg-muted);
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.65;
-}
-
-.home-page p.lead {
-    font-size: clamp(1.0625rem, 1.3vw, 1.25rem);
-    color: var(--ff-fg);
-    opacity: 0.85;
-    line-height: 1.55;
-    max-width: 48ch;
-}
-
-/* ---------- Buttons (legacy inline .btn + Gutenberg wp-block-button) ---------- */
-
-.home-page .btn,
-.home-page .wp-block-button__link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem !important;
-    border-radius: var(--ff-radius-sm) !important;
-    font-family: var(--ff-font-sans);
-    font-size: 0.9375rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
-    text-decoration: none;
-    white-space: nowrap;
-    background: transparent;
-    color: var(--ff-fg);
-    line-height: 1.2;
-}
-
-.home-page .wp-block-buttons {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 0.5rem;
-}
-
-/* Hero CTAs + CLI copy buttons + pricing buttons: stay on one row even
-   when the editor sidebar is open. WP's .is-layout-flex sets flex-wrap:
-   wrap with equal specificity, so we !important our way past it. */
-.home-page .hero-cta,
-.home-page .hero-cta.is-layout-flex,
-.home-page .cli-copy .wp-block-buttons,
-.home-page .cli-copy .wp-block-buttons.is-layout-flex,
-.home-page .price-copy .wp-block-buttons,
-.home-page .price-copy .wp-block-buttons.is-layout-flex,
-.home-page .closing .wp-block-buttons,
-.home-page .closing .wp-block-buttons.is-layout-flex {
-    flex-wrap: nowrap !important;
-}
-
-.home-page .hero-cta .wp-block-button,
-.home-page .cli-copy .wp-block-buttons .wp-block-button,
-.home-page .price-copy .wp-block-buttons .wp-block-button,
-.home-page .closing .wp-block-buttons .wp-block-button {
-    min-width: 0;
-    flex-shrink: 1;
-}
-
-/* Button labels: let text wrap INSIDE the button if the container is
-   narrow (better than overflow). flex-wrap on the container stays nowrap,
-   so the pair of buttons still sits in one row. */
-.home-page .hero-cta .wp-block-button__link,
-.home-page .cli-copy .wp-block-button__link,
-.home-page .price-copy .wp-block-button__link,
-.home-page .closing .wp-block-button__link {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    text-align: center;
-}
-
-.home-page .wp-block-button {
-    margin: 0;
-}
-
-/* Primary — inline or via Gutenberg wrapper */
-.home-page .btn-primary,
-.home-page .wp-block-button.btn-primary > .wp-block-button__link {
-    background: var(--ff-amber);
-    color: #0a0a0b !important;
-    border-color: var(--ff-amber);
-}
-
-.home-page .btn-primary:hover,
-.home-page .wp-block-button.btn-primary > .wp-block-button__link:hover {
-    background: #ffc14f;
-    border-color: #ffc14f;
-    transform: translateY(-1px);
-}
-
-/* Primary buttons auto-get an arrow via ::after */
-.home-page .wp-block-button.btn-primary > .wp-block-button__link::after {
-    content: "→";
-    display: inline-block;
-    transition: transform 180ms ease;
-    margin-left: 0.15em;
-}
-
-.home-page .wp-block-button.btn-primary > .wp-block-button__link:hover::after {
-    transform: translateX(2px);
-}
-
-/* Ghost */
-.home-page .btn-ghost,
-.home-page .wp-block-button.btn-ghost > .wp-block-button__link {
-    background: transparent;
-    color: var(--ff-fg) !important;
-    border-color: var(--ff-border-strong);
-}
-
-.home-page .btn-ghost:hover,
-.home-page .wp-block-button.btn-ghost > .wp-block-button__link:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.22);
-}
-
-.home-page .btn .arrow {
-    display: inline-block;
-    transition: transform 180ms ease;
-}
-
-.home-page .btn:hover .arrow {
-    transform: translateX(2px);
-}
-
-/* ---------- Section shell ---------- */
-
-.home-page section {
-    padding-block: var(--ff-section-y);
-    position: relative;
-}
-
-.home-page .section-head {
-    max-width: 60ch;
-    margin-bottom: 3rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.home-page .section-head.center {
-    margin-inline: auto;
-    text-align: center;
-    align-items: center;
-}
 
 /* ---------- HERO ---------- */
 
-.home-page .hero {
+body.firefly-page.page-home .hero {
     padding-top: clamp(6rem, 14vh, 9rem);
     padding-bottom: clamp(3rem, 5vw, 4.5rem);
     position: relative;
@@ -421,8 +21,8 @@ body.page-home #logo-name a {
     isolation: isolate;
 }
 
-/* Low, centered amber glow — painted directly from .hero::before */
-.home-page .hero::before {
+/* Low, centered amber glow painted via .hero::before */
+body.firefly-page.page-home .hero::before {
     content: '';
     position: absolute;
     top: 30%;
@@ -439,7 +39,7 @@ body.page-home #logo-name a {
 }
 
 /* Subtle slate + phosphor accents */
-.home-page .hero::after {
+body.firefly-page.page-home .hero::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -450,7 +50,7 @@ body.page-home #logo-name a {
     z-index: -1;
 }
 
-.home-page .hero-inner {
+body.firefly-page.page-home .hero-inner {
     position: relative;
     z-index: 2;
     display: grid;
@@ -460,31 +60,34 @@ body.page-home #logo-name a {
 }
 
 @media (min-width: 960px) {
-    .home-page .hero-inner {
+    body.firefly-page.page-home .hero-inner {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
         gap: 3rem;
     }
 }
 
-/* Force grid children to be shrinkable — default min-width:auto would
-   let content (the triple panel with its 3 sub-columns) push past the
-   container's right edge. */
-.home-page .hero-inner > * {
+/* Force grid children to be shrinkable so the triple-panel can't push
+   past the container's right edge. */
+body.firefly-page.page-home .hero-inner > * {
     min-width: 0;
 }
 
-.home-page .hero-copy {
+body.firefly-page.page-home .hero-copy {
     display: flex;
     flex-direction: column;
     gap: 1.75rem;
     max-width: 42rem;
 }
 
-.home-page .hero h1 {
+body.firefly-page.page-home .hero-copy > * + * {
+    margin-top: 0;
+}
+
+body.firefly-page.page-home .hero h1 {
     font-size: clamp(2.5rem, 5.5vw, 4.5rem);
 }
 
-.home-page .hero .headline-accent {
+body.firefly-page.page-home .hero .headline-accent {
     color: var(--ff-amber);
     font-family: var(--ff-font-serif);
     font-style: italic;
@@ -492,45 +95,21 @@ body.page-home #logo-name a {
     letter-spacing: -0.02em;
 }
 
-.home-page .hero p.lead {
+body.firefly-page.page-home .hero p.lead {
     font-size: clamp(1.0625rem, 1.3vw, 1.1875rem);
     max-width: 36rem;
 }
 
-.home-page .hero-cta {
+body.firefly-page.page-home .hero-cta {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
     margin-top: 0.5rem;
 }
 
-.home-page .hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--ff-border);
-    font-family: var(--ff-font-mono);
-    font-size: 0.75rem;
-    color: var(--ff-fg-muted);
-    letter-spacing: 0.04em;
-}
-
-.home-page .hero-meta span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.home-page .hero-meta .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--ff-green);
-    box-shadow: 0 0 6px var(--ff-green);
-}
-
 /* ---------- Triple-panel hero demo ---------- */
 
-.home-page .triple {
+body.firefly-page.page-home .triple {
     position: relative;
     display: grid;
     grid-template-columns: 1fr;
@@ -547,10 +126,10 @@ body.page-home #logo-name a {
 }
 
 @media (min-width: 640px) {
-    .home-page .triple { grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    body.firefly-page.page-home .triple { grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 }
 
-.home-page .panel {
+body.firefly-page.page-home .panel {
     position: relative;
     border: 1px solid var(--ff-border);
     border-radius: var(--ff-radius);
@@ -562,7 +141,7 @@ body.page-home #logo-name a {
     flex-direction: column;
 }
 
-.home-page .panel-head {
+body.firefly-page.page-home .panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -576,17 +155,17 @@ body.page-home #logo-name a {
     text-transform: uppercase;
 }
 
-.home-page .panel-head .dots {
+body.firefly-page.page-home .panel-head .dots {
     display: flex;
     gap: 5px;
 }
 
-.home-page .panel-head .dots span {
+body.firefly-page.page-home .panel-head .dots span {
     width: 8px; height: 8px; border-radius: 50%;
     background: rgba(255, 255, 255, 0.08);
 }
 
-.home-page .panel-body {
+body.firefly-page.page-home .panel-body {
     padding: 0.875rem;
     font-family: var(--ff-font-mono);
     font-size: 0.75rem;
@@ -597,19 +176,19 @@ body.page-home #logo-name a {
     overflow: hidden;
 }
 
-.home-page .panel-body .line {
+body.firefly-page.page-home .panel-body .line {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.home-page .panel-body .tag-k { color: var(--ff-amber); }
-.home-page .panel-body .tag-s { color: var(--ff-green); }
-.home-page .panel-body .tag-c { color: var(--ff-fg-muted); font-style: italic; }
-.home-page .panel-body .tag-d { color: #ff7a7a; }
-.home-page .panel-body .tag-a { color: var(--ff-green); }
+body.firefly-page.page-home .panel-body .tag-k { color: var(--ff-amber); }
+body.firefly-page.page-home .panel-body .tag-s { color: var(--ff-green); }
+body.firefly-page.page-home .panel-body .tag-c { color: var(--ff-fg-muted); font-style: italic; }
+body.firefly-page.page-home .panel-body .tag-d { color: #ff7a7a; }
+body.firefly-page.page-home .panel-body .tag-a { color: var(--ff-green); }
 
-.home-page .panel-cta {
+body.firefly-page.page-home .panel-cta {
     border-top: 1px solid var(--ff-border);
     padding: 0.5rem 0.875rem;
     font-family: var(--ff-font-mono);
@@ -620,12 +199,12 @@ body.page-home #logo-name a {
     gap: 0.5rem;
 }
 
-.home-page .panel-cta .live {
+body.firefly-page.page-home .panel-cta .live {
     color: var(--ff-green);
     font-weight: 500;
 }
 
-.home-page .panel-cta .live::before {
+body.firefly-page.page-home .panel-cta .live::before {
     content: '';
     display: inline-block;
     width: 6px; height: 6px;
@@ -638,7 +217,7 @@ body.page-home #logo-name a {
 }
 
 /* Shared "deployed preview" below panels */
-.home-page .triple-output {
+body.firefly-page.page-home .triple-output {
     margin-top: 0.75rem;
     padding: 0.875rem 1rem;
     border: 1px dashed var(--ff-amber-ring);
@@ -653,264 +232,53 @@ body.page-home #logo-name a {
     font-size: 0.75rem;
 }
 
-.home-page .triple-output .status {
+body.firefly-page.page-home .triple-output .status {
     color: var(--ff-green);
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.home-page .triple-output .url {
+body.firefly-page.page-home .triple-output .url {
     color: var(--ff-amber);
 }
 
-/* ---------- Pulse / live animation ---------- */
+/* ---------- Section background tints (home narrative ordering) ---------- */
 
-@keyframes ff-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-}
-
-/* ---------- Trust bar / logo strip ---------- */
-
-.home-page .trust {
-    padding-block: 2rem;
-    border-top: 1px solid var(--ff-border);
-    border-bottom: 1px solid var(--ff-border);
-    background: var(--ff-bg);
-    margin-top: 0;
-}
-
-.home-page .trust-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 2rem;
-    flex-wrap: wrap;
-}
-
-@media (max-width: 720px) {
-    .home-page .trust-grid { grid-template-columns: 1fr; }
-}
-
-.home-page .trust-label {
-    font-family: var(--ff-font-mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ff-fg-muted);
-}
-
-.home-page .trust-items {
-    display: flex;
-    gap: 2.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.home-page .trust-items .site {
-    font-family: var(--ff-font-serif);
-    font-style: italic;
-    font-size: 1.25rem;
-    color: var(--ff-fg);
-    opacity: 0.85;
-    transition: opacity 180ms ease;
-}
-
-.home-page .trust-items .site:hover { opacity: 1; }
-
-.home-page .trust-items .site .count {
-    font-family: var(--ff-font-mono);
-    font-style: normal;
-    font-size: 0.6875rem;
-    color: var(--ff-amber);
-    margin-left: 0.375rem;
-    letter-spacing: 0.08em;
-    opacity: 0.7;
-}
-
-/* ---------- Three-contributor story ---------- */
-
-.home-page .three-contrib {
+body.firefly-page.page-home .three-contrib {
     background: linear-gradient(180deg, var(--ff-bg) 0%, var(--ff-surface) 50%, var(--ff-bg) 100%);
     position: relative;
 }
 
-.home-page .three-contrib .grid,
-.home-page .three-contrib .wp-block-group.grid {
-    display: grid !important;
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
+body.firefly-page.page-home .three-contrib .grid,
+body.firefly-page.page-home .three-contrib .wp-block-group.grid {
     margin-top: 3rem;
-    align-items: stretch;
 }
 
-@media (min-width: 840px) {
-    .home-page .three-contrib .grid,
-    .home-page .three-contrib .wp-block-group.grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-}
-
-/* Each card must fill its grid cell */
-.home-page .three-contrib .grid > * {
-    min-width: 0;
-    width: 100%;
-}
-
-.home-page .contrib-card,
-.home-page article.contrib-card,
-.home-page .wp-block-firefly-contributor-card {
-    border: 1px solid var(--ff-border);
-    background: var(--ff-surface-2);
-    border-radius: var(--ff-radius-lg);
-    padding: 1.75rem !important;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 240ms ease, transform 240ms ease;
-    box-sizing: border-box;
-}
-
-.home-page .contrib-card:hover {
-    border-color: var(--ff-amber-ring);
-    transform: translateY(-2px);
-}
-
-.home-page .contrib-card .n {
-    font-family: var(--ff-font-mono);
-    font-size: 0.75rem;
-    color: var(--ff-amber);
-    letter-spacing: 0.08em;
-}
-
-.home-page .contrib-card h3 {
-    font-size: 1.375rem;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-}
-
-.home-page .contrib-card p {
-    font-size: 0.9375rem;
-    line-height: 1.6;
-}
-
-.home-page .contrib-card .tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    margin-top: 0.25rem;
-}
-
-.home-page .contrib-card .chip {
-    font-family: var(--ff-font-mono);
-    font-size: 0.6875rem;
-    padding: 0.25rem 0.625rem;
-    border: 1px solid var(--ff-border);
-    border-radius: 999px;
-    color: var(--ff-fg-muted);
-    background: rgba(255, 255, 255, 0.02);
-}
-
-.home-page .contrib-card .arrow-out {
-    position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
-    opacity: 0.4;
-    transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.home-page .contrib-card:hover .arrow-out {
-    opacity: 1;
-    transform: translate(2px, -2px);
-}
-
-/* ---------- Pillar grid (Flex MVC capabilities) ---------- */
-
-.home-page .pillars {
+body.firefly-page.page-home .pillars {
     background: var(--ff-bg);
 }
 
-.home-page .pillar-grid,
-.home-page .wp-block-group.pillar-grid {
-    display: grid !important;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin-top: 3rem;
-    align-items: stretch;
+body.firefly-page.page-home .proof {
+    background: var(--ff-bg);
 }
 
-.home-page .pillar-grid > * { min-width: 0; width: 100%; }
-
-@media (min-width: 640px) {
-    .home-page .pillar-grid,
-    .home-page .wp-block-group.pillar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1024px) {
-    .home-page .pillar-grid,
-    .home-page .wp-block-group.pillar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body.firefly-page.page-home .templates {
+    background: linear-gradient(180deg, var(--ff-bg) 0%, var(--ff-surface) 100%);
 }
 
-.home-page .pillar,
-.home-page article.pillar,
-.home-page .wp-block-firefly-pillar {
-    border: 1px solid var(--ff-border);
-    border-radius: var(--ff-radius);
-    padding: 1.5rem !important;
-    background: var(--ff-surface);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    min-height: 200px;
-    transition: border-color 240ms ease, background 240ms ease;
-    box-sizing: border-box;
-}
-
-.home-page .pillar:hover {
-    border-color: var(--ff-amber-ring);
-    background: var(--ff-surface-2);
-}
-
-.home-page .pillar .icon {
-    width: 36px; height: 36px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--ff-radius-sm);
-    background: var(--ff-amber-soft);
-    color: var(--ff-amber);
-    margin-bottom: 0.25rem;
-}
-
-.home-page .pillar h3 {
-    font-size: 1.0625rem;
-    font-weight: 500;
-    letter-spacing: -0.015em;
-}
-
-.home-page .pillar p {
-    font-size: 0.9375rem;
-    line-height: 1.6;
-}
-
-.home-page .pillar .meta {
-    margin-top: auto;
-    padding-top: 0.75rem;
-    font-family: var(--ff-font-mono);
-    font-size: 0.6875rem;
-    color: var(--ff-fg-dim);
-    letter-spacing: 0.05em;
+body.firefly-page.page-home .pricing {
+    background: var(--ff-bg);
 }
 
 /* ---------- CLI demo ---------- */
 
-.home-page .cli {
+body.firefly-page.page-home .cli {
     background: linear-gradient(180deg, var(--ff-surface) 0%, var(--ff-bg) 100%);
     position: relative;
 }
 
-.home-page .cli-inner {
+body.firefly-page.page-home .cli-inner {
     display: grid;
     grid-template-columns: 1fr;
     gap: 2.5rem;
@@ -919,13 +287,13 @@ body.page-home #logo-name a {
 }
 
 @media (min-width: 960px) {
-    .home-page .cli-inner { grid-template-columns: 1.1fr 1fr; }
+    body.firefly-page.page-home .cli-inner { grid-template-columns: 1.1fr 1fr; }
 }
 
-.home-page .cli-copy { max-width: 40ch; }
-.home-page .cli-copy h2 { margin-bottom: 1rem; }
+body.firefly-page.page-home .cli-copy { max-width: 40ch; }
+body.firefly-page.page-home .cli-copy h2 { margin-bottom: 1rem; }
 
-.home-page .cli-box {
+body.firefly-page.page-home .cli-box {
     border: 1px solid var(--ff-border);
     background: #0f0f10;
     border-radius: var(--ff-radius-lg);
@@ -933,7 +301,7 @@ body.page-home #logo-name a {
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(245, 181, 68, 0.08);
 }
 
-.home-page .cli-head {
+body.firefly-page.page-home .cli-head {
     padding: 0.625rem 0.875rem;
     border-bottom: 1px solid var(--ff-border);
     background: rgba(0, 0, 0, 0.35);
@@ -945,19 +313,19 @@ body.page-home #logo-name a {
     color: var(--ff-fg-muted);
 }
 
-.home-page .cli-head .dots {
+body.firefly-page.page-home .cli-head .dots {
     display: flex; gap: 5px;
 }
 
-.home-page .cli-head .dots span {
+body.firefly-page.page-home .cli-head .dots span {
     width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.12);
 }
 
-.home-page .cli-head .dots span:nth-child(1) { background: #ff605c; }
-.home-page .cli-head .dots span:nth-child(2) { background: #ffbd44; }
-.home-page .cli-head .dots span:nth-child(3) { background: #00ca4e; }
+body.firefly-page.page-home .cli-head .dots span:nth-child(1) { background: #ff605c; }
+body.firefly-page.page-home .cli-head .dots span:nth-child(2) { background: #ffbd44; }
+body.firefly-page.page-home .cli-head .dots span:nth-child(3) { background: #00ca4e; }
 
-.home-page .cli-body {
+body.firefly-page.page-home .cli-body {
     padding: 1.25rem 1.5rem;
     font-family: var(--ff-font-mono);
     font-size: 0.8125rem;
@@ -966,11 +334,11 @@ body.page-home #logo-name a {
     min-height: 260px;
 }
 
-.home-page .cli-body .prompt { color: var(--ff-amber); }
-.home-page .cli-body .cmd { color: var(--ff-fg); }
-.home-page .cli-body .ok { color: var(--ff-green); }
-.home-page .cli-body .dim { color: var(--ff-fg-dim); }
-.home-page .cli-body .cursor {
+body.firefly-page.page-home .cli-body .prompt { color: var(--ff-amber); }
+body.firefly-page.page-home .cli-body .cmd { color: var(--ff-fg); }
+body.firefly-page.page-home .cli-body .ok { color: var(--ff-green); }
+body.firefly-page.page-home .cli-body .dim { color: var(--ff-fg-dim); }
+body.firefly-page.page-home .cli-body .cursor {
     display: inline-block;
     width: 7px; height: 1em;
     background: var(--ff-amber);
@@ -983,16 +351,16 @@ body.page-home #logo-name a {
     50% { opacity: 0; }
 }
 
-/* ---------- Substrate band ---------- */
+/* ---------- Substrate band (centered tagline + logo grid) ---------- */
 
-.home-page .substrate {
+body.firefly-page.page-home .substrate {
     background: var(--ff-bg);
     border-top: 1px solid var(--ff-border);
     border-bottom: 1px solid var(--ff-border);
     padding-block: 3.5rem;
 }
 
-.home-page .substrate-inner {
+body.firefly-page.page-home .substrate-inner {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -1000,7 +368,7 @@ body.page-home #logo-name a {
     text-align: center;
 }
 
-.home-page .substrate p {
+body.firefly-page.page-home .substrate p {
     max-width: 52ch;
     font-size: 1.0625rem;
     line-height: 1.6;
@@ -1008,342 +376,17 @@ body.page-home #logo-name a {
     opacity: 0.84;
 }
 
-.home-page .substrate-logos {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1rem 2.25rem;
-    padding-top: 0.5rem;
-    opacity: 0.75;
+/* ---------- Hero copy stacking helper ---------- */
+
+body.firefly-page.page-home .hero-copy {
+    gap: 1.75rem;
 }
 
-.home-page .substrate-logos .tech {
-    font-family: var(--ff-font-mono);
-    font-size: 0.8125rem;
-    letter-spacing: 0.03em;
-    color: var(--ff-fg-muted);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.home-page .substrate-logos .tech::before {
-    content: '';
-    width: 6px; height: 6px;
-    background: var(--ff-amber);
-    border-radius: 1px;
-    transform: rotate(45deg);
-}
-
-/* ---------- Proof ---------- */
-
-.home-page .proof {
-    background: var(--ff-bg);
-}
-
-.home-page .quote-card,
-.home-page div.quote-card,
-.home-page .wp-block-group.quote-card {
-    border: 1px solid var(--ff-border);
-    border-radius: var(--ff-radius-lg);
-    padding: clamp(2rem, 4vw, 3.5rem) !important;
-    max-width: 900px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    background:
-        radial-gradient(circle at top left, var(--ff-amber-soft), transparent 40%),
-        var(--ff-surface);
-    position: relative;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-.home-page .quote-card .metric,
-.home-page .quote-card p.metric {
-    font-family: var(--ff-font-serif);
-    font-style: italic;
-    font-size: clamp(2.5rem, 5vw, 3.75rem);
-    color: var(--ff-amber);
-    letter-spacing: -0.03em;
-    line-height: 1;
-    margin: 0 0 1rem;
-}
-
-.home-page .quote-card blockquote {
-    margin: 0;
-    font-size: clamp(1.125rem, 1.6vw, 1.375rem);
-    line-height: 1.55;
-    color: var(--ff-fg);
-    letter-spacing: -0.01em;
-    font-weight: 300;
-}
-
-.home-page .quote-card cite {
-    display: block;
-    font-style: normal;
-    margin-top: 1.5rem;
-    font-family: var(--ff-font-mono);
-    font-size: 0.8125rem;
-    color: var(--ff-fg-muted);
-    letter-spacing: 0.02em;
-}
-
-/* ---------- Templates gallery ---------- */
-
-.home-page .templates {
-    background: linear-gradient(180deg, var(--ff-bg) 0%, var(--ff-surface) 100%);
-}
-
-.home-page .tmpl-grid,
-.home-page .wp-block-group.tmpl-grid {
-    display: grid !important;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin-top: 3rem;
-    align-items: stretch;
-}
-
-.home-page .tmpl-grid > * { min-width: 0; width: 100%; }
-
-@media (min-width: 640px) {
-    .home-page .tmpl-grid,
-    .home-page .wp-block-group.tmpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1024px) {
-    .home-page .tmpl-grid,
-    .home-page .wp-block-group.tmpl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-.home-page .tmpl-card {
-    border: 1px solid var(--ff-border);
-    background: var(--ff-surface);
-    border-radius: var(--ff-radius-lg);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: border-color 240ms ease, transform 240ms ease;
-}
-
-.home-page .tmpl-card:hover {
-    border-color: var(--ff-amber-ring);
-    transform: translateY(-2px);
-}
-
-.home-page .tmpl-thumb {
-    aspect-ratio: 16 / 10;
-    background: var(--ff-surface-2);
-    position: relative;
-    overflow: hidden;
-    display: grid;
-    place-items: center;
-}
-
-.home-page .tmpl-thumb::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, transparent 50%, rgba(0,0,0,0.4));
-}
-
-.home-page .tmpl-thumb .mock {
-    width: 72%;
-    height: 72%;
-    border-radius: var(--ff-radius-sm);
-    background:
-        linear-gradient(180deg, var(--ff-amber) 0%, transparent 30%),
-        linear-gradient(180deg, #202225 0%, #141416 100%);
-    border: 1px solid var(--ff-border-strong);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    position: relative;
-    z-index: 1;
-}
-
-.home-page .tmpl-thumb .mock::before {
-    content: '';
-    position: absolute;
-    top: 8px; left: 8px; right: 8px;
-    height: 24px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 4px;
-}
-
-.home-page .tmpl-body {
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.home-page .tmpl-body .title {
-    font-size: 1rem;
-    font-weight: 500;
-    letter-spacing: -0.015em;
-    color: var(--ff-fg);
-}
-
-.home-page .tmpl-body .meta {
-    font-family: var(--ff-font-mono);
-    font-size: 0.6875rem;
-    color: var(--ff-fg-muted);
-    letter-spacing: 0.04em;
-    display: flex;
-    gap: 1rem;
-}
-
-.home-page .tmpl-body .meta .ok { color: var(--ff-green); }
-
-/* ---------- Pricing band ---------- */
-
-.home-page .pricing {
-    background: var(--ff-bg);
-}
-
-.home-page .price-cta,
-.home-page div.price-cta,
-.home-page .wp-block-group.price-cta {
-    border: 1px solid var(--ff-border);
-    background:
-        radial-gradient(circle at top right, var(--ff-amber-soft), transparent 40%),
-        var(--ff-surface);
-    border-radius: var(--ff-radius-lg);
-    padding: clamp(2rem, 4vw, 3rem) !important;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    align-items: center;
-    box-sizing: border-box;
-}
-
-@media (min-width: 820px) { .home-page .price-cta { grid-template-columns: 1.4fr 1fr; } }
-
-.home-page .price-cta h3 {
-    font-size: clamp(1.5rem, 2.4vw, 2rem);
-    margin-bottom: 0.75rem;
-}
-
-.home-page .price-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    font-family: var(--ff-font-mono);
-    font-size: 0.8125rem;
-    color: var(--ff-fg-muted);
-}
-
-.home-page .price-list .tier,
-.home-page .tier,
-.home-page div.tier,
-.home-page .wp-block-firefly-tier {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 0.875rem 1rem !important;
-    border: 1px solid var(--ff-border);
-    border-radius: var(--ff-radius-sm);
-    background: rgba(255, 255, 255, 0.02);
-    box-sizing: border-box;
-}
-
-.home-page .price-list .tier strong {
-    color: var(--ff-fg);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.home-page .price-list .tier .price {
-    color: var(--ff-amber);
-    font-weight: 500;
-}
-
-/* ---------- Closing CTA ---------- */
-
-.home-page .closing {
-    padding-block: clamp(6rem, 10vw, 9rem);
-    text-align: center;
-    background:
-        radial-gradient(ellipse at center top, var(--ff-amber-soft), transparent 50%),
-        var(--ff-bg);
-    border-top: 1px solid var(--ff-border);
-}
-
-.home-page .closing h2 {
-    font-size: clamp(2rem, 4.5vw, 3.5rem);
-    margin-bottom: 1rem;
-}
-
-.home-page .closing p {
-    max-width: 44ch;
-    margin: 0 auto 2rem;
-    font-size: 1.0625rem;
-    color: var(--ff-fg);
-    opacity: 0.84;
-}
-
-.home-page .closing .btn-row {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.home-page .closing .footnote,
-.home-page .closing p.footnote {
-    margin: 2.5rem 0 0;
-    font-family: var(--ff-font-mono);
-    font-size: 0.75rem;
-    color: var(--ff-fg-dim);
-    letter-spacing: 0.06em;
-    text-align: center;
-}
-
-/* ---------- Reveal animation baseline ---------- */
-
-.home-page .reveal {
-    opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 560ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.home-page .reveal.is-in {
-    opacity: 1;
-    transform: none;
-}
-
-.home-page .reveal-stagger > * {
-    opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    transition-delay: calc(var(--i, 0) * 70ms);
-}
-
-.home-page .reveal-stagger.is-in > * {
-    opacity: 1;
-    transform: none;
-}
-
-/* ---------- Reduced-motion ---------- */
-
-@media (prefers-reduced-motion: reduce) {
-    .home-page *,
-    .home-page *::before,
-    .home-page *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 120ms !important;
-    }
-    .home-page .reveal,
-    .home-page .reveal-stagger > * {
-        opacity: 1 !important;
-        transform: none !important;
-    }
-}
-
-/* ---------- Mobile-specific tweaks ---------- */
+/* ---------- Mobile tweaks (home-specific layout pieces) ---------- */
 
 @media (max-width: 640px) {
-    .home-page .hero { padding-top: 6rem; }
-    .home-page .hero h1 { font-size: 2.375rem; }
-    .home-page .section-head { margin-bottom: 2rem; }
-    .home-page .panel { min-height: 180px; }
+    body.firefly-page.page-home .hero { padding-top: 6rem; }
+    body.firefly-page.page-home .hero h1 { font-size: 2.375rem; }
+    body.firefly-page.page-home .section-head { margin-bottom: 2rem; }
+    body.firefly-page.page-home .panel { min-height: 180px; }
 }

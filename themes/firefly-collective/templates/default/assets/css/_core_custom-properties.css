@@ -56,9 +56,11 @@
     --font-size-nav: 1.3rem;
     --font-size-nav-mobile: 1.15rem;
 
-    /* "Glowing in the dark" tokens — shared with home.css and any UI
-       chrome (nav, hamburger overlay) so the whole template reads as
-       one dark-amber system, not just the landing page. */
+    /* "Glowing in the dark" tokens — the rebrand surface for any fork.
+       Edit this block to retheme the entire template. See DESIGN.md
+       for the full contract. */
+
+    /* Color */
     --ff-bg: #0a0a0b;
     --ff-surface: #141416;
     --ff-surface-2: #1a1a1d;
@@ -68,6 +70,24 @@
     --ff-amber: #f5b544;
     --ff-amber-soft: rgba(245, 181, 68, 0.12);
     --ff-amber-ring: rgba(245, 181, 68, 0.28);
+    --ff-green: #9fe870;
+    --ff-green-soft: rgba(159, 232, 112, 0.12);
+    --ff-slate: #2a3440;
     --ff-border: rgba(255, 255, 255, 0.08);
     --ff-border-strong: rgba(255, 255, 255, 0.14);
+
+    /* Typography */
+    --ff-font-sans: 'Geist', system-ui, -apple-system, sans-serif;
+    --ff-font-serif: 'Instrument Serif', Georgia, serif;
+    --ff-font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+    /* Radii */
+    --ff-radius-sm: 6px;
+    --ff-radius: 10px;
+    --ff-radius-lg: 16px;
+
+    /* Spacing & layout */
+    --ff-section-y: clamp(5rem, 8vw, 8rem);
+    --ff-gutter: clamp(1.25rem, 5vw, 3.5rem);
+    --ff-container: 1240px;
 }
