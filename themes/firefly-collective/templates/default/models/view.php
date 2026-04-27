@@ -27,7 +27,6 @@
 
             case 'home':
                 $assets['css'][]    = $template_path . '/assets/css/home.css';
-                $assets['js'][]     = $template_path . '/assets/js/motion-helpers.js';
                 $assets['js'][]     = $template_path . '/assets/js/home.js';
                 break;
 

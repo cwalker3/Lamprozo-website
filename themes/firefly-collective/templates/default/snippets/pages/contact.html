@@ -1,5 +1,49 @@
-<!-- wp:cover {"url":"/wp-content/themes/firefly-collective/templates/default/images/landing-default-bg.webp","dimRatio":50,"customOverlayColor":"#b3bfcd","isUserOverlayColor":false,"isDark":false,"sizeSlug":"full","metadata":{"name":"Full Width Banner"},"style":{"dimensions":{"minHeight":"50vh"}},"layout":{"type":"constrained"},"heightPreset":"half"} -->
-<div class="wp-block-cover is-light height-preset-half"><img class="wp-block-cover__image-background size-full" alt="" src="/wp-content/themes/firefly-collective/templates/default/images/landing-default-bg.webp" data-object-fit="cover"/><span aria-hidden="true" class="wp-block-cover__background has-background-dim" style="background-color:#b3bfcd"></span><div class="wp-block-cover__inner-container"><!-- wp:paragraph {"align":"center","placeholder":"Write title…","fontSize":"large"} -->
-<p class="has-text-align-center has-large-font-size">Contact</p>
-<!-- /wp:paragraph --></div></div>
-<!-- /wp:cover -->
+<!-- wp:group {"tagName":"section","className":"hero","layout":{"type":"default"}} -->
+<section class="wp-block-group hero"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:group {"className":"hero-inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hero-inner"><!-- wp:group {"className":"hero-copy reveal","layout":{"type":"default"}} -->
+<div class="wp-block-group hero-copy reveal"><!-- wp:firefly/overline {"text":"Get in touch"} /-->
+
+<!-- wp:heading {"level":1,"className":"hero-headline"} -->
+<h1 class="wp-block-heading hero-headline">Talk to us about <span class="headline-accent">Firefly</span>.</h1>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph {"className":"lead"} -->
+<p class="lead">Tell us what you're building, what you'd want from a forkable WordPress base, or which corner of this demo broke first. A real human reads every message — usually within a day.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:firefly/hero-meta {"status":"alex@fireflycreative.io","tech":"every message routes to a real inbox · claude.md welcome"} /--></div>
+<!-- /wp:group -->
+
+<!-- wp:firefly/contact-form /--></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
+
+<!-- wp:group {"tagName":"section","className":"three-contrib","layout":{"type":"default"}} -->
+<section class="wp-block-group three-contrib"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:firefly/section-head {"overline":"Behind this form","heading":"You just used a Firefly block.","lead":"The three inputs above aren't a contact-form plugin. They're a single firefly/contact-form block — markup in render.php, behavior in contact.js, snippet in source control. Edit it in Gutenberg, sync to a snippet file, ship to live with one CLI command."} /-->
+
+<!-- wp:group {"className":"grid reveal-stagger","layout":{"type":"default"}} -->
+<div class="wp-block-group grid reveal-stagger"><!-- wp:firefly/contributor-card {"audience":"The block","title":"firefly/contact-form","description":"Three fields, one submit. Placeholder copy and the button label are editable as block attributes — the markup is fixed so JS bindings stay stable across the editor and frontend.","chips":"block.json · render.php · index.js"} /-->
+
+<!-- wp:firefly/contributor-card {"audience":"The wiring","title":"contact.js handles submit","description":"The frontend script binds to #send-message-btn, validates the three inputs, and POSTs to a custom REST route. Pure vanilla JS — swap it out per project without touching the block.","chips":"vanilla js · custom-api/v1 · wp_mail"} /-->
+
+<!-- wp:firefly/contributor-card {"audience":"The deploy","title":"firefly import default","description":"Saving in Gutenberg syncs the block markup back to snippets/pages/contact.html. One CLI command pushes that file to live dev or production. No FTP, no plugin upload.","chips":"snippet sync · cli deploy · git-tracked"} /--></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
+
+<!-- wp:group {"tagName":"section","className":"closing","layout":{"type":"default"}} -->
+<section class="wp-block-group closing"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:firefly/overline {"text":"Other channels"} /-->
+
+<!-- wp:heading {"level":2} -->
+<h2 class="wp-block-heading">Or skip the form.</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Email <a href="mailto:alex@fireflycreative.io">alex@fireflycreative.io</a> directly. Open a GitHub issue at <a href="https://github.com/fireflycreativeio/firefly-collective">fireflycreativeio/firefly-collective</a>. Or fork the repo and start sending PRs &mdash; that counts as the loudest possible message.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->

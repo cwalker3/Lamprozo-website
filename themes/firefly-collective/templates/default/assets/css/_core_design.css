@@ -379,6 +379,75 @@ body.firefly-page #logo-name a {
     align-items: center;
 }
 
+/* ---------- Hero pattern (template-wide baseline) ----------
+   Generous top padding (clears the fixed nav), tight bottom so the
+   following section doesn't feel orphaned. Pages can layer their own
+   per-page hero embellishments (glows, accents, demo art) on top. */
+
+.firefly-page .hero {
+    padding-top: clamp(6rem, 14vh, 9rem);
+    padding-bottom: clamp(2rem, 4vw, 3.5rem);
+    position: relative;
+    overflow: hidden;
+    background: var(--ff-bg);
+    isolation: isolate;
+}
+
+.firefly-page .hero-inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3rem;
+    align-items: center;
+}
+
+@media (min-width: 960px) {
+    .firefly-page .hero-inner {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+        gap: 3rem;
+    }
+}
+
+.firefly-page .hero-inner > * {
+    min-width: 0;
+}
+
+.firefly-page .hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    max-width: 42rem;
+}
+
+.firefly-page .hero-copy > * + * {
+    margin-top: 0;
+}
+
+.firefly-page .hero h1 {
+    font-size: clamp(2.5rem, 5.5vw, 4.5rem);
+}
+
+.firefly-page .hero .headline-accent {
+    color: var(--ff-amber);
+    font-family: var(--ff-font-serif);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+}
+
+.firefly-page .hero p.lead {
+    font-size: clamp(1.0625rem, 1.3vw, 1.1875rem);
+    max-width: 36rem;
+}
+
+.firefly-page .hero-cta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
 /* ---------- Hero meta block ---------- */
 
 .firefly-page .hero-meta {

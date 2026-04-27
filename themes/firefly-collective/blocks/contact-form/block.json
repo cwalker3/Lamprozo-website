@@ -1,0 +1,19 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/contact-form",
+    "title": "Firefly: Contact Form",
+    "category": "firefly",
+    "icon": "email-alt",
+    "description": "Three-field contact form (name, email, message). Frontend behavior is wired by contact.js — the block only owns markup + labels.",
+    "keywords": ["contact", "form"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "namePlaceholder":    { "type": "string", "default": "Your name" },
+        "emailPlaceholder":   { "type": "string", "default": "Email" },
+        "messagePlaceholder": { "type": "string", "default": "What are you working on?" },
+        "submitLabel":        { "type": "string", "default": "Send" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

@@ -10,16 +10,11 @@
    leaks if these classes happen to appear on another page.
 */
 
-/* ---------- HERO ---------- */
-
-body.firefly-page.page-home .hero {
-    padding-top: clamp(6rem, 14vh, 9rem);
-    padding-bottom: clamp(3rem, 5vw, 4.5rem);
-    position: relative;
-    overflow: hidden;
-    background: var(--ff-bg);
-    isolation: isolate;
-}
+/* ---------- HERO embellishments (home only) ----------
+   Base hero pattern (padding, grid, headline sizing, hero-meta, hero-cta)
+   lives in _core_design.css under .firefly-page .hero. This file owns
+   only the things that make the LANDING hero distinctive: the amber
+   glow, the slate + phosphor radial accents, and the lead width tweak. */
 
 /* Low, centered amber glow painted via .hero::before */
 body.firefly-page.page-home .hero::before {
@@ -50,61 +45,17 @@ body.firefly-page.page-home .hero::after {
     z-index: -1;
 }
 
+/* Home hero is intentionally roomier than other pages — the triple-panel
+   needs vertical space, and the landing benefits from extra breathing
+   room. Override the shared hero-inner gap. */
 body.firefly-page.page-home .hero-inner {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: 1fr;
     gap: 4rem;
-    align-items: center;
 }
 
 @media (min-width: 960px) {
     body.firefly-page.page-home .hero-inner {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
         gap: 3rem;
     }
-}
-
-/* Force grid children to be shrinkable so the triple-panel can't push
-   past the container's right edge. */
-body.firefly-page.page-home .hero-inner > * {
-    min-width: 0;
-}
-
-body.firefly-page.page-home .hero-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
-    max-width: 42rem;
-}
-
-body.firefly-page.page-home .hero-copy > * + * {
-    margin-top: 0;
-}
-
-body.firefly-page.page-home .hero h1 {
-    font-size: clamp(2.5rem, 5.5vw, 4.5rem);
-}
-
-body.firefly-page.page-home .hero .headline-accent {
-    color: var(--ff-amber);
-    font-family: var(--ff-font-serif);
-    font-style: italic;
-    font-weight: 400;
-    letter-spacing: -0.02em;
-}
-
-body.firefly-page.page-home .hero p.lead {
-    font-size: clamp(1.0625rem, 1.3vw, 1.1875rem);
-    max-width: 36rem;
-}
-
-body.firefly-page.page-home .hero-cta {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 0.5rem;
 }
 
 /* ---------- Triple-panel hero demo ---------- */
@@ -376,17 +327,9 @@ body.firefly-page.page-home .substrate p {
     opacity: 0.84;
 }
 
-/* ---------- Hero copy stacking helper ---------- */
-
-body.firefly-page.page-home .hero-copy {
-    gap: 1.75rem;
-}
-
 /* ---------- Mobile tweaks (home-specific layout pieces) ---------- */
 
 @media (max-width: 640px) {
     body.firefly-page.page-home .hero { padding-top: 6rem; }
-    body.firefly-page.page-home .hero h1 { font-size: 2.375rem; }
-    body.firefly-page.page-home .section-head { margin-bottom: 2rem; }
     body.firefly-page.page-home .panel { min-height: 180px; }
 }
