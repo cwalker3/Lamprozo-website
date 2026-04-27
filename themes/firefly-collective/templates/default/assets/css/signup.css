@@ -1,0 +1,289 @@
+/* theme/templates/default/assets/css/signup.css
+   Page-specific layout for /signup. Page chrome (hero pattern, typography,
+   sections) comes from _core_design.css; this file styles the
+   firefly/signup-form block in the dark/amber design system.
+*/
+
+body.firefly-page.page-signup .signup-form {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.5rem, 3vw, 2.25rem);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.875rem;
+    box-sizing: border-box;
+    transition: border-color 240ms ease;
+}
+
+body.firefly-page.page-signup .signup-form:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+/* Method toggle (Direct / Third-party) ------------------------------ */
+
+body.firefly-page.page-signup .signup-method {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.375rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    margin-bottom: 0.5rem;
+}
+
+body.firefly-page.page-signup .signup-method label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    color: var(--ff-fg-muted);
+    border-radius: var(--ff-radius-sm);
+    cursor: pointer;
+    transition: background 180ms ease, color 180ms ease;
+}
+
+body.firefly-page.page-signup .signup-method label:hover {
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-signup .signup-method label:has(input:checked) {
+    background: var(--ff-surface-2);
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-signup .signup-method input[type="radio"] {
+    accent-color: var(--ff-amber);
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
+/* Field grids ------------------------------------------------------- */
+
+body.firefly-page.page-signup #direct-signup-fields,
+body.firefly-page.page-signup #third-party-signup-fields {
+    display: grid;
+    gap: 0.75rem;
+}
+
+body.firefly-page.page-signup .signup-form input[type="text"],
+body.firefly-page.page-signup .signup-form input[type="email"],
+body.firefly-page.page-signup .signup-form input[type="tel"],
+body.firefly-page.page-signup .signup-form input[type="password"] {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+}
+
+body.firefly-page.page-signup .signup-form input:hover {
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-signup .signup-form input:focus {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-surface-2);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-signup .signup-form input::placeholder {
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-signup .signup-form input.invalid {
+    border-color: rgba(255, 122, 122, 0.6);
+    box-shadow: 0 0 0 3px rgba(255, 122, 122, 0.12);
+}
+
+body.firefly-page.page-signup .signup-form input.valid {
+    border-color: rgba(159, 232, 112, 0.5);
+}
+
+/* "Create a username and password" toggle --------------------------- */
+
+body.firefly-page.page-signup .signup-form > label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    user-select: none;
+}
+
+body.firefly-page.page-signup #enable-username-password {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ff-amber);
+    cursor: pointer;
+}
+
+body.firefly-page.page-signup #username-password-fields {
+    display: grid;
+    gap: 0.75rem;
+    padding-top: 0.25rem;
+}
+
+body.firefly-page.page-signup .password-field {
+    position: relative;
+}
+
+body.firefly-page.page-signup .password-field input {
+    padding-right: 2.5rem;
+}
+
+body.firefly-page.page-signup .toggle-password {
+    position: absolute;
+    top: 50%;
+    right: 0.875rem;
+    transform: translateY(-50%);
+    cursor: pointer;
+    user-select: none;
+    color: var(--ff-fg-muted);
+    font-size: 1.125rem;
+    line-height: 1;
+    transition: color 180ms ease;
+}
+
+body.firefly-page.page-signup .toggle-password:hover {
+    color: var(--ff-amber);
+}
+
+/* Submit / Join button ---------------------------------------------- */
+
+body.firefly-page.page-signup #signup-btn,
+body.firefly-page.page-signup #google-signin-btn {
+    margin-top: 0.5rem;
+    width: 100%;
+}
+
+body.firefly-page.page-signup #signup-btn button,
+body.firefly-page.page-signup #google-signin-btn button {
+    width: 100%;
+    padding: 0.875rem 1.25rem;
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border: 1px solid var(--ff-amber);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-signup #signup-btn button:hover,
+body.firefly-page.page-signup #google-signin-btn button:hover {
+    background: #ffc14f;
+    border-color: #ffc14f;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 181, 68, 0.18);
+}
+
+body.firefly-page.page-signup #signup-btn button:active,
+body.firefly-page.page-signup #google-signin-btn button:active {
+    transform: translateY(0);
+}
+
+body.firefly-page.page-signup #signup-btn button:disabled,
+body.firefly-page.page-signup #google-signin-btn button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Third-party providers grid ---------------------------------------- */
+
+body.firefly-page.page-signup .third-party-providers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+}
+
+body.firefly-page.page-signup .third-party-providers label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    letter-spacing: 0.02em;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    cursor: pointer;
+    transition: border-color 180ms ease, color 180ms ease;
+}
+
+body.firefly-page.page-signup .third-party-providers label:hover {
+    border-color: var(--ff-border-strong);
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-signup .third-party-providers label:has(input:checked) {
+    border-color: var(--ff-amber-ring);
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-signup .third-party-providers .party-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+body.firefly-page.page-signup .third-party-providers input[type="radio"] {
+    accent-color: var(--ff-amber);
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
+/* Error text -------------------------------------------------------- */
+
+body.firefly-page.page-signup #error-txt {
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: #ff7a7a;
+    letter-spacing: 0.02em;
+    min-height: 0;
+    transition: min-height 180ms ease;
+}
+
+body.firefly-page.page-signup #error-txt:not(:empty) {
+    min-height: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 122, 122, 0.08);
+    border: 1px solid rgba(255, 122, 122, 0.25);
+    border-radius: var(--ff-radius-sm);
+}
+
+/* Mobile tweaks ----------------------------------------------------- */
+
+@media (max-width: 640px) {
+    body.firefly-page.page-signup .signup-form {
+        padding: 1.25rem;
+    }
+    body.firefly-page.page-signup .third-party-providers {
+        grid-template-columns: 1fr;
+    }
+}

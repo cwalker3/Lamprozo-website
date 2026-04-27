@@ -59,7 +59,7 @@
                 break;
 
             case 'signup':
-                $assets['css'][]    = $template_path . '/assets/css/signup-appt.css';
+                $assets['css'][]    = $template_path . '/assets/css/signup.css';
                 $assets['js'][]     = $template_path . '/assets/js/auth.js';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 break;

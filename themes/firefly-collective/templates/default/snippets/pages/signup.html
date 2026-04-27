@@ -1,5 +1,49 @@
-<!-- wp:cover {"url":"/wp-content/themes/firefly-collective/templates/default/images/landing-default-bg.webp","dimRatio":50,"customOverlayColor":"#b3bfcd","isUserOverlayColor":false,"isDark":false,"sizeSlug":"full","metadata":{"name":"Full Width Banner"},"style":{"dimensions":{"minHeight":"50vh"}},"layout":{"type":"constrained"},"heightPreset":"half"} -->
-<div class="wp-block-cover is-light height-preset-half"><img class="wp-block-cover__image-background size-full" alt="" src="/wp-content/themes/firefly-collective/templates/default/images/landing-default-bg.webp" data-object-fit="cover"/><span aria-hidden="true" class="wp-block-cover__background has-background-dim" style="background-color:#b3bfcd"></span><div class="wp-block-cover__inner-container"><!-- wp:paragraph {"align":"center","placeholder":"Write title…","fontSize":"large"} -->
-<p class="has-text-align-center has-large-font-size">Sign Up</p>
-<!-- /wp:paragraph --></div></div>
-<!-- /wp:cover -->
+<!-- wp:group {"tagName":"section","className":"hero","layout":{"type":"default"}} -->
+<section class="wp-block-group hero"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:group {"className":"hero-inner","layout":{"type":"default"}} -->
+<div class="wp-block-group hero-inner"><!-- wp:group {"className":"hero-copy reveal","layout":{"type":"default"}} -->
+<div class="wp-block-group hero-copy reveal"><!-- wp:firefly/overline {"text":"Try Firefly free"} /-->
+
+<!-- wp:heading {"level":1,"className":"hero-headline"} -->
+<h1 class="wp-block-heading hero-headline">Spin up an <span class="headline-accent">account</span> in under a minute.</h1>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph {"className":"lead"} -->
+<p class="lead">Direct email signup, or one-click Google OAuth. Stripe and the rest of the auth providers are wired in the framework — flip them on per project. This whole flow is the firefly/signup-form block; the form on the right is what you'd ship.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:firefly/hero-meta {"status":"oauth + magic-link + password","tech":"google · stripe · wp_mail · custom-api/v1/signup"} /--></div>
+<!-- /wp:group -->
+
+<!-- wp:firefly/signup-form /--></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
+
+<!-- wp:group {"tagName":"section","className":"three-contrib","layout":{"type":"default"}} -->
+<section class="wp-block-group three-contrib"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:firefly/section-head {"overline":"What ships in the box","heading":"Auth, not your problem.","lead":"Most starters leave you to wire authentication yourself. Firefly bundles direct signup, third-party OAuth, password resets, encrypted user meta, and Stripe customer creation behind one block + one model. Swap the providers, swap the post-signup hook, ship."} /-->
+
+<!-- wp:group {"className":"grid reveal-stagger","layout":{"type":"default"}} -->
+<div class="wp-block-group grid reveal-stagger"><!-- wp:firefly/contributor-card {"audience":"The block","title":"firefly/signup-form","description":"Method toggle, direct fields, optional password creator, third-party provider grid. Markup is fixed so signup.js binds reliably; every visible label is a block attribute, editable in Gutenberg.","chips":"block.json · render.php · index.js"} /-->
+
+<!-- wp:firefly/contributor-card {"audience":"The wiring","title":"signup.js + REST","description":"signup.js validates inputs, hits custom-api/v1/signup, handles OAuth callbacks, and wires Google Sign-In via the Identity Services SDK. Replace the model to swap providers — block markup stays untouched.","chips":"vanilla js · oauth · stripe customer"} /-->
+
+<!-- wp:firefly/contributor-card {"audience":"The post-signup","title":"User-meta + redirect hook","description":"Account creation lands the user on the dashboard with their auth_id cookie set. Hooks fire for Stripe customer creation, transactional welcome email, and any project-specific onboarding logic.","chips":"user-meta · wp_mail · auth cookie"} /--></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
+
+<!-- wp:group {"tagName":"section","className":"closing","layout":{"type":"default"}} -->
+<section class="wp-block-group closing"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:firefly/overline {"text":"Already a member"} /-->
+
+<!-- wp:heading {"level":2} -->
+<h2 class="wp-block-heading">Returning visitors land at <span class="serif">/log-in</span>.</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Same auth model. Magic-link by email, OAuth via the same providers, or username + password if the project enabled it. The login view is its own snippet — non-coders edit copy in Gutenberg, devs swap the model in PHP, and the block stays untouched.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
