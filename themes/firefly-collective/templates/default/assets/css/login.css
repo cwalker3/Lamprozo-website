@@ -81,47 +81,47 @@ body.login::before {
 }
 
 /* --- Logo / heading ------------------------------------------------
-   WP's default login.css renders the H1 anchor as a background-image
-   (the WordPress / site-icon logo) with text-indent: -9999px to hide
-   the link text. We're rendering the site name as plain text instead,
-   so we need to fully suppress that background and dimensional
-   styling. Compound body.login div#login selector beats WP's defaults
-   without resorting to !important on every property. */
+   WP renders <h1><a href="...">Site name</a></h1> with the link text
+   hidden behind a background-image. Use the theme logo as that image
+   so the login page's brand mark matches the site header. */
 
 body.login div#login h1 {
-    margin: 0 0 1.5rem;
+    margin: 0 0 1.75rem;
     text-align: center;
 }
 
 body.login div#login h1 a,
 body.login div#login h1 a:link,
 body.login div#login h1 a:visited {
-    display: inline-block;
-    width: auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
+    display: block;
+    width: 72px !important;
+    height: 72px !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    margin: 0 !important;
-    background: none !important;
-    background-image: none !important;
-    background-size: 0 !important;
-    text-indent: 0 !important;
-    overflow: visible !important;
-    font-family: var(--ff-font-sans);
-    font-size: 1.0625rem;
-    font-weight: 500;
-    letter-spacing: -0.015em;
-    color: var(--ff-fg) !important;
-    line-height: 1;
-    transition: color 180ms ease;
-    filter: none !important;
-    -webkit-text-fill-color: var(--ff-fg);
-    text-decoration: none;
+    background-image: url('/wp-content/themes/firefly-collective/templates/default/images/logo.webp') !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: contain !important;
+    background-color: transparent !important;
+    color: transparent !important;
+    text-indent: 100% !important;
+    white-space: nowrap;
+    overflow: hidden !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    filter: drop-shadow(0 8px 24px rgba(245, 181, 68, 0.18));
+    transition: filter 240ms ease, transform 240ms ease;
 }
 
 body.login div#login h1 a:hover {
-    color: var(--ff-amber) !important;
+    filter: drop-shadow(0 12px 32px rgba(245, 181, 68, 0.32));
+    transform: translateY(-1px);
+}
+
+body.login div#login h1 a:focus {
+    outline: 2px solid var(--ff-amber-ring);
+    outline-offset: 6px;
+    border-radius: 50%;
 }
 
 /* --- Form card ----------------------------------------------------- */
