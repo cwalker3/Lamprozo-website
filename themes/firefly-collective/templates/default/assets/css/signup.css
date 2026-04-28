@@ -9,9 +9,20 @@ body.firefly-page.page-signup .signup-form {
     background: var(--ff-surface);
     border-radius: var(--ff-radius-lg);
     padding: clamp(1.5rem, 3vw, 2.25rem);
-    display: grid;
-    grid-template-columns: 1fr;
+    /* Switch from grid to flex column so we can pin everything to the
+       top regardless of total content height. min-height + align-items:
+       flex-start keeps the toggle anchored — extra vertical room (when
+       the third-party panel is shorter than the direct panel) just falls
+       below the panel instead of distributing across rows. */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.875rem;
+    /* min-height covers the taller of the two panel layouts (Direct
+       has 4 inputs + checkbox + button, Third-party has the provider
+       grid + Google button). 600 gives ~30px of bottom slack in
+       Direct so the third-party panel doesn't shrink the form. */
+    min-height: 600px;
     box-sizing: border-box;
     transition: border-color 240ms ease;
 }
@@ -65,9 +76,17 @@ body.firefly-page.page-signup .signup-method input[type="radio"] {
 
 /* Field grids ------------------------------------------------------- */
 
-body.firefly-page.page-signup #direct-signup-fields,
-body.firefly-page.page-signup #third-party-signup-fields {
+/* Both panels share the same vertical slot in the form (flex column).
+   signup.js toggles inline display:grid/none; whichever is showing
+   lays out its children as a grid. */
+
+body.firefly-page.page-signup #direct-signup-fields {
     display: grid;
+    gap: 0.75rem;
+}
+
+body.firefly-page.page-signup #third-party-signup-fields {
+    /* JS sets inline display:grid when third-party is selected. */
     gap: 0.75rem;
 }
 
@@ -114,7 +133,7 @@ body.firefly-page.page-signup .signup-form input.valid {
 
 /* "Create a username and password" toggle --------------------------- */
 
-body.firefly-page.page-signup .signup-form > label {
+body.firefly-page.page-signup .password-toggle {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -124,6 +143,7 @@ body.firefly-page.page-signup .signup-form > label {
     letter-spacing: 0.02em;
     cursor: pointer;
     user-select: none;
+    margin-top: 0.25rem;
 }
 
 body.firefly-page.page-signup #enable-username-password {
@@ -209,11 +229,11 @@ body.firefly-page.page-signup #google-signin-btn button:disabled {
     box-shadow: none;
 }
 
-/* Third-party providers grid ---------------------------------------- */
+/* Third-party providers grid — 3 columns × 2 rows (6 providers) ---- */
 
 body.firefly-page.page-signup .third-party-providers {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.5rem;
     padding-bottom: 0.25rem;
 }
@@ -282,8 +302,9 @@ body.firefly-page.page-signup #error-txt:not(:empty) {
 @media (max-width: 640px) {
     body.firefly-page.page-signup .signup-form {
         padding: 1.25rem;
+        min-height: 0;
     }
     body.firefly-page.page-signup .third-party-providers {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
     }
 }
