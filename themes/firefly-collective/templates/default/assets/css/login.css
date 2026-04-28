@@ -1,272 +1,424 @@
-/* template/assets/css/login.css */
+/* theme/templates/default/assets/css/login.css
+   Branding for the WP login page (wp-login.php served at the custom
+   slug from CUSTOM_LOGIN_SLUG). This is a system page — no Gutenberg,
+   no snippet — but the design system tokens still apply because the
+   token block in :root cascades through wp-login's <head> too.
 
-#login > h1 > a {
-  --stroke: #000;
-  filter:
-    drop-shadow(0 0 0 var(--stroke))
-    drop-shadow(1px 0 0 var(--stroke))
-    drop-shadow(-1px 0 0 var(--stroke))
-    drop-shadow(0 1px 0 var(--stroke))
-    drop-shadow(0 -1px 0 var(--stroke))
-    drop-shadow(1px 1px 0 var(--stroke));
+   Loaded via login_enqueue_scripts in models/signin.php. Keep all
+   selectors WP-login-form-specific (#login, .login, .wp-core-ui)
+   so nothing leaks into the rest of admin.
+*/
+
+/* Make tokens available even though _core_custom-properties.css
+   isn't auto-loaded into wp-login. Duplicating the values here is a
+   small cost for keeping wp-login self-contained. */
+:root {
+    --ff-bg:             #0a0a0b;
+    --ff-surface:        #141416;
+    --ff-surface-2:      #1a1a1d;
+    --ff-fg:             #fafaf7;
+    --ff-fg-muted:       rgba(250, 250, 247, 0.56);
+    --ff-fg-dim:         rgba(250, 250, 247, 0.38);
+    --ff-amber:          #f5b544;
+    --ff-amber-soft:     rgba(245, 181, 68, 0.12);
+    --ff-amber-ring:     rgba(245, 181, 68, 0.28);
+    --ff-border:         rgba(255, 255, 255, 0.08);
+    --ff-border-strong:  rgba(255, 255, 255, 0.14);
+    --ff-radius-sm:      6px;
+    --ff-radius:         10px;
+    --ff-radius-lg:      16px;
+    --ff-font-sans:      'Geist', system-ui, -apple-system, sans-serif;
+    --ff-font-mono:      'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
 
-/* Page background and font */
+/* Pull in Geist + mono from Google Fonts so the login page matches
+   the rest of the template. wp-login doesn't run wp_head() the same
+   way, but @import inside an enqueued stylesheet still works. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
+/* --- Page shell ----------------------------------------------------- */
+
+html, body.login {
+    background: var(--ff-bg);
+    background-color: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+    color-scheme: dark;
+}
+
 body.login {
-  background-image: url('/wp-content/themes/firefly-collective/templates/default/images/landing-default-bg.webp');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  font-family: Arial, sans-serif;
-  color: white;
-  position: relative;
-  min-height: 100vh;
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* Add overlay for better readability */
+/* Soft amber glow behind the form for a hint of warmth without
+   committing to a banner image — same vibe as the landing hero. */
 body.login::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 0;
+    content: '';
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vw;
+    height: 60vw;
+    max-width: 900px;
+    max-height: 600px;
+    background: radial-gradient(ellipse at center, rgba(245, 181, 68, 0.10) 0%, transparent 60%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
 }
 
-/* Ensure login container is above overlay */
 #login {
-  position: relative;
-  z-index: 1;
+    position: relative;
+    z-index: 1;
+    width: 360px;
+    padding: 6vh 0 3rem;
 }
 
-/* Form container styling */
+/* --- Logo / heading ------------------------------------------------
+   WP's default login.css renders the H1 anchor as a background-image
+   (the WordPress / site-icon logo) with text-indent: -9999px to hide
+   the link text. We're rendering the site name as plain text instead,
+   so we need to fully suppress that background and dimensional
+   styling. Compound body.login div#login selector beats WP's defaults
+   without resorting to !important on every property. */
+
+body.login div#login h1 {
+    margin: 0 0 1.5rem;
+    text-align: center;
+}
+
+body.login div#login h1 a,
+body.login div#login h1 a:link,
+body.login div#login h1 a:visited {
+    display: inline-block;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    background-image: none !important;
+    background-size: 0 !important;
+    text-indent: 0 !important;
+    overflow: visible !important;
+    font-family: var(--ff-font-sans);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--ff-fg) !important;
+    line-height: 1;
+    transition: color 180ms ease;
+    filter: none !important;
+    -webkit-text-fill-color: var(--ff-fg);
+    text-decoration: none;
+}
+
+body.login div#login h1 a:hover {
+    color: var(--ff-amber) !important;
+}
+
+/* --- Form card ----------------------------------------------------- */
+
 .login form {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 12px;
-  padding: 32px 28px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3), 0 2px 10px rgba(0,0,0,0.2);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: 1.75rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    margin: 0;
+    transition: border-color 240ms ease;
+    animation: ff-login-slide 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Input labels and fields */
+.login form:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+@keyframes ff-login-slide {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Field labels */
 .login label {
-  color: #374151;
-  font-weight: 600;
-  margin-bottom: 0.5em;
-  font-size: 14px;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.375rem;
+    display: block;
 }
 
+/* Inputs */
 .login form .input,
 .login form input[type="text"],
 .login form input[type="password"],
 .login form input[type="email"] {
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 12px 14px;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  width: 100%;
-  box-sizing: border-box;
+    width: 100%;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+    margin: 0 0 1rem;
+}
+
+.login form .input:hover,
+.login form input[type="text"]:hover,
+.login form input[type="password"]:hover,
+.login form input[type="email"]:hover {
+    border-color: var(--ff-border-strong);
 }
 
 .login form .input:focus,
 .login form input[type="text"]:focus,
 .login form input[type="password"]:focus,
 .login form input[type="email"]:focus {
-  border-color: var(--mainColor, #4da28f);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(77, 162, 143, 0.1);
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-surface-2);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
 }
 
-/* Links and button colors */
-.login #backtoblog a,
-.login #nav a {
-  color: #ffffff;
-  text-decoration: none;
-  font-weight: 500;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  transition: opacity 0.2s ease;
+.login form input::placeholder {
+    color: var(--ff-fg-dim);
 }
 
-.login #backtoblog a:hover,
-.login #nav a:hover {
-  opacity: 0.8;
-}
-
-/* Primary button styling */
-.wp-core-ui .button-primary {
-  background: var(--mainColor, #0044aa);
-  border: none;
-  color: #fff;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-  margin-top: 8px;
-  box-shadow: 0 4px 12px rgba(0, 68, 170, 0.3);
-}
-
-.wp-core-ui .button-primary:hover {
-  background: var(--navBgColor, #002d6f);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 68, 170, 0.4);
-}
-
-.wp-core-ui .button-primary:active {
-  transform: translateY(0);
-}
-
-.login .message, .login .notice, .login .success {
-  color: black;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 20px;
-}
-
-/* Checkbox styling */
+/* Remember-me checkbox row */
 .login form .forgetmenot {
-  margin-bottom: 16px;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .login form .forgetmenot label {
-  font-weight: normal;
-  color: #6b7280;
+    margin: 0;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    cursor: pointer;
 }
 
-/* Logo area enhancement */
-.login h1 {
-  margin-bottom: 30px;
+.login form input[type="checkbox"] {
+    accent-color: var(--ff-amber);
+    width: 14px;
+    height: 14px;
+    margin: 0;
 }
 
-.login h1 a {
-  background-size: contain;
-  width: 320px;
-  height: 84px;
+/* --- Submit button (Log In) --------------------------------------- */
+
+.wp-core-ui .button-primary,
+.wp-core-ui input.button-primary {
+    width: 100%;
+    padding: 0.75rem 1.25rem;
+    background: var(--ff-amber) !important;
+    color: #0a0a0b !important;
+    border: 1px solid var(--ff-amber) !important;
+    border-radius: var(--ff-radius-sm) !important;
+    font-family: var(--ff-font-sans) !important;
+    font-size: 0.9375rem !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.005em !important;
+    cursor: pointer;
+    transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    margin-top: 0.25rem;
 }
 
-/* Additional form enhancements */
-.login form {
-  animation: slideUp 0.5s ease;
+.wp-core-ui .button-primary:hover,
+.wp-core-ui input.button-primary:hover {
+    background: #ffc14f !important;
+    border-color: #ffc14f !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 181, 68, 0.18) !important;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
+.wp-core-ui .button-primary:active,
+.wp-core-ui input.button-primary:active {
     transform: translateY(0);
-  }
+    box-shadow: none !important;
 }
 
-/* Google Sign-in Button Styling */
-.google-signin-container {
-  margin-top: 16px;
+.wp-core-ui .button-primary:focus,
+.wp-core-ui input.button-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ff-amber-soft) !important;
 }
 
-.google-signin-button {
-  width: 100%;
-  padding: 12px 24px;
-  background: #ffffff;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+/* --- Bottom links (Lost password / Back to site) ------------------ */
+
+.login #nav,
+.login #backtoblog {
+    margin: 1rem 0 0;
+    text-align: center;
+    padding: 0 1rem;
 }
 
-.google-signin-button:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.login #nav a,
+.login #backtoblog a {
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    text-shadow: none;
+    transition: color 180ms ease;
 }
 
-.google-signin-button:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.login #nav a:hover,
+.login #backtoblog a:hover {
+    color: var(--ff-amber);
+    opacity: 1;
 }
 
-.google-icon {
-  flex-shrink: 0;
+/* --- Notices / messages ------------------------------------------- */
+
+.login .message,
+.login .notice,
+.login .success {
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-left: 3px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius-sm);
+    padding: 0.75rem 1rem;
+    margin: 0 0 1.25rem;
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    box-shadow: none;
 }
 
-/* Separator Styling */
+#login_error {
+    background: rgba(255, 122, 122, 0.08);
+    border-color: rgba(255, 122, 122, 0.25);
+    border-left-color: rgba(255, 122, 122, 0.6);
+    color: #ffb4b4;
+}
+
+/* --- Google sign-in / OAuth section ------------------------------- */
+
+#oauth-signin-section {
+    margin-top: 1rem;
+}
+
 .login-separator {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 20px 0;
-  width: 100%;
+    display: flex;
+    align-items: center;
+    margin: 1.25rem 0;
+    width: 100%;
 }
 
 .login-separator::before,
 .login-separator::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #d1d5db;
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--ff-border);
 }
 
-.login-separator::before {
-  margin-right: 12px;
-}
-
-.login-separator::after {
-  margin-left: 12px;
-}
+.login-separator::before { margin-right: 0.75rem; }
+.login-separator::after  { margin-left: 0.75rem; }
 
 .separator-text {
-  color: white;
-  font-size: 13px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    text-shadow: none;
 }
 
-/* OAuth section container */
-#oauth-signin-section {
-  margin-top: 0;
+.google-signin-container {
+    margin-top: 0.75rem;
 }
 
-/* Responsive adjustments */
+.google-signin-button {
+    width: 100%;
+    padding: 0.75rem 1.25rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    cursor: pointer;
+    transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    box-shadow: none;
+}
+
+.google-signin-button:hover {
+    background: var(--ff-surface-2);
+    border-color: var(--ff-amber-ring);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 181, 68, 0.08);
+}
+
+.google-signin-button:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.google-icon {
+    flex-shrink: 0;
+}
+
+/* --- Privacy policy link (WP 5.0+) -------------------------------- */
+
+.login .privacy-policy-page-link {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.login .privacy-policy-page-link a {
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    transition: color 180ms ease;
+}
+
+.login .privacy-policy-page-link a:hover {
+    color: var(--ff-amber);
+}
+
+/* --- Responsive --------------------------------------------------- */
+
 @media (max-width: 480px) {
-  .login form {
-    padding: 24px 20px;
-  }
+    #login {
+        width: 92vw;
+        max-width: 360px;
+        padding: 4vh 0 2rem;
+    }
 
-  #login {
-    width: 90%;
-    padding: 0;
-  }
-
-  .google-signin-button {
-    padding: 10px 20px;
-    font-size: 15px;
-  }
-
-  .login-separator::before {
-    margin-right: 8px;
-  }
-
-  .login-separator::after {
-    margin-left: 8px;
-  }
+    .login form {
+        padding: 1.5rem;
+    }
 }
-  
