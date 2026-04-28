@@ -1,364 +1,212 @@
-/* Professional Blog Layout */
+/* theme/templates/default/assets/css/blog.css
+   Page-specific layout for /blog (post listing). Page chrome (hero,
+   typography, sections, container) comes from _core_design.css; this
+   file styles the filter bar and the post-card grid in the dark/amber
+   design system.
+*/
 
-.blogs {
+/* --- Filter bar -------------------------------------------------- */
+
+body.firefly-page.blog #blog-filter {
+    max-width: var(--ff-container);
+    margin: 0 auto 2.5rem;
+    padding: 0 var(--ff-gutter);
+    box-sizing: border-box;
+}
+
+body.firefly-page.blog #blog-filter-options {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: 1.25rem 1.5rem;
+}
+
+body.firefly-page.blog #blog-filter-head {
+    display: none; /* legacy filter icon — design system uses the inline header instead */
+}
+
+body.firefly-page.blog #blog-filter h3 {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    margin: 0 0 0.875rem;
+}
+
+body.firefly-page.blog #blog-filter-options-wrapper {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 2rem;
-    max-width: 1400px;
-    margin: 3rem auto;
-    padding: 0 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.625rem;
+    align-items: center;
 }
 
-.blog-short {
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.06);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0;
-}
-
-.blog-short:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
-}
-
-.featured-img-container {
+body.firefly-page.blog #blog-filter select,
+body.firefly-page.blog #blog-filter input[type="text"] {
     width: 100%;
-    height: 220px;
-    overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    position: relative;
-}
-
-.featured-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.blog-short:hover .featured-img {
-    transform: scale(1.05);
-}
-
-.blog-content {
-    padding: 1.5rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.blog-short h2 {
-    font-size: 1.4rem;
-    margin: 0 0 0.5rem 0;
-    font-family: 'cinzel', serif;
-    text-align: left;
-    line-height: 1.3;
-}
-
-.blog-short h2 a {
-    color: var(--mainColor);
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.blog-short h2 a:hover {
-    color: var(--mainColorTransparent);
-}
-
-.blog-meta {
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
     font-size: 0.875rem;
-    color: #718096;
-    margin-bottom: 1rem;
-    font-family: system-ui, -apple-system, sans-serif;
-}
-
-.blog-excerpt {
-    color: #4a5568;
-    line-height: 1.6;
-    font-family: system-ui, -apple-system, sans-serif;
-    flex: 1;
-}
-
-.blog-short hr {
-    display: none;
-}
-
-#back-to-blogs {
-    position: fixed;
-    top: 100px;
-    left: 2rem;
-    z-index: 100;
-    background: var(--mainColor);
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 30px;
-    text-decoration: none;
-    font-family: 'cinzel', serif;
-    transition: background 0.2s ease;
-}
-
-#back-to-blogs:hover {
-    background: var(--navBgColor);
-}
-
-#more-blogs-loader {
-    display: none;
-    margin: 0 auto;
-}
-
-/* Blog Filter Section - Professional Compact Design */
-#blog-filter {
-    max-width: 1400px;
-    margin: 2rem auto 3rem;
-    padding: 0 2rem;
-}
-
-#blog-filter-head {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-#blog-filter-head img {
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+    appearance: none;
     cursor: pointer;
-    width: 28px;
-    height: 28px;
-    padding: 10px;
-    background: linear-gradient(135deg, var(--mainColor) 0%, var(--navBgColor) 100%);
-    border-radius: 50%;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-#blog-filter-head img:hover {
-    transform: rotate(180deg) scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+body.firefly-page.blog #blog-filter select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.875rem center;
+    padding-right: 2rem;
 }
 
-#blog-filter-options {
-    max-height: 0;
-    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-    margin-bottom: 1rem;
+body.firefly-page.blog #blog-filter select:hover,
+body.firefly-page.blog #blog-filter input[type="text"]:hover {
+    border-color: var(--ff-border-strong);
 }
 
-#blog-filter-options.expanded {
-    max-height: 500px;
+body.firefly-page.blog #blog-filter select:focus,
+body.firefly-page.blog #blog-filter input[type="text"]:focus {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
 }
 
-#blog-filter-options > div {
-    background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(226, 232, 240, 0.5);
-}
-
-#blog-filter-options h3 {
-    font-family: var(--font-brand);
-    color: var(--mainColor);
-    margin: 0 0 1.25rem 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-    text-align: left;
-    display: flex;
-    align-items: center;
+body.firefly-page.blog #blog-search-text {
+    display: grid;
+    grid-template-columns: 1fr auto;
     gap: 0.5rem;
 }
 
-#blog-filter-options h3::before {
-    content: '🔍';
-    font-size: 1.2rem;
+body.firefly-page.blog #blog-filter-submit-btn {
+    padding: 0.625rem 1.25rem;
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border: 1px solid var(--ff-amber);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 180ms ease, transform 180ms ease;
 }
 
-#blog-filter-options-wrapper {
+body.firefly-page.blog #blog-filter-submit-btn:hover {
+    background: #ffc14f;
+    transform: translateY(-1px);
+}
+
+/* --- Post-card grid ---------------------------------------------- */
+
+body.firefly-page.blog .blogs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    align-items: start;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    max-width: var(--ff-container);
+    margin: 0 auto;
+    padding: 0 var(--ff-gutter) var(--ff-section-y);
+    box-sizing: border-box;
 }
 
-/* First row - Categories and Tags */
-#category-filter,
-#tag-filter {
-    grid-column: span 1;
-}
-
-/* Second row - Month and Year */
-#month-filter,
-#year-filter {
-    grid-column: span 1;
-}
-
-/* Third row - Keywords spans full width */
-#blog-search-text {
-    grid-column: 1 / -1;
+body.firefly-page.blog .blog-short {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    overflow: hidden;
     display: flex;
-    gap: 0.75rem;
-    align-items: center;
+    flex-direction: column;
+    transition: border-color 240ms ease, transform 240ms ease;
 }
 
-#blog-filter-keywords {
+body.firefly-page.blog .blog-short:hover {
+    border-color: var(--ff-amber-ring);
+    transform: translateY(-2px);
+}
+
+body.firefly-page.blog .featured-img-container {
+    aspect-ratio: 16 / 10;
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--ff-amber-soft) 0%, var(--ff-surface-2) 100%);
+    position: relative;
+}
+
+body.firefly-page.blog .featured-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+body.firefly-page.blog .blog-short:hover .featured-img {
+    transform: scale(1.04);
+}
+
+body.firefly-page.blog .blog-content {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
     flex: 1;
 }
 
-/* Submit button inline with keywords */
-#blog-filter-submit {
-    grid-column: auto;
-    margin-top: 0;
-    display: flex;
+body.firefly-page.blog .blog-content h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--ff-fg);
 }
 
-#blog-filter-options-wrapper select,
-#blog-filter-options-wrapper input[type="text"] {
-    width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-family: system-ui, -apple-system, sans-serif;
-    transition: all 0.2s ease;
-    background: white;
+body.firefly-page.blog .blog-content h2 a {
+    color: inherit;
+    transition: color 180ms ease;
 }
 
-#blog-filter-options-wrapper select:hover,
-#blog-filter-options-wrapper input[type="text"]:hover {
-    border-color: #a0aec0;
+body.firefly-page.blog .blog-content h2 a:hover {
+    color: var(--ff-amber);
 }
 
-#blog-filter-options-wrapper select:focus,
-#blog-filter-options-wrapper input[type="text"]:focus {
-    outline: none;
-    border-color: var(--mainColor);
-    box-shadow: 0 0 0 3px rgba(56, 111, 181, 0.1);
+body.firefly-page.blog .blog-meta {
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--ff-fg-muted);
 }
 
-#blog-filter-submit-btn {
-    background: linear-gradient(135deg, var(--mainColor) 0%, var(--navBgColor) 100%);
-    color: white;
-    border: none;
-    padding: 0.625rem 1.5rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-family: var(--font-brand);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+body.firefly-page.blog .blog-excerpt {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--ff-fg-muted);
 }
 
-#blog-filter-submit-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+body.firefly-page.blog .blog-excerpt p {
+    margin: 0;
 }
 
-#blog-filter-submit-btn:active {
-    transform: translateY(0);
+/* The infinite-scroll loader is toggled by blog.js via inline
+   display:block/none. Hide it by default so initial paint isn't a
+   giant spinner; JS will inline-style it visible while fetching. */
+body.firefly-page.blog #more-blogs-loader {
+    display: none;
+    grid-column: 1 / -1;
+    justify-self: center;
+    max-width: 48px;
+    opacity: 0.5;
 }
 
-/* Responsive adjustments */
-@media (max-width: 1024px) {
-    #blog-filter-options-wrapper {
+@media (max-width: 640px) {
+    body.firefly-page.blog .blogs {
         grid-template-columns: 1fr;
     }
-    
-    #category-filter,
-    #tag-filter,
-    #month-filter,
-    #year-filter {
-        grid-column: 1 / -1;
-    }
-    
-    #blog-search-text {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-    
-    #blog-filter-submit {
-        width: 100%;
-    }
-    
-    #blog-filter-submit-btn {
-        width: 100%;
-        padding: 0.75rem;
-    }
-}
-
-/* Blog Post Single View */
-.blog-post {
-    max-width: 800px;
-    margin: 3rem auto;
-    padding: 0 2rem;
-}
-
-.blog-post > h1 {
-    font-family: 'cinzel', serif;
-    color: var(--mainColor);
-    font-size: 2.5rem;
-    text-align: center;
-    margin-bottom: 0.5rem;
-    line-height: 1.2;
-}
-
-.blog-post > h3 {
-    color: #718096;
-    font-weight: normal;
-    text-align: center;
-    font-size: 1rem;
-    margin-bottom: 2rem;
-}
-
-#blog-post-img {
-    margin: 2rem 0;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-}
-
-#blog-post-img > img {
-    width: 100%;
-    height: auto;
-    display: block;
-}
-
-.blog-post-content {
-    line-height: 1.8;
-    font-size: 1.1rem;
-    color: #2d3748;
-}
-
-.no-blogs {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #718096;
-    font-size: 1.2rem;
-    font-family: 'cinzel', serif;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .blogs {
-        grid-template-columns: 1fr;
-        padding: 0 1rem;
-    }
-    
-    .blog-post > h1 {
-        font-size: 2rem;
-    }
-    
-    #back-to-blogs {
-        position: static;
-        display: inline-block;
-        margin: 1rem 0;
-    }
-
-    #blog-filter-options-wrapper {
+    body.firefly-page.blog #blog-filter-options-wrapper {
         grid-template-columns: 1fr;
     }
 }
