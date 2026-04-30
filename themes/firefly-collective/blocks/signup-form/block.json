@@ -1,0 +1,26 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "firefly/signup-form",
+    "title": "Firefly: Signup Form",
+    "category": "firefly",
+    "icon": "id-alt",
+    "description": "Direct + third-party signup form. Frontend behavior wired by signup.js — block owns markup + labels.",
+    "keywords": ["signup", "auth", "form"],
+    "supports": { "inserter": true, "reusable": true, "html": false },
+    "attributes": {
+        "directLabel":      { "type": "string", "default": "Direct Signup" },
+        "thirdPartyLabel":  { "type": "string", "default": "Sign in with Third Party" },
+        "fnamePlaceholder": { "type": "string", "default": "First Name" },
+        "lnamePlaceholder": { "type": "string", "default": "Last Name" },
+        "emailPlaceholder": { "type": "string", "default": "Email" },
+        "phonePlaceholder": { "type": "string", "default": "Optional Phone" },
+        "passwordToggleLabel": { "type": "string", "default": "Create a username and password" },
+        "usernamePlaceholder": { "type": "string", "default": "Username" },
+        "passwordPlaceholder": { "type": "string", "default": "Password" },
+        "joinLabel":        { "type": "string", "default": "Join Now" },
+        "googleLabel":      { "type": "string", "default": "Sign in with Google" }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php"
+}

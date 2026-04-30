@@ -1,0 +1,230 @@
+/* theme/templates/default/assets/css/request-an-appointment.css
+   Page-specific layout for /request-an-appointment. Page chrome (hero,
+   typography, sections) comes from _core_design.css; this file styles
+   the booking form + calendar in the dark/amber design system.
+   Calendar chrome comes from calendar.css (still in legacy palette
+   pending its own conversion); we override the cell colors here.
+*/
+
+body.firefly-page.page-request-an-appointment .appt-section {
+    padding-block: clamp(2rem, 4vw, 3rem) var(--ff-section-y);
+}
+
+body.firefly-page.page-request-an-appointment .appt-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 960px) {
+    body.firefly-page.page-request-an-appointment .appt-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+        gap: 2rem;
+        align-items: start;
+    }
+}
+
+/* --- Form card ----------------------------------------------------- */
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.5rem, 3vw, 2.25rem);
+    display: grid;
+    gap: 0.875rem;
+    box-sizing: border-box;
+    transition: border-color 240ms ease;
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input[type="text"],
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input[type="email"],
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input[type="tel"],
+body.firefly-page.page-request-an-appointment .book-an-appointment-form textarea,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form select {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input:hover,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form textarea:hover,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form select:hover {
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input:focus,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form textarea:focus,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form select:focus {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-surface-2);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form input::placeholder,
+body.firefly-page.page-request-an-appointment .book-an-appointment-form textarea::placeholder {
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form textarea {
+    resize: vertical;
+    min-height: 120px;
+    font-family: var(--ff-font-sans);
+}
+
+body.firefly-page.page-request-an-appointment .book-an-appointment-form select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+
+/* Submit button */
+
+body.firefly-page.page-request-an-appointment #book-an-appointment-btn {
+    margin-top: 0.25rem;
+    width: 100%;
+}
+
+body.firefly-page.page-request-an-appointment #book-an-appointment-btn button {
+    width: 100%;
+    padding: 0.875rem 1.25rem;
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border: 1px solid var(--ff-amber);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-request-an-appointment #book-an-appointment-btn button:hover {
+    background: #ffc14f;
+    border-color: #ffc14f;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 181, 68, 0.18);
+}
+
+body.firefly-page.page-request-an-appointment #book-an-appointment-btn button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Error text */
+
+body.firefly-page.page-request-an-appointment #error-txt {
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: #ff7a7a;
+    letter-spacing: 0.02em;
+}
+
+body.firefly-page.page-request-an-appointment #error-txt:not(:empty) {
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 122, 122, 0.08);
+    border: 1px solid rgba(255, 122, 122, 0.25);
+    border-radius: var(--ff-radius-sm);
+}
+
+/* --- Calendar card ------------------------------------------------- */
+
+body.firefly-page.page-request-an-appointment .appt-calendar-card {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    box-sizing: border-box;
+    min-height: 320px;
+}
+
+/* Override the legacy calendar.css to live in the dark theme. We
+   restyle the cells/headers but keep the structural rules from
+   calendar.css so its JS doesn't need to know about the rebrand. */
+
+body.firefly-page.page-request-an-appointment #calendar-container,
+body.firefly-page.page-request-an-appointment #calendar-container * {
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-header,
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-month-title {
+    color: var(--ff-fg);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-day,
+body.firefly-page.page-request-an-appointment #calendar-container .day {
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-fg-muted);
+    transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-day:hover,
+body.firefly-page.page-request-an-appointment #calendar-container .day:hover {
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+    color: var(--ff-amber);
+    cursor: pointer;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-day.selected,
+body.firefly-page.page-request-an-appointment #calendar-container .day.selected,
+body.firefly-page.page-request-an-appointment #calendar-container .selected {
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border-color: var(--ff-amber);
+    font-weight: 500;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container .calendar-day.disabled,
+body.firefly-page.page-request-an-appointment #calendar-container .day.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container button {
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-fg);
+    cursor: pointer;
+    transition: border-color 180ms ease, color 180ms ease;
+}
+
+body.firefly-page.page-request-an-appointment #calendar-container button:hover {
+    border-color: var(--ff-amber-ring);
+    color: var(--ff-amber);
+}
+
+@media (max-width: 640px) {
+    body.firefly-page.page-request-an-appointment .book-an-appointment-form {
+        padding: 1.25rem;
+    }
+    body.firefly-page.page-request-an-appointment .appt-calendar-card {
+        padding: 1rem;
+    }
+}

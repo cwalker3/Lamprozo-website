@@ -121,17 +121,11 @@
     <div <?php if ($use_any_overlay && !$is_web_app):?>
             class="element-disable"
          <?php endif; ?>>
-        <img id="hamburger"<?php echo $user_nav_attr; ?>
-             src="<?php echo esc_url( $template_path_web . '/images/hamburger.webp' ); ?>"
-             alt="<?php esc_attr_e('Menu'); ?>">
-    </div>
-
-    <div <?php if ($use_any_overlay && !$is_web_app):?>
-            class="element-disable"
-         <?php endif; ?>>
-        <img id="close-nav-btn"<?php echo $user_nav_attr; ?>
-             src="<?php echo esc_url( $template_path_web . '/images/close-nav.webp' ); ?>"
-             alt="<?php esc_attr_e('Close Menu'); ?>">
+        <button id="hamburger" type="button" aria-label="<?php esc_attr_e('Menu'); ?>" aria-expanded="false"<?php echo $user_nav_attr; ?>>
+            <span class="bar bar-1"></span>
+            <span class="bar bar-2"></span>
+            <span class="bar bar-3"></span>
+        </button>
     </div>
 
     <!-- Profile Dropdown -->

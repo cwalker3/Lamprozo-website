@@ -40,11 +40,6 @@
             "set_as": "posts_page"
         },
         {
-            "slug": "contact",
-            "title": "Contact",
-            "snippet": "contact.html"
-        },
-        {
             "slug": "signup",
             "title": "Signup",
             "snippet": "signup.html"
@@ -55,6 +50,13 @@
             "snippet": "home.html",
             "set_as": "front_page",
             "menu_order": 1,
+            "in_menu": false
+        },
+        {
+            "slug": "contact",
+            "title": "Contact",
+            "snippet": "contact.html",
+            "menu_order": 4,
             "in_menu": false
         }
     ],

@@ -57,7 +57,7 @@
                     <h3><?php esc_html_e('Get in Touch'); ?></h3>
                     <ul class="footer-contact-list">
                         <li><a href="/contact"><?php esc_html_e('Contact Us'); ?></a></li>
-                        <li><a href="/signup"><?php esc_html_e('Book Appointment'); ?></a></li>
+                        <li><a href="/request-an-appointment"><?php esc_html_e('Book Appointment'); ?></a></li>
                     </ul>
                     <div class="footer-newsletter">
                         <h4><?php esc_html_e('Stay Updated'); ?></h4>

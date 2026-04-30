@@ -11,43 +11,57 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Add CORS headers for cross-origin REST API requests
- * This allows the local dev site to call bootstrap endpoints on production
+ * CORS headers for cross-origin REST API requests.
+ *
+ * The receive-side endpoints are gated by either the shared secret
+ * (firefly_projects_verify_shared_secret) or capability + nonce, so
+ * direct exploitation of CORS isn't the threat. But Allow-Credentials:
+ * true with a reflected Origin is the textbook permissive posture, so
+ * we now check the Origin against firefly_projects_allowed_origins()
+ * before sending any Allow-Origin header. Browser CORS will then block
+ * non-allowlisted origins from reading responses or sending credentials.
  */
 add_action('rest_api_init', function() {
     remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
     add_filter('rest_pre_serve_request', function($value) {
-        $origin = get_http_origin();
-
-        // Allow requests from any origin for firefly-plugin endpoints
-        // The shared secret provides authentication
-        if ($origin) {
-            header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
-            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-            header('Access-Control-Allow-Headers: X-Firefly-Secret, Content-Type, X-WP-Nonce');
-            header('Access-Control-Allow-Credentials: true');
-        }
-
+        firefly_projects_send_cors_headers();
         return $value;
     });
 }, 15);
 
 /**
- * Handle preflight OPTIONS requests for CORS
+ * Handle preflight OPTIONS requests for CORS — same allowlist gate.
  */
 add_action('init', function() {
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        $origin = get_http_origin();
-        if ($origin) {
-            header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
-            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-            header('Access-Control-Allow-Headers: X-Firefly-Secret, Content-Type, X-WP-Nonce');
-            header('Access-Control-Allow-Credentials: true');
+        if (firefly_projects_send_cors_headers()) {
             header('Access-Control-Max-Age: 86400');
         }
         exit(0);
     }
 });
+
+/**
+ * Emit Access-Control-Allow-* headers iff the request's Origin is on
+ * the allowlist. Returns true if headers were emitted, false otherwise
+ * (so callers know whether the preflight should signal "allowed").
+ */
+function firefly_projects_send_cors_headers() {
+    $origin = get_http_origin();
+    if (!$origin) return false;
+
+    $allowed = firefly_projects_allowed_origins();
+    if (!in_array($origin, $allowed, true)) {
+        return false;
+    }
+
+    header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
+    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+    header('Access-Control-Allow-Headers: X-Firefly-Secret, Content-Type, X-WP-Nonce');
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
+    return true;
+}
 
 /**
  * Verify REST request permissions for admin-level endpoints
@@ -709,22 +723,10 @@ function firefly_projects_sync_page($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_receive_page($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-    
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Load the page sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
@@ -809,22 +811,10 @@ function firefly_projects_sync_menu($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_receive_menu($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Load the menu sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/menu-sync.php';
@@ -1028,22 +1018,10 @@ function firefly_projects_get_pages_orphan_count($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_list_pages($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Load the pages list sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/pages-list-sync.php';
@@ -1060,22 +1038,10 @@ function firefly_projects_list_pages($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_delete_pages($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Load the pages list sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/pages-list-sync.php';
@@ -1180,22 +1146,10 @@ function firefly_projects_pull_page($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_export_page($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     $post_slug = $request->get_param('post_slug');
 
@@ -1620,22 +1574,10 @@ function firefly_projects_fetch_remote_pages($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_list_menus($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Get all nav menus
     $menus = wp_get_nav_menus();
@@ -1669,22 +1611,10 @@ function firefly_projects_list_menus($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_export_menu($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     $menu_id = $request->get_param('menu_id');
 
@@ -1903,15 +1833,27 @@ function firefly_projects_pull_menu($request) {
  */
 
 /**
- * Verify shared secret for bootstrap endpoints
+ * Verify shared secret for bootstrap endpoints. Used as a
+ * permission_callback so it returns WP_Error/true rather than the
+ * WP_REST_Response shape the body-style helper uses, but applies the
+ * same security hardening (constant-time compare, deploy-window gate,
+ * rotation grace period).
  *
  * @param WP_REST_Request $request
- * @return bool|WP_Error
+ * @return bool|WP_Error True on success, WP_Error on failure.
  */
 function firefly_projects_verify_bootstrap_secret($request) {
-    $secret = $request->get_header('X-Firefly-Secret');
+    // Item 8: deploy window — closed window blocks bootstrap too.
+    if (defined('FIREFLY_DEPLOY_OPEN_UNTIL') && !empty(FIREFLY_DEPLOY_OPEN_UNTIL)) {
+        $open_until = strtotime((string) FIREFLY_DEPLOY_OPEN_UNTIL);
+        if ($open_until === false || $open_until < time()) {
+            return new WP_Error('firefly_deploy_window_closed', 'Deployment window closed.', array('status' => 403));
+        }
+    }
 
-    if (empty($secret)) {
+    $secret = (string) $request->get_header('X-Firefly-Secret');
+
+    if ($secret === '') {
         return new WP_Error('missing_secret', 'Missing authentication header', array('status' => 401));
     }
 
@@ -1919,11 +1861,17 @@ function firefly_projects_verify_bootstrap_secret($request) {
         return new WP_Error('not_configured', 'Shared secret not configured on this site', array('status' => 500));
     }
 
-    if ($secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_Error('invalid_secret', 'Invalid authentication', array('status' => 403));
+    // Item 1: constant-time compare. Item 5: previous secret accepted during rotation.
+    if (hash_equals((string) FIREFLY_SHARED_SECRET, $secret)) {
+        return true;
+    }
+    if (defined('FIREFLY_SHARED_SECRET_PREVIOUS')
+        && !empty(FIREFLY_SHARED_SECRET_PREVIOUS)
+        && hash_equals((string) FIREFLY_SHARED_SECRET_PREVIOUS, $secret)) {
+        return true;
     }
 
-    return true;
+    return new WP_Error('invalid_secret', 'Invalid authentication', array('status' => 403));
 }
 
 /**
@@ -2405,22 +2353,10 @@ function firefly_projects_sync_template_schema($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_receive_template_schema($request) {
-    // Verify shared secret
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Shared secret not configured on remote.'
-        ), 500);
-    }
-
-    if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-        return new WP_REST_Response(array(
-            'success' => false,
-            'message' => 'Invalid shared secret.'
-        ), 403);
-    }
+    // Receive-side auth: shared-secret header. Helper handles missing
+    // config, missing/invalid header, and any future hardening.
+    $auth_failure = firefly_projects_verify_shared_secret($request);
+    if ($auth_failure !== null) return $auth_failure;
 
     // Load the template schema sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/template-schema-sync.php';
@@ -2449,26 +2385,12 @@ function firefly_projects_receive_template_schema($request) {
  * @return WP_REST_Response
  */
 function firefly_projects_list_schemas_endpoint($request) {
-    // Check if this is a remote call (shared secret) or local call (admin)
-    $provided_secret = $request->get_header('X-Firefly-Secret');
-
-    if ($provided_secret) {
-        // Remote call - verify shared secret
-        if (!defined('FIREFLY_SHARED_SECRET') || empty(FIREFLY_SHARED_SECRET)) {
-            return new WP_REST_Response(array(
-                'success' => false,
-                'message' => 'Shared secret not configured on remote.'
-            ), 500);
-        }
-
-        if ($provided_secret !== FIREFLY_SHARED_SECRET) {
-            return new WP_REST_Response(array(
-                'success' => false,
-                'message' => 'Invalid shared secret.'
-            ), 403);
-        }
+    // Dual-mode endpoint: header present = remote call gated by shared
+    // secret; no header = local admin call gated by capability check.
+    if ($request->get_header('X-Firefly-Secret')) {
+        $auth_failure = firefly_projects_verify_shared_secret($request);
+        if ($auth_failure !== null) return $auth_failure;
     } else {
-        // Local call - verify admin
         if (!current_user_can('manage_options')) {
             return new WP_REST_Response(array(
                 'success' => false,

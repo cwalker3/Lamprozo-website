@@ -27,7 +27,6 @@
 
             case 'home':
                 $assets['css'][]    = $template_path . '/assets/css/home.css';
-                $assets['js'][]     = $template_path . '/assets/js/motion-helpers.js';
                 $assets['js'][]     = $template_path . '/assets/js/home.js';
                 break;
 
@@ -60,14 +59,14 @@
                 break;
 
             case 'signup':
-                $assets['css'][]    = $template_path . '/assets/css/signup-appt.css';
+                $assets['css'][]    = $template_path . '/assets/css/signup.css';
                 $assets['js'][]     = $template_path . '/assets/js/auth.js';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 break;
 
             case 'request-an-appointment':
-                $assets['css'][]    = $template_path . '/assets/css/signup-appt.css';
                 $assets['css'][]    = $template_path . '/assets/css/calendar.css';
+                $assets['css'][]    = $template_path . '/assets/css/request-an-appointment.css';
                 $assets['js'][]     = $template_path . '/assets/js/calendar.js';
                 $assets['js'][]     = $template_path . '/assets/js/request-an-appointment.js';
                 break;

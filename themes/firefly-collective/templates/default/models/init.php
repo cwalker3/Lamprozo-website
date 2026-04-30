@@ -13,6 +13,24 @@
     add_theme_support('post-thumbnails');
 
     /**
+     * Tag every page rendered through this template with the `firefly-page`
+     * body class so the shared design system in _core_design.css applies.
+     * The PWA SPA at /app is excluded since it ships its own chrome.
+     *
+     * See templates/default/DESIGN.md for the body-class contract.
+     */
+    function firefly_default_add_body_class( $classes ) {
+        if ( function_exists('determine_view') && determine_view() === 'app' ) {
+            return $classes;
+        }
+        if ( ! in_array('firefly-page', $classes, true) ) {
+            $classes[] = 'firefly-page';
+        }
+        return $classes;
+    }
+    add_filter('body_class', 'firefly_default_add_body_class', 5);
+
+    /**
      * Enqueue core template assets (files starting with _core_)
      */
     function enqueue_core_assets($template_name, $theme_path, $version) {
@@ -129,30 +147,37 @@
             ));
         }
 
-        // Dashboard
+        // Dashboard — dashboard.js always expects `dashboardData` to be
+        // defined, or it throws a ReferenceError on initializeDashboard.
+        // The feature-configurator-specific fields (features list,
+        // subscription status, campaign config) only get populated when
+        // that plugin is loaded; otherwise we emit a minimal stub so the
+        // profile-only path still works.
         if (determine_view() === 'dashboard') {
-            $features_options_addons = get_features_options_addons();
             global $theme_path, $is_campaign_mode;
             $theme_path = get_template_directory_uri();
 
             $user_id = decrypt_with_auth_key($auth_id);
-
             $is_campaign_mode = !empty($_COOKIE['campaign_token']);
-            
-            // Get Stripe configuration
+            $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
+
             $publishable_key = defined('STRIPE_PUBLISHABLE_KEY') ? STRIPE_PUBLISHABLE_KEY : get_option('firefly_stripe_publishable_key', '');
 
-            // Get subscription status
-            $request = new WP_REST_Request();
-            $request->set_param('user_id', $user_id);
-            
-            $subscription_status = firefly_collective_check_subscription_status($request);
-            
+            $features_options_addons = function_exists('get_features_options_addons')
+                ? get_features_options_addons()
+                : array();
+
+            $subscription_status = null;
+            if (function_exists('firefly_collective_check_subscription_status')) {
+                $request = new WP_REST_Request();
+                $request->set_param('user_id', $user_id);
+                $subscription_status = firefly_collective_check_subscription_status($request);
+            }
+
             // Check for campaign token (from URL or cookie)
             $campaign_config = null;
-            $campaign_token = null;
+            $campaign_token  = null;
 
-            // First check URL path for token
             $request_uri = $_SERVER['REQUEST_URI'];
             if (preg_match('/\/dashboard\/([a-zA-Z0-9]+)/', $request_uri, $matches)) {
                 $campaign_token = $matches[1];
@@ -166,19 +191,16 @@
                     "SELECT features_config, preselect_config FROM {$wpdb->prefix}ffc_campaigns WHERE token = %s",
                     $campaign_token
                 ));
-                
+
                 if ($campaign) {
                     $campaign_config = array(
-                        'features_config' => json_decode($campaign->features_config, true),
+                        'features_config'  => json_decode($campaign->features_config, true),
                         'preselect_config' => json_decode($campaign->preselect_config, true)
                     );
                 }
 
-                // Enqueue auth.js
                 wp_enqueue_script('auth-js', $template_path . '/assets/js/auth.js', array(), $unique_id, true);
             }
-
-            $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
 
             wp_localize_script('dashboard-js', 'dashboardData', array(
                 'nonce'                 => $nonce,

@@ -14,12 +14,12 @@ document.addEventListener('DOMContentLoaded', function () {
 // Extract initialization into a function that can be called after dynamic menu insertion
 function initNavigation() {
     const hamburger = document.getElementById('hamburger');
-    const closeNavBtn = document.getElementById('close-nav-btn');
+    const closeNavBtn = document.getElementById('close-nav-btn'); // legacy — optional
     const nav = document.querySelector('body > nav');
     const backdrop = document.getElementById('backdrop');
 
     // Skip if elements don't exist yet
-    if (!hamburger || !closeNavBtn || !nav || !backdrop) {
+    if (!hamburger || !nav || !backdrop) {
         console.log('Navigation elements not found, skipping initialization');
         return;
     }
@@ -54,43 +54,75 @@ function initNavigation() {
 
     // Clear any existing event listeners to prevent duplicates
     hamburger.replaceWith(hamburger.cloneNode(true));
-    closeNavBtn.replaceWith(closeNavBtn.cloneNode(true));
-    
+    if (closeNavBtn) closeNavBtn.replaceWith(closeNavBtn.cloneNode(true));
+
     // Get fresh references after cloning
     const newHamburger = document.getElementById('hamburger');
     const newCloseNavBtn = document.getElementById('close-nav-btn');
 
+    // Hamburger is now a single toggle — same button morphs into an X
+    // when the menu is open, so clicking it either opens or closes.
     newHamburger.addEventListener('click', function (event) {
         event.stopImmediatePropagation();
-        openWebsiteMenu();
+        if (document.body.classList.contains('menu-open')) {
+            closeWebsiteMenu();
+        } else {
+            openWebsiteMenu();
+        }
     });
-    newCloseNavBtn.addEventListener('click', function (event) {
-        event.stopImmediatePropagation();
-        closeWebsiteMenu();
-    });
+    if (newCloseNavBtn) {
+        newCloseNavBtn.addEventListener('click', function (event) {
+            event.stopImmediatePropagation();
+            closeWebsiteMenu();
+        });
+    }
     backdrop.addEventListener('click', function (event) {
         event.stopImmediatePropagation();
         closeWebsiteMenu();
     });
 
+    // Landing page only: dim the hamburger once the user scrolls past the
+    // hero so it recedes into the content, then restore full opacity on
+    // return-to-top. Other pages keep the hamburger at a constant opacity.
+    if (document.body.classList.contains('page-home')) {
+        const scrollHamburger = document.getElementById('hamburger');
+        if (scrollHamburger) {
+            let ticking = false;
+            const syncScrollState = function () {
+                scrollHamburger.classList.toggle('scrolled-dim', window.scrollY > 80);
+                ticking = false;
+            };
+            window.addEventListener('scroll', function () {
+                if (!ticking) {
+                    window.requestAnimationFrame(syncScrollState);
+                    ticking = true;
+                }
+            }, { passive: true });
+            syncScrollState();
+        }
+    }
+
     // Handle authentication-based menu visibility for hamburger menu
     handleAuthMenuVisibility('body > nav .website-menu ul > li');
 
     function openWebsiteMenu() {
-        const hamburger = document.getElementById('hamburger');
-        const closeNavBtn = document.getElementById('close-nav-btn');
+        const hamburgerEl = document.getElementById('hamburger');
 
         nav.style.display = 'grid';
         nav.style.visibility = 'visible';  // Override CSS hidden state when explicitly opening
         nav.style.opacity = '1';  // Override CSS opacity when explicitly opening
         backdrop.style.display = 'block';
         backdrop.style.pointerEvents = 'auto';
-        hamburger.style.display = 'none';
-        closeNavBtn.style.display = 'block';
         nav.classList.remove('slide-out');
         backdrop.classList.remove('fade');
 
-        // Add body class for CSS styling
+        // CSS handles the bar-to-X morph — we toggle `is-open` on the
+        // hamburger itself AND `menu-open` on the body so either trigger
+        // on its own is enough to drive the animation.
+        if (hamburgerEl) {
+            hamburgerEl.setAttribute('aria-expanded', 'true');
+            hamburgerEl.classList.add('is-open');
+        }
         document.body.classList.add('menu-open');
 
         // Ensure auth check has run to show menu items
@@ -100,16 +132,16 @@ function initNavigation() {
     }
 
     function closeWebsiteMenu() {
-        const hamburger = document.getElementById('hamburger');
-        const closeNavBtn = document.getElementById('close-nav-btn');
-        
+        const hamburgerEl = document.getElementById('hamburger');
+
         nav.classList.add('slide-out');
         backdrop.classList.add('fade');
         backdrop.style.pointerEvents = 'none';
-        hamburger.style.display = 'block';
-        closeNavBtn.style.display = 'none';
-        
-        // Remove body class
+
+        if (hamburgerEl) {
+            hamburgerEl.setAttribute('aria-expanded', 'false');
+            hamburgerEl.classList.remove('is-open');
+        }
         document.body.classList.remove('menu-open');
     }
 

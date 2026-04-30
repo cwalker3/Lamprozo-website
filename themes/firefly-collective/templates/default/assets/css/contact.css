@@ -1,258 +1,126 @@
-/* Professional Contact Page Layout */
+/* theme/templates/default/assets/css/contact.css
+   Page-specific layout for /contact. The dark "glowing in the dark"
+   chrome (page reset, typography, hero pattern, sections, buttons)
+   comes from _core_design.css automatically because the body has
+   .firefly-page; this file only styles the contact-form block.
+*/
 
-.contact-page {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 3rem 2rem;
-}
-
-.contact-form {
-    max-width: 600px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.05);
-    padding: 3rem 2.5rem;
+body.firefly-page.page-contact .contact-form {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.5rem, 3vw, 2.25rem);
     display: grid;
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
+    box-sizing: border-box;
     position: relative;
+    overflow: hidden;
+    transition: border-color 240ms ease;
 }
 
-.contact-form::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--mainColor) 0%, var(--navBgColor) 100%);
-    border-radius: 16px 16px 0 0;
+body.firefly-page.page-contact .contact-form:focus-within {
+    border-color: var(--ff-amber-ring);
 }
 
-.contact-form input[type="text"],
-.contact-form input[type="email"],
-.contact-form textarea {
+body.firefly-page.page-contact .contact-form input[type="text"],
+body.firefly-page.page-contact .contact-form input[type="email"],
+body.firefly-page.page-contact .contact-form textarea {
     width: 100%;
-    padding: 1rem;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-family: system-ui, -apple-system, sans-serif;
-    transition: all 0.3s ease;
-    background: #fafbfc;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
     box-sizing: border-box;
 }
 
-.contact-form input[type="text"]:focus,
-.contact-form input[type="email"]:focus,
-.contact-form textarea:focus {
+body.firefly-page.page-contact .contact-form input[type="text"]:hover,
+body.firefly-page.page-contact .contact-form input[type="email"]:hover,
+body.firefly-page.page-contact .contact-form textarea:hover {
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-contact .contact-form input[type="text"]:focus,
+body.firefly-page.page-contact .contact-form input[type="email"]:focus,
+body.firefly-page.page-contact .contact-form textarea:focus {
     outline: none;
-    border-color: var(--mainColor);
-    background: white;
-    box-shadow: 0 0 0 4px rgba(0, 68, 170, 0.1);
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-surface-2);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
 }
 
-.contact-form input[type="text"]::placeholder,
-.contact-form input[type="email"]::placeholder,
-.contact-form textarea::placeholder {
-    color: #94a3b8;
-    font-weight: 400;
+body.firefly-page.page-contact .contact-form input::placeholder,
+body.firefly-page.page-contact .contact-form textarea::placeholder {
+    color: var(--ff-fg-dim);
 }
 
-.contact-form textarea {
+body.firefly-page.page-contact .contact-form textarea {
     resize: vertical;
-    min-height: 150px;
-    line-height: 1.5;
+    min-height: 140px;
+    font-family: var(--ff-font-sans);
 }
 
-#send-message-btn {
-    margin-top: 1rem;
-    width: 100%;
-    position: static;
-    transform: none;
+/* Validation states */
+body.firefly-page.page-contact .contact-form input.invalid,
+body.firefly-page.page-contact .contact-form textarea.invalid {
+    border-color: rgba(255, 122, 122, 0.6);
+    box-shadow: 0 0 0 3px rgba(255, 122, 122, 0.12);
 }
 
-#send-message-btn button {
+body.firefly-page.page-contact .contact-form input.valid,
+body.firefly-page.page-contact .contact-form textarea.valid {
+    border-color: rgba(159, 232, 112, 0.5);
+}
+
+/* Submit button — amber pill matching the design system .btn-primary */
+body.firefly-page.page-contact #send-message-btn {
+    margin-top: 0.5rem;
     width: 100%;
-    padding: 1rem 2rem;
-    background: var(--mainColor);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-family: 'cinzel-bold', serif;
-    font-size: 1.1rem;
+}
+
+body.firefly-page.page-contact #send-message-btn button {
+    width: 100%;
+    padding: 0.875rem 1.25rem;
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border: 1px solid var(--ff-amber);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
     cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
+    transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
-#send-message-btn button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s ease;
+body.firefly-page.page-contact #send-message-btn button:hover {
+    background: #ffc14f;
+    border-color: #ffc14f;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 181, 68, 0.18);
 }
 
-#send-message-btn button:hover {
-    background: var(--navBgColor);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 68, 170, 0.3);
-}
-
-#send-message-btn button:hover::before {
-    left: 100%;
-}
-
-#send-message-btn button:active {
+body.firefly-page.page-contact #send-message-btn button:active {
     transform: translateY(0);
-    box-shadow: 0 4px 10px rgba(0, 68, 170, 0.2);
 }
 
-.contact-success,
-.contact-error {
-    padding: 1rem 1.25rem;
-    border-radius: 10px;
-    text-align: center;
-    font-family: system-ui, -apple-system, sans-serif;
-    animation: slideInFade 0.4s ease;
+body.firefly-page.page-contact #send-message-btn button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.contact-success {
-    background: #10b981;
-    color: white;
-    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
-}
-
-.contact-error {
-    background: #ef4444;
-    color: white;
-    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
-}
-
-@keyframes slideInFade {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Form Validation Styles */
-.contact-form input.invalid,
-.contact-form textarea.invalid {
-    border-color: #ef4444;
-    background: #fef2f2;
-}
-
-.contact-form input.valid,
-.contact-form textarea.valid {
-    border-color: #10b981;
-    background: #f0fdf4;
-}
-
-/* Loading State */
-#send-message-btn button.loading {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-#send-message-btn button.loading::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    margin: auto;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border: 2px solid white;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* Contact Info Section (optional) */
-.contact-info {
-    max-width: 600px;
-    margin: 3rem auto 2rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 2rem;
-    text-align: center;
-}
-
-.contact-info-item {
-    padding: 1.5rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    transition: transform 0.3s ease;
-}
-
-.contact-info-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-}
-
-.contact-info-item h3 {
-    color: var(--mainColor);
-    font-family: 'cinzel', serif;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-}
-
-.contact-info-item p {
-    color: #4a5568;
-    font-family: system-ui, -apple-system, sans-serif;
-    margin: 0;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .contact-page {
-        padding: 2rem 1rem;
-    }
-    
-    .contact-form {
-        padding: 2rem 1.5rem;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    }
-    
-    .contact-info {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-    
-    #send-message-btn button {
-        font-size: 1rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .contact-form {
-        padding: 1.5rem 1rem;
-    }
-    
-    .contact-form input[type="text"],
-    .contact-form input[type="email"],
-    .contact-form textarea {
-        padding: 0.875rem 1rem;
-        font-size: 0.95rem;
+/* Mobile: form sits below hero copy in the hero-inner grid (which
+   stacks to 1 column under 960px via the home/contact-shared rule).
+   Tighten internal padding a touch on small screens. */
+@media (max-width: 640px) {
+    body.firefly-page.page-contact .contact-form {
+        padding: 1.25rem;
     }
 }

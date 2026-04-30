@@ -1,11 +1,15 @@
 /* template/assets/css/_core_main.css */
 
 :root {
-	--mainColor: hsl(214, 100%, 33%);
-	--mainColorTransparent: hsla(214, 100%, 33%, 0.7);
-    --navBgColor: hsla(214, 100%, 21%, 0.99);
-    --secondaryColor: rgb(194, 194, 194);
-    --mainTextColor: rgb(46, 46, 46);
+    /* Legacy tokens kept for compatibility with older nav / form / utility
+       CSS, but rebound to the "glowing in the dark" palette so any
+       leftover references inherit the design system. The canonical
+       tokens are --ff-* in _core_custom-properties.css. */
+    --mainColor: #f5b544;                       /* was blue — now amber */
+    --mainColorTransparent: rgba(20, 20, 22, 0.72);  /* was translucent blue — now translucent dark */
+    --navBgColor: rgba(20, 20, 22, 0.96);        /* was deep blue — now near-black surface */
+    --secondaryColor: rgba(250, 250, 247, 0.85); /* was light gray */
+    --mainTextColor: #fafaf7;                   /* was dark gray — now off-white */
 }
 
 html {
