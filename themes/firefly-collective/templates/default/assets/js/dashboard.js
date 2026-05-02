@@ -1,6 +1,77 @@
 // plugin/assets/js/dashboard.js
 
 (function() {
+    // ---------- SVG icon picker for price-calculator feature cards ----------
+    // Maps a feature.featureName to an inline SVG marker so each feature-type
+    // card reads as a configured product, not raw form fields. Keywords are
+    // matched lowercase substring; falls through to a generic "layers" icon.
+    var FEATURE_ICONS = {
+        membership: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m11.42 2.86-1.81 3.66-4.05.59c-.73.1-1.02.99-.49 1.5l2.93 2.85-.69 4.02c-.13.72.63 1.27 1.28.93l3.61-1.9 3.61 1.9c.65.34 1.41-.21 1.28-.93l-.69-4.02 2.93-2.85c.53-.51.24-1.4-.49-1.5l-4.05-.59-1.81-3.66a.832.832 0 0 0-1.49 0Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        member: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+        subscription: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12a9 9 0 1 1-3.75-7.31M21 4v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        plan: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 12h6M9 16h4M7 4h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        addon: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+        addons: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+        booking: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        appointment: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        donation: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        donate: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        product: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        service: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        bonus: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7Zm0 0h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+    var DEFAULT_FEATURE_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function pickFeatureIcon(name) {
+        var key = String(name || '').toLowerCase();
+        for (var k in FEATURE_ICONS) {
+            if (key.indexOf(k) !== -1) return FEATURE_ICONS[k];
+        }
+        return DEFAULT_FEATURE_ICON;
+    }
+
+    // Shared dark/amber appearance for every Stripe Elements instance we
+    // mount. Stripe's `theme: 'night'` gives a dark base; the variable
+    // overrides bring it inline with the Firefly token palette so card-
+    // number/expiry labels render off-white on the dark surface.
+    function fireflyStripeAppearance() {
+        return {
+            theme: 'night',
+            variables: {
+                colorPrimary:    '#f5b544',
+                colorBackground: '#0a0a0b',
+                colorText:       '#fafaf7',
+                colorTextSecondary: 'rgba(250,250,247,0.72)',
+                colorTextPlaceholder: 'rgba(250,250,247,0.38)',
+                colorDanger:     '#ff7a7a',
+                colorIconTab:    '#fafaf7',
+                colorIconTabSelected: '#0a0a0b',
+                fontFamily:      'Geist, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                fontSizeBase:    '15px',
+                spacingUnit:     '4px',
+                borderRadius:    '6px'
+            },
+            rules: {
+                '.Tab, .Input, .Block': {
+                    backgroundColor: '#141416',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: 'none'
+                },
+                '.Tab:hover, .Input:hover': {
+                    borderColor: 'rgba(245,181,68,0.28)'
+                },
+                '.Tab--selected, .Input:focus': {
+                    borderColor: '#f5b544',
+                    boxShadow: '0 0 0 1px rgba(245,181,68,0.4)'
+                },
+                '.Label': {
+                    color: 'rgba(250,250,247,0.72)',
+                    fontWeight: '500'
+                }
+            }
+        };
+    }
+
     // Store initialization state globally to persist across re-renders
     if (typeof window.dashboardInitialized === 'undefined') {
         window.dashboardInitialized = false;
@@ -620,6 +691,18 @@
         }
 
         const updateModal = document.getElementById('update-payment-modal');
+
+        // Backdrop-click closes the static dashboard modals (cancel-sub
+        // wires its own listener inside cancelSubscription, but update-
+        // payment is opened from multiple places — install once here).
+        if (updateModal) {
+            updateModal.addEventListener('click', function(e) {
+                if (e.target === updateModal) {
+                    closeUpdatePaymentModal();
+                }
+            });
+        }
+
         const invoiceDetails = document.getElementById('invoice-details');
         const invoiceTotal = document.getElementById('invoice-total');
         const themePath = dashboardData.theme_path;
@@ -714,41 +797,41 @@
                 featuresContainer.style.pointerEvents = 'none';
                 featuresContainer.style.opacity = '0.7';
             }
-            
-            // Optionally add a subtle visual indicator that the form is locked
-            const lockIndicator = document.createElement('div');
-            lockIndicator.className = 'order-placed-indicator';
-            lockIndicator.innerHTML = `
-                <div class="lock-message">
-                    <i class="fa fa-check-circle"></i> Order placed successfully! Pay Below.
-                </div>
+
+            // Show a viewport-level toast in the top-right corner.
+            // Auto-dismisses after a few seconds with a fade.
+            showOrderPlacedToast();
+        }
+
+        // Pop a one-shot success toast in the top-right of the viewport.
+        // Reuses the .ff-toast structure styled in dashboard.css.
+        function showOrderPlacedToast() {
+            // De-dup if user clicks twice in quick succession.
+            const existing = document.getElementById('ff-order-toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'ff-order-toast';
+            toast.className = 'ff-toast ff-toast-success';
+            toast.setAttribute('role', 'status');
+            toast.setAttribute('aria-live', 'polite');
+            toast.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Order placed successfully. Pay below.</span>
             `;
-            
-            // Style the indicator
-            lockIndicator.style.position = 'absolute';
-            lockIndicator.style.top = '10px';
-            lockIndicator.style.right = '10px';
-            lockIndicator.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
-            lockIndicator.style.color = 'white';
-            lockIndicator.style.padding = '8px (--fontSizeSmallest)';
-            lockIndicator.style.borderRadius = '4px';
-            lockIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-            lockIndicator.style.zIndex = '1';
-            lockIndicator.style.fontSize = '14px';
-            
-            // Find a good container to append to
-            const container = document.querySelector('.price-calculator-container') || 
-                            document.querySelector('.dashboard-content') ||
-                            featuresContainer.parentNode;
-                            
-            if (container) {
-                // Check if we already added the indicator
-                const existingIndicator = document.querySelector('.order-placed-indicator');
-                if (!existingIndicator) {
-                    container.style.position = 'relative';
-                    container.appendChild(lockIndicator);
-                }
-            }
+            document.body.appendChild(toast);
+
+            // Slide in on next frame.
+            requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+            // Fade + slide out, then remove.
+            setTimeout(() => {
+                toast.classList.remove('is-visible');
+                toast.classList.add('is-leaving');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
         }
 
         function showOrderConfirmation() {
@@ -3171,6 +3254,16 @@
             const featureTypeDiv = document.createElement('div');
             featureTypeDiv.classList.add('feature-type');
 
+            // Decorative icon — picks a relevant SVG based on featureName
+            // keywords so the price calculator reads as a real product
+            // configurator rather than raw form fields. CSS positions it
+            // top-right of the .feature-type card.
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'feature-type-icon';
+            iconWrap.setAttribute('aria-hidden', 'true');
+            iconWrap.innerHTML = pickFeatureIcon(feature.featureName);
+            featureTypeDiv.appendChild(iconWrap);
+
             // Header with feature name + description
             const header = document.createElement('h3');
             header.textContent = feature.featureName;
@@ -3486,59 +3579,92 @@
             }
         }
         
-        // Create and mount the Stripe payment form
+        // Create and mount the Stripe payment form. The form lives in a
+        // centered overlay modal — backdrop, blur, all chrome matches the
+        // existing .dash-modal pattern. The Pay Now button is relocated
+        // into the modal so it's reachable above the backdrop, then
+        // restored to its origin if the user cancels.
         function createPaymentForm(clientSecret) {
             if (isOrderPaid()) {
                 showPaymentSuccess();
                 return;
             }
 
-            // Create container + form + error div
-            const paymentContainer = document.createElement('div');
-            paymentContainer.id = 'payment-element-container';
-            paymentContainer.style.marginBottom = '20px';
+            const payNowBtn = document.getElementById('pay-now');
+            // Remember where Pay Now lived so Cancel can put it back.
+            const payNowOrigin = {
+                parent: payNowBtn.parentNode,
+                next:   payNowBtn.nextSibling
+            };
+
+            // Build the modal shell.
+            const modal = document.createElement('div');
+            modal.id = 'payment-form-modal';
+            modal.className = 'dash-modal payment-form-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'payment-form-title');
+
+            const content = document.createElement('div');
+            content.className = 'dash-modal-content payment-form-content';
+
+            const heading = document.createElement('h3');
+            heading.id = 'payment-form-title';
+            heading.textContent = 'Complete payment';
+            content.appendChild(heading);
+
+            const description = document.createElement('p');
+            description.className = 'payment-form-description';
+            description.textContent = 'Enter your card details to finish placing your order.';
+            content.appendChild(description);
 
             const form = document.createElement('form');
             form.id = 'payment-form';
-            
-            // Create the payment element container
+
             const paymentElementDiv = document.createElement('div');
             paymentElementDiv.id = 'payment-element';
             form.appendChild(paymentElementDiv);
 
             const errorDiv = document.createElement('div');
             errorDiv.id = 'payment-error';
-            errorDiv.style.color = 'red';
-            errorDiv.style.marginTop = '10px';
+            errorDiv.className = 'form-message';
             errorDiv.style.display = 'none';
             form.appendChild(errorDiv);
 
-            paymentContainer.appendChild(form);
+            content.appendChild(form);
 
-            const payNowBtn = document.getElementById('pay-now');
-            payNowBtn.parentNode.insertBefore(paymentContainer, payNowBtn);
+            // Action row: Cancel + relocated Pay Now button.
+            const btnRow = document.createElement('div');
+            btnRow.className = 'btn-row payment-form-actions';
 
-            // Initialize Stripe Elements
-            elements = stripe.elements({
-                clientSecret: clientSecret,
-                appearance: {
-                    theme: 'stripe',
-                    variables: {
-                        colorPrimary: '#0073aa',
-                        colorBackground: '#ffffff',
-                        colorText: '#333333',
-                        colorDanger: '#d83838',
-                        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                        borderRadius: '4px'
-                    }
-                }
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn btn-ghost';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.addEventListener('click', closePaymentFormModal);
+
+            btnRow.appendChild(cancelBtn);
+            btnRow.appendChild(payNowBtn);
+            content.appendChild(btnRow);
+
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            // Backdrop click dismisses too.
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closePaymentFormModal();
             });
 
-            // Mount the Payment Element
+            // Initialize Stripe Elements with our shared dark/amber appearance.
+            elements = stripe.elements({
+                clientSecret: clientSecret,
+                appearance: fireflyStripeAppearance()
+            });
+
             paymentElement = elements.create('payment');
             paymentElement.mount('#payment-element');
 
-            // Re-enable “Pay Now” and only disable on click
+            // Re-enable Pay Now and wire it to the payment handler.
             payNowBtn.textContent = 'Pay Now';
             payNowBtn.disabled = false;
             payNowBtn.onclick = function(e) {
@@ -3548,9 +3674,25 @@
                 handlePayment(e);
             };
 
-            setTimeout(() => {
-                smoothScrollToElement(paymentContainer, 120);
-            }, 100);
+            // Stash the cleanup so handlers can call it on success/error.
+            window._closePaymentFormModal = closePaymentFormModal;
+
+            function closePaymentFormModal() {
+                if (paymentElement) {
+                    try { paymentElement.unmount(); } catch (e) { /* ignore */ }
+                    paymentElement = null;
+                }
+                elements = null;
+
+                // Restore Pay Now to its original location.
+                if (payNowOrigin.parent) {
+                    payNowBtn.disabled = false;
+                    payNowBtn.textContent = 'Pay now';
+                    payNowOrigin.parent.insertBefore(payNowBtn, payNowOrigin.next);
+                }
+                modal.remove();
+                window._closePaymentFormModal = null;
+            }
         }
         
         // Handle the payment submission
@@ -3825,6 +3967,12 @@
         }
 
         function showPaymentSuccess() {
+            // Close the centered payment-form modal if it's still open.
+            // (Pay Now button is restored to its origin as part of close.)
+            if (typeof window._closePaymentFormModal === 'function') {
+                window._closePaymentFormModal();
+            }
+
             const payNowBtn = document.getElementById('pay-now');
 
             // Disable form interaction immediately
@@ -4067,47 +4215,47 @@
                     </div>
                     
                     ${(availablePlans.length > 0 || isPastDue) ? `
-                        <div class="plan-change-section" style="margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
-                            ${isPastDue ? 
-                                `<div style="color: #d83838; margin-bottom: 10px; font-weight: bold;">
+                        <div class="plan-change-section">
+                            ${isPastDue ?
+                                `<div class="plan-past-due">
                                     Your subscription is past due. Please renew to continue service.
                                 </div>` : ''
                             }
-                            
+
                             ${availablePlans.length > 0 ? `
-                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-                                    ${isPastDue ? 'Renew with a different plan:' : 'Change Plan:'}
+                                <label class="plan-change-label">
+                                    ${isPastDue ? 'Renew with a different plan' : 'Change plan'}
                                 </label>
-                                <select class="plan-select" data-subscription-id="${sub.subscription_id}" 
-                                        data-current-option="${currentOptionId}"
-                                        style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                                    <option value="">Select a plan...</option>
+                                <select class="plan-select form-input"
+                                        data-subscription-id="${sub.subscription_id}"
+                                        data-current-option="${currentOptionId}">
+                                    <option value="">Select a plan…</option>
                                     ${availablePlans.map(plan => `
                                         <option value="${plan.id}">
-                                            ${plan.optionName} - $${plan.staticPrice}/${plan.interval || 'month'}
+                                            ${plan.optionName} — $${plan.staticPrice}/${plan.interval || 'month'}
                                         </option>
                                     `).join('')}
                                 </select>
                             ` : ''}
-                            
-                            <button class="btn-primary ${isPastDue ? 'renew-subscription' : 'change-plan'}" 
+
+                            <button class="btn btn-primary ${isPastDue ? 'renew-subscription' : 'change-plan'}"
                                     data-subscription-id="${sub.subscription_id}"
                                     ${availablePlans.length > 0 ? 'disabled' : ''}>
-                                ${isPastDue ? 'Renew Subscription' : 'Change Plan'}
+                                ${isPastDue ? 'Renew subscription' : 'Change plan'}
                             </button>
                         </div>
                     ` : ''}
                     
                     <div class="subscription-actions">
-                        <button class="btn-primary update-payment-btn" 
+                        <button class="btn btn-primary update-payment-btn"
                                 ${isPastDue > 0 ? 'disabled ' : ''}
                                 data-subscription-id="${sub.subscription_id}">
-                            Update Payment Method
+                            Update payment method
                         </button>
-                        ${sub.subscription_status === 'active' && !isPastDue ? 
-                            `<button class="btn-danger cancel-sub-btn" data-subscription-id="${sub.subscription_id}">
-                                Cancel Subscription
-                            </button>` 
+                        ${sub.subscription_status === 'active' && !isPastDue ?
+                            `<button class="btn btn-danger cancel-sub-btn" data-subscription-id="${sub.subscription_id}">
+                                Cancel subscription
+                            </button>`
                             : ''}
                     </div>
                 `;
@@ -4342,9 +4490,7 @@
                     // Create elements for updating payment method
                     updatePaymentElements = stripe.elements({
                         clientSecret: data.clientSecret,
-                        appearance: {
-                            theme: 'stripe'
-                        }
+                        appearance: fireflyStripeAppearance()
                     });
                     
                     updatePaymentElement = updatePaymentElements.create('payment');
@@ -4528,9 +4674,7 @@
                     // Create elements for plan change
                     updatePaymentElements = stripe.elements({
                         clientSecret: data.clientSecret,
-                        appearance: {
-                            theme: 'stripe'
-                        }
+                        appearance: fireflyStripeAppearance()
                     });
                     
                     updatePaymentElement = updatePaymentElements.create('payment');
