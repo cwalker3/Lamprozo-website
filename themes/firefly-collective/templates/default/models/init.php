@@ -274,8 +274,29 @@
     }
 
     function disable_comments() {
-        // Remove from admin menu
-        remove_menu_page('edit-comments.php');
+        // This file is loaded for both frontend and admin requests.
+        // `remove_menu_page()` relies on the global $menu being initialized;
+        // calling it too early (e.g. on plain `init`) can produce core warnings.
+        if ( ! is_admin() ) {
+            return;
+        }
+
+        // Diagnostic: identify which wp-admin URL is hitting this every minute.
+        // Rate-limited to once per minute to avoid log spam.
+        static $last_log_ts = 0;
+        $now = time();
+        if ( $now !== $last_log_ts ) {
+            $last_log_ts = $now;
+            $uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field((string) $_SERVER['REQUEST_URI']) : 'unknown';
+            $ua = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field((string) $_SERVER['HTTP_USER_AGENT']) : '';
+            error_log('[FireflyPlatform] disable_comments() invoked. URI=' . $uri . ' UA=' . $ua);
+        }
+
+        // Remove from admin menu (guard against core warning: $menu === null)
+        global $menu;
+        if ( isset($menu) && is_array($menu) ) {
+            remove_menu_page('edit-comments.php');
+        }
         
         // Remove from post and pages
         remove_post_type_support('post', 'comments');
@@ -287,7 +308,8 @@
         }
         add_filter('comments_open', 'disable_all_comments', 10, 2);
     }
-    add_action('init', 'disable_comments');
+    // Ensure WordPress has initialized $menu/$submenu before we try removing pages.
+    add_action('admin_menu', 'disable_comments', 999);
 
     // Remove 'jquery-migrate' as a dependency of WordPress' jQuery
     add_action('wp_default_scripts', function ($scripts) {
