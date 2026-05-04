@@ -13,6 +13,112 @@ document.addEventListener('DOMContentLoaded', function () {
   const loader = document.querySelector('#loader');
   const websiteApp = document.querySelector('#website-app');
 
+  const PWA_VIEW_CLASSES = ['page-app', 'page-app-login', 'page-dashboard', 'page-signup', 'page-order-history'];
+
+  function getAppRoot() {
+    return document.querySelector('#app-root');
+  }
+
+  function applyPwaViewClasses(view) {
+    const viewClassMap = {
+      app: 'page-app',
+      login: 'page-app-login',
+      dashboard: 'page-dashboard',
+      signup: 'page-signup',
+      'order-history': 'page-order-history'
+    };
+
+    const body = document.body;
+    body.classList.add('firefly-page');
+    PWA_VIEW_CLASSES.forEach(cls => body.classList.remove(cls));
+
+    const nextClass = viewClassMap[view] || 'page-app';
+    body.classList.add('page-app');
+    body.classList.add(nextClass);
+
+    const appRoot = getAppRoot();
+    if (appRoot) {
+      appRoot.setAttribute('data-pwa-view', view || 'app');
+    }
+  }
+
+  /* ----- View transitions: fade #app-root out, fade loader in,
+     swap content, fade loader out and #app-root back in. CSS at
+     #app-root.is-leaving and #loader.is-visible drives the fades.
+     Respects prefers-reduced-motion via ffMotion.reduced(). ----- */
+  const TRANSITION_MS = 220;
+
+  function reducedMotion() {
+    return !!(window.ffMotion && typeof window.ffMotion.reduced === 'function' && window.ffMotion.reduced());
+  }
+
+  function showLoader() {
+    return new Promise(resolve => {
+      if (!loader) { resolve(); return; }
+      loader.style.display = 'block';
+      if (reducedMotion()) {
+        loader.classList.add('is-visible');
+        resolve();
+        return;
+      }
+      void loader.offsetWidth;
+      loader.classList.add('is-visible');
+      setTimeout(resolve, TRANSITION_MS);
+    });
+  }
+
+  function hideLoader() {
+    return new Promise(resolve => {
+      if (!loader) { resolve(); return; }
+      // Already hidden — resolve immediately so callers don't wait pointlessly.
+      if (!loader.classList.contains('is-visible') && loader.style.display === 'none') {
+        resolve();
+        return;
+      }
+      loader.classList.remove('is-visible');
+      if (reducedMotion()) {
+        loader.style.display = 'none';
+        resolve();
+        return;
+      }
+      setTimeout(() => {
+        if (!loader.classList.contains('is-visible')) {
+          loader.style.display = 'none';
+        }
+        resolve();
+      }, TRANSITION_MS);
+    });
+  }
+
+  function fadeOutAppRoot() {
+    return new Promise(resolve => {
+      const appRoot = getAppRoot();
+      if (!appRoot) { resolve(); return; }
+      // Already faded — skip the 220ms wait so initial-authenticated
+      // boot doesn't pause for nothing.
+      if (appRoot.classList.contains('is-leaving')) { resolve(); return; }
+      appRoot.classList.add('is-leaving');
+      if (reducedMotion()) { resolve(); return; }
+      setTimeout(resolve, TRANSITION_MS);
+    });
+  }
+
+  function fadeInAppRoot() {
+    return new Promise(resolve => {
+      const appRoot = getAppRoot();
+      if (!appRoot) { resolve(); return; }
+      if (!appRoot.classList.contains('is-leaving')) { resolve(); return; }
+      if (reducedMotion()) {
+        appRoot.classList.remove('is-leaving');
+        resolve();
+        return;
+      }
+      void appRoot.offsetWidth;
+      appRoot.classList.remove('is-leaving');
+      setTimeout(resolve, TRANSITION_MS);
+    });
+  }
+
   // Debug logging function
   function debugLog(message, data = null) {
     return;
@@ -354,9 +460,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!templateAssets) {
       try {
         const cachedData = await getFromIndexedDB('template-info', {});
-        templateAssets = cachedData.template_assets || { css: [], js: [] };
+        templateAssets = cachedData.template_assets || { core_css: [], core_js: [], css: [], js: [] };
       } catch (e) {
-        templateAssets = { css: [], js: [] }; // Fallback
+        templateAssets = { core_css: [], core_js: [], css: [], js: [] }; // Fallback
       }
     }
 
@@ -367,9 +473,24 @@ document.addEventListener('DOMContentLoaded', function () {
       window.templateData = { success: '1' }; // Fallback
     }
 
+    function normalizeAssetPath(url) {
+      try {
+        return new URL(url, window.location.origin).pathname;
+      } catch (e) {
+        return url;
+      }
+    }
+
     // Helper function to load CSS
     function loadCSS(href) {
       return new Promise((resolve, reject) => {
+        const wantedPath = normalizeAssetPath(href);
+        const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"][href]'))
+          .find(link => normalizeAssetPath(link.getAttribute('href')) === wantedPath);
+        if (existing) {
+          resolve();
+          return;
+        }
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = href;
@@ -382,6 +503,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // Helper function to load JS
     function loadJS(src) {
       return new Promise((resolve, reject) => {
+        const wantedPath = normalizeAssetPath(src);
+        const existing = Array.from(document.querySelectorAll('script[src]'))
+          .find(script => normalizeAssetPath(script.getAttribute('src')) === wantedPath);
+        if (existing) {
+          resolve();
+          return;
+        }
         const script = document.createElement('script');
         script.src = src;
         script.defer = true;
@@ -392,15 +520,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     try {
+      const cssQueue = [
+        ...(templateAssets.core_css || []),
+        ...(templateAssets.css || [])
+      ];
+
+      const jsQueue = [
+        ...(templateAssets.js || [])
+      ];
+
       // Load template CSS
-      if (templateAssets.css && templateAssets.css.length > 0) {
-        await Promise.all(templateAssets.css.map(href => loadCSS(href)));
+      if (cssQueue.length > 0) {
+        await Promise.all(cssQueue.map(href => loadCSS(href)));
         appLog('Template CSS loaded successfully');
       }
 
       // Load template JS
-      if (templateAssets.js && templateAssets.js.length > 0) {
-        await Promise.all(templateAssets.js.map(src => loadJS(src)));
+      if (jsQueue.length > 0) {
+        await Promise.all(jsQueue.map(src => loadJS(src)));
         appLog('Template JS loaded successfully');
       }
 
@@ -410,20 +547,30 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function getView(view) {
-    const appRoot = document.querySelector('#app-root');
+    const appRoot = getAppRoot();
 
     if (!appRoot) {
       return;
     }
 
-    loader.style.display = 'block';
+    // Phase 1: fade out current content. Important — we DON'T change the
+    // body's page-{view} class yet. Template CSS is scoped per-body-class
+    // (e.g. `body.firefly-page.page-dashboard .dash-card-head`), so if we
+    // swap the class while the old content is still in the DOM, every
+    // selector for the leaving view stops matching and you see an
+    // unstyled flicker as the old content fades. Class swap happens
+    // atomically with the innerHTML replace below.
+    await fadeOutAppRoot();
+    // Phase 2: fade in the loader (await — loader fully visible before fetch
+    // starts so the user has continuous visual feedback).
+    await showLoader();
 
     try {
       const endpoint = 'app-get-view';
       const params = { view };
       let dataResponse;
       let isOffline = false;
-      
+
       // First, try network
       try {
         const url = `${window.api_url}${endpoint}`;
@@ -434,24 +581,24 @@ document.addEventListener('DOMContentLoaded', function () {
           },
           body: JSON.stringify(params)
         };
-        
+
         if (devMode) {
           options.cache = 'no-store';
         }
-        
+
         const response = await fetch(url, options);
         if (!response.ok) {
           throw new Error(`Network error (${response.status})`);
         }
-        
+
         dataResponse = await response.json();
-        
+
         // Check if this is an offline response from service worker
         if (dataResponse._offline || !dataResponse.success) {
           appLog('Got offline response from service worker, trying IndexedDB');
           throw new Error('Offline response - fallback to IndexedDB');
         }
-        
+
         // Save successful response to IndexedDB
         if (dataResponse.success) {
           await saveToIndexedDB(`view:${view}`, {}, {
@@ -462,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } catch (networkError) {
         appLog('Network failed or offline, trying IndexedDB:', networkError);
         isOffline = true;
-        
+
         // Try IndexedDB
         try {
           const cachedData = await getFromIndexedDB(`view:${view}`, {});
@@ -470,9 +617,9 @@ document.addEventListener('DOMContentLoaded', function () {
           appLog('Loaded view from IndexedDB:', view);
         } catch (cacheError) {
           appLog('View not available in IndexedDB:', cacheError);
-          loader.style.display = 'none';
-          
-          // Show offline message
+
+          // Show offline message — atomic body-class + content swap.
+          applyPwaViewClasses(view);
           appRoot.innerHTML = `
             <div class="offline-message" style="text-align: center; padding: 40px 20px;">
               <h2>This view is not available offline</h2>
@@ -483,14 +630,14 @@ document.addEventListener('DOMContentLoaded', function () {
               </button>
             </div>
           `;
+          await fadeInAppRoot();
+          await hideLoader();
           return;
         }
       }
-      
+
       // Process the response
       if (dataResponse && dataResponse.success) {
-        loader.style.display = 'none';
-        
         // Update window variables
         switch (view) {
           case 'dashboard':
@@ -500,25 +647,41 @@ document.addEventListener('DOMContentLoaded', function () {
             window.subscription_status = dataResponse.subscription_status;
             window.third_party = dataResponse.third_party;
             break;
-            
+
           case 'order-history':
             window.apiUrl = dataResponse.apiUrl;
             window.data = dataResponse.data;
             break;
         }
 
-        // Insert HTML
+        // Phase 3: atomically swap body class + content. Both happen in
+        // a single JS turn — the browser doesn't paint between them, so
+        // there's no frame where old content is in the DOM under the new
+        // body class (or vice versa).
+        applyPwaViewClasses(view);
         appRoot.innerHTML = '';
         appRoot.innerHTML = dataResponse.response_html;
+        // SPA-injected content reveals as a single unit with the app-root
+        // fade. If we let _core_motion.js's IntersectionObserver run, it
+        // fires immediately (layout-based, ignores opacity) and starts
+        // each .reveal child on its own 560ms transition — so by the time
+        // app-root finishes fading in (220ms), non-reveal content is at
+        // full opacity while the hero is still ghosting in. Mark reveals
+        // .is-in eagerly so everything fades together.
+        appRoot.querySelectorAll('.reveal, .reveal-stagger').forEach(el => el.classList.add('is-in'));
+        // Phase 4: fade in the new content (loader still fully visible above).
+        await fadeInAppRoot();
+        // Phase 5: fade out the loader (content now fully visible underneath).
+        await hideLoader();
       } else {
         throw new Error('Invalid response data');
       }
-      
+
     } catch (err) {
-      loader.style.display = 'none';
       appLog('Failed to load view:', err);
-      
-      // Show error message
+
+      // Show error message — atomic body-class + content swap.
+      applyPwaViewClasses(view);
       appRoot.innerHTML = `
         <div class="error-message" style="text-align: center; padding: 40px 20px;">
           <h2>Unable to load this view</h2>
@@ -528,6 +691,8 @@ document.addEventListener('DOMContentLoaded', function () {
           </button>
         </div>
       `;
+      await fadeInAppRoot();
+      await hideLoader();
     }
   }
 
@@ -572,44 +737,46 @@ document.addEventListener('DOMContentLoaded', function () {
         break;
 
       case 'log-in':
+        await fadeOutAppRoot();
+        await showLoader();
         appRoot.innerHTML = '';
         loadAppTitleAndAppHTML();
         loadLoginForm();
+        await fadeInAppRoot();
+        await hideLoader();
         scrollToTop();
         break;
 
       case 'log-out':
-        loader.style.display = 'block';
-        
+        await fadeOutAppRoot();
+        await showLoader();
+
         // If offline, just clear local data
         if (!navigator.onLine) {
-          loader.style.display = 'none';
           clearUser();
+          await fadeInAppRoot();
+          await hideLoader();
         }
 
         else {
           // Logout endpoint
-          fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-          }).then(response => response.json())
-          .then(data => {
+          try {
+            const resp = await fetch(`${window.api_url}app-logout/?auth_id=${window.auth_id}`, {
+              headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
             if (data.logout) {
-              
               // Also reset dashboard if it has a similar pattern
               if (window.resetDashboard) {
                 window.resetDashboard();
               }
-
               clearUser();
-              loader.style.display = 'none';
             }
-          })
-          .catch(error => {
+          } catch (error) {
             appLog('Error logging out:', error);
-            loader.style.display = 'none';
-          });
+          }
+          await fadeInAppRoot();
+          await hideLoader();
         }
         scrollToTop();
         break;
@@ -647,7 +814,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Update visibility of both nav and profile dropdown
     updateNavVisibility();
     updateProfileDropdownVisibility();
-    appRoot.innerHTML = '';
+    const appRoot = getAppRoot();
+    if (appRoot) {
+      appRoot.innerHTML = '';
+    }
     loadAppTitleAndAppHTML();
     loadLoginForm();
     scrollToTop();
@@ -914,8 +1084,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // Initialize the app
   async function appInit() {
 	debugLog('Initializing App...');
-    loader.style.display = 'block';
-    
+    showLoader();
+    // Start with #app-root hidden so the first paint fades in.
+    const initialRoot = getAppRoot();
+    if (initialRoot) initialRoot.classList.add('is-leaving');
+
     // First, try to restore auth from IndexedDB - with better error handling
     return getFromIndexedDB('user-auth', {})
       .then(authData => {
@@ -1004,51 +1177,62 @@ document.addEventListener('DOMContentLoaded', function () {
           app_page_html: data.app_page_html
         });
 
+        // Save template asset manifest for offline startup.
+        if (data.template_assets) {
+          await saveToIndexedDB('template-info', {}, {
+            template_assets: data.template_assets,
+            timestamp: Date.now()
+          });
+        }
+
         loadAppTitleAndAppHTML();
 
         // Dashboard (or log in form if not logged in)
         if (!window.auth_id) {
           loadLoginForm();
+          await fadeInAppRoot();
+          await hideLoader();
         } else {
+          // getView manages its own fade-in + loader hide.
           await getView('dashboard');
           if (window.initializeDashboard) {
             window.initializeDashboard();
           }
         }
-        
+
         window.gapiDomain = data.gapiDomain;
-        loader.style.display = 'none';
       })
       .catch(async error => {
         appLog('Failed to load app:', error);
-        loader.style.display = 'none';
-        
+
         // Try to load cached data if available
         try {
           const cachedMenu = await getFromIndexedDB('menu-html', {});
           const cachedAppData = await getFromIndexedDB('app-page-data', {});
-          
+
           // Load dynamic CSS even when offline
           await loadDynamicCSS();
-          
+
           // Load assets even when offline
           await loadTemplateAssets();
-          
+
           if (cachedMenu && cachedMenu.menu_html) {
             insertMenuIntoDOM(cachedMenu.menu_html);
           }
-          
+
           if (cachedAppData) {
             window.app_page_title = cachedAppData.app_page_title;
             window.app_page_html = cachedAppData.app_page_html;
           }
-          
+
           loadAppTitleAndAppHTML();
-          
+
           if (!window.auth_id) {
             loadLoginForm();
+            await fadeInAppRoot();
+            await hideLoader();
           } else {
-            // Try to load cached dashboard
+            // getView manages its own fade-in + loader hide.
             await getView('dashboard');
             if (window.initializeDashboard) {
               window.initializeDashboard();
@@ -1056,29 +1240,39 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         } catch (e) {
           appLog('No cached data available:', e);
-          
+
           // Still try to load CSS and assets
           await loadDynamicCSS();
           await loadTemplateAssets();
           insertFallbackMenu();
+          await fadeInAppRoot();
+          await hideLoader();
         }
       });
   }
 
-  // App page title and HTML
+  // App page title and HTML.
+  // The /app page snippet (snippets/pages/app.html) is itself a full
+  // design-system layout — hero + content sections — so we inject it
+  // directly into #app-root instead of wrapping it in a programmatic
+  // hero. This keeps the /app landing visually consistent with every
+  // other view (dashboard, orders, etc.) and lets editors author the
+  // copy in Gutenberg / on disk.
   function loadAppTitleAndAppHTML() {
-    if (!window.app_page_title || !window.app_page_html) {
+    if (!window.app_page_html) {
       appLog('App page data not available');
       return;
     }
-    
-    const titleEl = document.createElement('h1');
-    titleEl.innerText = window.app_page_title;
-    const contentEl = document.createElement('div');
-    contentEl.id = 'app-page-html';
-    contentEl.innerHTML = window.app_page_html;
-    appRoot.appendChild(titleEl);
-    appRoot.appendChild(contentEl);
+
+    const appRoot = getAppRoot();
+    if (!appRoot) return;
+
+    applyPwaViewClasses('app');
+
+    appRoot.innerHTML = window.app_page_html;
+    // Match the getView() reveal handling: mark all reveals .is-in
+    // eagerly so the whole landing fades in as one unit.
+    appRoot.querySelectorAll('.reveal, .reveal-stagger').forEach(el => el.classList.add('is-in'));
   }
 
   // Fallback menu for when everything fails
@@ -1310,41 +1504,56 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Login form
   function loadLoginForm() {
+    applyPwaViewClasses('login');
+
     const loginFormHTML = `
-      <div class="login-container">
-        <div class="login-form">
-          <h2 class="form-title">Log in</h2>
+      <section class="hero app-auth-hero">
+        <div class="wp-block-group container">
+          <div class="app-auth-shell is-in">
+            <div class="section-head app-auth-head">
+              <p class="overline">PWA Access</p>
+              <h2>Log in <span class="serif">to your workspace.</span></h2>
+              <p class="lead">Use your Firefly account to manage dashboard and order history in the app shell.</p>
+            </div>
 
-          <div id="login-error-msg"></div>
+            <div class="login-form app-auth-card">
+              <h3 class="form-title">Account Login</h3>
 
-          <div class="input-group">
-            <label for="username">Username</label>
-            <input id="app-username" type="text" placeholder="Enter your username" required>
+              <div id="login-error-msg"></div>
+
+              <div class="input-group">
+                <label for="username">Username</label>
+                <input id="app-username" type="text" placeholder="Enter your username" required>
+              </div>
+
+              <div class="input-group">
+                <label for="password">Password</label>
+                <input id="app-password" type="password" placeholder="Enter your password" required>
+              </div>
+
+              <button type="submit" class="btn btn-primary login-btn" id="app-login">Log In</button>
+
+              <button type="submit" class="btn btn-ghost" id="start-signup">Sign Up</button>
+
+              <div class="divider"><span>OR</span></div>
+
+              <button type="button" id="google-signin" class="btn btn-ghost google-btn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
+                Sign in with Google
+              </button>
+            </div>
           </div>
-
-          <div class="input-group">
-            <label for="password">Password</label>
-            <input id="app-password" type="password" placeholder="Enter your password" required>
-          </div>
-
-          <button type="submit" class="btn login-btn" id="app-login">Log In</button>
-
-          <button type="submit" class="btn" id="start-signup">Sign Up</button>
-
-          <div class="divider"><span>OR</span></div>
-
-          <button type="button" id="google-signin" class="btn google-btn">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo">
-            Sign in with Google
-          </button>
         </div>
-      </div>
+      </section>
     `;
     
     // Create a container for the login form
     const loginContainer = document.createElement('div');
     loginContainer.innerHTML = loginFormHTML;
     
+    const appRoot = getAppRoot();
+    if (!appRoot) return;
+
     // Append to appRoot instead of replacing
     appRoot.appendChild(loginContainer);
 
@@ -1353,7 +1562,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const appPasswordInput = document.querySelector('#app-password');
     const loginErrorMsg = document.querySelector('#login-error-msg');
     appLogin.addEventListener('pointerup', async () =>{
-      loader.style.display = 'block';
+      showLoader();
       try {
         const url = `${window.api_url}app-login`;
         const options = {
@@ -1374,25 +1583,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const dataResponse = await response.json();
         if (dataResponse.success) {
-          loader.style.display = 'none';
+          // loginUser → getView('dashboard') manages its own loader/fade.
           loginUser(dataResponse.auth_id);
           scrollToTop();
         }
         else {
           loginErrorMsg.innerText = dataResponse.message;
-          loader.style.display = 'none';
+          hideLoader();
         }
-      } 
+      }
       catch (err) {
-        loader.style.display = 'none';
+        hideLoader();
         appLog('the network failed:', err);
       }
     });
 
     const startSignup = document.querySelector('#start-signup');
     startSignup.addEventListener('pointerup', async ()=>{
-      const appRoot = document.querySelector('#app-root');
-      appRoot.innerHTML = '';
+      // getView handles fade-out, content swap, and fade-in.
       await getView('signup');
       window.initializeSignup();
       scrollToTop();
@@ -1438,9 +1646,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }, 100);
 
-          appRoot.innerHTML = '';
-
-          // Load dashboard view - no need to reset on initial login
+          // getView handles fade-out (login form fades), content swap, and fade-in.
           await getView('dashboard');
 
           // Add delay to ensure DOM is fully rendered before initializing

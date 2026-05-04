@@ -20,9 +20,6 @@
      * See templates/default/DESIGN.md for the body-class contract.
      */
     function firefly_default_add_body_class( $classes ) {
-        if ( function_exists('determine_view') && determine_view() === 'app' ) {
-            return $classes;
-        }
         if ( ! in_array('firefly-page', $classes, true) ) {
             $classes[] = 'firefly-page';
         }
