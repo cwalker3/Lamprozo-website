@@ -830,9 +830,6 @@ body.firefly-page.page-dashboard .invoice-card {
 }
 
 body.firefly-page.page-dashboard .invoice-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
     margin-bottom: 1rem;
     min-height: 4rem;
 }
@@ -842,9 +839,168 @@ body.firefly-page.page-dashboard .invoice-details:empty::before {
     color: var(--ff-fg-dim);
     font-style: italic;
     font-size: 0.875rem;
+    display: block;
+    padding: 0.5rem 0;
 }
 
-body.firefly-page.page-dashboard .invoice-details > div,
+/* ---- Invoice table (rendered by updateInvoice in dashboard.js) ----
+   Two columns, thin row dividers, right-aligned prices that don't
+   wrap. Section headers (One-Time / Recurring) use a muted mono
+   uppercase treatment. Totals get a heavier top border. */
+
+body.firefly-page.page-dashboard .invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    color: var(--ff-fg-muted);
+    table-layout: auto;
+}
+
+body.firefly-page.page-dashboard .invoice-table thead th {
+    text-align: left;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .invoice-table thead th:last-child {
+    text-align: right;
+    width: 1%;
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody td {
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--ff-border);
+    vertical-align: top;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody td:last-child {
+    text-align: right;
+    white-space: nowrap;
+    color: var(--ff-fg);
+    font-variant-numeric: tabular-nums;
+    padding-left: 1rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Section header rows (One-Time Charges / Recurring Charges) */
+body.firefly-page.page-dashboard .invoice-table tr.section-header td {
+    padding: 1rem 0 0.375rem;
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .invoice-table tr.section-header td strong {
+    font-weight: 500;
+    color: inherit;
+}
+
+/* First section header right after thead has no extra top padding */
+body.firefly-page.page-dashboard .invoice-table thead + tbody tr.section-header:first-child td {
+    padding-top: 0.625rem;
+}
+
+/* Spacer rows between One-Time and Recurring blocks */
+body.firefly-page.page-dashboard .invoice-table tr.section-spacer td {
+    padding: 0;
+    border-bottom: 0;
+    height: 0.5rem;
+}
+
+/* Per-line item composition (built in renderItemRow) */
+body.firefly-page.page-dashboard .invoice-table .item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table .feature-name {
+    color: var(--ff-fg);
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-name {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .invoice-table .recurring-interval {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-detail-line {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-dim);
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .invoice-table .addon-item-name {
+    color: var(--ff-fg-muted);
+}
+
+/* Totals footer (One-Time Total / Recurring Total / Due Today) */
+body.firefly-page.page-dashboard .invoice-table tfoot td {
+    padding: 0.625rem 0;
+    border-top: 1px solid var(--ff-border);
+    font-family: var(--ff-font-sans);
+    color: var(--ff-fg-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot td:last-child {
+    text-align: right;
+    color: var(--ff-fg);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr:not(:first-child) td {
+    border-top: 0;
+    padding-top: 0.25rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr.invoice-grand-total td,
+body.firefly-page.page-dashboard .invoice-table tfoot tr:last-child td {
+    border-top: 1px solid var(--ff-amber-ring);
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr:last-child td:last-child {
+    color: var(--ff-amber);
+    font-size: 1.125rem;
+    letter-spacing: -0.01em;
+}
+
+/* Legacy non-table invoice rows (still used in some flows) */
 body.firefly-page.page-dashboard .invoice-line {
     display: flex;
     justify-content: space-between;
@@ -857,11 +1013,6 @@ body.firefly-page.page-dashboard .invoice-line {
     color: var(--ff-fg-muted);
 }
 
-body.firefly-page.page-dashboard .invoice-details > div:last-child {
-    border-bottom: 0;
-}
-
-body.firefly-page.page-dashboard .invoice-details strong,
 body.firefly-page.page-dashboard .invoice-line strong {
     color: var(--ff-fg);
     font-weight: 500;
@@ -884,6 +1035,37 @@ body.firefly-page.page-dashboard .invoice-total .total-amount {
     font-size: 1.5rem;
     color: var(--ff-amber);
     letter-spacing: -0.01em;
+}
+
+/* ---- Addon tooltip "?" badge ----
+   Without styling, the literal "?" character bleeds straight into the
+   addon name. Make it a proper circular info badge. */
+body.firefly-page.page-dashboard .tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin: 0 0.5rem 0 0.375rem;
+    border-radius: 50%;
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+body.firefly-page.page-dashboard .tooltip-icon:hover,
+body.firefly-page.page-dashboard .tooltip-icon:focus-visible {
+    color: var(--ff-amber);
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+    outline: none;
 }
 
 /* Order-placed indicator */
