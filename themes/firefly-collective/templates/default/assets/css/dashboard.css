@@ -646,11 +646,14 @@ body.firefly-page.page-dashboard .feature-type-icon svg {
 }
 
 body.firefly-page.page-dashboard .feature-type > h3 {
-    font-size: 1.125rem;
+    /* Design-system h3 baseline + slightly heavier ceiling so features
+       read as primary product names, not subheadings. */
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
     font-weight: 500;
     letter-spacing: -0.02em;
+    line-height: 1.2;
     color: var(--ff-fg);
-    margin: 0 0 0.375rem;
+    margin: 0 0 0.5rem;
     padding-right: 3rem;
 }
 
@@ -687,68 +690,14 @@ body.firefly-page.page-dashboard .feature-fields:focus-within {
     border-color: var(--ff-amber-ring);
 }
 
-/* User-editable field (label + input) */
-
-body.firefly-page.page-dashboard .user-field,
-body.firefly-page.page-dashboard .feature-level-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-}
-
-body.firefly-page.page-dashboard .user-field label,
-body.firefly-page.page-dashboard .feature-level-field label {
-    font-family: var(--ff-font-mono);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ff-fg-muted);
-}
-
-body.firefly-page.page-dashboard .user-field input,
-body.firefly-page.page-dashboard .user-field textarea,
-body.firefly-page.page-dashboard .user-field select,
-body.firefly-page.page-dashboard .feature-level-field input,
-body.firefly-page.page-dashboard .feature-level-field textarea,
-body.firefly-page.page-dashboard .feature-level-field select {
-    width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid var(--ff-border);
-    border-radius: var(--ff-radius-sm);
-    background: var(--ff-surface-2);
-    color: var(--ff-fg);
-    font-family: var(--ff-font-sans);
-    font-size: 0.875rem;
-    line-height: 1.4;
-    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-    box-sizing: border-box;
-}
-
-body.firefly-page.page-dashboard .user-field input:hover,
-body.firefly-page.page-dashboard .user-field textarea:hover,
-body.firefly-page.page-dashboard .user-field select:hover,
-body.firefly-page.page-dashboard .feature-level-field input:hover,
-body.firefly-page.page-dashboard .feature-level-field textarea:hover,
-body.firefly-page.page-dashboard .feature-level-field select:hover {
-    border-color: var(--ff-border-strong);
-}
-
-body.firefly-page.page-dashboard .user-field input:focus,
-body.firefly-page.page-dashboard .user-field textarea:focus,
-body.firefly-page.page-dashboard .user-field select:focus,
-body.firefly-page.page-dashboard .feature-level-field input:focus,
-body.firefly-page.page-dashboard .feature-level-field textarea:focus,
-body.firefly-page.page-dashboard .feature-level-field select:focus {
-    outline: none;
-    border-color: var(--ff-amber-ring);
-    box-shadow: 0 0 0 3px var(--ff-amber-soft);
-}
-
-body.firefly-page.page-dashboard .user-field input::placeholder,
-body.firefly-page.page-dashboard .user-field textarea::placeholder {
-    color: var(--ff-fg-dim);
-}
+/* User-editable fields are rendered via the shared renderUserFieldRow
+   helper in dashboard.js, which uses the .form-row + .form-input
+   pattern (see line ~104). The legacy .user-field input/textarea/select
+   chrome was duplicating those Profile-card rules at lower specificity
+   and has been removed in favour of the unified pattern. .user-field
+   class is still emitted on the wrapper so .feature-fields-scoped
+   styling has a hook, and .user-display-value is the amber-pill chrome
+   for read-only _display fields. */
 
 body.firefly-page.page-dashboard .user-display-value {
     display: inline-block;
@@ -762,31 +711,28 @@ body.firefly-page.page-dashboard .user-display-value {
     letter-spacing: 0.02em;
 }
 
-body.firefly-page.page-dashboard .feature-fields select,
-body.firefly-page.page-dashboard .feature-type select {
+/* Custom chevron for any remaining <select> inside the calculator —
+   user-field array (dropdown) types still render as native <select>
+   elements with .form-input. The option-picker and price-option
+   selector use custom tile/segmented components, no <select>. */
+body.firefly-page.page-dashboard .feature-type select.form-input,
+body.firefly-page.page-dashboard .feature-fields select.form-input {
     appearance: none;
+    -webkit-appearance: none;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
+    background-position: right 0.875rem center;
     padding-right: 2rem;
     cursor: pointer;
 }
 
-/* "Add new <feature>" button */
-
+/* "Add another <feature>" button — composes .btn .btn-ghost from the
+   design system with an .add-new-feature modifier for the dashed
+   border (so it visually reads as "extend this list, not commit"). */
 body.firefly-page.page-dashboard .add-new-feature {
     align-self: flex-start;
     margin-top: 0.75rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-    background: transparent;
-    border-style: dashed;
-}
-
-body.firefly-page.page-dashboard .add-new-feature::before {
-    content: '+';
-    font-weight: 600;
-    margin-right: 0.125rem;
+    border-style: dashed !important;
 }
 
 /* Remove instance button */
@@ -810,6 +756,934 @@ body.firefly-page.page-dashboard .remove-instance:hover,
 body.firefly-page.page-dashboard .remove-feature:hover {
     color: #ff7a7a;
     border-color: rgba(255, 122, 122, 0.4);
+}
+
+/* ============================================================== */
+/* PRICE CALCULATOR — TILE / CARD UI                               */
+/* All form-element-y bits replaced with custom components that    */
+/* sit on top of the existing render pipeline. Native <input> and  */
+/* <select> elements either disappear or get visually hidden       */
+/* inside a custom card; the data flow in dashboard.js is unchanged.*/
+/* ============================================================== */
+
+/* ---------- Instance shell (the inset panel inside a feature card) ---------- */
+
+body.firefly-page.page-dashboard .feature {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.125rem 1.25rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    transition: border-color 240ms ease;
+}
+
+body.firefly-page.page-dashboard .feature:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .feature .instance-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 0;
+}
+
+body.firefly-page.page-dashboard .feature .instance-eyebrow {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .feature .instance-header:empty {
+    display: none;
+}
+
+/* Icon-only delete button absolutely positioned top-right */
+body.firefly-page.page-dashboard .instance-delete {
+    position: absolute;
+    top: 0.625rem;
+    right: 0.625rem;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-fg-dim);
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .instance-delete:hover,
+body.firefly-page.page-dashboard .instance-delete:focus-visible {
+    color: #ff7a7a;
+    border-color: rgba(255, 122, 122, 0.4);
+    background: rgba(255, 122, 122, 0.08);
+    outline: none;
+}
+
+body.firefly-page.page-dashboard .instance-delete svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---------- Option details panel (rendered after a tile is picked) ----------
+   Vertical rhythm for the stack of sections: description → display
+   fields (tier benefits) → price (or segmented) → threshold track →
+   user fields → quantity stepper → add-ons. Each section gets the
+   same breathing room so the panel reads as a structured form, not a
+   pile of paragraphs. */
+body.firefly-page.page-dashboard .option-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+body.firefly-page.page-dashboard .option-details.is-hidden {
+    display: none;
+}
+
+/* The .option-summary description sits right under the option-tile
+   grid; tighten its top margin so it doesn't compound with .feature's
+   own gap rule above it. */
+body.firefly-page.page-dashboard .option-details > .option-summary:first-child {
+    margin-top: -0.25rem;
+}
+
+/* ---------- Option-tile picker (replaces <select>) -------------- */
+
+body.firefly-page.page-dashboard .option-tile-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+@media (min-width: 640px) {
+    body.firefly-page.page-dashboard .option-tile-grid {
+        /* Wider min-width so tier-benefit lists have room to breathe
+           without wrapping mid-phrase. Tiles in the same row stretch to
+           the tallest member so a row never looks ragged. */
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+}
+
+/* Tile layout is two stacked rows:
+     1. .option-tile-header  — icon + name + meta (price + check)
+     2. bullets / teaser     — gets the full tile width, doesn't fight
+                              the icon or meta columns for room.
+   This is the standard SaaS pricing-card stack and lets benefit text
+   span the entire content width minus tile padding. */
+body.firefly-page.page-dashboard .option-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    width: 100%;
+    height: 100%;
+    padding: 1.125rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 180ms ease, background 240ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-dashboard .option-tile-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+body.firefly-page.page-dashboard .option-tile:hover {
+    border-color: var(--ff-border-strong);
+    transform: translateY(-1px);
+}
+
+body.firefly-page.page-dashboard .option-tile:focus-visible {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected {
+    border-color: var(--ff-amber);
+    background: linear-gradient(180deg, var(--ff-amber-soft), transparent 70%), var(--ff-surface-2);
+}
+
+body.firefly-page.page-dashboard .option-tile[disabled],
+body.firefly-page.page-dashboard .option-tile.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+body.firefly-page.page-dashboard .option-tile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+body.firefly-page.page-dashboard .option-tile-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+}
+
+/* Plain-paragraph teaser (used when the source isn't a "·"-separated
+   benefit list). Wraps naturally — no truncation. */
+body.firefly-page.page-dashboard .option-tile-teaser {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+/* Benefit list — used whenever the teaser source uses "·" separators
+   (tierBenefits in pricing.json follows this convention). Renders as
+   a checkmark bullet list, which reads as a real pricing-page benefit
+   stack rather than a wrapped paragraph. */
+body.firefly-page.page-dashboard .option-tile-bullets {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+}
+
+body.firefly-page.page-dashboard .option-tile-bullets li {
+    display: grid;
+    grid-template-columns: 14px 1fr;
+    align-items: start;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.45;
+}
+
+body.firefly-page.page-dashboard .option-tile-bullets li svg {
+    width: 14px;
+    height: 14px;
+    margin-top: 0.1875rem;
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected .option-tile-bullets li svg {
+    color: var(--ff-amber);
+}
+
+/* Right meta cluster inside the header row: price chip + selection
+   indicator inline. Sits next to the name on a single header row;
+   bullet list / teaser flows below as a full-width row. */
+body.firefly-page.page-dashboard .option-tile-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile-price {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.125rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-amber);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .option-tile-period {
+    font-size: 0.6875rem;
+    color: var(--ff-fg-muted);
+    letter-spacing: 0.02em;
+}
+
+body.firefly-page.page-dashboard .option-tile-check {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid var(--ff-border-strong);
+    color: transparent;
+    background: transparent;
+    transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected .option-tile-check {
+    border-color: var(--ff-amber);
+    background: var(--ff-amber);
+    color: #0a0a0b;
+}
+
+body.firefly-page.page-dashboard .option-tile-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+body.firefly-page.page-dashboard .option-tile-disabled-note {
+    margin-left: 0.375rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+/* ---------- Segmented price-options selector --------------------- */
+
+body.firefly-page.page-dashboard .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+body.firefly-page.page-dashboard .segmented-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: 999px;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-sans);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .segmented-pill:hover {
+    color: var(--ff-fg);
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .segmented-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .segmented-pill.is-selected {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .segmented-pill-label {
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .segmented-pill-price {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+}
+
+body.firefly-page.page-dashboard .segmented-pill.is-selected .segmented-pill-price {
+    opacity: 1;
+}
+
+/* ---------- Addon block (header + list/groups) ------------------ */
+
+body.firefly-page.page-dashboard .addons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+body.firefly-page.page-dashboard .addons-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+body.firefly-page.page-dashboard .addons-head .overline {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .addons-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+/* ---------- Addon card (replaces .addon-item) ------------------- */
+
+body.firefly-page.page-dashboard .addon-card {
+    /* Icon is absolutely positioned in the top-left corner so the body
+       and meta columns get the full card width. padding-left reserves
+       just enough room for the icon badge. */
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.875rem;
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 3.25rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 180ms ease, background 240ms ease, transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-card:hover {
+    border-color: var(--ff-border-strong);
+    transform: translateY(-1px);
+}
+
+body.firefly-page.page-dashboard .addon-card:focus-visible {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected {
+    border-color: var(--ff-amber-ring);
+    background: linear-gradient(180deg, var(--ff-amber-soft), transparent 70%), var(--ff-surface-2);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    transform: none;
+}
+
+/* The native <input type="checkbox"> kept inside the button for
+   enforceMaxAddons / enforceMaxGroupItems queries — visually hidden. */
+body.firefly-page.page-dashboard .addon-card > input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-icon {
+    /* Corner badge — out of grid flow so the body and meta can use the
+       full card width minus the reserved 3.25rem padding-left. */
+    position: absolute;
+    top: 0.875rem;
+    left: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.firefly-page.page-dashboard .addon-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    min-width: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-name {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .addon-card-desc {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .addon-card-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-price {
+    font-family: var(--ff-font-mono);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-fg);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-price {
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--ff-fg-dim);
+    transition: color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle svg {
+    width: 22px;
+    height: 22px;
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle .addon-card-toggle-checked {
+    display: none;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle {
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle-empty {
+    display: none;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle-checked {
+    display: inline-block;
+}
+
+/* ---------- Addon group panel ----------------------------------- */
+
+body.firefly-page.page-dashboard .addon-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 1rem 1rem 0.875rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+}
+
+body.firefly-page.page-dashboard .addon-group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-name {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .addon-group-counter {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .addon-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-group-status.is-pending {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .addon-group-status.is-active {
+    color: var(--ff-green);
+    background: var(--ff-green-soft);
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+body.firefly-page.page-dashboard .addon-group-status svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* ---------- Quantity stepper ------------------------------------ */
+
+body.firefly-page.page-dashboard .quantity-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .quantity-row .form-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .quantity-metric {
+    font-family: var(--ff-font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .qty-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    height: 40px;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-surface-2);
+    overflow: hidden;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-dashboard .qty-stepper:focus-within {
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--ff-fg-muted);
+    cursor: pointer;
+    transition: color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .qty-step:hover {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step:focus-visible {
+    outline: none;
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step:disabled {
+    color: var(--ff-fg-dim);
+    cursor: not-allowed;
+    background: transparent;
+}
+
+body.firefly-page.page-dashboard .qty-step svg {
+    width: 14px;
+    height: 14px;
+}
+
+body.firefly-page.page-dashboard .qty-step-input {
+    width: 64px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--ff-border);
+    border-right: 1px solid var(--ff-border);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+    -webkit-appearance: none;
+}
+
+body.firefly-page.page-dashboard .qty-step-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+body.firefly-page.page-dashboard .qty-step-input::-webkit-outer-spin-button,
+body.firefly-page.page-dashboard .qty-step-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ---------- Threshold-discount track ---------------------------- */
+
+/* ---------- Threshold-discount track (chips, not cards) ----------
+   Tiers render as compact inline pills — count + percent on one line,
+   icon shrinks to a small dot/check. No outer panel chrome; the chips
+   sit on a flat row aligned with the rest of the form. */
+body.firefly-page.page-dashboard .threshold-track {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .threshold-track-label {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-track-tiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-tier {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem 0.625rem;
+    background: transparent;
+    border: 1px solid var(--ff-border);
+    border-radius: 999px;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-passed {
+    color: var(--ff-fg-muted);
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-active {
+    color: var(--ff-amber);
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .threshold-tier-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 11px;
+    height: 11px;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-icon svg {
+    width: 11px;
+    height: 11px;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-count {
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-pct {
+    color: inherit;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-active .threshold-tier-pct {
+    opacity: 1;
+}
+
+body.firefly-page.page-dashboard .threshold-track-current {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-amber);
+    min-height: 0.6875rem;
+}
+
+body.firefly-page.page-dashboard .threshold-track-current:empty {
+    color: var(--ff-fg-dim);
+}
+
+/* ---------- Display-rows (description / display fields / price) - */
+
+body.firefly-page.page-dashboard .option-summary {
+    margin: 0;
+    color: var(--ff-fg-muted);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+}
+
+body.firefly-page.page-dashboard .display-field-row .user-display-value {
+    align-self: flex-start;
+}
+
+body.firefly-page.page-dashboard .price-row {
+    /* inherits .form-row layout */
+}
+
+body.firefly-page.page-dashboard .option-price-display {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font-family: var(--ff-font-mono);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-amber);
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .option-price-suffix {
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    margin-left: 0.125rem;
+}
+
+/* ---------- User-field icon (inline beside label) ---------------- */
+
+body.firefly-page.page-dashboard .user-field-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.375rem;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .user-field-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---------- Inline alert (replaces inline-styled red message) --- */
+
+body.firefly-page.page-dashboard .ff-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--ff-radius-sm);
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+}
+
+body.firefly-page.page-dashboard .ff-alert-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .ff-alert-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+body.firefly-page.page-dashboard .ff-alert-text {
+    line-height: 1.35;
+}
+
+body.firefly-page.page-dashboard .ff-alert-warning {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .ff-alert-info {
+    color: var(--ff-fg-muted);
+    background: transparent;
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .ff-alert-success {
+    color: var(--ff-green);
+    background: var(--ff-green-soft);
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+/* ---------- Add-new-feature button (icon + ghost variant) ------- */
+
+body.firefly-page.page-dashboard .add-new-feature .add-new-feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .add-new-feature .add-new-feature-icon svg {
+    width: 14px;
+    height: 14px;
 }
 
 /* ---------- Invoice card (sticky on desktop) --------------------- */
@@ -1212,13 +2086,154 @@ body.firefly-page.page-dashboard .loading-overlay::after {
 /* ---------- Mobile tweaks ---------------------------------------- */
 
 @media (max-width: 640px) {
+    /* Outer cards: tighten container padding so the inner panels have
+       more horizontal room for content. */
     body.firefly-page.page-dashboard .dash-card,
     body.firefly-page.page-dashboard .feature-type,
     body.firefly-page.page-dashboard .invoice-card {
-        padding: 1.25rem;
+        padding: 1.125rem;
     }
+
     body.firefly-page.page-dashboard .feature-type-icon {
-        top: 1.25rem;
-        right: 1.25rem;
+        top: 1.125rem;
+        right: 1.125rem;
+        width: 32px;
+        height: 32px;
+    }
+
+    body.firefly-page.page-dashboard .feature-type-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Feature title — clamp already scales down to 1.375rem; give it
+       a hair more breathing room above and the option-tile grid below. */
+    body.firefly-page.page-dashboard .feature-type > h3 {
+        margin-bottom: 0.5rem;
+        padding-right: 2.75rem;
+    }
+
+    body.firefly-page.page-dashboard .feature-type > p {
+        margin-bottom: 1rem;
+        padding-right: 0;
+    }
+
+    /* Instance shell — reduce inner padding so feature-card → instance
+       → addon stacking doesn't accumulate ~6rem of horizontal padding. */
+    body.firefly-page.page-dashboard .feature {
+        padding: 1rem 1rem;
+        gap: 0.875rem;
+    }
+
+    /* Instance header / option-2 eyebrow */
+    body.firefly-page.page-dashboard .instance-delete {
+        top: 0.5rem;
+        right: 0.5rem;
+    }
+
+    /* Option-details rhythm: tighter than desktop but still clearly
+       sectioned so the panel doesn't read as a wall of text. */
+    body.firefly-page.page-dashboard .option-details {
+        gap: 1rem;
+    }
+
+    body.firefly-page.page-dashboard .addons {
+        gap: 0.75rem;
+    }
+
+    body.firefly-page.page-dashboard .addons-list {
+        gap: 0.5rem;
+    }
+
+    /* Option tiles — single column; tighter padding and gap. */
+    body.firefly-page.page-dashboard .option-tile-grid {
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile {
+        padding: 1rem;
+        gap: 0.75rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-header {
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Addon card — smaller corner-icon, tighter padding-left clearance. */
+    body.firefly-page.page-dashboard .addon-card {
+        padding: 0.75rem 0.875rem 0.75rem 2.875rem;
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-icon {
+        top: 0.75rem;
+        left: 0.75rem;
+        width: 24px;
+        height: 24px;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-name {
+        font-size: 0.9375rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-desc {
+        font-size: 0.8125rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-meta {
+        gap: 0.5rem;
+    }
+
+    /* Addon group panel inset — match the tighter card padding. */
+    body.firefly-page.page-dashboard .addon-group {
+        padding: 0.875rem 0.875rem 0.75rem;
+    }
+
+    /* Threshold chips wrap naturally on narrow widths — no extra
+       overrides needed; the desktop pill rules already work at 360px. */
+
+    /* Quantity stepper — full-row treatment so the input is a fat
+       touch target on phones. */
+    body.firefly-page.page-dashboard .qty-stepper {
+        height: 44px;
+    }
+
+    body.firefly-page.page-dashboard .qty-step {
+        width: 44px;
+    }
+
+    body.firefly-page.page-dashboard .qty-step-input {
+        width: 72px;
+        font-size: 1rem;
+    }
+
+    /* Invoice — tighter row padding so the invoice fits comfortably
+       below the calculator on a single mobile column. */
+    body.firefly-page.page-dashboard .invoice-table thead th {
+        font-size: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .invoice-table tbody td {
+        padding: 0.5rem 0;
+    }
+
+    body.firefly-page.page-dashboard #pay-now {
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
     }
 }

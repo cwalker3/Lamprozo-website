@@ -34,6 +34,24 @@ body.firefly-page {
     color-scheme: dark;
 }
 
+/* Suppress the iOS / Android Chromium blue tap-flash on every
+   element in the template. The property doesn't inherit, so it has
+   to be set on the universal selector. !important is used because
+   some user-agent stylesheets and third-party CSS (Stripe iframe,
+   wp-admin chrome that may bleed in) set a non-transparent tap
+   highlight at higher specificity. Keyboard focus rings still
+   render via existing :focus-visible rules — this only kills the
+   touch-tap flash. */
+html,
+body,
+body.firefly-page,
+body.firefly-page *,
+body.firefly-page *::before,
+body.firefly-page *::after {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
 body.firefly-page main,
 body.firefly-page main .content,
 body.firefly-page main > .content {
