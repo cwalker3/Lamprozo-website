@@ -2134,7 +2134,11 @@
 
                 renderOptionDetails(fIndex, instIndex, feature, optionDetailsDiv);
                 if (instance.optionIndex !== undefined && !isNaN(instance.optionIndex)) {
-                    smoothScrollToElement(instanceDiv, 120);
+                    // Land the viewport on the details panel (its first
+                    // child is the .option-details-title overline + the
+                    // description) instead of the top of the feature
+                    // card. The selected tile remains visible just above.
+                    smoothScrollToElement(optionDetailsDiv, 140);
                 }
                 saveSelections();
             }
@@ -3161,6 +3165,14 @@
                 const staticP = parseSafe(selectedOption.staticPrice, 0);
                 optionPriceText = `$${staticP.toFixed(2)}`;
             }
+
+            // Subtle title — option name in overline style. Acts as the
+            // scroll-target marker so picking a tile lands the viewport
+            // here, not at the top of the feature card.
+            const titleEl = document.createElement('p');
+            titleEl.classList.add('overline', 'option-details-title');
+            titleEl.textContent = selectedOption.optionName || '';
+            optionDetailsDiv.appendChild(titleEl);
 
             // Description as a flat paragraph (no "Description:" prefix).
             if (descText) optionDetailsDiv.appendChild(renderOptionSummary(descText));

@@ -847,11 +847,20 @@ body.firefly-page.page-dashboard .option-details.is-hidden {
     display: none;
 }
 
-/* The .option-summary description sits right under the option-tile
-   grid; tighten its top margin so it doesn't compound with .feature's
-   own gap rule above it. */
-body.firefly-page.page-dashboard .option-details > .option-summary:first-child {
-    margin-top: -0.25rem;
+/* Subtle title (overline) introducing the details section. Acts as
+   the smooth-scroll target when an option is picked — the viewport
+   lands on this label so the user reads "[Option Name]" → description
+   immediately, with the selected tile still in view above. */
+body.firefly-page.page-dashboard .option-details-title {
+    margin: 0;
+    color: var(--ff-amber);
+}
+
+/* Tighten the description's top margin when it directly follows the
+   title so the two read as a single header block, not two stacked
+   sections separated by the panel's 1.25rem gap. */
+body.firefly-page.page-dashboard .option-details-title + .option-summary {
+    margin-top: -0.875rem;
 }
 
 /* ---------- Option-tile picker (replaces <select>) -------------- */
