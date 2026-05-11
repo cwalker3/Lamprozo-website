@@ -278,17 +278,6 @@
             return;
         }
 
-        // Diagnostic: identify which wp-admin URL is hitting this every minute.
-        // Rate-limited to once per minute to avoid log spam.
-        static $last_log_ts = 0;
-        $now = time();
-        if ( $now !== $last_log_ts ) {
-            $last_log_ts = $now;
-            $uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field((string) $_SERVER['REQUEST_URI']) : 'unknown';
-            $ua = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field((string) $_SERVER['HTTP_USER_AGENT']) : '';
-            error_log('[FireflyPlatform] disable_comments() invoked. URI=' . $uri . ' UA=' . $ua);
-        }
-
         // Remove from admin menu (guard against core warning: $menu === null)
         global $menu;
         if ( isset($menu) && is_array($menu) ) {
