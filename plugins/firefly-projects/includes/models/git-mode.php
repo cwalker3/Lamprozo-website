@@ -54,16 +54,20 @@ function firefly_projects_git_mode_is_enabled_for_user( $user_id = null ) {
 
 /**
  * Classify a porcelain two-char status code into a simpler category the UI
- * can color: "staged" (ready to commit), "modified" (unstaged working-tree
- * change), or "untracked" (new file).
+ * can color: "deleted", "staged" (ready to commit), "modified" (unstaged
+ * working-tree change), or "untracked" (new file).
  *
  * If a file is both staged AND modified (e.g. "MM"), we return "modified"
  * since that's the actionable state — there's work that hasn't been staged.
+ * A 'D' in either column wins over everything else — the file is going
+ * to be removed from the remote, regardless of which gen of the change
+ * the user has staged.
  */
 function firefly_projects_git_classify_status( $xy ) {
     if ( $xy === '??' ) return 'untracked';
     $x = isset( $xy[0] ) ? $xy[0] : ' ';
     $y = isset( $xy[1] ) ? $xy[1] : ' ';
+    if ( $x === 'D' || $y === 'D' ) return 'deleted';
     if ( $y !== ' ' && $y !== '?' ) return 'modified';   // unstaged change present
     if ( $x !== ' ' && $x !== '?' ) return 'staged';     // staged only
     return 'modified';
@@ -191,7 +195,7 @@ function firefly_projects_git_status_endpoint( WP_REST_Request $request ) {
         'all_changed_files' => array(),
         'in_scope_files'    => array(),
         'status_map'        => new stdClass(),  // "/wp-content/x" => "staged"|"modified"|"untracked"
-        'status_counts'     => array( 'staged' => 0, 'modified' => 0, 'untracked' => 0 ),
+        'status_counts'     => array( 'staged' => 0, 'modified' => 0, 'untracked' => 0, 'deleted' => 0 ),
         'changed_count'     => 0,
     );
 
@@ -215,7 +219,7 @@ function firefly_projects_git_status_endpoint( WP_REST_Request $request ) {
     $result['changed_count']  = count( $scoped['paths'] );
 
     // Counts per status for the UI label
-    $counts = array( 'staged' => 0, 'modified' => 0, 'untracked' => 0 );
+    $counts = array( 'staged' => 0, 'modified' => 0, 'untracked' => 0, 'deleted' => 0 );
     foreach ( $scoped['status_map'] as $status ) {
         if ( isset( $counts[ $status ] ) ) $counts[ $status ]++;
     }

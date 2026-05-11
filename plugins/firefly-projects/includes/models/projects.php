@@ -156,14 +156,47 @@
         // Synchronize the unzipped file structure with the live site
         firefly_collective_sync_unzipped($update_dir, $sync_mode);
 
+        // Apply explicit deletions from a partial-sync payload. The
+        // local site sends a list of wp-content-relative paths the user
+        // marked for removal (git-deleted files surfaced as ghost nodes
+        // in the file tree). Each path is mapped to ABSPATH-relative
+        // and unlinked, with realpath-based containment checks so a
+        // malformed payload can never escape ABSPATH.
+        $deletions_count = 0;
+        if ($sync_mode === 'partial') {
+            $deletions_json = $request->get_param('selected_deletions');
+            $deletions      = array();
+            if (is_string($deletions_json) && $deletions_json !== '') {
+                $decoded = json_decode(wp_unslash($deletions_json), true);
+                if (is_array($decoded)) $deletions = $decoded;
+            }
+            if (!empty($deletions)) {
+                $abspath_real = realpath(ABSPATH);
+                foreach ($deletions as $rel) {
+                    if (!is_string($rel) || $rel === '') continue;
+                    $abs = ABSPATH . ltrim($rel, '/');
+                    // Parent must exist (we can't realpath the file
+                    // itself — it should not exist post-delete — so
+                    // resolve the parent and re-append basename).
+                    $parent_real = realpath(dirname($abs));
+                    if (!$parent_real || strpos($parent_real, $abspath_real) !== 0) continue;
+                    $resolved = $parent_real . '/' . basename($abs);
+                    if (file_exists($resolved)) {
+                        if (@unlink($resolved)) $deletions_count++;
+                    }
+                }
+            }
+        }
+
         // Delete the update directory and all its contents after successful sync
         // WP_Filesystem delete method accepts a second parameter for recursive deletion.
         $wp_filesystem->delete($update_dir, true);
 
         return new WP_REST_Response(array(
-            'message' => 'Project updated successfully.',
-            'project' => $project_name,
-            'sync_mode' => $sync_mode
+            'message'         => 'Project updated successfully.',
+            'project'         => $project_name,
+            'sync_mode'       => $sync_mode,
+            'deletions_count' => $deletions_count,
         ), 200);
     }
 
@@ -190,6 +223,12 @@
             $file_path     = $file->getRealPath();
             $relative_path = str_replace($update_dir, '', $file_path);
             $relative_path = ltrim($relative_path, '/');
+
+            // Skip sync-meta markers (e.g. .firefly-sync-meta/deletions-only).
+            // These exist solely so a deletion-only zip materializes on
+            // disk on the sender side; they carry no payload and must
+            // never land in wp-content on the remote.
+            if (strpos($relative_path, '.firefly-sync-meta/') === 0) continue;
 
             // Determine destination
             if (strpos($relative_path, 'plugins/') === 0 || strpos($relative_path, 'themes/') === 0) {
@@ -590,19 +629,56 @@
         }
 
         // For FULL sync mode, ALWAYS use all project files (ignore selected_files parameter)
+        $selected_deletions = array();
         if ($sync_mode === 'full') {
             // $directories already contains all files from projects.json
-            // Don't filter by selected_files
+            // Don't filter by selected_files. Full-sync deletes whatever
+            // isn't in the payload anyway, so explicit deletion list is
+            // a no-op here.
         } else {
-            // PARTIAL sync mode: use selected_files if provided
+            // PARTIAL sync mode: use selected_files if provided.
+            // Split into real on-disk paths (to be zipped + copied) and
+            // ghost paths (git-deleted files — sent as a separate
+            // selected_deletions list so the remote can unlink them
+            // alongside the file copy).
             $selected_files = $request->get_param('selected_files');
 
             if (!empty($selected_files) && is_array($selected_files)) {
-                $directories = $selected_files;
+                $real_files = array();
+                foreach ($selected_files as $path) {
+                    $abs = ABSPATH . ltrim($path, '/');
+                    if (file_exists($abs)) {
+                        $real_files[] = $path;
+                    } else {
+                        // Ghost path — only counts as a deletion if git
+                        // reports it. Cross-check against git status so we
+                        // never delete a remote file just because the
+                        // user selected a typo'd path.
+                        $selected_deletions[] = $path;
+                    }
+                }
+                if ( ! empty( $selected_deletions ) && function_exists( 'firefly_projects_git_changed_files' ) ) {
+                    $changed = firefly_projects_git_changed_files();
+                    $scoped  = firefly_projects_git_files_in_project_scope( $changed, $directories );
+                    $valid   = array();
+                    foreach ( $selected_deletions as $del ) {
+                        if ( isset( $scoped['status_map'][ $del ] ) && $scoped['status_map'][ $del ] === 'deleted' ) {
+                            $valid[] = $del;
+                        }
+                    }
+                    $selected_deletions = $valid;
+                }
+                $directories = $real_files;
             }
         }
 
-        $zip_path = firefly_collective_zip_contents($project_name, $directories, $target_env);
+        // Allow an empty zip when the only intent of this sync is to
+        // delete files on the remote (the deletions travel as a
+        // separate JSON field on the multipart POST, not inside the
+        // zip). Without this, the zip guard fires "No files to sync"
+        // even though there's real work to do.
+        $allow_empty_zip = empty($directories) && ! empty($selected_deletions);
+        $zip_path = firefly_collective_zip_contents($project_name, $directories, $target_env, $allow_empty_zip);
         if (is_wp_error($zip_path)) {
             return $zip_path;
         }
@@ -624,7 +700,7 @@
             $target_env
         );
 
-        $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode);
+        $response = firefly_collective_send_project_update($zip_path, $project_name, $endpoint, $sync_mode, $selected_deletions);
         if (is_wp_error($response)) {
             return $response;
         }
@@ -648,7 +724,7 @@
      * @param string $target_env   Target environment: 'dev' or 'prod'
      * @return string|WP_Error Path to created zip file or error
      */
-    function firefly_collective_zip_contents($project_name, $directories, $target_env = 'dev') {
+    function firefly_collective_zip_contents($project_name, $directories, $target_env = 'dev', $allow_empty = false) {
         $upload_dir = wp_upload_dir();
         $temp_dir   = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
         if (!file_exists($temp_dir)) {
@@ -700,10 +776,26 @@
             $files_added++;
         }
 
+        // Deletion-only path: ZipArchive::close() on a zip with zero
+        // entries doesn't reliably produce a physical file on disk
+        // across PHP / libzip versions. Drop a tiny meta marker into
+        // the archive so the zip file definitely exists when we hand
+        // it to curl. The receiver's sync_unzipped() skips anything
+        // under .firefly-sync-meta/ (see below), and the whole update
+        // dir is wiped after the sync, so the marker leaves no trace.
+        if ($files_added === 0 && $allow_empty) {
+            $zip->addFromString('.firefly-sync-meta/deletions-only', '1');
+        }
+
         $zip->close();
 
-        // Check if anything was added to the zip
-        if ($files_added === 0) {
+        // Empty-zip guard. Normally an error — but when the caller is
+        // doing a deletion-only sync (no real files to copy, just
+        // selected_deletions to apply on the remote), they pass
+        // $allow_empty=true so we keep the zip and let the request
+        // proceed. The remote unzips, skips the meta marker, and then
+        // runs the deletion loop.
+        if ($files_added === 0 && ! $allow_empty) {
             @unlink($zip_path);
             $message = 'No files to sync.';
             if (!empty($skipped_dirs)) {
@@ -796,11 +888,97 @@
             }
         }
 
+        // Inject ghost nodes for git-deleted files at their natural
+        // location in the tree, so the UI can render them with a
+        // strikethrough where they used to live. These have type=file,
+        // deleted=true, and a synthesized path. Sync logic separates
+        // them out before zipping and forwards as selected_deletions.
+        if ( function_exists( 'firefly_projects_git_changed_files' ) && function_exists( 'firefly_projects_git_files_in_project_scope' ) ) {
+            $changed = firefly_projects_git_changed_files();
+            $scoped  = firefly_projects_git_files_in_project_scope( $changed, $directories );
+            $deleted_paths = array();
+            foreach ( $scoped['status_map'] as $path => $status ) {
+                if ( $status === 'deleted' ) $deleted_paths[] = $path;
+            }
+            if ( ! empty( $deleted_paths ) ) {
+                firefly_collective_inject_deleted_paths( $file_tree, $deleted_paths );
+            }
+        }
+
         return new WP_REST_Response(array(
             'success' => true,
             'project' => $project_name,
             'files'   => $file_tree
         ), 200);
+    }
+
+    /**
+     * Walk the tree and inject a ghost node for each git-deleted path.
+     * Lands the ghost in its natural parent directory; if any ancestor
+     * directory is also missing (the whole folder got deleted), the ghost
+     * is attached to the deepest existing ancestor — that way the user
+     * still sees something to check, and the sync payload still carries
+     * the original path so the remote `unlink()` resolves correctly.
+     */
+    function firefly_collective_inject_deleted_paths( &$tree, $deleted_paths ) {
+        foreach ( $deleted_paths as $del ) {
+            $injected = false;
+            foreach ( $tree as &$top ) {
+                if ( firefly_collective_inject_deleted_into_node( $top, $del ) ) {
+                    $injected = true;
+                    break;
+                }
+            }
+            unset( $top );
+            if ( ! $injected ) {
+                $tree[] = array(
+                    'path'    => $del,
+                    'name'    => basename( $del ),
+                    'type'    => 'file',
+                    'deleted' => true,
+                );
+            }
+        }
+    }
+
+    function firefly_collective_inject_deleted_into_node( &$node, $deleted_path ) {
+        $node_path = rtrim( $node['path'], '/' );
+        if ( $node['type'] !== 'directory' ) return false;
+        if ( strpos( $deleted_path, $node_path . '/' ) !== 0 ) return false;
+
+        $remaining = substr( $deleted_path, strlen( $node_path ) + 1 );
+
+        // Direct child of this directory — drop it here.
+        if ( strpos( $remaining, '/' ) === false ) {
+            if ( ! isset( $node['children'] ) ) $node['children'] = array();
+            $node['children'][] = array(
+                'path'    => $deleted_path,
+                'name'    => basename( $deleted_path ),
+                'type'    => 'file',
+                'deleted' => true,
+            );
+            return true;
+        }
+
+        // Try to descend into a matching child directory.
+        if ( isset( $node['children'] ) ) {
+            foreach ( $node['children'] as &$child ) {
+                if ( firefly_collective_inject_deleted_into_node( $child, $deleted_path ) ) {
+                    return true;
+                }
+            }
+            unset( $child );
+        }
+
+        // Deepest existing ancestor — attach here (its own folder is gone).
+        if ( ! isset( $node['children'] ) ) $node['children'] = array();
+        $node['children'][] = array(
+            'path'    => $deleted_path,
+            'name'    => basename( $deleted_path ),
+            'type'    => 'file',
+            'deleted' => true,
+        );
+        return true;
     }
 
     /**
@@ -911,7 +1089,7 @@
     /**
      * Send the zipped project file to the live dev environment (Local Site).
      */
-    function firefly_collective_send_project_update($zip_path, $project_name, $destination_url, $sync_mode = 'partial') {
+    function firefly_collective_send_project_update($zip_path, $project_name, $destination_url, $sync_mode = 'partial', $selected_deletions = array()) {
         if (!file_exists($zip_path)) {
             return new WP_Error('no_zip', 'Zip file does not exist.');
         }
@@ -921,9 +1099,15 @@
         $cfile = new CURLFile($zip_path, 'application/zip', basename($zip_path));
 
         $post_fields = array(
-            'project_name' => $project_name,
-            'file'         => $cfile,
-            'sync_mode'    => $sync_mode
+            'project_name'       => $project_name,
+            'file'               => $cfile,
+            'sync_mode'          => $sync_mode,
+            // JSON-encoded array of wp-content-relative paths the remote
+            // should unlink after applying the zipped file copies. Empty
+            // string when no deletions are part of this sync — keeps the
+            // multipart field present (avoids "Undefined index" notices
+            // on older PHP) without triggering the deletion loop.
+            'selected_deletions' => is_array($selected_deletions) ? wp_json_encode($selected_deletions) : '[]',
         );
 
         curl_setopt($ch, CURLOPT_URL, $destination_url);
