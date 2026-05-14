@@ -1,7 +1,13 @@
 <?php
 /**
- * Home view — renders page content then injects dynamic active challenge block.
+ * Home view — renders page content with dynamic active challenge + Twitch iframe injection.
+ *
+ * The Twitch iframe is rendered server-side here (rather than from the snippet)
+ * because wp_kses strips <script> and <iframe> tags from post content during
+ * the firefly-projects cross-environment sync.
  */
+
+$twitch_channel = 'lamprozo';
 
 // Find the active challenge with an ongoing attempt
 $active_challenge = null;
@@ -41,9 +47,30 @@ if ($active_challenge):
     $challenge_html = ob_get_clean();
 endif;
 
-// Inject challenge block just before the stream section
+// Build the Twitch iframe — uses host from request so it works across
+// localhost, dev, and prod without hardcoding the parent domain.
+$parent_host  = isset($_SERVER['HTTP_HOST']) ? preg_replace('/[^a-zA-Z0-9.\-:]/', '', $_SERVER['HTTP_HOST']) : '';
+$parent_param = $parent_host ? '&parent=' . rawurlencode(preg_replace('/:\d+$/', '', $parent_host)) : '';
+$twitch_iframe = '<iframe src="https://player.twitch.tv/?channel=' . rawurlencode($twitch_channel) . $parent_param . '&autoplay=false" '
+               . 'allowfullscreen="true" frameborder="0" scrolling="no" '
+               . 'class="twitch-iframe" title="Lamprozo on Twitch"></iframe>';
+
+// Inject Twitch iframe in place of the embed placeholder
+$content = str_replace(
+    '<div id="twitch-embed"></div>',
+    $twitch_iframe,
+    $content
+);
+
+// Inject challenge block just before the stream section (match on opening
+// class — tolerant of any extra attributes added to the <section>)
 if ($challenge_html) {
-    echo str_replace('<section class="stream-section">', $challenge_html . '<section class="stream-section">', $content);
-} else {
-    echo $content;
+    $content = preg_replace(
+        '/<section\s+class="stream-section"/',
+        $challenge_html . '<section class="stream-section"',
+        $content,
+        1
+    );
 }
+
+echo $content;

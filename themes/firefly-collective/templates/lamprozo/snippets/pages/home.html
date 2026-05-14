@@ -19,21 +19,4 @@
         <div id="twitch-embed"></div>
     </div>
 </section>
-<script>
-(function() {
-    var script = document.createElement('script');
-    script.src = 'https://embed.twitch.tv/embed/v1.js';
-    script.onload = function() {
-        var embed = new Twitch.Embed("twitch-embed", {
-            width: "100%",
-            height: "100%",
-            channel: "lamprozo",
-            layout: "video-with-chat",
-            autoplay: false,
-            parent: [window.location.hostname]
-        });
-    };
-    document.head.appendChild(script);
-})();
-</script>
 <!-- /wp:html -->

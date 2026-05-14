@@ -330,9 +330,12 @@ main {
 }
 
 #twitch-embed,
-#twitch-embed iframe {
+#twitch-embed iframe,
+.twitch-iframe {
     width: 100% !important;
     height: 100% !important;
+    border: 0;
+    display: block;
 }
 
 /* ── Footer ── */
@@ -343,6 +346,19 @@ footer {
     padding: 2rem;
     text-align: center;
     font-size: 0.9rem;
+}
+
+footer p {
+    margin: 0.25rem 0;
+}
+
+.footer-contact a {
+    color: var(--color-twitch);
+    text-decoration: none;
+}
+
+.footer-contact a:hover {
+    text-decoration: underline;
 }
 
 /* ── 404 ── */

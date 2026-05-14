@@ -49,7 +49,7 @@ function get_view_assets($view, $theme_path) {
     // Add view-specific assets here
     switch ($view) {
         case 'home':
-            // $assets['css'][] = $template_path . '/assets/css/home.css';
+            // Twitch embed rendered server-side in home.php (see kses sync constraint)
             break;
         case 'contact':
             // $assets['js'][] = $template_path . '/assets/js/contact.js';
