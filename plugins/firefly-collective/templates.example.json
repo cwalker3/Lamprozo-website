@@ -1,5 +1,5 @@
 {
     "default_template": "default",
-    "default": ["rest", "bookings", "orders", "pricing", "campaign", "payment"],
+    "default": ["rest", "bookings", "orders", "pricing", "campaign", "payment", "submissions", "notes"],
     "glow": ["rest"]
 }
