@@ -717,9 +717,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
 
-            /** Manual re-read of git status (user clicks refresh). */
+            /** Manual flush + re-read (user clicks refresh).
+             *  Re-loads the file tree (refreshes mtimes/sizes) AND re-reads
+             *  git status, while preserving the user's current selection. */
             async refreshGitStatus() {
-                await this.fetchGitStatus();
+                if (!this.selectedProject) {
+                    await this.fetchGitStatus();
+                    return;
+                }
+                // Stash selection + git mode state so reload doesn't drop them.
+                const savedSelection = new Set(this.selectedPaths);
+                const savedGitMode   = this.gitModeEnabled;
+                const savedSyncMode  = this.syncMode;
+
+                await this.loadProjectFiles();
+
+                // loadProjectFiles resets selection state — restore it.
+                this.selectedPaths  = savedSelection;
+                this.gitModeEnabled = savedGitMode;
+                this.syncMode       = savedSyncMode;
+
+                // loadProjectFiles already kicks off fetchGitStatus, but if
+                // git mode is on we want its selection refresh to win.
+                if (savedGitMode) {
+                    await this.fetchGitStatus();
+                }
             },
 
             /** Apply the current gitChangedFiles list as the selection,

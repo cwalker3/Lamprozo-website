@@ -520,3 +520,52 @@ function firefly_filter_posts_page_for_customizer($page_id) {
 
     return $page_id;
 }
+
+// =============================================================================
+// CUSTOMIZER HOMEPAGE SETTINGS VISIBILITY
+// =============================================================================
+
+/**
+ * Force the core "Homepage Settings" customizer section to stay visible.
+ *
+ * Background: WordPress core's WP_Customize_Manager::has_published_pages()
+ * checks for a published page via get_pages(['number' => 1]) and uses the
+ * result as the active_callback for the static_front_page section. The
+ * LIMIT is applied in SQL before our firefly_filter_scoped_pages() runs,
+ * so if the single page WP fetched doesn't belong to the active firefly
+ * template, our filter discards it — has_published_pages() returns false,
+ * and the section is hidden, even when the active template HAS pages.
+ *
+ * Fix: override the section's active state. If the active firefly template
+ * (or its temp/preview counterpart in the customizer iframe) has any
+ * published page, force the section visible.
+ */
+add_filter( 'customize_section_active', 'firefly_force_static_front_page_active', 10, 2 );
+
+function firefly_force_static_front_page_active( $active, $section ) {
+    if ( ! is_object( $section ) || $section->id !== 'static_front_page' ) {
+        return $active;
+    }
+
+    // Use temp template in customizer iframe context, active template otherwise.
+    if ( function_exists( 'in_customizer_iframe' ) && in_customizer_iframe() ) {
+        $template = get_option( FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE );
+    } else {
+        $template = firefly_get_scoping_template();
+    }
+
+    // Count scoped pages without going through our get_pages filter
+    // (firefly_skip_scoping bypasses it for this query only).
+    $pages = get_posts( array(
+        'post_type'            => 'page',
+        'post_status'          => 'publish',
+        'numberposts'          => 1,
+        'meta_key'             => FIREFLY_TEMPLATE_META_KEY,
+        'meta_value'           => $template,
+        'firefly_skip_scoping' => true,
+        'fields'               => 'ids',
+        'suppress_filters'     => false, // we WANT pre_get_posts to run with our skip flag
+    ) );
+
+    return ! empty( $pages ) ? true : $active;
+}

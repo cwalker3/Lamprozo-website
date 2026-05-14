@@ -88,6 +88,14 @@ function firefly_projects_git_changed_files() {
     if ( ! firefly_projects_git_is_available() ) return array();
 
     $wp_content = firefly_projects_git_wp_content_dir();
+
+    // Force git to re-stat all files before reading status. Without this,
+    // git's lazy stat cache can hold onto outdated mtime/size info after
+    // bulk operations (rebase, checkout, bind-mount filesystem sync delays
+    // on WSL2/Docker), causing `git status --porcelain` to report files as
+    // modified even when their content matches HEAD.
+    @shell_exec( 'cd ' . escapeshellarg( $wp_content ) . ' && git update-index --refresh 2>/dev/null' );
+
     $cmd = 'cd ' . escapeshellarg( $wp_content ) . ' && git status --porcelain 2>&1';
     $output = shell_exec( $cmd );
     if ( ! is_string( $output ) || $output === '' ) return array();
