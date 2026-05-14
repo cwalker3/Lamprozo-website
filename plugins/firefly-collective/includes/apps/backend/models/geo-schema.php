@@ -131,65 +131,48 @@ function firefly_geo_get_config_fresh() {
 function firefly_geo_get_default_config() {
     return [
         'organization' => [
-            'name' => 'Firefly Creative, LLC',
-            'legalName' => 'Firefly Creative, LLC',
-            'url' => 'https://fireflycreative.co',
-            'foundingDate' => '2022',
-            'description' => 'Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses.',
-            'disambiguatingDescription' => 'Firefly Creative, LLC is a Redding, California-based digital agency specializing in custom WordPress development, web design, and digital strategy. Not affiliated with Adobe Firefly or other companies using the Firefly name.',
-            'logo' => 'https://fireflycreative.co/wp-content/uploads/logo.png',
-            'image' => 'https://fireflycreative.co/wp-content/uploads/og-image.png'
+            'name' => '',
+            'legalName' => '',
+            'entityType' => 'ProfessionalService',
+            'tagline' => '',
+            'alternateNames' => [],
+            'url' => '',
+            'foundingDate' => '',
+            'description' => '',
+            'disambiguatingDescription' => '',
+            'serviceCatalogName' => '',
+            'contactDescription' => '',
+            'logo' => '',
+            'image' => ''
         ],
         'location' => [
-            'city' => 'Redding',
-            'state' => 'California',
-            'stateCode' => 'CA',
-            'country' => 'United States',
-            'countryCode' => 'US'
+            'city' => '',
+            'state' => '',
+            'stateCode' => '',
+            'country' => '',
+            'countryCode' => ''
         ],
         'contact' => [
             'email' => '',
             'phone' => ''
         ],
-        'founders' => [
-            [
-                'name' => 'Alex Strait',
-                'jobTitle' => 'Co-Founder & Lead Developer',
-                'description' => 'Co-founder of Firefly Creative, LLC with expertise in custom WordPress development and web application architecture.'
-            ],
-            [
-                'name' => 'Anna Strait',
-                'jobTitle' => 'Co-Founder',
-                'description' => 'Co-founder of Firefly Creative, LLC.'
-            ]
-        ],
+        'founders' => [],
         'social' => [
             'linkedin' => '',
             'facebook' => '',
             'twitter' => '',
             'github' => '',
-            'instagram' => ''
+            'instagram' => '',
+            'youtube' => '',
+            'twitch' => '',
+            'tiktok' => '',
+            'discord' => '',
+            'bluesky' => '',
+            'mastodon' => ''
         ],
-        'services' => [
-            [
-                'name' => 'Custom WordPress Development',
-                'description' => 'Bespoke WordPress themes and plugins built from scratch, not modified templates'
-            ],
-            [
-                'name' => 'Web Application Development',
-                'description' => 'Full-stack web applications using modern PHP and JavaScript frameworks'
-            ],
-            [
-                'name' => 'E-commerce Solutions',
-                'description' => 'Custom shopping experiences and WooCommerce development'
-            ],
-            [
-                'name' => 'Digital Strategy',
-                'description' => 'Strategic planning for digital presence and web technology'
-            ]
-        ],
-        'naics' => '541511',
-        'isicV4' => '6201'
+        'services' => [],
+        'naics' => '',
+        'isicV4' => ''
     ];
 }
 
@@ -267,15 +250,10 @@ function firefly_geo_organization_schema() {
     $social = $config['social'];
 
     $schema = [
-        '@type' => 'ProfessionalService',
+        '@type' => !empty($org['entityType']) ? $org['entityType'] : 'ProfessionalService',
         '@id' => $org['url'] . '/#organization',
         'name' => $org['name'],
         'legalName' => $org['legalName'],
-        'alternateName' => [
-            'Firefly Creative',
-            'Firefly Creative Agency',
-            'Firefly Web Development'
-        ],
         'url' => $org['url'],
         'description' => $org['description'],
         'disambiguatingDescription' => $org['disambiguatingDescription'],
@@ -283,6 +261,10 @@ function firefly_geo_organization_schema() {
         'naics' => $config['naics'],
         'isicV4' => $config['isicV4']
     ];
+
+    if (!empty($org['alternateNames']) && is_array($org['alternateNames'])) {
+        $schema['alternateName'] = array_values(array_filter($org['alternateNames']));
+    }
 
     // Logo
     if (!empty($org['logo'])) {
@@ -301,24 +283,32 @@ function firefly_geo_organization_schema() {
     }
 
     // Address
-    $schema['address'] = [
-        '@type' => 'PostalAddress',
-        'addressLocality' => $loc['city'],
-        'addressRegion' => $loc['stateCode'],
-        'addressCountry' => $loc['countryCode']
-    ];
+    if (!empty($loc['city']) || !empty($loc['stateCode']) || !empty($loc['countryCode'])) {
+        $schema['address'] = [
+            '@type' => 'PostalAddress',
+            'addressLocality' => $loc['city'],
+            'addressRegion' => $loc['stateCode'],
+            'addressCountry' => $loc['countryCode']
+        ];
+    }
 
     // Area Served
-    $schema['areaServed'] = [
-        [
+    $areaServed = [];
+    if (!empty($loc['country'])) {
+        $areaServed[] = [
             '@type' => 'Country',
-            'name' => 'United States'
-        ],
-        [
+            'name' => $loc['country']
+        ];
+    }
+    if (!empty($loc['state'])) {
+        $areaServed[] = [
             '@type' => 'State',
             'name' => $loc['state']
-        ]
-    ];
+        ];
+    }
+    if (!empty($areaServed)) {
+        $schema['areaServed'] = $areaServed;
+    }
 
     // Contact
     if (!empty($contact['email'])) {
@@ -367,7 +357,7 @@ function firefly_geo_organization_schema() {
         }
         $schema['hasOfferCatalog'] = [
             '@type' => 'OfferCatalog',
-            'name' => 'Web Development Services',
+            'name' => !empty($org['serviceCatalogName']) ? $org['serviceCatalogName'] : 'Services',
             'itemListElement' => $offers
         ];
     }
@@ -415,7 +405,10 @@ function firefly_geo_webpage_schema($type = 'WebPage', $page_type = '') {
 
     if (is_front_page()) {
         $url = $org['url'];
-        $title = $org['name'] . ' - Custom WordPress Development';
+        $title = $org['name'];
+        if (!empty($org['tagline'])) {
+            $title .= ' - ' . $org['tagline'];
+        }
     }
 
     $schema = [
@@ -484,16 +477,9 @@ function firefly_geo_founders_schema() {
                 ]
             ];
 
-            // Add knowsAbout for developers
-            if (strpos(strtolower($founder['jobTitle']), 'developer') !== false) {
-                $person['knowsAbout'] = [
-                    'WordPress Development',
-                    'PHP Programming',
-                    'Web Application Architecture',
-                    'Custom Plugin Development',
-                    'JavaScript',
-                    'MySQL'
-                ];
+            // Add knowsAbout if explicitly configured per-founder
+            if (!empty($founder['knowsAbout']) && is_array($founder['knowsAbout'])) {
+                $person['knowsAbout'] = array_values(array_filter($founder['knowsAbout']));
             }
 
             $schemas[] = $person;
@@ -521,7 +507,9 @@ function firefly_geo_contact_page_schema() {
         'about' => [
             '@id' => $org['url'] . '/#organization'
         ],
-        'description' => 'Contact ' . $org['name'] . ' for custom WordPress development services.',
+        'description' => !empty($org['contactDescription'])
+            ? $org['contactDescription']
+            : 'Contact ' . $org['name'] . '.',
         'inLanguage' => 'en-US'
     ];
 }
@@ -533,20 +521,24 @@ function firefly_geo_services_schema() {
     $config = firefly_geo_get_config();
     $org = $config['organization'];
 
+    $loc = $config['location'];
     $services = [];
     foreach ($config['services'] as $service) {
-        $services[] = [
+        $service_schema = [
             '@type' => 'Service',
             'name' => $service['name'],
             'description' => $service['description'],
             'provider' => [
                 '@id' => $org['url'] . '/#organization'
-            ],
-            'areaServed' => [
-                '@type' => 'Country',
-                'name' => 'United States'
             ]
         ];
+        if (!empty($loc['country'])) {
+            $service_schema['areaServed'] = [
+                '@type' => 'Country',
+                'name' => $loc['country']
+            ];
+        }
+        $services[] = $service_schema;
     }
 
     return [
@@ -765,8 +757,12 @@ function firefly_geo_meta_tags() {
     echo '<meta name="publisher" content="' . esc_attr($org['name']) . '">' . "\n";
 
     // Geographic meta
-    echo '<meta name="geo.region" content="US-' . esc_attr($loc['stateCode']) . '">' . "\n";
-    echo '<meta name="geo.placename" content="' . esc_attr($loc['city']) . '">' . "\n";
+    if (!empty($loc['countryCode']) && !empty($loc['stateCode'])) {
+        echo '<meta name="geo.region" content="' . esc_attr($loc['countryCode']) . '-' . esc_attr($loc['stateCode']) . '">' . "\n";
+    }
+    if (!empty($loc['city'])) {
+        echo '<meta name="geo.placename" content="' . esc_attr($loc['city']) . '">' . "\n";
+    }
 
     // Robots meta - respect WordPress "Discourage search engines" setting
     if (get_option('blog_public') != '0') {
@@ -782,7 +778,12 @@ add_filter('document_title_parts', 'firefly_geo_title_parts');
 function firefly_geo_title_parts($title) {
     if (is_front_page()) {
         $config = firefly_geo_get_config();
-        $title['tagline'] = 'Custom WordPress Development Agency in ' . $config['location']['city'] . ', ' . $config['location']['stateCode'];
+        $org = $config['organization'];
+        if (!empty($org['tagline'])) {
+            $title['tagline'] = $org['tagline'];
+        } elseif (!empty($config['location']['city']) && !empty($config['location']['stateCode'])) {
+            $title['tagline'] = $config['location']['city'] . ', ' . $config['location']['stateCode'];
+        }
     }
     return $title;
 }

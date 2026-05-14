@@ -1,20 +1,28 @@
 {
     "organization": {
-        "name": "Firefly Creative, LLC",
-        "legalName": "Firefly Creative, LLC",
-        "url": "https://fireflycreative.co",
-        "foundingDate": "2022",
-        "description": "Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses.",
-        "disambiguatingDescription": "Firefly Creative, LLC is a Redding, California-based digital agency specializing in custom WordPress development, web design, and digital strategy. Founded by Alex and Anna Strait in 2022. Not affiliated with Adobe Firefly or other companies using the Firefly name.",
-        "logo": "https://fireflycreative.co/wp-content/uploads/logo.png",
-        "image": "https://fireflycreative.co/wp-content/uploads/og-image.png"
+        "name": "Lamprozo",
+        "legalName": "Lamprozo",
+        "entityType": "Person",
+        "tagline": "Hardcore Pokémon Nuzlockes on Twitch & YouTube",
+        "alternateNames": [
+            "Lamprozo1",
+            "Lampropeltis zonata"
+        ],
+        "url": "https://lamprozo.com",
+        "foundingDate": "2024",
+        "description": "Hardcore Pokémon Nuzlocke and ROM hack content creator streaming on Twitch and YouTube.",
+        "disambiguatingDescription": "Lamprozo is a hardcore Pokémon Nuzlocker, herper, and disc golfer creating long-form Nuzlocke and ROM hack runs on Twitch and YouTube. The channel name is derived from Lampropeltis zonata — the California Mountain Kingsnake. Since starting Nuzlockes in November 2024, Lamprozo has accumulated over 1000 hours of Nuzlocke experience and focuses on the most punishing ROM hacks in the genre, including Sterling Silver, Renegade Platinum, and Platinum Kaizo. Not affiliated with any other content creators or projects using similar names.",
+        "serviceCatalogName": "Content Series",
+        "contactDescription": "Get in touch with Lamprozo for collaborations and business inquiries.",
+        "logo": "https://lamprozo.com/wp-content/themes/firefly-collective/templates/lamprozo/images/logo.png",
+        "image": "https://lamprozo.com/wp-content/themes/firefly-collective/templates/lamprozo/images/logo.png"
     },
     "location": {
-        "city": "Redding",
-        "state": "California",
-        "stateCode": "CA",
-        "country": "United States",
-        "countryCode": "US"
+        "city": "",
+        "state": "",
+        "stateCode": "",
+        "country": "",
+        "countryCode": ""
     },
     "contact": {
         "email": "",
@@ -22,14 +30,44 @@
     },
     "founders": [
         {
-            "name": "Alex Strait",
-            "jobTitle": "Co-Founder & Lead Developer",
-            "description": "Co-founder of Firefly Creative, LLC with expertise in custom WordPress development, PHP programming, and web application architecture."
+            "name": "Lamprozo",
+            "jobTitle": "Content Creator & Streamer",
+            "description": "Hardcore Pokémon Nuzlocker with 1000+ hours of experience since November 2024. Creates long-form challenge runs on Twitch and YouTube. Beyond gaming, Lamprozo is an avid herper (searching for reptiles and amphibians in the wild) and disc golfer. Other favorite games include Undertale and Xenoblade Chronicles.",
+            "knowsAbout": [
+                "Pokémon Nuzlockes",
+                "Pokémon ROM Hacks",
+                "Sterling Silver",
+                "Renegade Platinum",
+                "Platinum Kaizo",
+                "Pokémon Gen IV",
+                "Pokémon Game Mechanics",
+                "Live Streaming",
+                "Herpetology",
+                "Disc Golf",
+                "California Mountain Kingsnake (Lampropeltis zonata)"
+            ]
+        }
+    ],
+    "services": [
+        {
+            "name": "Sterling Silver Nuzlocke",
+            "description": "Ongoing Nuzlocke challenge run of Sterling Silver, a Gen IV Pokémon ROM hack. 80+ attempts and counting on Twitch and YouTube."
         },
         {
-            "name": "Anna Strait",
-            "jobTitle": "Co-Founder",
-            "description": "Co-founder of Firefly Creative, LLC."
+            "name": "Renegade Platinum Nuzlocke",
+            "description": "Completed Nuzlocke challenge run of Renegade Platinum, a Gen IV Pokémon ROM hack. Cleared in 12 attempts."
+        },
+        {
+            "name": "Platinum Kaizo Nuzlocke",
+            "description": "Nuzlocke challenge run of Platinum Kaizo, one of the most difficult Gen IV Pokémon ROM hacks ever made."
+        },
+        {
+            "name": "Live Pokémon Streams",
+            "description": "Live Pokémon Nuzlocke and ROM hack streams on Twitch with full chat interaction."
+        },
+        {
+            "name": "YouTube Highlights & VODs",
+            "description": "Edited Nuzlocke highlights, full-attempt VODs, and challenge run breakdowns on YouTube."
         }
     ],
     "social": {
@@ -37,30 +75,16 @@
         "facebook": "",
         "twitter": "",
         "github": "",
-        "instagram": ""
+        "instagram": "",
+        "youtube": "https://www.youtube.com/@Lamprozo1",
+        "twitch": "https://www.twitch.tv/lamprozo",
+        "tiktok": "",
+        "discord": "",
+        "bluesky": "",
+        "mastodon": ""
     },
-    "services": [
-        {
-            "name": "Custom WordPress Development",
-            "description": "Bespoke WordPress themes and plugins built from scratch, not modified templates"
-        },
-        {
-            "name": "Web Application Development",
-            "description": "Full-stack web applications using modern PHP and JavaScript frameworks"
-        },
-        {
-            "name": "AI Integration & RAG Systems",
-            "description": "Custom AI solutions including Retrieval-Augmented Generation (RAG) systems, chatbot development, and LLM integration for business applications"
-        },
-        {
-            "name": "E-commerce Solutions",
-            "description": "Custom shopping experiences and WooCommerce development"
-        },
-        {
-            "name": "Digital Strategy",
-            "description": "Strategic planning for digital presence and web technology"
-        }
-    ],
-    "naics": "541511",
-    "isicV4": "6201"
+    "industry": {
+        "naics": "711510",
+        "isicV4": "9000"
+    }
 }

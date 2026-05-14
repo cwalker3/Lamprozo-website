@@ -49,10 +49,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     organization: {
                         name: '',
                         legalName: '',
+                        entityType: '',
+                        tagline: '',
+                        alternateNames: [],
                         url: '',
                         foundingDate: '',
                         description: '',
                         disambiguatingDescription: '',
+                        serviceCatalogName: '',
+                        contactDescription: '',
                         logo: '',
                         image: ''
                     },
@@ -74,7 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         facebook: '',
                         twitter: '',
                         github: '',
-                        instagram: ''
+                        instagram: '',
+                        youtube: '',
+                        twitch: '',
+                        tiktok: '',
+                        discord: '',
+                        bluesky: '',
+                        mastodon: ''
                     },
                     industry: {
                         naics: '',
@@ -141,10 +152,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     organization: {
                         name: '',
                         legalName: '',
+                        entityType: '',
+                        tagline: '',
+                        alternateNames: [],
                         url: '',
                         foundingDate: '',
                         description: '',
                         disambiguatingDescription: '',
+                        serviceCatalogName: '',
+                        contactDescription: '',
                         logo: '',
                         image: ''
                     },
@@ -166,7 +182,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         facebook: '',
                         twitter: '',
                         github: '',
-                        instagram: ''
+                        instagram: '',
+                        youtube: '',
+                        twitch: '',
+                        tiktok: '',
+                        discord: '',
+                        bluesky: '',
+                        mastodon: ''
                     },
                     industry: {
                         naics: '',
@@ -383,7 +405,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.config.founders.push({
                     name: '',
                     jobTitle: '',
-                    description: ''
+                    description: '',
+                    knowsAbout: []
                 });
             },
 
@@ -436,7 +459,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     facebook: 'dashicons-facebook',
                     twitter: 'dashicons-twitter',
                     github: 'dashicons-media-code',
-                    instagram: 'dashicons-instagram'
+                    instagram: 'dashicons-instagram',
+                    youtube: 'dashicons-video-alt3',
+                    twitch: 'dashicons-format-video',
+                    tiktok: 'dashicons-format-video',
+                    discord: 'dashicons-format-chat',
+                    bluesky: 'dashicons-twitter',
+                    mastodon: 'dashicons-admin-site'
                 };
                 return icons[platform] || 'dashicons-admin-links';
             },
@@ -450,7 +479,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     facebook: 'Facebook',
                     twitter: 'Twitter / X',
                     github: 'GitHub',
-                    instagram: 'Instagram'
+                    instagram: 'Instagram',
+                    youtube: 'YouTube',
+                    twitch: 'Twitch',
+                    tiktok: 'TikTok',
+                    discord: 'Discord',
+                    bluesky: 'Bluesky',
+                    mastodon: 'Mastodon'
                 };
                 return labels[platform] || platform;
             }

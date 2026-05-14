@@ -379,15 +379,30 @@ function firefly_collective_sanitize_geo_config($config) {
     
     // Organization
     if (isset($config['organization'])) {
+        $org = $config['organization'];
+        $alternate_names = array();
+        if (!empty($org['alternateNames']) && is_array($org['alternateNames'])) {
+            foreach ($org['alternateNames'] as $alt) {
+                $alt = sanitize_text_field($alt);
+                if ($alt !== '') {
+                    $alternate_names[] = $alt;
+                }
+            }
+        }
         $sanitized['organization'] = array(
-            'name' => sanitize_text_field($config['organization']['name'] ?? ''),
-            'legalName' => sanitize_text_field($config['organization']['legalName'] ?? ''),
-            'url' => esc_url_raw($config['organization']['url'] ?? ''),
-            'foundingDate' => sanitize_text_field($config['organization']['foundingDate'] ?? ''),
-            'description' => sanitize_textarea_field($config['organization']['description'] ?? ''),
-            'disambiguatingDescription' => sanitize_textarea_field($config['organization']['disambiguatingDescription'] ?? ''),
-            'logo' => esc_url_raw($config['organization']['logo'] ?? ''),
-            'image' => esc_url_raw($config['organization']['image'] ?? '')
+            'name' => sanitize_text_field($org['name'] ?? ''),
+            'legalName' => sanitize_text_field($org['legalName'] ?? ''),
+            'entityType' => sanitize_text_field($org['entityType'] ?? ''),
+            'tagline' => sanitize_text_field($org['tagline'] ?? ''),
+            'alternateNames' => $alternate_names,
+            'url' => esc_url_raw($org['url'] ?? ''),
+            'foundingDate' => sanitize_text_field($org['foundingDate'] ?? ''),
+            'description' => sanitize_textarea_field($org['description'] ?? ''),
+            'disambiguatingDescription' => sanitize_textarea_field($org['disambiguatingDescription'] ?? ''),
+            'serviceCatalogName' => sanitize_text_field($org['serviceCatalogName'] ?? ''),
+            'contactDescription' => sanitize_textarea_field($org['contactDescription'] ?? ''),
+            'logo' => esc_url_raw($org['logo'] ?? ''),
+            'image' => esc_url_raw($org['image'] ?? '')
         );
     }
     
@@ -414,10 +429,20 @@ function firefly_collective_sanitize_geo_config($config) {
     if (isset($config['founders']) && is_array($config['founders'])) {
         $sanitized['founders'] = array();
         foreach ($config['founders'] as $founder) {
+            $knows_about = array();
+            if (!empty($founder['knowsAbout']) && is_array($founder['knowsAbout'])) {
+                foreach ($founder['knowsAbout'] as $topic) {
+                    $topic = sanitize_text_field($topic);
+                    if ($topic !== '') {
+                        $knows_about[] = $topic;
+                    }
+                }
+            }
             $sanitized['founders'][] = array(
                 'name' => sanitize_text_field($founder['name'] ?? ''),
                 'jobTitle' => sanitize_text_field($founder['jobTitle'] ?? ''),
-                'description' => sanitize_textarea_field($founder['description'] ?? '')
+                'description' => sanitize_textarea_field($founder['description'] ?? ''),
+                'knowsAbout' => $knows_about
             );
         }
     }
@@ -434,14 +459,15 @@ function firefly_collective_sanitize_geo_config($config) {
     }
     
     // Social
-    if (isset($config['social'])) {
-        $sanitized['social'] = array(
-            'linkedin' => esc_url_raw($config['social']['linkedin'] ?? ''),
-            'facebook' => esc_url_raw($config['social']['facebook'] ?? ''),
-            'twitter' => esc_url_raw($config['social']['twitter'] ?? ''),
-            'github' => esc_url_raw($config['social']['github'] ?? ''),
-            'instagram' => esc_url_raw($config['social']['instagram'] ?? '')
+    if (isset($config['social']) && is_array($config['social'])) {
+        $allowed_platforms = array(
+            'linkedin', 'facebook', 'twitter', 'github', 'instagram',
+            'youtube', 'twitch', 'tiktok', 'discord', 'bluesky', 'mastodon'
         );
+        $sanitized['social'] = array();
+        foreach ($allowed_platforms as $platform) {
+            $sanitized['social'][$platform] = esc_url_raw($config['social'][$platform] ?? '');
+        }
     }
     
     // Industry

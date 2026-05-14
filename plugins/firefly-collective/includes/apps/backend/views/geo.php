@@ -159,23 +159,45 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-name">Organization Name</label>
-                            <input type="text" id="org-name" v-model="config.organization.name" placeholder="Firefly Creative, LLC">
-                            <p class="description">Display name for your organization</p>
+                            <input type="text" id="org-name" v-model="config.organization.name" placeholder="Lamprozo">
+                            <p class="description">Display name for your organization or brand</p>
                         </div>
                         <div class="geo-field">
                             <label for="org-legal-name">Legal Name</label>
-                            <input type="text" id="org-legal-name" v-model="config.organization.legalName" placeholder="Firefly Creative, LLC">
-                            <p class="description">Registered business name</p>
+                            <input type="text" id="org-legal-name" v-model="config.organization.legalName" placeholder="Lamprozo">
+                            <p class="description">Registered legal name (or same as display name)</p>
                         </div>
                     </div>
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-url">Website URL</label>
-                            <input type="url" id="org-url" v-model="config.organization.url" placeholder="https://fireflycreative.co">
+                            <input type="url" id="org-url" v-model="config.organization.url" placeholder="https://lamprozo.com">
                         </div>
                         <div class="geo-field">
-                            <label for="org-founded">Year Founded</label>
-                            <input type="text" id="org-founded" v-model="config.organization.foundingDate" placeholder="2022">
+                            <label for="org-founded">Year Founded / Started</label>
+                            <input type="text" id="org-founded" v-model="config.organization.foundingDate" placeholder="2024">
+                        </div>
+                    </div>
+                    <div class="geo-field-row">
+                        <div class="geo-field">
+                            <label for="org-entity-type">Schema Entity Type</label>
+                            <select id="org-entity-type" v-model="config.organization.entityType">
+                                <option value="ProfessionalService">ProfessionalService</option>
+                                <option value="Organization">Organization</option>
+                                <option value="LocalBusiness">LocalBusiness</option>
+                                <option value="Corporation">Corporation</option>
+                                <option value="NGO">NGO</option>
+                                <option value="EducationalOrganization">EducationalOrganization</option>
+                                <option value="MediaObject">MediaObject</option>
+                                <option value="Brand">Brand</option>
+                                <option value="Person">Person</option>
+                            </select>
+                            <p class="description">Schema.org @type for your organization. Use "Person" or "Brand" for content creators.</p>
+                        </div>
+                        <div class="geo-field">
+                            <label for="org-tagline">Tagline</label>
+                            <input type="text" id="org-tagline" v-model="config.organization.tagline" placeholder="Hardcore Pokémon Nuzlockes on Twitch &amp; YouTube">
+                            <p class="description">Appended to homepage title and used in meta tags</p>
                         </div>
                     </div>
                 </div>
@@ -184,13 +206,39 @@ if (!current_user_can('manage_options')) {
                     <h3>Descriptions</h3>
                     <div class="geo-field">
                         <label for="org-description">Short Description</label>
-                        <textarea id="org-description" v-model="config.organization.description" rows="3" placeholder="Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses."></textarea>
-                        <p class="description">Brief description of your organization (1-2 sentences)</p>
+                        <textarea id="org-description" v-model="config.organization.description" rows="3" placeholder="Hardcore Pokémon Nuzlocke content creator streaming on Twitch and YouTube."></textarea>
+                        <p class="description">Brief description (1-2 sentences). Used in meta description and schema.</p>
                     </div>
                     <div class="geo-field">
                         <label for="org-disambiguation">Disambiguation Description</label>
-                        <textarea id="org-disambiguation" v-model="config.organization.disambiguatingDescription" rows="4" placeholder="Firefly Creative, LLC is a Redding, California-based digital agency... Not affiliated with Adobe Firefly or other companies using the Firefly name."></textarea>
+                        <textarea id="org-disambiguation" v-model="config.organization.disambiguatingDescription" rows="4" placeholder="Lamprozo is a hardcore Pokémon Nuzlocker creating long-form Nuzlocke and ROM hack content. The name is derived from Lampropeltis zonata (California Mountain Kingsnake)."></textarea>
                         <p class="description">Detailed description that distinguishes you from other entities with similar names. Important for AI search engines.</p>
+                    </div>
+                    <div class="geo-field">
+                        <label>Alternate Names</label>
+                        <div v-for="(alt, idx) in config.organization.alternateNames" :key="idx" style="display:flex; gap:8px; margin-bottom:6px;">
+                            <input type="text" v-model="config.organization.alternateNames[idx]" placeholder="Alternate spelling or nickname" style="flex:1;">
+                            <button type="button" class="button" @click="config.organization.alternateNames.splice(idx, 1)">
+                                <span class="dashicons dashicons-trash"></span>
+                            </button>
+                        </div>
+                        <button type="button" class="button" @click="config.organization.alternateNames.push('')">
+                            <span class="dashicons dashicons-plus-alt"></span>
+                            Add Alternate Name
+                        </button>
+                        <p class="description">Other names people use to find you (e.g. nicknames, common misspellings, channel names).</p>
+                    </div>
+                    <div class="geo-field-row">
+                        <div class="geo-field">
+                            <label for="org-service-catalog-name">Service Catalog Name</label>
+                            <input type="text" id="org-service-catalog-name" v-model="config.organization.serviceCatalogName" placeholder="Content Offerings">
+                            <p class="description">Heading shown over the services list in schema. Defaults to "Services".</p>
+                        </div>
+                        <div class="geo-field">
+                            <label for="org-contact-description">Contact Page Description</label>
+                            <input type="text" id="org-contact-description" v-model="config.organization.contactDescription" placeholder="Reach out to Lamprozo for collabs and business inquiries.">
+                            <p class="description">Description shown on the contact page schema.</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -288,6 +336,20 @@ if (!current_user_can('manage_options')) {
                             <div class="geo-field">
                                 <label>Description / Bio</label>
                                 <textarea v-model="founder.description" rows="2" placeholder="Brief bio or expertise description"></textarea>
+                            </div>
+                            <div class="geo-field">
+                                <label>Knows About (Topics of Expertise)</label>
+                                <div v-for="(topic, tIdx) in (founder.knowsAbout || [])" :key="tIdx" style="display:flex; gap:8px; margin-bottom:6px;">
+                                    <input type="text" v-model="founder.knowsAbout[tIdx]" placeholder="Topic, technique, or domain" style="flex:1;">
+                                    <button type="button" class="button" @click="founder.knowsAbout.splice(tIdx, 1)">
+                                        <span class="dashicons dashicons-trash"></span>
+                                    </button>
+                                </div>
+                                <button type="button" class="button" @click="(founder.knowsAbout = founder.knowsAbout || []).push('')">
+                                    <span class="dashicons dashicons-plus-alt"></span>
+                                    Add Topic
+                                </button>
+                                <p class="description">Subjects this person is known for. Adds the schema.org "knowsAbout" property.</p>
                             </div>
                         </div>
                     </div>
