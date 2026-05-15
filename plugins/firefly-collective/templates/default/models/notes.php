@@ -26,11 +26,19 @@ function firefly_notes_asset_version( $abs_path ) {
 
 /**
  * Single source of truth for who can use the Notes feature.
- * Default template gates on manage_options; flip to is_user_logged_in()
- * (or any custom cap) to open it up.
+ *
+ * Default template gates on manage_options. Other contexts can broaden
+ * (or tighten) access without forking the model file by adding handlers
+ * to the `firefly_notes_can_access` filter — return true to grant.
+ *
+ * Example: open to a custom role.
+ *   add_filter( 'firefly_notes_can_access', function ( $can ) {
+ *       return $can || current_user_can( 'editor' );
+ *   } );
  */
 function firefly_notes_can_access() {
-    return current_user_can( 'manage_options' );
+    $can = current_user_can( 'manage_options' );
+    return (bool) apply_filters( 'firefly_notes_can_access', $can );
 }
 
 // ---------- Custom post type ----------
