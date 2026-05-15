@@ -7,6 +7,33 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 <div class="wrap firefly-notes">
     <div class="firefly-notes-header">
         <h1 class="wp-heading-inline">Notes</h1>
+
+        <!-- Session picker: shows the active dictation session (mirrors a Ragsmith
+             conversation). Clicking opens a popover with CRUD over local sessions. -->
+        <div class="firefly-notes-session-picker">
+            <button
+                type="button"
+                class="page-title-action firefly-notes-icon-btn firefly-notes-session-btn"
+                id="firefly-notes-session-btn"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-label="Active dictation session"
+                title="Active dictation session"
+            >
+                <span class="dashicons dashicons-format-chat" aria-hidden="true"></span>
+                <span class="firefly-notes-session-label" id="firefly-notes-session-label">Session</span>
+                <span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
+            </button>
+            <div class="firefly-notes-session-popover" id="firefly-notes-session-popover" role="menu" hidden>
+                <div class="firefly-notes-session-popover-head">
+                    <strong>Dictation sessions</strong>
+                    <button type="button" class="button button-small" id="firefly-notes-session-new" aria-label="Start a new dictation session">+ New session</button>
+                </div>
+                <ul class="firefly-notes-session-list" id="firefly-notes-session-list" aria-label="Dictation sessions list"></ul>
+                <p class="firefly-notes-session-hint">Each session groups dictations into one Ragsmith conversation. Starting a new session begins a fresh conversation.</p>
+            </div>
+        </div>
+
         <button type="button" class="page-title-action firefly-notes-icon-btn" id="firefly-notes-new" aria-label="New note" title="New note">
             <span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>
             <span class="firefly-notes-btn-label">New note</span>

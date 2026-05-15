@@ -12,6 +12,16 @@
     const REST  = FireflyNotes.restUrl.replace(/\/$/, '');
     const NONCE = FireflyNotes.nonce;
 
+    // Source tag attached to every Ragsmith conversation we create from here,
+    // so the main Ragsmith web app can filter wp-notes conversations out of
+    // its primary list.
+    const SOURCE = 'wp-notes';
+
+    // localStorage keys are namespaced per-origin (per WP host) so multiple
+    // Firefly sites on the same browser don't collide.
+    const LS_SESSIONS_KEY = 'firefly-notes/sessions/v1';
+    const LS_ACTIVE_KEY   = 'firefly-notes/active-session/v1';
+
     // ---------- DOM ----------
     const $ = (id) => document.getElementById(id);
     const els = {};
@@ -27,6 +37,19 @@
         listening: false,
         muted: false,
         editMode: false,
+
+        // Dictation sessions (browser-local, mirrors Ragsmith conversations).
+        // sessions: [{ id, label, ragsmithSessionId, createdAt }]
+        // activeSessionId: id of the currently-active session row in `sessions`
+        sessions: [],
+        activeSessionId: null,
+        // Buffer of transcript text captured during the current mic-on cycle.
+        // Flushed to Ragsmith once on mic-stop so we don't create one message
+        // per Whisper chunk.
+        dictationBuffer: '',
+        // True while a saveDictation() call is in flight, used to avoid
+        // double-saves if mic toggles before the previous flush settles.
+        savingDictation: false,
     };
 
     // ---------- API ----------
@@ -233,6 +256,209 @@
         }
     }
 
+    // ---------- Sessions ----------
+    // A "session" here is a browser-local handle to a Ragsmith conversation.
+    // We store an array in localStorage; each entry binds a friendly label
+    // to a Ragsmith session_id (null until the first dictation creates one
+    // server-side). The user can switch between sessions, rename, or delete.
+
+    function uuid() {
+        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+        // RFC4122-ish fallback for older browsers.
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    }
+
+    function loadSessionsFromStorage() {
+        try {
+            const raw = localStorage.getItem(LS_SESSIONS_KEY);
+            const list = raw ? JSON.parse(raw) : null;
+            state.sessions = Array.isArray(list) ? list : [];
+            state.activeSessionId = localStorage.getItem(LS_ACTIVE_KEY) || null;
+        } catch (e) {
+            state.sessions = [];
+            state.activeSessionId = null;
+        }
+        // Ensure at least one session exists so the user always has somewhere to dictate.
+        if (state.sessions.length === 0) {
+            const first = makeSession('Default');
+            state.sessions = [first];
+            state.activeSessionId = first.id;
+            persistSessions();
+        } else if (!state.sessions.some((s) => s.id === state.activeSessionId)) {
+            // Saved active id doesn't exist anymore (e.g. cleared elsewhere) — fall back to first.
+            state.activeSessionId = state.sessions[0].id;
+            localStorage.setItem(LS_ACTIVE_KEY, state.activeSessionId);
+        }
+    }
+
+    function persistSessions() {
+        try {
+            localStorage.setItem(LS_SESSIONS_KEY, JSON.stringify(state.sessions));
+            if (state.activeSessionId) {
+                localStorage.setItem(LS_ACTIVE_KEY, state.activeSessionId);
+            }
+        } catch (e) { /* quota or disabled — ignore */ }
+    }
+
+    function makeSession(label) {
+        return {
+            id: uuid(),
+            label: label || ('Session ' + (state.sessions.length + 1)),
+            ragsmithSessionId: null,
+            createdAt: new Date().toISOString(),
+        };
+    }
+
+    function getActiveSession() {
+        return state.sessions.find((s) => s.id === state.activeSessionId) || null;
+    }
+
+    function setActiveSession(id) {
+        if (!state.sessions.some((s) => s.id === id)) return;
+        state.activeSessionId = id;
+        persistSessions();
+        renderActiveSession();
+        renderSessionList();
+    }
+
+    function createSession() {
+        const sess = makeSession('Session ' + (state.sessions.length + 1));
+        state.sessions.unshift(sess);
+        state.activeSessionId = sess.id;
+        persistSessions();
+        renderActiveSession();
+        renderSessionList();
+    }
+
+    function renameSession(id) {
+        const sess = state.sessions.find((s) => s.id === id);
+        if (!sess) return;
+        const next = prompt('Rename session', sess.label);
+        if (next == null) return;
+        const trimmed = next.trim();
+        if (!trimmed) return;
+        sess.label = trimmed;
+        persistSessions();
+        renderActiveSession();
+        renderSessionList();
+    }
+
+    async function deleteSession(id) {
+        const sess = state.sessions.find((s) => s.id === id);
+        if (!sess) return;
+        if (!confirm('Delete this session? Its Ragsmith conversation will also be removed.')) return;
+        // Drop from Ragsmith first (only if a conversation actually exists for it).
+        if (sess.ragsmithSessionId && window.FireflyRagsmith && typeof FireflyRagsmith.deleteSession === 'function') {
+            try { await FireflyRagsmith.deleteSession(sess.ragsmithSessionId); }
+            catch (e) { /* best-effort: still drop the local row */ }
+        }
+        state.sessions = state.sessions.filter((s) => s.id !== id);
+        if (state.activeSessionId === id) {
+            state.activeSessionId = state.sessions.length ? state.sessions[0].id : null;
+        }
+        if (state.sessions.length === 0) {
+            const first = makeSession('Default');
+            state.sessions = [first];
+            state.activeSessionId = first.id;
+        }
+        persistSessions();
+        renderActiveSession();
+        renderSessionList();
+    }
+
+    function renderActiveSession() {
+        const sess = getActiveSession();
+        if (!sess) {
+            els.sessionLabel.textContent = 'Session';
+            return;
+        }
+        els.sessionLabel.textContent = sess.label;
+    }
+
+    function renderSessionList() {
+        const ul = els.sessionList;
+        ul.innerHTML = '';
+        for (const s of state.sessions) {
+            const li = document.createElement('li');
+            li.className = 'firefly-notes-session-item' + (s.id === state.activeSessionId ? ' is-active' : '');
+            li.dataset.id = s.id;
+            const label = document.createElement('button');
+            label.type = 'button';
+            label.className = 'firefly-notes-session-pick';
+            label.textContent = s.label;
+            label.addEventListener('click', () => { setActiveSession(s.id); closeSessionPopover(); });
+            const rename = document.createElement('button');
+            rename.type = 'button';
+            rename.className = 'firefly-notes-session-action';
+            rename.title = 'Rename';
+            rename.setAttribute('aria-label', 'Rename session');
+            rename.innerHTML = '<span class="dashicons dashicons-edit" aria-hidden="true"></span>';
+            rename.addEventListener('click', (e) => { e.stopPropagation(); renameSession(s.id); });
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'firefly-notes-session-action firefly-notes-session-delete';
+            del.title = 'Delete';
+            del.setAttribute('aria-label', 'Delete session');
+            del.innerHTML = '<span class="dashicons dashicons-trash" aria-hidden="true"></span>';
+            del.addEventListener('click', (e) => { e.stopPropagation(); deleteSession(s.id); });
+            li.appendChild(label);
+            li.appendChild(rename);
+            li.appendChild(del);
+            ul.appendChild(li);
+        }
+    }
+
+    function openSessionPopover() {
+        els.sessionPopover.hidden = false;
+        els.sessionBtn.setAttribute('aria-expanded', 'true');
+        renderSessionList();
+        // Close on outside click — re-bound each open so we don't leak listeners.
+        document.addEventListener('mousedown', onDocClickForPopover, { capture: true });
+    }
+    function closeSessionPopover() {
+        els.sessionPopover.hidden = true;
+        els.sessionBtn.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', onDocClickForPopover, { capture: true });
+    }
+    function onDocClickForPopover(e) {
+        if (els.sessionPopover.contains(e.target) || els.sessionBtn.contains(e.target)) return;
+        closeSessionPopover();
+    }
+
+    // ---------- Dictation persistence ----------
+    // Saves the current dictation buffer to Ragsmith under the active session.
+    // Creates the conversation server-side on first save, then reuses the
+    // returned session_id for subsequent saves in the same session.
+    async function flushDictationBufferToRagsmith() {
+        const text = state.dictationBuffer.trim();
+        state.dictationBuffer = '';
+        if (!text) return;
+        const sess = getActiveSession();
+        if (!sess) return;
+        if (!window.FireflyRagsmith || typeof FireflyRagsmith.saveDictation !== 'function') return;
+
+        state.savingDictation = true;
+        try {
+            const res = await FireflyRagsmith.saveDictation(text, {
+                session_id: sess.ragsmithSessionId || undefined,
+                source: SOURCE,
+            });
+            if (res && res.session_id && !sess.ragsmithSessionId) {
+                sess.ragsmithSessionId = res.session_id;
+                persistSessions();
+            }
+        } catch (e) {
+            // Silent failure — the transcript is still in the WordPress note,
+            // so the user hasn't lost anything. Surface a status hint.
+            setStatus('Dictation save failed: ' + (e && e.message || e));
+        } finally {
+            state.savingDictation = false;
+        }
+    }
+
     // ---------- Dictation ----------
     function ensureDictation() {
         if (dict) return dict;
@@ -260,18 +486,32 @@
         ta.value = before + sep + chunk;
         // Keep cursor / scroll at the end so the user sees new text appear.
         ta.scrollTop = ta.scrollHeight;
+        // Buffer the same chunk for Ragsmith persistence. We flush as a single
+        // message on mic-stop rather than per-chunk so one dictation session
+        // doesn't produce dozens of tiny conversation rows.
+        state.dictationBuffer += (state.dictationBuffer ? ' ' : '') + chunk;
         scheduleSave();
     }
 
     function onDictationStateChange(s) {
         // States: 'idle' | 'connecting' | 'listening' | 'speaking' | 'muted' | 'error'
         switch (s) {
-            case 'idle':       state.listening = false; setMicVisual(false); setStatus('Idle'); break;
+            case 'idle':
+                state.listening = false;
+                setMicVisual(false);
+                setStatus('Idle');
+                // Mic stopped — flush any captured transcript to Ragsmith.
+                flushDictationBufferToRagsmith();
+                break;
             case 'connecting': setStatus('Connecting…'); break;
             case 'listening':  state.listening = true;  setMicVisual(true);  setStatus(state.muted ? 'Muted' : 'Listening…'); break;
             case 'speaking':   setStatus(state.muted ? 'Muted' : 'Hearing you…'); break;
             case 'muted':      setStatus('Muted'); break;
-            case 'error':      setStatus('Mic error'); break;
+            case 'error':
+                setStatus('Mic error');
+                // Drop the partial buffer — incomplete capture, don't persist.
+                state.dictationBuffer = '';
+                break;
         }
     }
 
@@ -313,20 +553,25 @@
 
     // ---------- Init ----------
     function bindRefs() {
-        els.list       = $('firefly-notes-list');
-        els.count      = $('firefly-notes-count');
-        els.main       = $('firefly-notes-main');
-        els.title      = $('firefly-notes-title');
-        els.transcript = $('firefly-notes-transcript');
-        els.edit       = $('firefly-notes-edit');
-        els.delete     = $('firefly-notes-delete');
-        els.modified   = $('firefly-notes-meta-modified');
-        els.saved      = $('firefly-notes-meta-saved');
-        els.mic        = $('firefly-notes-mic');
-        els.mute       = $('firefly-notes-mute');
-        els.status     = $('firefly-notes-status');
-        els.newBtn     = $('firefly-notes-new');
-        els.toggleList = $('firefly-notes-toggle-list');
+        els.list           = $('firefly-notes-list');
+        els.count          = $('firefly-notes-count');
+        els.main           = $('firefly-notes-main');
+        els.title          = $('firefly-notes-title');
+        els.transcript     = $('firefly-notes-transcript');
+        els.edit           = $('firefly-notes-edit');
+        els.delete         = $('firefly-notes-delete');
+        els.modified       = $('firefly-notes-meta-modified');
+        els.saved          = $('firefly-notes-meta-saved');
+        els.mic            = $('firefly-notes-mic');
+        els.mute           = $('firefly-notes-mute');
+        els.status         = $('firefly-notes-status');
+        els.newBtn         = $('firefly-notes-new');
+        els.toggleList     = $('firefly-notes-toggle-list');
+        els.sessionBtn     = $('firefly-notes-session-btn');
+        els.sessionLabel   = $('firefly-notes-session-label');
+        els.sessionPopover = $('firefly-notes-session-popover');
+        els.sessionList    = $('firefly-notes-session-list');
+        els.sessionNew     = $('firefly-notes-session-new');
     }
 
     function bindEvents() {
@@ -337,6 +582,15 @@
         els.transcript.addEventListener('input', scheduleSave);
         els.mic.addEventListener('click', micToggle);
         els.mute.addEventListener('click', muteToggle);
+        if (els.sessionBtn) {
+            els.sessionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                els.sessionPopover.hidden ? openSessionPopover() : closeSessionPopover();
+            });
+        }
+        if (els.sessionNew) {
+            els.sessionNew.addEventListener('click', () => { createSession(); closeSessionPopover(); });
+        }
         if (els.toggleList) {
             els.toggleList.addEventListener('click', () => {
                 const wrap = document.querySelector('.firefly-notes');
@@ -361,6 +615,8 @@
     function init() {
         bindRefs();
         if (!els.list) return;
+        loadSessionsFromStorage();
+        renderActiveSession();
         bindEvents();
         loadList(true).catch((e) => {
             els.list.innerHTML = '<li class="firefly-notes-empty">Failed to load: ' + e.message + '</li>';

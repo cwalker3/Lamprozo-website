@@ -67,6 +67,108 @@
     margin-bottom: 16px;
 }
 
+/* Session picker: header button + click-out popover with CRUD over local sessions. */
+.firefly-notes-session-picker {
+    position: relative;
+    display: inline-flex;
+}
+.firefly-notes-session-btn {
+    /* Make the active session label visually distinct from the action buttons. */
+    border-color: var(--firefly-notes-border);
+}
+.firefly-notes-session-btn .firefly-notes-session-label {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-notes-session-btn .dashicons-arrow-down-alt2 {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+.firefly-notes-session-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 30;
+    width: 280px;
+    background: #fff;
+    border: 1px solid var(--firefly-notes-border);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+    padding: 10px 10px 8px;
+}
+.firefly-notes-session-popover[hidden] { display: none; }
+.firefly-notes-session-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.firefly-notes-session-popover-head strong {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #2c3338;
+}
+.firefly-notes-session-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.firefly-notes-session-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    padding: 2px;
+}
+.firefly-notes-session-item:hover { background: var(--firefly-notes-bg); }
+.firefly-notes-session-item.is-active { background: var(--firefly-notes-accent-soft); }
+.firefly-notes-session-pick {
+    flex: 1 1 auto;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 6px 8px;
+    cursor: pointer;
+    font: inherit;
+    color: #1d2327;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-notes-session-pick:focus { outline: 2px solid var(--firefly-notes-accent); outline-offset: -2px; }
+.firefly-notes-session-action {
+    background: none;
+    border: 0;
+    padding: 6px;
+    cursor: pointer;
+    color: #50575e;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.firefly-notes-session-action:hover { color: #1d2327; background: rgba(0, 0, 0, 0.06); }
+.firefly-notes-session-delete:hover { color: #b32d2e; }
+.firefly-notes-session-action .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+.firefly-notes-session-hint {
+    margin: 8px 2px 0;
+    color: #646970;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
 /* Layout */
 .firefly-notes-layout {
     display: grid;
@@ -443,6 +545,17 @@
     }
     .firefly-notes-btn-label {
         display: none; /* icon-only on mobile */
+    }
+    /* Hide the session label text on mobile too — the chat icon + caret is enough. */
+    .firefly-notes-session-btn .firefly-notes-session-label {
+        display: none;
+    }
+    /* Popover slides to fit the viewport on small screens so it doesn't clip
+       past the right edge when the button is near the top-right corner. */
+    .firefly-notes-session-popover {
+        right: 0;
+        left: auto;
+        width: min(320px, calc(100vw - 16px));
     }
     .firefly-notes hr.wp-header-end {
         margin: 0 0 10px;
