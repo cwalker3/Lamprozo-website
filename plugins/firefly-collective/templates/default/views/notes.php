@@ -74,6 +74,20 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                     <span class="dashicons dashicons-edit" aria-hidden="true"></span>
                     <span class="firefly-notes-edit-label">Edit</span>
                 </button>
+                <!-- Save to AI: explicit user-triggered persist to the Ragsmith
+                     conversation (and fact extraction). Replaces the prior
+                     auto-save-on-mic-stop flow so each note maps cleanly to
+                     a single dictation message that the user controls. -->
+                <button type="button" class="button button-primary firefly-notes-ai-save" id="firefly-notes-ai-save" aria-label="Save to AI" title="Save to AI">
+                    <span class="firefly-notes-ai-sparkles" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" focusable="false">
+                            <path d="M12 2.5l1.6 4.9 4.9 1.6-4.9 1.6L12 15.5l-1.6-4.9L5.5 9l4.9-1.6L12 2.5z"/>
+                            <path d="M19 14.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z"/>
+                            <path d="M5.5 17l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7z"/>
+                        </svg>
+                    </span>
+                    <span class="firefly-notes-ai-save-label">Save to AI</span>
+                </button>
                 <button type="button" class="button button-link-delete firefly-notes-delete-btn" id="firefly-notes-delete" aria-label="Delete note">Delete</button>
             </div>
 

@@ -15,6 +15,17 @@ const FIREFLY_NOTES_MENU_SLUG  = 'firefly-notes';
 const FIREFLY_NOTES_POST_TYPE  = 'firefly_note';
 const FIREFLY_NOTES_REST_NS    = 'firefly-notes/v1';
 
+// Per-note meta:
+//   _firefly_note_session_id — the browser-local session uuid the note was
+//   created under. Lets us bulk-delete notes when their owning session is
+//   deleted from the picker.
+//   _firefly_note_messages — JSON-serialized list of {session_id, message_id}
+//   pairs identifying each Ragsmith dictation message this note produced.
+//   Iterated on note delete so the Ragsmith conversation history stays in
+//   sync with the WP side.
+const FIREFLY_NOTES_META_SESSION  = '_firefly_note_session_id';
+const FIREFLY_NOTES_META_MESSAGES = '_firefly_note_messages';
+
 /**
  * Per-file mtime cache busting. Whenever an asset's content changes on
  * disk, its mtime updates and browsers refetch on the next request.
@@ -26,19 +37,11 @@ function firefly_notes_asset_version( $abs_path ) {
 
 /**
  * Single source of truth for who can use the Notes feature.
- *
- * Default template gates on manage_options. Other contexts can broaden
- * (or tighten) access without forking the model file by adding handlers
- * to the `firefly_notes_can_access` filter — return true to grant.
- *
- * Example: open to a custom role.
- *   add_filter( 'firefly_notes_can_access', function ( $can ) {
- *       return $can || current_user_can( 'editor' );
- *   } );
+ * Default template gates on manage_options; flip to is_user_logged_in()
+ * (or any custom cap) to open it up.
  */
 function firefly_notes_can_access() {
-    $can = current_user_can( 'manage_options' );
-    return (bool) apply_filters( 'firefly_notes_can_access', $can );
+    return current_user_can( 'manage_options' );
 }
 
 // ---------- Custom post type ----------
@@ -157,6 +160,30 @@ add_action( 'rest_api_init', function () {
         'permission_callback' => $perm,
         'callback'            => 'firefly_notes_route_update',
     ) );
+
+    // Record a single Ragsmith dictation message id against a note so the
+    // delete cascade can remove it from Ragsmith later. Idempotent — duplicate
+    // message ids are dropped on append.
+    register_rest_route( FIREFLY_NOTES_REST_NS, '/notes/(?P<id>\d+)/messages', array(
+        'methods'             => WP_REST_Server::CREATABLE,
+        'permission_callback' => $perm,
+        'callback'            => 'firefly_notes_route_append_message',
+    ) );
+
+    // Session-scoped operations: count + bulk delete notes carrying a given
+    // browser-local session_id meta. Used by the session picker's delete flow.
+    register_rest_route( FIREFLY_NOTES_REST_NS, '/sessions/(?P<sid>[A-Za-z0-9_\-]+)/notes', array(
+        array(
+            'methods'             => WP_REST_Server::DELETABLE,
+            'permission_callback' => $perm,
+            'callback'            => 'firefly_notes_route_delete_session_notes',
+        ),
+    ) );
+    register_rest_route( FIREFLY_NOTES_REST_NS, '/sessions/(?P<sid>[A-Za-z0-9_\-]+)/notes/count', array(
+        'methods'             => WP_REST_Server::READABLE,
+        'permission_callback' => $perm,
+        'callback'            => 'firefly_notes_route_count_session_notes',
+    ) );
 } );
 
 /**
@@ -174,12 +201,32 @@ function firefly_notes_owned_post( $id ) {
 }
 
 function firefly_notes_format( WP_Post $post ) {
+    // Surface the Ragsmith message refs so the client can tell whether this
+    // note has been pushed to AI (and, if so, which message to PUT against
+    // on subsequent saves). The meta stores a JSON-encoded list — invalid
+    // or missing data falls back to an empty array.
+    $raw_messages = get_post_meta( $post->ID, FIREFLY_NOTES_META_MESSAGES, true );
+    $messages = array();
+    if ( is_string( $raw_messages ) && $raw_messages !== '' ) {
+        $decoded = json_decode( $raw_messages, true );
+        if ( is_array( $decoded ) ) {
+            foreach ( $decoded as $row ) {
+                if ( isset( $row['session_id'], $row['message_id'] ) ) {
+                    $messages[] = array(
+                        'session_id' => (string) $row['session_id'],
+                        'message_id' => (string) $row['message_id'],
+                    );
+                }
+            }
+        }
+    }
     return array(
         'id'       => (int) $post->ID,
         'title'    => $post->post_title !== '' ? $post->post_title : 'Untitled',
         'content'  => (string) $post->post_content,
         'modified' => mysql2date( 'c', $post->post_modified ),
         'created'  => mysql2date( 'c', $post->post_date ),
+        'messages' => $messages,
     );
 }
 
@@ -206,7 +253,18 @@ function firefly_notes_route_list( WP_REST_Request $req ) {
 }
 
 function firefly_notes_route_create( WP_REST_Request $req ) {
-    $title = sprintf( 'Untitled — %s', wp_date( 'M j, Y g:i A' ) );
+    $body  = $req->get_json_params() ?: array();
+    // Default to America/Los_Angeles so the timestamp in the title reads as
+    // PST/PDT regardless of how WordPress's site-wide timezone is set (the
+    // host server often defaults to UTC). Falls back to wp_date()'s default
+    // if the timezone class isn't available for some reason.
+    try {
+        $tz    = new DateTimeZone( 'America/Los_Angeles' );
+        $stamp = wp_date( 'M j, Y g:i A', null, $tz );
+    } catch ( Exception $e ) {
+        $stamp = wp_date( 'M j, Y g:i A' );
+    }
+    $title = sprintf( 'Untitled — %s', $stamp );
     $id = wp_insert_post( array(
         'post_type'    => FIREFLY_NOTES_POST_TYPE,
         'post_status'  => 'publish',
@@ -215,6 +273,13 @@ function firefly_notes_route_create( WP_REST_Request $req ) {
         'post_content' => '',
     ), true );
     if ( is_wp_error( $id ) ) return $id;
+
+    // Stamp the creating browser session_id so delete-session can find this
+    // note later. We accept any non-empty string — the client owns the uuid
+    // shape; we don't need to validate it here.
+    if ( ! empty( $body['session_id'] ) && is_string( $body['session_id'] ) ) {
+        update_post_meta( $id, FIREFLY_NOTES_META_SESSION, sanitize_text_field( $body['session_id'] ) );
+    }
     return rest_ensure_response( firefly_notes_format( get_post( $id ) ) );
 }
 
@@ -227,8 +292,121 @@ function firefly_notes_route_get( WP_REST_Request $req ) {
 function firefly_notes_route_delete( WP_REST_Request $req ) {
     $post = firefly_notes_owned_post( $req['id'] );
     if ( is_wp_error( $post ) ) return $post;
+    // Tear down the matching Ragsmith messages before trashing the post so
+    // the conversation history stays in sync. Best-effort — a Ragsmith hop
+    // failure shouldn't strand the WP note in a half-deleted state.
+    firefly_notes_purge_ragsmith_messages( $post->ID );
     wp_trash_post( $post->ID );
     return rest_ensure_response( array( 'deleted' => true, 'id' => (int) $post->ID ) );
+}
+
+/**
+ * POST /notes/{id}/messages — append a Ragsmith message reference.
+ * Body: { session_id, message_id }. Both required. Idempotent: appending
+ * an existing pair is a no-op so retries don't bloat the meta.
+ */
+function firefly_notes_route_append_message( WP_REST_Request $req ) {
+    $post = firefly_notes_owned_post( $req['id'] );
+    if ( is_wp_error( $post ) ) return $post;
+
+    $body       = $req->get_json_params() ?: array();
+    $session_id = isset( $body['session_id'] ) ? sanitize_text_field( (string) $body['session_id'] ) : '';
+    $message_id = isset( $body['message_id'] ) ? (string) $body['message_id'] : '';
+
+    if ( $session_id === '' || $message_id === '' ) {
+        return new WP_Error( 'firefly_notes_bad_request', 'session_id and message_id are required.', array( 'status' => 400 ) );
+    }
+
+    $existing = get_post_meta( $post->ID, FIREFLY_NOTES_META_MESSAGES, true );
+    $list     = is_string( $existing ) && $existing !== '' ? json_decode( $existing, true ) : array();
+    if ( ! is_array( $list ) ) $list = array();
+
+    foreach ( $list as $row ) {
+        if ( isset( $row['session_id'], $row['message_id'] )
+             && $row['session_id'] === $session_id
+             && (string) $row['message_id'] === $message_id ) {
+            return rest_ensure_response( array( 'ok' => true, 'duplicate' => true ) );
+        }
+    }
+    $list[] = array( 'session_id' => $session_id, 'message_id' => $message_id );
+    update_post_meta( $post->ID, FIREFLY_NOTES_META_MESSAGES, wp_json_encode( $list ) );
+    return rest_ensure_response( array( 'ok' => true, 'count' => count( $list ) ) );
+}
+
+/**
+ * GET /sessions/{sid}/notes/count — how many notes carry this local session_id.
+ * The notes UI calls this to show "this will delete N notes" in the confirm.
+ */
+function firefly_notes_route_count_session_notes( WP_REST_Request $req ) {
+    $sid = sanitize_text_field( (string) $req['sid'] );
+    $ids = firefly_notes_ids_for_local_session( $sid );
+    return rest_ensure_response( array( 'count' => count( $ids ) ) );
+}
+
+/**
+ * DELETE /sessions/{sid}/notes — bulk-trash every note tagged with this
+ * browser-local session_id. Each note's Ragsmith messages are torn down
+ * via purge_ragsmith_messages before the post is trashed.
+ */
+function firefly_notes_route_delete_session_notes( WP_REST_Request $req ) {
+    $sid = sanitize_text_field( (string) $req['sid'] );
+    $ids = firefly_notes_ids_for_local_session( $sid );
+    $deleted = array();
+    foreach ( $ids as $id ) {
+        // Ownership re-check per row — keeps multi-author setups honest.
+        $post = firefly_notes_owned_post( $id );
+        if ( is_wp_error( $post ) ) continue;
+        firefly_notes_purge_ragsmith_messages( $post->ID );
+        wp_trash_post( $post->ID );
+        $deleted[] = (int) $post->ID;
+    }
+    return rest_ensure_response( array( 'deleted' => $deleted, 'count' => count( $deleted ) ) );
+}
+
+/**
+ * Return note IDs whose _firefly_note_session_id meta matches $sid,
+ * scoped to the current user (admins see everything).
+ */
+function firefly_notes_ids_for_local_session( $sid ) {
+    if ( $sid === '' ) return array();
+    $args = array(
+        'post_type'      => FIREFLY_NOTES_POST_TYPE,
+        'post_status'    => array( 'publish', 'draft' ),
+        'posts_per_page' => 500,
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+        'meta_key'       => FIREFLY_NOTES_META_SESSION,
+        'meta_value'     => $sid,
+    );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        $args['author'] = get_current_user_id();
+    }
+    $q = new WP_Query( $args );
+    return array_map( 'intval', $q->posts );
+}
+
+/**
+ * Delete the Ragsmith messages this note produced, then clear the meta.
+ * Skips silently when the firefly-ragsmith plugin isn't installed so the
+ * notes plugin remains usable standalone.
+ */
+function firefly_notes_purge_ragsmith_messages( $post_id ) {
+    if ( ! function_exists( 'firefly_ragsmith' ) ) return;
+    $raw = get_post_meta( $post_id, FIREFLY_NOTES_META_MESSAGES, true );
+    if ( ! is_string( $raw ) || $raw === '' ) return;
+    $list = json_decode( $raw, true );
+    if ( ! is_array( $list ) ) return;
+
+    $client = firefly_ragsmith();
+    if ( ! is_object( $client ) || ! method_exists( $client, 'delete_session_message' ) ) return;
+
+    foreach ( $list as $row ) {
+        if ( empty( $row['session_id'] ) || empty( $row['message_id'] ) ) continue;
+        // Errors here are non-fatal — the conversation may already be gone
+        // (e.g. session deletion ran before this call). Swallow + continue.
+        $client->delete_session_message( $row['session_id'], $row['message_id'] );
+    }
+    delete_post_meta( $post_id, FIREFLY_NOTES_META_MESSAGES );
 }
 
 /**

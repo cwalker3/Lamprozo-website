@@ -169,6 +169,180 @@
     line-height: 1.4;
 }
 
+/* Save to AI button — explicit user-triggered persist of the note's
+   content to the Ragsmith conversation with fact extraction. */
+.firefly-notes-ai-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #f5b544 0%, #ff8a3d 100%);
+    border-color: #d99b2c;
+    color: #1d2327;
+    font-weight: 600;
+}
+.firefly-notes-ai-save:hover {
+    background: linear-gradient(135deg, #ffc764 0%, #ff9a4d 100%);
+    border-color: #c98a1d;
+    color: #1d2327;
+}
+.firefly-notes-ai-save:disabled {
+    background: #e3e3e3;
+    border-color: #c6c6c6;
+    color: #757575;
+    cursor: not-allowed;
+}
+.firefly-notes-ai-save.is-synced {
+    background: #f0f0f1;
+    border-color: #c6c6c6;
+    color: #50575e;
+    font-weight: 500;
+}
+.firefly-notes-ai-save.is-synced:hover {
+    background: #e6e6e7;
+    color: #1d2327;
+}
+.firefly-notes-ai-sparkles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+}
+.firefly-notes-ai-sparkles svg {
+    display: block;
+}
+/* On mobile the label hides and we show just the sparkles icon, like the
+   other icon-only buttons. */
+@media (max-width: 782px) {
+    .firefly-notes-ai-save .firefly-notes-ai-save-label {
+        display: none;
+    }
+}
+
+/* Modal — Promise-based replacement for window.alert/confirm/prompt. */
+.firefly-notes-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100000; /* above WP admin bar and notice areas */
+}
+.firefly-notes-modal-root[hidden] { display: none; }
+.firefly-notes-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 18, 22, 0.55);
+    backdrop-filter: blur(2px);
+}
+.firefly-notes-modal-dialog {
+    position: relative;
+    margin: 12vh auto 0;
+    width: min(440px, calc(100vw - 32px));
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 22px 22px 16px;
+    animation: firefly-notes-modal-in 140ms ease-out;
+}
+@keyframes firefly-notes-modal-in {
+    from { transform: translateY(-8px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.firefly-notes-modal-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #1d2327;
+}
+.firefly-notes-modal-body {
+    color: #1d2327;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.firefly-notes-modal-message {
+    margin: 0 0 12px;
+}
+.firefly-notes-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 4px 0 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--firefly-notes-border);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+    background: #fff;
+    color: #1d2327;
+    outline: none;
+}
+.firefly-notes-modal-input:focus {
+    border-color: var(--firefly-notes-accent-strong);
+    box-shadow: 0 0 0 2px rgba(245, 181, 68, 0.25);
+}
+.firefly-notes-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.firefly-notes-modal-cancel,
+.firefly-notes-modal-ok {
+    min-width: 88px;
+}
+/* Danger variant — destructive confirms (delete note, delete session) */
+.firefly-notes-modal-ok.button-danger {
+    background: #b32d2e;
+    border-color: #a02526;
+    color: #fff;
+}
+.firefly-notes-modal-ok.button-danger:hover {
+    background: #9c1f20;
+    border-color: #8a1819;
+    color: #fff;
+}
+.firefly-notes-modal-ok.button-danger:focus {
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px rgba(179, 45, 46, 0.45);
+}
+.firefly-notes-modal-dialog.is-danger .firefly-notes-modal-title {
+    color: #8a1819;
+}
+
+/* Fullscreen busy overlay shown during destructive async ops (delete note,
+   delete session). Sits above everything except the modal — modal stacks
+   higher because it's the foreground confirm. */
+.firefly-notes-busy-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999; /* below modal-root's 100000 so confirms always win */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(15, 18, 22, 0.35);
+    backdrop-filter: blur(1px);
+    cursor: wait;
+    /* Block clicks beneath. */
+    pointer-events: all;
+}
+.firefly-notes-busy-overlay[hidden] { display: none; }
+.firefly-notes-busy-spinner {
+    width: 44px;
+    height: 44px;
+    border: 4px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: firefly-notes-busy-spin 0.9s linear infinite;
+}
+@keyframes firefly-notes-busy-spin {
+    to { transform: rotate(360deg); }
+}
+.firefly-notes-busy-label {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
 /* Layout */
 .firefly-notes-layout {
     display: grid;
@@ -550,12 +724,19 @@
     .firefly-notes-session-btn .firefly-notes-session-label {
         display: none;
     }
-    /* Popover slides to fit the viewport on small screens so it doesn't clip
-       past the right edge when the button is near the top-right corner. */
+    /* Switch to viewport-fixed positioning on mobile so positionSessionPopover()
+       in notes.js can center the popover under the button regardless of where
+       the button sits in the flex row, then clamp to the viewport on either
+       side so it never spills off-screen. */
     .firefly-notes-session-popover {
-        right: 0;
-        left: auto;
+        position: fixed;
+        top: 0;       /* placeholder — JS sets the real top from button rect */
+        left: 0;      /* placeholder — JS sets the real left after centering */
+        right: auto;
+        bottom: auto;
         width: min(320px, calc(100vw - 16px));
+        max-height: calc(100dvh - 120px);
+        overflow-y: auto;
     }
     .firefly-notes hr.wp-header-end {
         margin: 0 0 10px;
