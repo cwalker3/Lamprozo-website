@@ -941,4 +941,93 @@
         });
     }
 
+    /* =========================================================================
+     * Recent syncs — read-only activity feed mirroring the pages-list expansion.
+     *
+     * Subscribes to the same /sync-log REST endpoint, shows the last 5 entries,
+     * and refetches whenever the post finishes saving (which is the closest
+     * proxy we have to "sync just happened from the panel above" since the
+     * sync flow doesn't expose a dedicated event in this file).
+     * ======================================================================== */
+    const SyncLogPanel = () => {
+        const [entries, setEntries] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState(null);
+
+        const { postId, isSaving } = useSelect((select) => {
+            const editor = select('core/editor');
+            return {
+                postId:   editor.getCurrentPostId(),
+                isSaving: editor.isSavingPost() && !editor.isAutosavingPost(),
+            };
+        });
+
+        const restUrl = (window.fireflyPageSync && window.fireflyPageSync.restUrl) || '';
+        const nonce   = (window.fireflyPageSync && window.fireflyPageSync.nonce)   || '';
+
+        const fetchLog = () => {
+            if (!postId || !restUrl) return;
+            setLoading(true);
+            setError(null);
+            fetch(restUrl + 'sync-log?post_id=' + postId + '&limit=5', {
+                headers: { 'X-WP-Nonce': nonce },
+                credentials: 'same-origin'
+            })
+                .then((r) => r.ok ? r.json() : r.json().then((j) => { throw new Error(j.message || 'HTTP ' + r.status); }))
+                .then((data) => { setEntries((data && data.entries) || []); })
+                .catch((e) => { setError(e.message || 'Failed to load activity.'); })
+                .finally(() => { setLoading(false); });
+        };
+
+        // Initial load + reload after each save (saves typically follow a
+        // sync from the sister panel; cheap to re-poll).
+        useEffect(fetchLog, [postId]);
+        useEffect(() => {
+            if (!isSaving) {
+                // Debounce slightly so the log row written by the sync flow
+                // has time to land before we re-read.
+                const t = setTimeout(fetchLog, 600);
+                return () => clearTimeout(t);
+            }
+        }, [isSaving]);
+
+        const dirArrow = (d) => d === 'push' ? '↑' : '↓';
+        const envLabel = (e) => e === 'prod' ? 'Production' : 'Live Dev';
+
+        let body;
+        if (loading && entries.length === 0) {
+            body = el('div', { className: 'firefly-sync-log-loading' }, el(Spinner), ' Loading…');
+        } else if (error) {
+            body = el(Notice, { status: 'error', isDismissible: false }, error);
+        } else if (entries.length === 0) {
+            body = el('p', { className: 'firefly-sync-log-empty' }, __('No sync activity yet.', 'firefly-projects'));
+        } else {
+            body = el('ul', { className: 'firefly-sync-log-mini' },
+                entries.map((entry) => el('li', {
+                    key: entry.id,
+                    className: 'firefly-sync-log-mini-entry' + (entry.status === 'failure' ? ' is-failure' : ' is-success')
+                },
+                    el('span', { className: 'firefly-sync-log-dot' }),
+                    el('span', { className: 'firefly-sync-log-mini-dir' }, dirArrow(entry.direction) + ' ' + envLabel(entry.env)),
+                    el('span', { className: 'firefly-sync-log-mini-user' }, entry.user || 'System'),
+                    entry.revision_url
+                        ? el('a', { className: 'firefly-sync-log-mini-rev', href: entry.revision_url }, __('View', 'firefly-projects'))
+                        : null,
+                    el('span', { className: 'firefly-sync-log-mini-time', title: entry.created_at_iso || '' }, entry.created_at_human || '')
+                ))
+            );
+        }
+
+        return el(PluginDocumentSettingPanel, {
+            name: 'firefly-sync-log',
+            title: __('Recent syncs', 'firefly-projects'),
+            className: 'firefly-sync-log-panel'
+        }, body);
+    };
+
+    registerPlugin('firefly-sync-log', {
+        render: SyncLogPanel,
+        icon: 'clock'
+    });
+
 })(window.wp);

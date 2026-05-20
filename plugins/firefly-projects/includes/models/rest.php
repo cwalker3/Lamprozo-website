@@ -647,8 +647,47 @@ function firefly_plugin_register_rest_endpoints() {
             'permission_callback' => '__return_true' // Uses shared secret for remote, admin for local
         )
     );
+
+    // Sync Log: Read the activity log for a specific post (admin only).
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/sync-log',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_sync_log_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'post_id' => array(
+                    'required' => true,
+                    'type'     => 'integer',
+                ),
+                'limit'   => array(
+                    'required' => false,
+                    'type'     => 'integer',
+                    'default'  => 20,
+                ),
+            ),
+        )
+    );
 }
 add_action('rest_api_init', 'firefly_plugin_register_rest_endpoints');
+
+/**
+ * REST: GET /sync-log?post_id=X[&limit=N]
+ * Returns the most recent sync log entries for a post, shaped for the UI.
+ */
+function firefly_projects_sync_log_endpoint( WP_REST_Request $request ) {
+    $post_id = (int) $request->get_param( 'post_id' );
+    $limit   = (int) ( $request->get_param( 'limit' ) ?: 20 );
+    if ( $post_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'post_id required.' ), 400 );
+    }
+    if ( ! function_exists( 'firefly_projects_get_sync_log' ) ) {
+        return new WP_REST_Response( array( 'success' => true, 'entries' => array() ), 200 );
+    }
+    $entries = firefly_projects_get_sync_log( $post_id, $limit );
+    return new WP_REST_Response( array( 'success' => true, 'entries' => $entries ), 200 );
+}
 
 /**
  * Sync page content to remote site
@@ -1125,6 +1164,25 @@ function firefly_projects_pull_page($request) {
     $result = firefly_projects_import_pulled_page($data, $source_env);
 
     if ($result['success']) {
+        // Activity log row — pull, success.
+        if ( function_exists( 'firefly_projects_log_sync' ) && ! empty( $result['post_id'] ) ) {
+            $pulled = get_post( (int) $result['post_id'] );
+            firefly_projects_log_sync(array(
+                'post_id'     => (int) $result['post_id'],
+                'post_type'   => $pulled ? $pulled->post_type : 'page',
+                'direction'   => 'pull',
+                'env'         => ( $source_env === 'prod' ) ? 'prod' : 'dev',
+                'user_id'     => get_current_user_id() ?: null,
+                'status'      => 'success',
+                'revision_id' => null,
+                'files_count' => 0,
+                'summary'     => array(
+                    'source_host' => parse_url( $endpoint, PHP_URL_HOST ),
+                    'slug'        => $post_slug,
+                ),
+            ));
+        }
+
         return new WP_REST_Response(array(
             'success' => true,
             'message' => $result['message'],
@@ -1132,6 +1190,28 @@ function firefly_projects_pull_page($request) {
             'details' => isset($result['details']) ? $result['details'] : null
         ), 200);
     } else {
+        // Activity log row — pull, failure. We may not know the local post_id
+        // yet (it could be a not-yet-existing page), so look it up by slug.
+        if ( function_exists( 'firefly_projects_log_sync' ) ) {
+            $local = get_page_by_path( $post_slug, OBJECT, array( 'page', 'post' ) );
+            if ( $local ) {
+                firefly_projects_log_sync(array(
+                    'post_id'     => (int) $local->ID,
+                    'post_type'   => $local->post_type,
+                    'direction'   => 'pull',
+                    'env'         => ( $source_env === 'prod' ) ? 'prod' : 'dev',
+                    'user_id'     => get_current_user_id() ?: null,
+                    'status'      => 'failure',
+                    'revision_id' => null,
+                    'files_count' => 0,
+                    'summary'     => array(
+                        'source_host'   => parse_url( $endpoint, PHP_URL_HOST ),
+                        'slug'          => $post_slug,
+                        'error_message' => $result['message'],
+                    ),
+                ));
+            }
+        }
         return new WP_REST_Response(array(
             'success' => false,
             'message' => $result['message']

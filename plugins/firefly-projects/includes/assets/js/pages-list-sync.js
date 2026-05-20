@@ -440,6 +440,8 @@
             headers: { 'X-WP-Nonce': config.nonce },
             success: function(response) {
                 showSyncResult(true, response.message, response.details);
+                // Notify the per-row activity log to refresh if its panel is open.
+                $(document).trigger('firefly:sync-page:done', [{ postId: postId, success: true }]);
             },
             error: function(xhr) {
                 var message = 'Sync failed.';
@@ -448,6 +450,7 @@
                     if (resp.message) message = resp.message;
                 } catch (e) {}
                 showSyncResult(false, message);
+                $(document).trigger('firefly:sync-page:done', [{ postId: postId, success: false }]);
             },
             complete: function() {
                 state.isSyncing = false;
@@ -1128,4 +1131,179 @@
     // Initialize when document is ready
     $(document).ready(init);
 
+})(jQuery);
+
+/* =============================================================================
+ * Sync activity log — per-row expandable panel.
+ *
+ * The chevron row action ('.firefly-sync-log-link') toggles a sub-<tr> directly
+ * after the post's row. First open fetches `/sync-log?post_id=X`, renders the
+ * timeline, and caches the markup in a data-attribute so toggling open again
+ * is instant. Re-fetch is triggered after a sync from the per-row "Sync to
+ * Remote" link (so the new entry shows up without a page reload).
+ * ============================================================================= */
+(function ($) {
+    'use strict';
+
+    var SyncLog = window.FireflyProjectsSyncLog = window.FireflyProjectsSyncLog || {};
+
+    function getRest() {
+        var cfg = window.fireflyPagesSync || window.fireflyPageSync || {};
+        return {
+            url:   cfg.restUrl   || (window.location.origin + '/wp-json/firefly-plugin/v1/'),
+            nonce: cfg.nonce     || ''
+        };
+    }
+
+    // Inline SVGs reused in the entries.
+    var ICONS = {
+        push:     '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 9 8 4 13 9"/><line x1="8" y1="4" x2="8" y2="13"/></svg>',
+        pull:     '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 8 12 13 7"/><line x1="8" y1="3" x2="8" y2="12"/></svg>',
+        spinner:  '<span class="firefly-sync-log-spinner" aria-hidden="true"></span>'
+    };
+
+    function fetchEntries(postId, cb) {
+        var r = getRest();
+        $.ajax({
+            url: r.url + 'sync-log',
+            method: 'GET',
+            data: { post_id: postId, limit: 20 },
+            headers: { 'X-WP-Nonce': r.nonce }
+        }).done(function (data) {
+            cb(null, (data && data.entries) ? data.entries : []);
+        }).fail(function (xhr) {
+            var msg = 'Failed to load activity (' + (xhr && xhr.status ? xhr.status : 'network') + ').';
+            try { var j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+            cb(new Error(msg), null);
+        });
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function envLabel(env) { return env === 'prod' ? 'Production' : 'Live Dev'; }
+    function dirLabel(direction, env) {
+        var arrow = direction === 'push' ? '→' : '←';
+        var verb  = direction === 'push' ? 'Push'   : 'Pull';
+        return verb + ' ' + arrow + ' ' + envLabel(env);
+    }
+
+    function summaryFiles(summary) {
+        if (!summary) return [];
+        var out = [];
+        if (Array.isArray(summary.media_files))      out = out.concat(summary.media_files);
+        if (Array.isArray(summary.associated_files)) out = out.concat(summary.associated_files);
+        return out;
+    }
+
+    function renderEntries(entries) {
+        if (!entries || entries.length === 0) {
+            return '<div class="firefly-sync-log-empty">No sync activity yet for this page.</div>';
+        }
+        var html = '<ol class="firefly-sync-log-timeline">';
+        entries.forEach(function (e) {
+            var isFail   = e.status === 'failure';
+            var dirHtml  = (e.direction === 'pull' ? ICONS.pull : ICONS.push) + escapeHtml(dirLabel(e.direction, e.env));
+            var files    = summaryFiles(e.summary);
+            var filesTip = files.length ? files.join('\n') : '';
+            var filesPart = files.length
+                ? '<span class="firefly-sync-log-files" title="' + escapeHtml(filesTip) + '">' + e.files_count + ' file' + (e.files_count === 1 ? '' : 's') + '</span>'
+                : (e.direction === 'push' ? '<span class="firefly-sync-log-files is-muted">no files</span>' : '');
+            var revPart = e.revision_url
+                ? '<a class="firefly-sync-log-revision" href="' + escapeHtml(e.revision_url) + '">View version</a>'
+                : '';
+            var errPart = '';
+            if (isFail && e.summary && e.summary.error_message) {
+                errPart = '<div class="firefly-sync-log-error">' + escapeHtml(e.summary.error_message) + '</div>';
+            }
+            html += '<li class="firefly-sync-log-entry ' + (isFail ? 'is-failure' : 'is-success') + '">'
+                  +   '<span class="firefly-sync-log-dot" aria-hidden="true"></span>'
+                  +   '<span class="firefly-sync-log-direction">' + dirHtml + '</span>'
+                  +   '<span class="firefly-sync-log-user">' + escapeHtml(e.user || 'System') + '</span>'
+                  +   filesPart
+                  +   revPart
+                  +   '<time class="firefly-sync-log-time" datetime="' + escapeHtml(e.created_at_iso || '') + '" title="' + escapeHtml(e.created_at_iso || '') + '">' + escapeHtml(e.created_at_human || '') + '</time>'
+                  +   errPart
+                  + '</li>';
+        });
+        html += '</ol>';
+        return html;
+    }
+
+    function getColspan($row) {
+        // colspan matches the number of column headers so the panel spans the
+        // full table width even when WP columns are reconfigured.
+        var n = $row.closest('table.wp-list-table').find('thead th, thead td').length;
+        return n > 0 ? n : 1;
+    }
+
+    function ensurePanel($row, postId) {
+        var $next = $row.next('.firefly-sync-log-row');
+        if ($next.length) return $next;
+        var colspan = getColspan($row);
+        var $panel = $('<tr class="firefly-sync-log-row" data-post-id="' + postId + '" hidden>'
+                     +   '<td colspan="' + colspan + '">'
+                     +     '<div class="firefly-sync-log-body"></div>'
+                     +   '</td>'
+                     + '</tr>');
+        $row.after($panel);
+        return $panel;
+    }
+
+    function loadInto($panel, postId, opts) {
+        opts = opts || {};
+        var $body = $panel.find('.firefly-sync-log-body');
+        $body.html('<div class="firefly-sync-log-loading">' + ICONS.spinner + ' Loading activity…</div>');
+        fetchEntries(postId, function (err, entries) {
+            if (err) {
+                $body.html('<div class="firefly-sync-log-error">' + escapeHtml(err.message) + '</div>');
+                return;
+            }
+            $body.html(renderEntries(entries));
+            $panel.data('loaded', true);
+            if (opts.onLoad) opts.onLoad(entries);
+        });
+    }
+
+    function togglePanel($link) {
+        var postId = parseInt($link.attr('data-post-id'), 10);
+        if (!postId) return;
+        var $row   = $link.closest('tr');
+        var $panel = ensurePanel($row, postId);
+        var willOpen = $panel.prop('hidden');
+
+        $panel.prop('hidden', !willOpen);
+        $link.attr('aria-expanded', willOpen ? 'true' : 'false');
+        $link.toggleClass('is-open', willOpen);
+
+        if (willOpen && !$panel.data('loaded')) {
+            loadInto($panel, postId);
+        }
+    }
+
+    /**
+     * Public: refresh the activity panel for a given post (if its panel is open).
+     * Called from the existing sync flow so a new entry appears without reload.
+     */
+    SyncLog.refresh = function (postId) {
+        var $panel = $('.firefly-sync-log-row[data-post-id="' + postId + '"]');
+        if (!$panel.length || $panel.prop('hidden')) return;
+        loadInto($panel, postId);
+    };
+
+    $(document).ready(function () {
+        $(document).on('click', '.firefly-sync-log-link', function (e) {
+            e.preventDefault();
+            togglePanel($(this));
+        });
+
+        // Whenever the existing per-row "Sync to Remote" flow finishes,
+        // refresh the matching activity panel so the new entry shows up.
+        $(document).on('firefly:sync-page:done', function (e, data) {
+            if (data && data.postId) SyncLog.refresh(data.postId);
+        });
+    });
 })(jQuery);

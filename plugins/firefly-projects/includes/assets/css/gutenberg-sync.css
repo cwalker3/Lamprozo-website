@@ -643,3 +643,45 @@
 .firefly-overwrite-button.is-primary:focus:not(:disabled) {
     box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d63638;
 }
+
+/* =============================================================================
+   Recent syncs — Gutenberg sidebar mini panel.
+   ========================================================================== */
+.firefly-sync-log-panel .firefly-sync-log-mini {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.firefly-sync-log-mini-entry {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px dashed #dcdcde;
+}
+.firefly-sync-log-mini-entry:last-child { border-bottom: 0; }
+.firefly-sync-log-mini-entry .firefly-sync-log-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #2e7d32;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-mini-entry.is-failure .firefly-sync-log-dot { background: #b32d2e; }
+.firefly-sync-log-mini-dir  { font-weight: 500; color: #2c3338; }
+.firefly-sync-log-mini-user { color: #50575e; }
+.firefly-sync-log-mini-rev  {
+    color: #2271b1;
+    text-decoration: none;
+}
+.firefly-sync-log-mini-rev:hover { text-decoration: underline; }
+.firefly-sync-log-mini-time {
+    margin-left: auto;
+    color: #646970;
+}
+.firefly-sync-log-panel .firefly-sync-log-loading {
+    display: flex; align-items: center; gap: 6px;
+    color: #646970; font-style: italic;
+}
+.firefly-sync-log-panel .firefly-sync-log-empty {
+    color: #646970; font-style: italic; margin: 0;
+}

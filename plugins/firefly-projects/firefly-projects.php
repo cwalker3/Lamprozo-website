@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FIREFLY_PROJECTS_VERSION', '1.0.21');
+define('FIREFLY_PROJECTS_VERSION', '1.0.22');
 define('FIREFLY_PROJECTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_FILE', __FILE__);
@@ -36,6 +36,7 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/git-mode.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/sync-log.php';
 
 /**
  * Activation hook - Create necessary directories
@@ -52,6 +53,11 @@ function firefly_projects_activate() {
 
     if (!file_exists($temp_dir)) {
         wp_mkdir_p($temp_dir);
+    }
+
+    // Create / upgrade the sync activity log table.
+    if (function_exists('firefly_projects_install_sync_log_table')) {
+        firefly_projects_install_sync_log_table();
     }
 
     // Flush rewrite rules for REST API
@@ -261,8 +267,28 @@ function firefly_projects_register_meta() {
             }
         ));
 
+        // Attribution: user_id who triggered the last Live Dev push.
+        register_post_meta($post_type, '_firefly_last_sync_dev_by', array(
+            'show_in_rest'  => true,
+            'single'        => true,
+            'type'          => 'integer',
+            'auth_callback' => function() {
+                return current_user_can('edit_posts');
+            }
+        ));
+
         // Last sync to Production
         register_post_meta($post_type, '_firefly_last_sync_prod', array(
+            'show_in_rest'  => true,
+            'single'        => true,
+            'type'          => 'integer',
+            'auth_callback' => function() {
+                return current_user_can('edit_posts');
+            }
+        ));
+
+        // Attribution: user_id who triggered the last Production push.
+        register_post_meta($post_type, '_firefly_last_sync_prod_by', array(
             'show_in_rest'  => true,
             'single'        => true,
             'type'          => 'integer',
@@ -516,6 +542,16 @@ function firefly_projects_add_page_sync_row_action($actions, $post) {
         esc_attr($last_sync_dev),
         esc_attr($last_sync_prod),
         __('Sync to Remote', 'firefly-projects')
+    );
+
+    // Chevron toggle that opens a per-row activity-log panel below the row.
+    // Inline SVG matches the icon convention used elsewhere; no dashicons dep.
+    $chevron_svg = '<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true" class="firefly-sync-log-chevron"><polyline points="5 8 10 13 15 8"/></svg>';
+    $actions['firefly_sync_log'] = sprintf(
+        '<a href="#" class="firefly-sync-log-link" data-post-id="%d" aria-expanded="false">%s<span class="firefly-sync-log-label">%s</span></a>',
+        $post->ID,
+        $chevron_svg,
+        __( 'Sync activity', 'firefly-projects' )
     );
 
     return $actions;

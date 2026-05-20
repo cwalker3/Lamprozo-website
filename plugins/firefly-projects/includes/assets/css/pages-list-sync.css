@@ -712,3 +712,143 @@
         justify-content: space-between;
     }
 }
+
+/* =============================================================================
+   Sync activity log — chevron row action + per-row expansion panel.
+   ========================================================================== */
+
+/* Row action: chevron link sits alongside Edit / Quick Edit / Sync to Remote. */
+.row-actions .firefly-sync-log-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #50575e;
+}
+.row-actions .firefly-sync-log-link:hover {
+    color: #135e96;
+}
+.firefly-sync-log-chevron {
+    transition: transform .15s ease;
+}
+.row-actions .firefly-sync-log-link.is-open .firefly-sync-log-chevron {
+    transform: rotate(180deg);
+}
+
+/* The injected sub-row spans the full table width via colspan from JS. */
+tr.firefly-sync-log-row > td {
+    background: #f6f7f7;
+    border-top: 0;
+    padding: 12px 18px 16px;
+    box-shadow: inset 0 1px 0 #dcdcde, inset 0 -1px 0 #dcdcde;
+}
+tr.firefly-sync-log-row .firefly-sync-log-body {
+    max-width: 920px;
+}
+.firefly-sync-log-loading,
+.firefly-sync-log-empty {
+    color: #646970;
+    font-style: italic;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.firefly-sync-log-error {
+    color: #b32d2e;
+    padding: 6px 0;
+    font-size: 12px;
+}
+.firefly-sync-log-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #c3c4c7;
+    border-top-color: #2271b1;
+    border-radius: 50%;
+    animation: firefly-sync-log-spin .9s linear infinite;
+}
+@keyframes firefly-sync-log-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .firefly-sync-log-spinner { animation: none; }
+}
+
+/* Timeline list. Each row is a flex strip: dot + chips + meta. */
+ol.firefly-sync-log-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.firefly-sync-log-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed #dcdcde;
+    font-size: 13px;
+    color: #1d2327;
+}
+.firefly-sync-log-entry:last-child {
+    border-bottom: 0;
+}
+.firefly-sync-log-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2e7d32;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-entry.is-failure .firefly-sync-log-dot {
+    background: #b32d2e;
+}
+.firefly-sync-log-direction {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-weight: 500;
+    color: #2c3338;
+}
+.firefly-sync-log-user {
+    color: #2c3338;
+    font-weight: 500;
+}
+.firefly-sync-log-files {
+    color: #646970;
+    cursor: help;
+}
+.firefly-sync-log-files.is-muted {
+    color: #a7aaad;
+    cursor: default;
+}
+.firefly-sync-log-revision {
+    color: #2271b1;
+    text-decoration: none;
+}
+.firefly-sync-log-revision:hover {
+    text-decoration: underline;
+}
+.firefly-sync-log-time {
+    margin-left: auto;
+    color: #646970;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.firefly-sync-log-entry .firefly-sync-log-error {
+    flex: 1 1 100%;
+    padding: 4px 0 0;
+}
+
+/* Mobile: stack the time below the row instead of right-aligning. */
+@media (max-width: 782px) {
+    .firefly-sync-log-time {
+        margin-left: 0;
+        flex: 1 1 100%;
+    }
+    tr.firefly-sync-log-row > td {
+        padding: 10px 12px 14px;
+    }
+}

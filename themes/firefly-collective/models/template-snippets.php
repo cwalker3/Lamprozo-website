@@ -149,6 +149,15 @@ function firefly_get_snippet_path($post_id, $post_type = 'page') {
  * Save post content to snippet file
  */
 function firefly_save_snippet($post_id) {
+    // Suppress when an inbound page-sync is currently applying the snippet
+    // explicitly from the sender's manifest. Without this guard the receiver
+    // would immediately re-derive the snippet from post_content via
+    // firefly_relativize_urls() and clobber the file we just wrote, defeating
+    // the point of shipping snippet HTML byte-for-byte.
+    if (defined('FIREFLY_PROJECTS_SYNCING_INBOUND') && FIREFLY_PROJECTS_SYNCING_INBOUND) {
+        return;
+    }
+
     // Skip autosaves
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
         return;
