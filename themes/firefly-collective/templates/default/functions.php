@@ -10,9 +10,13 @@
     global $template_path;
 
     // Load models
+    // NOTE: 'meta' (OG/Twitter) + 'schema' (JSON-LD) used to live in
+    // templates/default/models/. Both were promoted to the framework in
+    // themes/firefly-collective/models/seo-{meta,schema}.php so every
+    // template inherits SEO output. Don't re-list them here.
     $models = array(
                 'init',         'rest',
-                'user',         'meta',
+                'user',
                 'contact',      'signup',
                 'signin',       'blogs',
                 'bookings',     'mail',

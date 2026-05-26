@@ -10,6 +10,25 @@
 define('FIREFLY_TEMPLATE_META_KEY', '_firefly_template');
 
 /**
+ * Expose _firefly_template via REST so the Gutenberg Template Assignment
+ * panel can read/write it through wp.data.dispatch('core/editor').editPost.
+ * The classic meta box still uses raw $_POST so registration is purely
+ * additive — no save_post conflict.
+ */
+add_action( 'init', function () {
+    foreach ( array( 'post', 'page' ) as $post_type ) {
+        register_post_meta( $post_type, FIREFLY_TEMPLATE_META_KEY, array(
+            'show_in_rest'      => true,
+            'single'            => true,
+            'type'              => 'string',
+            'default'           => '',
+            'sanitize_callback' => 'sanitize_text_field',
+            'auth_callback'     => function () { return current_user_can( 'edit_posts' ); },
+        ) );
+    }
+} );
+
+/**
  * Get valid templates dynamically by checking existing template directories.
  */
 function firefly_get_valid_templates() {

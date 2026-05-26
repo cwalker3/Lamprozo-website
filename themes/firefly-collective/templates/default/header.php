@@ -13,7 +13,7 @@
 <head>
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?php echo esc_html( get_bloginfo('name') . ' - ' . (isset($args['page-title']) ? $args['page-title'] : '') ); ?></title>
+    <title><?php echo esc_html( firefly_get_document_title( isset( $args['page-title'] ) ? $args['page-title'] : '' ) ); ?></title>
     <?php wp_head(); ?>
 </head>
 

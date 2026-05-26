@@ -148,7 +148,15 @@ function firefly_projects_package_page($post, $include_assets = true) {
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint');
+    $allowed_underscore_keys = array(
+        '_thumbnail_id', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint',
+        // GEO meta
+        '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq',
+        // SEO meta (per-page overrides — see seo-post.php for the registration)
+        '_seo_title', '_seo_description', '_seo_canonical',
+        '_seo_robots_noindex', '_seo_robots_nofollow',
+        '_seo_og_image_id', '_seo_og_title', '_seo_og_description',
+    );
     foreach ($meta as $key => $values) {
         // Skip internal meta keys (except whitelisted ones)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -459,7 +467,15 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $meta = get_post_meta($post->ID);
     $meta_data = array();
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint');
+    $allowed_underscore_keys = array(
+        '_thumbnail_id', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint',
+        // GEO meta
+        '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq',
+        // SEO meta (per-page overrides — see seo-post.php for the registration)
+        '_seo_title', '_seo_description', '_seo_canonical',
+        '_seo_robots_noindex', '_seo_robots_nofollow',
+        '_seo_og_image_id', '_seo_og_title', '_seo_og_description',
+    );
     foreach ($meta as $key => $values) {
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;

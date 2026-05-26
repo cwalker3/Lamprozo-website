@@ -36,6 +36,7 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/git-mode.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/seo-post.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/sync-log.php';
 
 /**
@@ -245,6 +246,68 @@ function firefly_projects_enqueue_geo_assets() {
 }
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_gutenberg_assets');
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_geo_assets');
+add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_seo_assets');
+
+/**
+ * Enqueue the per-page SEO sidebar panel + its styles.
+ *
+ * Loads on the block editor for both pages and posts (every post type that
+ * has _seo_* meta registered). Localizes the post's current permalink + the
+ * publisher org name into JS so the live SERP preview can render accurately
+ * even before the user types anything.
+ */
+function firefly_projects_enqueue_seo_assets() {
+    global $post;
+    $post_id = $post ? $post->ID : ( isset( $_GET['post'] ) ? (int) $_GET['post'] : 0 );
+
+    $current_post_type = '';
+    if ( $post ) {
+        $current_post_type = $post->post_type;
+    } elseif ( isset( $_GET['post'] ) ) {
+        $current_post_type = get_post_type( (int) $_GET['post'] );
+    } elseif ( isset( $_GET['post_type'] ) ) {
+        $current_post_type = sanitize_key( $_GET['post_type'] );
+    }
+
+    // Only on page + post editors; other CPTs don't have _seo_* meta registered.
+    if ( ! in_array( $current_post_type, array( 'page', 'post' ), true ) ) {
+        return;
+    }
+
+    $js_file  = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/seo-post-panel.js';
+    $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/seo-post.css';
+    $js_ver   = file_exists( $js_file )  ? filemtime( $js_file )  : FIREFLY_PROJECTS_VERSION;
+    $css_ver  = file_exists( $css_file ) ? filemtime( $css_file ) : FIREFLY_PROJECTS_VERSION;
+
+    wp_enqueue_script(
+        'firefly-seo-post-panel',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/seo-post-panel.js',
+        array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'wp-i18n', 'wp-media-utils' ),
+        $js_ver,
+        true
+    );
+
+    wp_enqueue_style(
+        'firefly-seo-post',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/seo-post.css',
+        array(),
+        $css_ver
+    );
+
+    // wp.media() needs its own enqueue for the OG image picker.
+    wp_enqueue_media();
+
+    $publisher = function_exists( 'firefly_get_publisher_organization' )
+        ? firefly_get_publisher_organization()
+        : array( 'name' => get_bloginfo( 'name' ), 'logo_url' => '' );
+
+    wp_localize_script( 'firefly-seo-post-panel', 'fireflySeoPanel', array(
+        'siteName'       => get_bloginfo( 'name' ),
+        'publisherName'  => $publisher['name'],
+        'postPermalink'  => $post_id ? get_permalink( $post_id ) : home_url( '/' ),
+        'homeUrl'        => home_url( '/' ),
+    ) );
+}
 
 /**
  * Register post meta for REST API access
