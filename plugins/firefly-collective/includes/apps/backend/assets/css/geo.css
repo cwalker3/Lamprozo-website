@@ -688,3 +688,126 @@
 .geo-sync-warning .dashicons {
     color: #996800;
 }
+
+/* ============================================================================
+   Split tab navigation — visually separates SEO (site-wide defaults) from
+   GEO (Organization structured data). The labels above each group + the
+   center divider make it obvious which domain each tab configures.
+   ============================================================================ */
+.geo-tabs-split {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-bottom: 2px solid #c3c4c7;
+    padding-top: 18px; /* room for the absolute-positioned group labels */
+    position: relative;
+}
+
+.geo-tabs-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    position: relative;
+    padding-top: 0;
+}
+
+.geo-tabs-group-seo {
+    flex: 0 0 auto;
+    padding-right: 16px;
+}
+
+.geo-tabs-group-geo {
+    flex: 1 1 auto;
+    padding-left: 16px;
+}
+
+/* Group labels — small uppercase eyebrows above each tab cluster. */
+.geo-tabs-group-label {
+    position: absolute;
+    top: -18px;
+    left: 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #646970;
+    background: transparent;
+}
+.geo-tabs-group-geo .geo-tabs-group-label {
+    left: 16px;
+}
+
+/* Vertical divider between the two groups, with a small horizontal cap
+   that bridges the bottom-border so the seam reads cleanly. */
+.geo-tabs-divider {
+    width: 1px;
+    background: #c3c4c7;
+    align-self: stretch;
+    margin: 0 4px -2px;
+}
+
+/* Tinted underline accents so each side's active tab inherits a color hint. */
+.geo-tab-seo.active {
+    box-shadow: inset 0 -3px 0 #2271b1;
+}
+.geo-tab-geo.active {
+    box-shadow: inset 0 -3px 0 #d65c2c;
+}
+
+/* SEO panel banner — sits at the top of the SEO tab content, makes the
+   domain clear once you click in. */
+.geo-panel-seo .geo-panel-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f0f6fc;
+    border: 1px solid #c5d9ed;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+    color: #1d2327;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.geo-panel-seo .geo-panel-banner .dashicons {
+    color: #2271b1;
+    flex: 0 0 auto;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+/* Inline checkbox rows for the robots policy toggles. */
+.geo-field-inline label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.geo-field-inline input[type="checkbox"] {
+    margin: 0;
+}
+
+/* Stack groups vertically on narrow screens — divider becomes a horizontal rule. */
+@media (max-width: 782px) {
+    .geo-tabs-split {
+        flex-direction: column;
+        gap: 16px;
+        padding-top: 0;
+    }
+    .geo-tabs-group-seo, .geo-tabs-group-geo {
+        padding: 18px 0 0 0;
+    }
+    .geo-tabs-group-label,
+    .geo-tabs-group-geo .geo-tabs-group-label {
+        position: static;
+        margin-bottom: 4px;
+        display: block;
+    }
+    .geo-tabs-divider {
+        width: 100%;
+        height: 1px;
+        margin: 0;
+    }
+}

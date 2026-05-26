@@ -34,8 +34,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     message: ''
                 },
                 
-                // Tabs configuration
+                // Tabs configuration. SEO leads because it controls site-wide
+                // defaults that affect every page; the GEO tabs configure
+                // structured data for one Organization.
                 tabs: [
+                    { id: 'seo', label: 'SEO', icon: 'dashicons-search' },
                     { id: 'organization', label: 'Organization', icon: 'dashicons-building' },
                     { id: 'location', label: 'Location', icon: 'dashicons-location' },
                     { id: 'contact', label: 'Contact', icon: 'dashicons-email' },
@@ -45,6 +48,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     { id: 'industry', label: 'Industry', icon: 'dashicons-chart-bar' }
                 ],
                 
+                // SEO config (site-wide defaults that compose with per-page _seo_* meta).
+                // Mirrors the seo-config.json shape.
+                seoConfig: {
+                    defaults: {
+                        og_image_url: '',
+                        title_separator: ' - '
+                    },
+                    twitter: {
+                        site_handle: '',
+                        creator_handle: '',
+                        card_type: 'summary_large_image'
+                    },
+                    verification: {
+                        google: '',
+                        bing: '',
+                        yandex: '',
+                        pinterest: '',
+                        baidu: ''
+                    },
+                    robots: {
+                        default_index: true,
+                        default_follow: true
+                    }
+                },
+                originalSeoConfig: null,
+
+                // Twitter card-type options (Twitter docs: summary, summary_large_image, app, player).
+                twitterCardOptions: [
+                    { value: 'summary',             label: 'Summary' },
+                    { value: 'summary_large_image', label: 'Summary with large image' },
+                    { value: 'app',                 label: 'App' },
+                    { value: 'player',              label: 'Player' }
+                ],
+
                 // Configuration data
                 config: {
                     organization: {
@@ -86,15 +123,17 @@ document.addEventListener('DOMContentLoaded', function() {
         },
 
         computed: {
-            // Check if config has been modified (for unsaved changes warning)
+            // True when EITHER the GEO config OR the SEO config has unsaved changes.
             hasChanges() {
-                return JSON.stringify(this.config) !== JSON.stringify(this.originalConfig);
+                return JSON.stringify(this.config) !== JSON.stringify(this.originalConfig)
+                    || JSON.stringify(this.seoConfig) !== JSON.stringify(this.originalSeoConfig);
             }
         },
 
         mounted() {
-            this.loadConfig();
-            
+            // Load both configs in parallel — they're independent stores.
+            Promise.all([ this.loadConfig(), this.loadSeoConfig() ]);
+
             // Warn before leaving with unsaved changes
             window.addEventListener('beforeunload', (e) => {
                 if (this.hasChanges) {
@@ -110,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
              */
             async loadConfig() {
                 this.loading = true;
-                
+
                 try {
                     const response = await fetch(geoData.apiUrl + 'geo/config', {
                         method: 'GET',
@@ -119,9 +158,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             'Content-Type': 'application/json'
                         }
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (data.success && data.config) {
                         this.config = this.mergeWithDefaults(data.config);
                         this.originalConfig = JSON.parse(JSON.stringify(this.config));
@@ -131,6 +170,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.showNotification('error', 'Failed to load configuration');
                 } finally {
                     this.loading = false;
+                }
+            },
+
+            /**
+             * Load SEO config from the parallel /seo/config endpoint.
+             * Independent of GEO config — separate DB rows, separate state.
+             */
+            async loadSeoConfig() {
+                try {
+                    const response = await fetch(geoData.apiUrl + 'seo/config', {
+                        method: 'GET',
+                        headers: {
+                            'X-WP-Nonce': geoData.nonce,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success && data.config) {
+                        // Shallow-merge with the data() defaults so missing
+                        // sub-keys (added in later releases) get their defaults.
+                        this.seoConfig = Object.assign({}, this.seoConfig, data.config);
+                        // Section-level merge so each section's missing keys
+                        // still resolve to the JS default values.
+                        ['defaults', 'twitter', 'verification', 'robots'].forEach((s) => {
+                            this.seoConfig[s] = Object.assign({}, this.seoConfig[s] || {}, (data.config[s] || {}));
+                        });
+                        this.originalSeoConfig = JSON.parse(JSON.stringify(this.seoConfig));
+                    }
+                } catch (error) {
+                    console.error('Error loading SEO config:', error);
+                    this.showNotification('error', 'Failed to load SEO configuration');
                 }
             },
 
@@ -189,33 +259,51 @@ document.addEventListener('DOMContentLoaded', function() {
             },
 
             /**
-             * Save configuration to API
+             * Save BOTH GEO and SEO configurations. Two parallel POSTs so a
+             * single "Save Changes" button covers all of the user's edits on
+             * either tab group. Each is retried independently; partial failure
+             * surfaces in the notification.
              */
             async saveConfig() {
                 this.saving = true;
-                
+
                 try {
-                    const response = await fetch(geoData.apiUrl + 'geo/config', {
-                        method: 'POST',
-                        headers: {
-                            'X-WP-Nonce': geoData.nonce,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(this.config)
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
+                    const [geoResp, seoResp] = await Promise.all([
+                        fetch(geoData.apiUrl + 'geo/config', {
+                            method: 'POST',
+                            headers: {
+                                'X-WP-Nonce': geoData.nonce,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.config)
+                        }).then((r) => r.json()).catch((e) => ({ success: false, message: e.message })),
+                        fetch(geoData.apiUrl + 'seo/config', {
+                            method: 'POST',
+                            headers: {
+                                'X-WP-Nonce': geoData.nonce,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.seoConfig)
+                        }).then((r) => r.json()).catch((e) => ({ success: false, message: e.message }))
+                    ]);
+
+                    if (geoResp && geoResp.success) {
                         this.originalConfig = JSON.parse(JSON.stringify(this.config));
-                        this.showNotification('success', 'Configuration saved successfully');
-                        
-                        // Refresh preview if open
+                    }
+                    if (seoResp && seoResp.success) {
+                        this.originalSeoConfig = JSON.parse(JSON.stringify(this.seoConfig));
+                    }
+
+                    if (geoResp.success && seoResp.success) {
+                        this.showNotification('success', 'SEO/GEO configuration saved successfully');
                         if (this.showPreview) {
                             this.generatePreview();
                         }
                     } else {
-                        this.showNotification('error', data.message || 'Failed to save configuration');
+                        const parts = [];
+                        if (!geoResp.success) parts.push('GEO: ' + (geoResp.message || 'failed'));
+                        if (!seoResp.success) parts.push('SEO: ' + (seoResp.message || 'failed'));
+                        this.showNotification('error', 'Save failed — ' + parts.join('; '));
                     }
                 } catch (error) {
                     console.error('Error saving config:', error);
@@ -226,34 +314,46 @@ document.addEventListener('DOMContentLoaded', function() {
             },
 
             /**
-             * Reset configuration to defaults
+             * Reset BOTH GEO and SEO configurations to their default values
+             * (re-seeds each table from the corresponding JSON file).
              */
             async resetConfig() {
                 this.showResetModal = false;
                 this.saving = true;
-                
+
                 try {
-                    const response = await fetch(geoData.apiUrl + 'geo/reset', {
-                        method: 'POST',
-                        headers: {
-                            'X-WP-Nonce': geoData.nonce,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success && data.config) {
-                        this.config = this.mergeWithDefaults(data.config);
+                    const [geoResp, seoResp] = await Promise.all([
+                        fetch(geoData.apiUrl + 'geo/reset', {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': geoData.nonce, 'Content-Type': 'application/json' }
+                        }).then((r) => r.json()).catch((e) => ({ success: false, message: e.message })),
+                        fetch(geoData.apiUrl + 'seo/reset', {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': geoData.nonce, 'Content-Type': 'application/json' }
+                        }).then((r) => r.json()).catch((e) => ({ success: false, message: e.message }))
+                    ]);
+
+                    if (geoResp && geoResp.success && geoResp.config) {
+                        this.config = this.mergeWithDefaults(geoResp.config);
                         this.originalConfig = JSON.parse(JSON.stringify(this.config));
-                        this.showNotification('success', 'Configuration reset to defaults');
-                        
-                        // Refresh preview if open
+                    }
+                    if (seoResp && seoResp.success && seoResp.config) {
+                        ['defaults', 'twitter', 'verification', 'robots'].forEach((s) => {
+                            this.seoConfig[s] = Object.assign({}, this.seoConfig[s] || {}, (seoResp.config[s] || {}));
+                        });
+                        this.originalSeoConfig = JSON.parse(JSON.stringify(this.seoConfig));
+                    }
+
+                    if (geoResp.success && seoResp.success) {
+                        this.showNotification('success', 'SEO/GEO configuration reset to defaults');
                         if (this.showPreview) {
                             this.generatePreview();
                         }
                     } else {
-                        this.showNotification('error', data.message || 'Failed to reset configuration');
+                        const parts = [];
+                        if (!geoResp.success) parts.push('GEO: ' + (geoResp.message || 'failed'));
+                        if (!seoResp.success) parts.push('SEO: ' + (seoResp.message || 'failed'));
+                        this.showNotification('error', 'Reset failed — ' + parts.join('; '));
                     }
                 } catch (error) {
                     console.error('Error resetting config:', error);

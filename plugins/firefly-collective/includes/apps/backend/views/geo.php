@@ -145,21 +145,118 @@ if (!current_user_can('manage_options')) {
             </div>
         </div>
         
-        <!-- Tab navigation -->
-        <div class="geo-tabs">
-            <button v-for="tab in tabs" 
-                    :key="tab.id"
-                    type="button"
-                    :class="['geo-tab', { active: activeTab === tab.id }]"
-                    @click="setActiveTab(tab.id)">
-                <span class="dashicons" :class="tab.icon"></span>
-                {{ tab.label }}
-            </button>
+        <!-- Tab navigation, split into two visually distinct groups:
+             SEO (site-wide defaults) on the left, GEO (structured-data
+             organization profile) on the right. The divider + section
+             labels make it obvious which settings affect which domain. -->
+        <div class="geo-tabs geo-tabs-split">
+            <div class="geo-tabs-group geo-tabs-group-seo">
+                <span class="geo-tabs-group-label">SEO</span>
+                <button v-for="tab in tabs.filter(t => t.id === 'seo')"
+                        :key="tab.id"
+                        type="button"
+                        :class="['geo-tab', 'geo-tab-seo', { active: activeTab === tab.id }]"
+                        @click="setActiveTab(tab.id)">
+                    <span class="dashicons" :class="tab.icon"></span>
+                    {{ tab.label }}
+                </button>
+            </div>
+            <div class="geo-tabs-divider" aria-hidden="true"></div>
+            <div class="geo-tabs-group geo-tabs-group-geo">
+                <span class="geo-tabs-group-label">GEO</span>
+                <button v-for="tab in tabs.filter(t => t.id !== 'seo')"
+                        :key="tab.id"
+                        type="button"
+                        :class="['geo-tab', 'geo-tab-geo', { active: activeTab === tab.id }]"
+                        @click="setActiveTab(tab.id)">
+                    <span class="dashicons" :class="tab.icon"></span>
+                    {{ tab.label }}
+                </button>
+            </div>
         </div>
         
         <!-- Tab content -->
         <div class="geo-content">
-            
+
+            <!-- SEO Tab — site-wide defaults that compose with per-page _seo_* meta.
+                 Editable values land in wp_ffc_seo_config; the theme's seo-meta.php
+                 reads them via firefly_get_seo_setting() at wp_head time. -->
+            <div :class="['geo-panel', 'geo-panel-seo', { active: activeTab === 'seo' }]">
+                <div class="geo-panel-banner">
+                    <span class="dashicons dashicons-search"></span>
+                    <span><strong>SEO settings</strong> — site-wide defaults applied to every page. Per-page overrides live in each post's Gutenberg SEO panel.</span>
+                </div>
+
+                <h3>Defaults</h3>
+                <div class="geo-field">
+                    <label>Default OG image URL</label>
+                    <input type="url" v-model="seoConfig.defaults.og_image_url" placeholder="https://example.com/og.png">
+                    <p class="description">Used when a page has no <code>_seo_og_image_id</code> override and no featured image. Leave blank to fall back to the active template's <code>default-og.webp</code>.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Title separator</label>
+                    <input type="text" v-model="seoConfig.defaults.title_separator" maxlength="12" placeholder=" - " style="width:120px;">
+                    <p class="description">Joins site name + page title in the &lt;title&gt; tag (e.g. <code> - </code>, <code> | </code>, <code> · </code>). Whitespace is preserved.</p>
+                </div>
+
+                <h3>Twitter / X Card</h3>
+                <div class="geo-field">
+                    <label>Site handle</label>
+                    <input type="text" v-model="seoConfig.twitter.site_handle" placeholder="@yoursite">
+                    <p class="description">Emitted as <code>twitter:site</code>. The <code>@</code> is added automatically if missing.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Creator handle</label>
+                    <input type="text" v-model="seoConfig.twitter.creator_handle" placeholder="@author">
+                    <p class="description">Optional. Emitted as <code>twitter:creator</code> when set.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Card type</label>
+                    <select v-model="seoConfig.twitter.card_type">
+                        <option v-for="opt in twitterCardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                    <p class="description">Drives how social-card previews render. <em>Summary with large image</em> is the right pick for most marketing sites.</p>
+                </div>
+
+                <h3>Search-engine verification</h3>
+                <p class="description geo-panel-description">Paste the verification code each provider gives you. Only providers with a non-empty code emit a meta tag.</p>
+                <div class="geo-field">
+                    <label>Google Search Console</label>
+                    <input type="text" v-model="seoConfig.verification.google" placeholder="abc123-google-verification-token">
+                </div>
+                <div class="geo-field">
+                    <label>Bing Webmaster Tools</label>
+                    <input type="text" v-model="seoConfig.verification.bing" placeholder="msvalidate.01 token">
+                </div>
+                <div class="geo-field">
+                    <label>Yandex Webmaster</label>
+                    <input type="text" v-model="seoConfig.verification.yandex" placeholder="yandex-verification token">
+                </div>
+                <div class="geo-field">
+                    <label>Pinterest</label>
+                    <input type="text" v-model="seoConfig.verification.pinterest" placeholder="p:domain_verify token">
+                </div>
+                <div class="geo-field">
+                    <label>Baidu</label>
+                    <input type="text" v-model="seoConfig.verification.baidu" placeholder="baidu-site-verification token">
+                </div>
+
+                <h3>Default robots policy</h3>
+                <p class="description geo-panel-description">These are the site-wide defaults; per-page toggles can override them. Dev / localhost always forces <code>noindex,nofollow</code> regardless.</p>
+                <div class="geo-field geo-field-inline">
+                    <label>
+                        <input type="checkbox" v-model="seoConfig.robots.default_index">
+                        Allow search engines to index pages by default
+                    </label>
+                </div>
+                <div class="geo-field geo-field-inline">
+                    <label>
+                        <input type="checkbox" v-model="seoConfig.robots.default_follow">
+                        Allow search engines to follow links by default
+                    </label>
+                </div>
+            </div>
+
             <!-- Organization Tab -->
             <div :class="['geo-panel', { active: activeTab === 'organization' }]">
                 <div class="geo-section">

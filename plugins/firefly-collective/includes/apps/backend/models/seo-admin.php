@@ -198,9 +198,18 @@ function firefly_collective_sanitize_seo_config( $config ) {
     $clean = array();
 
     if ( isset( $config['defaults'] ) && is_array( $config['defaults'] ) ) {
+        // title_separator preserves whitespace (so " | " keeps its spaces).
+        // strip_tags + UTF-8 check is enough hardening; trimming would
+        // corrupt the user's intent for separators like " · " or " — ".
+        $sep_raw = isset( $config['defaults']['title_separator'] ) ? (string) $config['defaults']['title_separator'] : ' - ';
+        $sep_clean = wp_check_invalid_utf8( strip_tags( $sep_raw ) );
+        // Cap length to prevent abuse — separators are tiny by nature.
+        if ( strlen( $sep_clean ) > 12 ) {
+            $sep_clean = substr( $sep_clean, 0, 12 );
+        }
         $clean['defaults'] = array(
-            'og_image_url'    => isset( $config['defaults']['og_image_url'] )    ? esc_url_raw( $config['defaults']['og_image_url'] )       : '',
-            'title_separator' => isset( $config['defaults']['title_separator'] ) ? sanitize_text_field( $config['defaults']['title_separator'] ) : ' - ',
+            'og_image_url'    => isset( $config['defaults']['og_image_url'] ) ? esc_url_raw( $config['defaults']['og_image_url'] ) : '',
+            'title_separator' => $sep_clean,
         );
     }
     if ( isset( $config['twitter'] ) && is_array( $config['twitter'] ) ) {
@@ -273,8 +282,15 @@ function firefly_collective_rest_get_seo_config( WP_REST_Request $request ) {
 
 function firefly_collective_rest_save_seo_config( WP_REST_Request $request ) {
     $params = $request->get_json_params();
-    $config = isset( $params['config'] ) ? $params['config'] : array();
-    $clean  = firefly_collective_sanitize_seo_config( $config );
+    // Accept both shapes:
+    //   { config: { defaults: {...}, twitter: {...}, ... } }   ← wrapped
+    //   { defaults: {...}, twitter: {...}, ... }               ← direct (matches GEO save)
+    if ( isset( $params['config'] ) && is_array( $params['config'] ) ) {
+        $config = $params['config'];
+    } else {
+        $config = is_array( $params ) ? $params : array();
+    }
+    $clean = firefly_collective_sanitize_seo_config( $config );
 
     if ( empty( $clean ) ) {
         return new WP_REST_Response( array(
