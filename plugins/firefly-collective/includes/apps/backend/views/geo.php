@@ -218,6 +218,13 @@ if (!current_user_can('manage_options')) {
                     <p class="description">Drives how social-card previews render. <em>Summary with large image</em> is the right pick for most marketing sites.</p>
                 </div>
 
+                <h3>Facebook</h3>
+                <div class="geo-field">
+                    <label>Facebook App ID</label>
+                    <input type="text" v-model="seoConfig.facebook.app_id" placeholder="1234567890123456">
+                    <p class="description">Optional. Emitted as <code>fb:app_id</code>. Required only if you want Facebook Insights tracking — eliminates the FB Sharing Debugger warning. Leave blank otherwise.</p>
+                </div>
+
                 <h3>Search-engine verification</h3>
                 <p class="description geo-panel-description">Paste the verification code each provider gives you. Only providers with a non-empty code emit a meta tag.</p>
                 <div class="geo-field">

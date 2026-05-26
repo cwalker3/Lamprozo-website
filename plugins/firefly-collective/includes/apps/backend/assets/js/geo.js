@@ -68,6 +68,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         creator_handle: '',
                         card_type: 'summary_large_image'
                     },
+                    facebook: {
+                        app_id: ''
+                    },
                     verification: {
                         google: '',
                         bing: '',
@@ -201,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.seoConfig = Object.assign({}, this.seoConfig, data.config);
                         // Section-level merge so each section's missing keys
                         // still resolve to the JS default values.
-                        ['defaults', 'twitter', 'verification', 'robots'].forEach((s) => {
+                        ['defaults', 'twitter', 'facebook', 'verification', 'robots'].forEach((s) => {
                             this.seoConfig[s] = Object.assign({}, this.seoConfig[s] || {}, (data.config[s] || {}));
                         });
                         this.originalSeoConfig = JSON.parse(JSON.stringify(this.seoConfig));
@@ -346,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.originalConfig = JSON.parse(JSON.stringify(this.config));
                     }
                     if (seoResp && seoResp.success && seoResp.config) {
-                        ['defaults', 'twitter', 'verification', 'robots'].forEach((s) => {
+                        ['defaults', 'twitter', 'facebook', 'verification', 'robots'].forEach((s) => {
                             this.seoConfig[s] = Object.assign({}, this.seoConfig[s] || {}, (seoResp.config[s] || {}));
                         });
                         this.originalSeoConfig = JSON.parse(JSON.stringify(this.seoConfig));

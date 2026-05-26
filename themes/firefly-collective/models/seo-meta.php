@@ -134,28 +134,59 @@ function firefly_get_og_description() {
  *   _seo_og_image_id postmeta  →  featured image  →  default-og.webp from active template
  */
 function firefly_get_og_image_url() {
-    global $template_path_web;
-
     $post_id = firefly_get_seo_post_id();
     if ( $post_id ) {
         $override_id = (int) get_post_meta( $post_id, '_seo_og_image_id', true );
         if ( $override_id > 0 ) {
             $url = wp_get_attachment_image_url( $override_id, 'full' );
-            if ( $url ) return $url;
+            if ( $url ) return firefly_absolute_url( $url );
         }
 
         $featured = get_the_post_thumbnail_url( $post_id, 'full' );
-        if ( $featured ) return $featured;
+        if ( $featured ) return firefly_absolute_url( $featured );
     }
 
     // Site-wide default from the SEO settings (Sync SEO admin page).
     $configured = firefly_get_seo_setting( 'defaults', 'og_image_url', '' );
     if ( $configured ) {
-        return $configured;
+        return firefly_absolute_url( $configured );
     }
 
-    $base = $template_path_web ? $template_path_web : get_template_directory_uri();
-    return $base . '/images/default-og.webp';
+    // Default to the active template's default-og.webp. We don't trust the
+    // global $template_path_web here — in some request contexts (SPA boot,
+    // REST callbacks) it ends up relative or unset. Build the path from
+    // scratch and pin to home_url() so the result is always absolute.
+    $template = function_exists( 'firefly_collective_get_active_template' )
+        ? firefly_collective_get_active_template()
+        : 'default';
+    $path = '/wp-content/themes/firefly-collective/templates/' . $template . '/images/default-og.webp';
+    return firefly_absolute_url( $path );
+}
+
+/**
+ * Normalize a URL to absolute form (scheme + host + path).
+ *
+ * Social crawlers (Twitter, LinkedIn, Slack, Discord) silently skip
+ * images with relative URLs. Facebook is forgiving on `og:image` but not
+ * on `twitter:image`. Firefly's snippet relativizer + various
+ * `template_directory_uri` filters mean even WP-derived URLs can come
+ * back path-only on this stack, so we centralize the absolute-ize step
+ * for every OG/Twitter URL we emit.
+ *
+ * Already-absolute and protocol-relative URLs pass through unchanged.
+ */
+function firefly_absolute_url( $url ) {
+    if ( empty( $url ) ) return $url;
+    // Already has scheme — pass through.
+    if ( preg_match( '#^https?://#i', $url ) ) return $url;
+    // Protocol-relative — pass through (browser resolves at request time).
+    if ( strpos( $url, '//' ) === 0 ) return $url;
+    // Root-relative path — prepend home_url() with no double-slash.
+    if ( strpos( $url, '/' ) === 0 ) {
+        return rtrim( home_url(), '/' ) . $url;
+    }
+    // Bare path or unknown shape — try home_url() anyway.
+    return rtrim( home_url(), '/' ) . '/' . ltrim( $url, '/' );
 }
 
 /**
@@ -170,11 +201,15 @@ function set_open_graph_meta_data() {
     $description = firefly_get_og_description();
     $image       = firefly_get_og_image_url();
     $seo_post_id = firefly_get_seo_post_id();
-    $url         = $seo_post_id ? get_permalink( $seo_post_id ) : home_url();
+    // Both og:url and the image URL go through firefly_absolute_url() so
+    // crawlers that don't auto-resolve (Twitter, LinkedIn) always get a
+    // full scheme+host URL instead of a path-only one.
+    $url         = firefly_absolute_url( $seo_post_id ? get_permalink( $seo_post_id ) : home_url() );
     $type        = is_singular() ? 'article' : 'website';
     $twitter_card    = firefly_get_seo_setting( 'twitter', 'card_type',      'summary_large_image' );
     $twitter_site    = firefly_get_seo_setting( 'twitter', 'site_handle',    '' );
     $twitter_creator = firefly_get_seo_setting( 'twitter', 'creator_handle', '' );
+    $fb_app_id       = firefly_get_seo_setting( 'facebook', 'app_id',        '' );
 
     echo '<!-- Open Graph meta tags -->' . "\n";
     echo '<meta property="og:title" content="' . esc_attr( $title ) . '" />' . "\n";
@@ -184,6 +219,9 @@ function set_open_graph_meta_data() {
     }
     echo '<meta property="og:url" content="' . esc_url( $url ) . '" />' . "\n";
     echo '<meta property="og:type" content="' . esc_attr( $type ) . '" />' . "\n";
+    if ( $fb_app_id ) {
+        echo '<meta property="fb:app_id" content="' . esc_attr( $fb_app_id ) . '" />' . "\n";
+    }
 
     echo '<!-- Twitter Card meta tags -->' . "\n";
     echo '<meta name="twitter:card" content="' . esc_attr( $twitter_card ) . '" />' . "\n";

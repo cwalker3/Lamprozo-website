@@ -37,6 +37,9 @@ function firefly_seo_get_default_config() {
             'creator_handle' => '',
             'card_type'      => 'summary_large_image',
         ),
+        'facebook' => array(
+            'app_id' => '',
+        ),
         'verification' => array(
             'google'    => '',
             'bing'      => '',
@@ -105,7 +108,7 @@ function firefly_collective_migrate_seo_config() {
         $config = firefly_seo_get_default_config();
     }
 
-    $sections = array( 'defaults', 'twitter', 'verification', 'robots' );
+    $sections = array( 'defaults', 'twitter', 'facebook', 'verification', 'robots' );
     foreach ( $sections as $section ) {
         if ( isset( $config[ $section ] ) ) {
             $wpdb->replace(
@@ -168,7 +171,7 @@ function firefly_collective_save_seo_config( $config ) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'ffc_seo_config';
 
-    $sections = array( 'defaults', 'twitter', 'verification', 'robots' );
+    $sections = array( 'defaults', 'twitter', 'facebook', 'verification', 'robots' );
     $all_ok   = true;
     foreach ( $sections as $section ) {
         if ( isset( $config[ $section ] ) ) {
@@ -217,6 +220,13 @@ function firefly_collective_sanitize_seo_config( $config ) {
             'site_handle'    => isset( $config['twitter']['site_handle'] )    ? sanitize_text_field( $config['twitter']['site_handle'] )    : '',
             'creator_handle' => isset( $config['twitter']['creator_handle'] ) ? sanitize_text_field( $config['twitter']['creator_handle'] ) : '',
             'card_type'      => isset( $config['twitter']['card_type'] )      ? sanitize_text_field( $config['twitter']['card_type'] )      : 'summary_large_image',
+        );
+    }
+    if ( isset( $config['facebook'] ) && is_array( $config['facebook'] ) ) {
+        // fb:app_id is a 16-digit numeric string from FB. Keep it as a
+        // plain string so leading zeros (if any) survive — sanitize as text.
+        $clean['facebook'] = array(
+            'app_id' => isset( $config['facebook']['app_id'] ) ? sanitize_text_field( $config['facebook']['app_id'] ) : '',
         );
     }
     if ( isset( $config['verification'] ) && is_array( $config['verification'] ) ) {

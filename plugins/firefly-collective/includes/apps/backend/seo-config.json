@@ -8,6 +8,9 @@
         "creator_handle": "",
         "card_type": "summary_large_image"
     },
+    "facebook": {
+        "app_id": ""
+    },
     "verification": {
         "google": "",
         "bing": "",
