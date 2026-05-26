@@ -55,11 +55,32 @@ function firefly_get_document_title( $page_title = '' ) {
             return $override;
         }
     }
-    $site = get_bloginfo( 'name' );
+    $site      = get_bloginfo( 'name' );
+    $separator = firefly_get_seo_setting( 'defaults', 'title_separator', ' - ' );
     if ( $page_title === '' ) {
         return $site;
     }
-    return $site . ' - ' . $page_title;
+    return $site . $separator . $page_title;
+}
+
+/**
+ * Small accessor that reads a single value from the site-wide SEO config
+ * (managed by firefly-collective/includes/apps/backend/models/seo-admin.php).
+ * Falls back to $default when the config function isn't loaded yet — keeps
+ * frontend rendering safe on environments where the plugin is disabled.
+ */
+function firefly_get_seo_setting( $section, $key, $default = '' ) {
+    if ( ! function_exists( 'firefly_collective_get_seo_config' ) ) {
+        return $default;
+    }
+    static $cache = null;
+    if ( $cache === null ) {
+        $cache = firefly_collective_get_seo_config();
+    }
+    if ( isset( $cache[ $section ] ) && isset( $cache[ $section ][ $key ] ) && $cache[ $section ][ $key ] !== '' ) {
+        return $cache[ $section ][ $key ];
+    }
+    return $default;
 }
 
 /**
@@ -127,6 +148,12 @@ function firefly_get_og_image_url() {
         if ( $featured ) return $featured;
     }
 
+    // Site-wide default from the SEO settings (Sync SEO admin page).
+    $configured = firefly_get_seo_setting( 'defaults', 'og_image_url', '' );
+    if ( $configured ) {
+        return $configured;
+    }
+
     $base = $template_path_web ? $template_path_web : get_template_directory_uri();
     return $base . '/images/default-og.webp';
 }
@@ -145,6 +172,9 @@ function set_open_graph_meta_data() {
     $seo_post_id = firefly_get_seo_post_id();
     $url         = $seo_post_id ? get_permalink( $seo_post_id ) : home_url();
     $type        = is_singular() ? 'article' : 'website';
+    $twitter_card    = firefly_get_seo_setting( 'twitter', 'card_type',      'summary_large_image' );
+    $twitter_site    = firefly_get_seo_setting( 'twitter', 'site_handle',    '' );
+    $twitter_creator = firefly_get_seo_setting( 'twitter', 'creator_handle', '' );
 
     echo '<!-- Open Graph meta tags -->' . "\n";
     echo '<meta property="og:title" content="' . esc_attr( $title ) . '" />' . "\n";
@@ -156,7 +186,15 @@ function set_open_graph_meta_data() {
     echo '<meta property="og:type" content="' . esc_attr( $type ) . '" />' . "\n";
 
     echo '<!-- Twitter Card meta tags -->' . "\n";
-    echo '<meta name="twitter:card" content="summary_large_image" />' . "\n";
+    echo '<meta name="twitter:card" content="' . esc_attr( $twitter_card ) . '" />' . "\n";
+    if ( $twitter_site ) {
+        $handle = ( strpos( $twitter_site, '@' ) === 0 ) ? $twitter_site : '@' . $twitter_site;
+        echo '<meta name="twitter:site" content="' . esc_attr( $handle ) . '" />' . "\n";
+    }
+    if ( $twitter_creator ) {
+        $handle = ( strpos( $twitter_creator, '@' ) === 0 ) ? $twitter_creator : '@' . $twitter_creator;
+        echo '<meta name="twitter:creator" content="' . esc_attr( $handle ) . '" />' . "\n";
+    }
     echo '<meta name="twitter:title" content="' . esc_attr( $title ) . '" />' . "\n";
     echo '<meta name="twitter:description" content="' . esc_attr( $description ) . '" />' . "\n";
     if ( $image ) {
@@ -164,3 +202,28 @@ function set_open_graph_meta_data() {
     }
 }
 add_action( 'wp_head', 'set_open_graph_meta_data' );
+
+/**
+ * Emit search-engine site-verification meta tags from the SEO config.
+ * Each provider has its own meta name convention; we emit only the ones
+ * that have a non-empty configured value.
+ *
+ * Hooked to wp_head priority 3 so it sits between the
+ * canonical/description block (priority 1) and the schema script (5).
+ */
+function firefly_output_verification_meta() {
+    $providers = array(
+        'google'    => 'google-site-verification',
+        'bing'      => 'msvalidate.01',
+        'yandex'    => 'yandex-verification',
+        'pinterest' => 'p:domain_verify',
+        'baidu'     => 'baidu-site-verification',
+    );
+    foreach ( $providers as $config_key => $meta_name ) {
+        $value = firefly_get_seo_setting( 'verification', $config_key, '' );
+        if ( $value ) {
+            echo '<meta name="' . esc_attr( $meta_name ) . '" content="' . esc_attr( $value ) . '" />' . "\n";
+        }
+    }
+}
+add_action( 'wp_head', 'firefly_output_verification_meta', 3 );

@@ -18,7 +18,7 @@ if (!current_user_can('manage_options')) {
 <div class="geo-admin-wrap" id="geo-admin-app" v-cloak>
     <h1>
         <span class="dashicons dashicons-visibility"></span>
-        GEO Settings
+        SEO/GEO Settings
     </h1>
     
     <!-- Notification -->
@@ -69,26 +69,26 @@ if (!current_user_can('manage_options')) {
             <div class="geo-sync-header">
                 <h3>
                     <span class="dashicons dashicons-update"></span>
-                    Sync GEO Data
+                    Sync to Remote
                 </h3>
             </div>
             <div class="geo-sync-content">
                 <div class="geo-sync-info">
-                    <p>Push your GEO configuration to remote environments. Files sync via Firefly Projects, data syncs here.</p>
+                    <p>Push your SEO/GEO configuration to remote environments. Two parallel push flows: GEO settings (Organization, location, services) and SEO settings (default OG image, Twitter handles, verification codes).</p>
                 </div>
-                
-                <!-- Environment toggle -->
+
+                <!-- Environment toggle (shared between SEO + GEO sync) -->
                 <div v-if="hasProdEndpoint" class="geo-env-toggle">
                     <label class="geo-toggle-label">Target Environment:</label>
                     <div class="geo-toggle-switch">
-                        <button type="button" 
+                        <button type="button"
                                 :class="['geo-toggle-btn', { active: syncEnv === 'dev' }]"
                                 @click="syncEnv = 'dev'">
                             <span class="dashicons dashicons-desktop"></span>
                             Live Dev
                             <small v-if="devSite">({{ devSite }})</small>
                         </button>
-                        <button type="button" 
+                        <button type="button"
                                 :class="['geo-toggle-btn', { active: syncEnv === 'prod' }]"
                                 @click="syncEnv = 'prod'">
                             <span class="dashicons dashicons-admin-site-alt3"></span>
@@ -97,16 +97,24 @@ if (!current_user_can('manage_options')) {
                         </button>
                     </div>
                 </div>
-                
-                <!-- Sync button -->
+
+                <!-- Sync buttons (parallel: SEO + GEO) -->
                 <div class="geo-sync-actions">
-                    <button type="button" 
+                    <button type="button"
+                            class="button button-primary"
+                            @click="syncSeoConfig"
+                            :disabled="syncingSeo || syncing">
+                        <span class="spinner is-active" v-if="syncingSeo" style="float: none; margin: 0 5px 0 0;"></span>
+                        <span class="dashicons dashicons-upload" v-else></span>
+                        {{ syncingSeo ? 'Syncing SEO...' : 'Sync SEO to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
+                    </button>
+                    <button type="button"
                             class="button button-primary"
                             @click="syncConfig"
-                            :disabled="syncing">
+                            :disabled="syncing || syncingSeo">
                         <span class="spinner is-active" v-if="syncing" style="float: none; margin: 0 5px 0 0;"></span>
                         <span class="dashicons dashicons-upload" v-else></span>
-                        {{ syncing ? 'Syncing...' : 'Sync to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
+                        {{ syncing ? 'Syncing GEO...' : 'Sync GEO to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
                     </button>
                     <span v-if="!hasProdEndpoint" class="geo-sync-note">
                         <span class="dashicons dashicons-info"></span>

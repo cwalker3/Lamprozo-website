@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 loading: true,
                 saving: false,
                 syncing: false,
+                syncingSeo: false,
                 activeTab: 'organization',
                 showPreview: false,
                 previewLoading: false,
@@ -263,12 +264,12 @@ document.addEventListener('DOMContentLoaded', function() {
             },
 
             /**
-             * Sync configuration to remote environment
+             * Sync GEO configuration to remote environment
              */
             async syncConfig() {
                 this.syncing = true;
                 const envName = this.syncEnv === 'prod' ? 'Production' : 'Live Dev';
-                
+
                 try {
                     const response = await fetch(geoData.apiUrl + 'geo/sync', {
                         method: 'POST',
@@ -280,19 +281,56 @@ document.addEventListener('DOMContentLoaded', function() {
                             target_env: this.syncEnv
                         })
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (data.success) {
                         this.showNotification('success', data.message || `GEO config synced to ${envName}`);
                     } else {
                         this.showNotification('error', data.message || `Failed to sync to ${envName}`);
                     }
                 } catch (error) {
-                    console.error('Error syncing config:', error);
+                    console.error('Error syncing GEO config:', error);
                     this.showNotification('error', `Failed to sync to ${envName}`);
                 } finally {
                     this.syncing = false;
+                }
+            },
+
+            /**
+             * Sync SEO configuration to remote environment.
+             * Parallel to syncConfig but hits the /seo/sync endpoint which
+             * pushes the wp_ffc_seo_config rows (default OG, Twitter handles,
+             * verification codes, title separator). Same shared-secret flow.
+             */
+            async syncSeoConfig() {
+                this.syncingSeo = true;
+                const envName = this.syncEnv === 'prod' ? 'Production' : 'Live Dev';
+
+                try {
+                    const response = await fetch(geoData.apiUrl + 'seo/sync', {
+                        method: 'POST',
+                        headers: {
+                            'X-WP-Nonce': geoData.nonce,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            target_env: this.syncEnv
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showNotification('success', data.message || `SEO config synced to ${envName}`);
+                    } else {
+                        this.showNotification('error', data.message || `Failed to sync SEO to ${envName}`);
+                    }
+                } catch (error) {
+                    console.error('Error syncing SEO config:', error);
+                    this.showNotification('error', `Failed to sync SEO to ${envName}`);
+                } finally {
+                    this.syncingSeo = false;
                 }
             },
 

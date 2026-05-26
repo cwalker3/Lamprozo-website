@@ -251,11 +251,38 @@ function firefly_output_meta_description() {
 add_action( 'wp_head', 'firefly_output_meta_description', 1 );
 
 /**
- * Output canonical URL. Hooked to wp_head priority 1.
- * _seo_canonical postmeta overrides the self-canonical when present.
+ * Canonical URL — single source of truth via WP core's emission path.
+ *
+ * Two contributors:
+ *   1. _seo_canonical postmeta override → injected into the `get_canonical_url`
+ *      filter so WP core's rel_canonical() emits it as the singular tag.
+ *   2. Posts-page case (/blog) where WP core's rel_canonical() bails because
+ *      is_singular() is false → we emit the tag directly via wp_head, with
+ *      the same override-aware resolution.
+ *
+ * No double tag for singular pages: WP core wins, with our override applied.
  */
-function firefly_output_canonical_url() {
-    $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
+add_filter( 'get_canonical_url', 'firefly_filter_canonical_url', 10, 2 );
+
+function firefly_filter_canonical_url( $canonical, $post ) {
+    if ( $post && $post->ID ) {
+        $override = get_post_meta( $post->ID, '_seo_canonical', true );
+        if ( ! empty( $override ) ) {
+            return $override;
+        }
+    }
+    return $canonical;
+}
+
+/**
+ * Emit canonical on the WP posts page (is_home() with a static blog page).
+ * WP core's rel_canonical() skips this case; we fill the gap.
+ */
+function firefly_output_canonical_url_for_home() {
+    if ( ! is_home() || is_front_page() ) {
+        return;
+    }
+    $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : 0;
     if ( ! $post_id ) {
         return;
     }
@@ -263,7 +290,7 @@ function firefly_output_canonical_url() {
     $canonical = ! empty( $override ) ? $override : get_permalink( $post_id );
     echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
 }
-add_action( 'wp_head', 'firefly_output_canonical_url', 1 );
+add_action( 'wp_head', 'firefly_output_canonical_url_for_home', 10 );
 
 /**
  * Robots directives — composed via WP core's wp_robots filter (5.7+) so
