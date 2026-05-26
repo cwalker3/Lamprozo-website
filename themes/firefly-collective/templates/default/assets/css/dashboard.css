@@ -1,1590 +1,2248 @@
-:root {
-    --profileMaxWidth: 95vw;
-    --calcMaxWidth: 95vw;
-    --primaryColor: #0073aa;
-    --secondaryColor: #005177;
-    --bgLight: #f9f9f9;
-    --bgWhite: #fff;
-    --textDark: #333;
-    --fontSizeLarge: 2rem;
-    --fontSizeMedium: 1.6rem;
-    --fontSizeSmall: 1.4rem;
-    --fontSizeSmaller: 1.2rem;
-    --fontSizeSmallest: 1rem;
-    --textGray: #555;
-    --fieldColumnWidth: 150px; /* Fixed width for label column */
-}
-
-*, *::before, *::after {
-    box-sizing: border-box;
-}
-
-h1 {
-    text-align: center;
-}
-
-/* Campaigns */
-#campaign-head {
-    width: 900px;
-    max-width: var(--calcMaxWidth);
-    margin: 0 auto;
-    background: #f0f8ff; 
-    border-radius: 5px;
-    margin-bottom: 20px;
-    margin-top: 1rem;
-    border-radius: 5px;
-    background: #ffffff;
-    color: black;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-/* Profile Section */
-#profile-container {
-    width: 100%;
-    max-width: var(--profileMaxWidth);
-    margin: 0 auto;
-    margin-top: 1rem;
-    border-radius: 5px;
-    background: #ffffff;
-    color: black;
-    padding: 20px;
-    box-sizing: border-box;
-    text-align: center;
-}
-
-#profile-container form,
-#profile-form {
-    display: grid;
-    grid-template-columns: 1fr; /* Force single column layout */
-    width: 70% !important; /* Use !important to override any conflicting styles */
-    margin: 0 auto;
-    box-sizing: border-box;
-}
-
-/* Remove place-content which can cause width issues */
-#profile-form > div {
-    width: 100%;
-    margin-block: .4rem;
-    box-sizing: border-box;
-    text-align: left;
-}
-
-#profile-container input {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 15px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    box-sizing: border-box;
-}
-
-#profile-container button {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 15px;
-    border: none;
-    border-radius: 3px;
-    background: var(--primaryColor);
-    color: #fff;
-    cursor: pointer;
-    box-sizing: border-box;
-}
-
-#profile-container button:hover {
-    background: var(--secondaryColor);
-}
-
-#profile-message {
-    color: green;
-    margin-bottom: 15px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Price Calculator Container */
-#price-calculator {
-    margin: 20px auto;
-    max-width: var(--calcMaxWidth);
-    background: var(--bgLight);
-    padding: 20px;
-    border-radius: 5px;
-}
-#price-calculator h2 {
-    font-size: var(--fontSizeLarge);
-    margin-bottom: 15px;
-    color: var(--textDark);
-}
-
-/* Feature Type Block */
-.feature-type {
-    margin-bottom: 5rem;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #ddd;
-}
-.feature-type h3 {
-    font-size: var(--fontSizeMedium);
-    margin-bottom: 5px;
-    color: var(--primaryColor);
-}
-.feature-type p {
-    font-size: var(--fontSizeSmall);
-    color: var(--textGray);
-    margin-bottom: 10px;
-}
-
-/* Instance Block (each duplicate instance) */
-.instances-container {
-    color: black;
-    margin-left: 10px;
-}
-.feature {
-    margin-bottom: 20px;
-    padding: 15px;
-    background: var(--bgWhite);
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    transition: all 0.3s ease;
-}
-
-/* Header for each instance */
-.instance-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: var(--fontSizeSmaller);
-    font-weight: bold;
-}
-.delete-instance {
-    background: var(--secondaryColor);
-    border: none;
-    padding: 4px 8px;
-    color: #fff;
-    border-radius: 3px;
-    cursor: pointer;
-}
-.delete-instance:hover {
-    background: var(--primaryColor);
-}
-
-/* Select dropdown */
-.feature select {
-    padding: 8px;
-    font-size: var(--fontSizeSmall);
-    width: 100%;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-}
-
-/* Feature-level fields container */
-.feature-fields {
-    display: none;
-    padding: 15px;
-    margin: 15px 0;
-    background: #f6f6f6;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-}
-
-/* Feature fields title */
-.feature-fields-title {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: var(--fontSizeMedium);
-    color: var(--primaryColor);
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 5px;
-}
-
-/* Feature-level fields should have a slightly different background to distinguish them */
-.feature-level-field {
-    padding: 10px;
-    border-radius: 3px;
-    margin-bottom: 8px;
-}
-
-/* Style the feature fields on the invoice too */
-.feature-field-item {
-    font-size: var(--fontSizeSmaller);
-    color: #555;
-    padding: 2px 0;
-}
-
-/* Add a subtle separator between feature name and feature fields in invoice */
-td .feature-fields-list {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px dotted #eee;
-    font-size: var(--fontSizeSmaller);
-}
-
-/* Option Details */
-.option-details {
-    padding: 15px;
-    background: #fff;
-    border: 1px solid #eee;
-    border-radius: 3px;
-    margin-top: 10px;
-}
-
-/* Standard paragraph styles in option details */
-.option-details p {
-    margin: 10px 0;
-    font-size: var(--fontSizeSmaller);
-    display: grid;
-    grid-template-columns: var(--fieldColumnWidth) 1fr;
-    gap: 10px;
-    align-items: start;
-}
-
-.option-details p strong {
-    font-weight: bold;
-}
-
-/* Grid-based Layout for Form Fields */
-.price-option-selector,
-.user-field,
-.quantity-input {
-    display: grid;
-    grid-template-columns: var(--fieldColumnWidth) 1fr;
-    gap: 10px;
-    margin: 10px 0;
-    padding: 5px 0 10px;
-    border-bottom: 1px solid #f0f0f0;
-    width: 100%;
-    align-items: start;
-}
-
-/* Make label a grid container */
-.price-option-selector label,
-.user-field label,
-.quantity-input label {
-    display: contents; /* Let children participate in parent grid */
-    color: black;
-}
-
-/* Style for label text */
-.price-option-selector strong,
-.user-field strong,
-.quantity-input strong {
-    grid-column: 1;
-    font-weight: bold;
-    padding-top: 6px; /* Vertical alignment with inputs */
-}
-
-/* Style all form inputs consistently */
-.price-option-selector select,
-.user-field select,
-.user-field input[type="text"],
-.user-field input[type="number"],
-.user-field input[type="date"],
-.user-field textarea,
-.quantity-input input {
-    grid-column: 2;
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: var(--fontSizeSmall);
-    background-color: #fff;
-}
-
-/* Special case for quantity input */
-.quantity-input input {
-    width: 80px;
-    justify-self: start; /* Align to left of grid cell */
-}
-
-/* Textarea styling */
-.user-field textarea {
-    min-height: 80px;
-    font-family: inherit;
-    resize: vertical;
-}
-
-/* Focus styles for all input types */
-.price-option-selector select:focus,
-.user-field select:focus,
-.user-field input:focus,
-.user-field textarea:focus,
-.quantity-input input:focus {
-    outline: none;
-    border-color: var(--primaryColor);
-    box-shadow: 0 0 0 1px var(--primaryColor);
-}
-
-/* Dropdown field styles */
-.price-option-selector select,
-.user-field select {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 12px;
-    padding-right: 30px;
-}
-
-/* Styling for user-display values */
-.user-display-value {
-    display: inline-block;
-    padding: 0;
-    margin: 0;
-    font-weight: normal;
-}
-
-/* Style the container when it has display fields */
-.user-field {
-    padding: .5rem;
-    padding-left: 0; 
-}
-
-.user-field strong {
-    padding-top: 0;
-}
-
-/* Hide the price paragraph when price options are shown */
-.option-details:has(.price-option-selector) p:has(strong:contains("Price:")) {
-    display: none;
-}
-
-/* Fallback for browsers that don't support :has() */
-.option-details .price-option-selector ~ p:nth-of-type(2) {
-    display: none;
-}
-
-/* Addons */
-.addons {
-    margin-top: 15px;
-    padding: 12px;
-    background: #f7f7f7;
-    border-radius: 4px;
-}
-.addons h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: var(--fontSizeMedium);
-    color: var(--primaryColor);
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 5px;
-}
-
-.addon-item {
-  display: flex;
-  align-items: flex-start; /* Align items to top when text wraps */
-  margin-bottom: 12px; /* More space between items */
-  padding: 4px 0;
-  min-height: 24px; /* Minimum height, can expand */
-  cursor: default; /* Important - no pointer cursor on the entire container */
-}
-
-.addon-checkbox {
-  flex: 0 0 16px; /* Fixed width */
-  height: 16px;
-  width: 16px;
-  margin: 0;
-  margin-right: 12px; /* Consistent spacing */
-  margin-top: 2px; /* Slight offset to align with first line of text */
-  padding: 0;
-  cursor: pointer; /* Cursor only on the checkbox itself */
-}
-
-.addon-text {
-  color: black;
-  flex: 1;
-  margin: 0;
-  padding: 0;
-  line-height: 1.4; /* Allow normal line spacing for wrapped text */
-  word-wrap: break-word; /* Force long words to break */
-  white-space: normal; /* Allow text to wrap */
-  cursor: default; /* Explicitly not clickable */
-}
-
-/* Add New Feature Button */
-.add-new-feature {
-    background: var(--primaryColor);
-    color: #fff;
-    border: none;
-    padding: 8px 12px;
-    margin: 10px 0;
-    cursor: pointer;
-    border-radius: 3px;
-    float: right;
-    margin-top: 1rem;
-}
-
-/* Max addons message */
-.max-addons-message {
-    color: #216900;
-    font-size: var(--fontSizeSmaller);
-    margin-top: 8px;
-    font-weight: bold;
-    animation: pulse 1.5s infinite;
-}
-
-.addon-group {
-    color: black;
-}
-
-@keyframes pulse {
-    0% { opacity: 0.7; }
-    50% { opacity: 1; }
-    100% { opacity: 0.7; }
-}
-
-/* Discount info */
-.quantity-discounts {
-    color: black;
-    position: relative;
-    margin-top: 12px; 
-    padding: 8px;
-    background-color: #f8f8f8;
-    border-radius: 4px;
-    border: 1px solid #e0e0e0;
-}
-
-.quantity-discounts:before {
-    content: '💰';
-    position: absolute;
-    right: 10px;
-    top: 8px;
-    font-size: var(--fontSizeLarge);
-}
-
-.add-new-feature:hover {
-    background: var(--secondaryColor);
-}
-
-/* Invoice Container */
-#invoice-container {
-    margin: 20px auto;
-    max-width: var(--calcMaxWidth);
-    background: var(--bgLight);
-    padding: 20px;
-    border-radius: 5px;
-}
-#invoice-container h2 {
-    font-size: var(--fontSizeLarge);
-    margin-bottom: 15px;
-    color: var(--textDark);
-}
-
-/* Invoice Table - 2 Column Layout */
-.invoice-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: #fff;
-    margin-bottom: 15px;
-    color: black;
-}
-
-.invoice-table th,
-.invoice-table td {
-    border: 1px solid #ccc;
-    padding: 12px;
-    vertical-align: top;
-    text-align: left;
-}
-
-.invoice-table thead {
-    background-color: #eee;
-}
-
-.invoice-table tfoot td {
-    background-color: #eee;
-    font-weight: bold;
-}
-
-/* Price column alignment */
-.invoice-table th:nth-child(2),
-.invoice-table td:nth-child(2) {
-    text-align: right;
-    width: 150px;
-}
-
-/* Main item styling */
-.item-main {
-    line-height: 1.4;
-}
-
-.feature-name {
-    font-weight: bold;
-    color: var(--primaryColor);
-    font-size: var(--fontSizeSmall);
-    margin-bottom: 4px;
-}
-
-.option-details {
-    font-size: var(--fontSizeSmaller);
-    color: #333;
-}
-
-.option-name {
-    font-weight: 500;
-    margin-bottom: 3px;
-}
-
-.option-detail-line {
-    font-size: var(--fontSizeSmaller);
-    color: #666;
-    margin-left: 8px;
-    margin-bottom: 2px;
-    line-height: 1.3;
-}
-
-/* Legacy classes for backward compatibility */
-.quantity-display,
-.interval-display,
-.user-fields-display {
-    font-size: var(--fontSizeSmaller);
-    color: #666;
-    font-style: italic;
-}
-
-.interval-display {
-    color: var(--secondaryColor);
-    font-weight: 500;
-}
-
-/* Addon row styling */
-.addon-row td {
-    color: #666;
-    padding-left: 24px;
-    border-top: none;
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
-.addon-item-name {
-    font-size: var(--fontSizeSmaller);
-    position: relative;
-}
-
-.addon-item-name::before {
-    content: "└ ";
-    color: #ccc;
-    font-weight: bold;
-    margin-right: 4px;
-}
-
-/* Discount row styling */
-.discount-row td {
-    color: #216900;
-    padding-left: 24px;
-    border-top: none;
-    padding-top: 6px;
-    padding-bottom: 6px;
-    font-size: var(--fontSizeSmaller);
-    font-weight: bold;
-}
-
-.discount-item-name {
-    position: relative;
-}
-
-.discount-item-name::before {
-    content: "└ ";
-    color: #216900;
-    font-weight: bold;
-    margin-right: 4px;
-}
-
-/* Price with discount styling */
-.price-with-discount {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-}
-
-.original-price {
-    text-decoration: line-through;
-    color: #999;
-    font-size: var(--fontSizeSmaller);
-}
-
-.discounted-price {
-    color: #216900;
-    font-weight: bold;
-    font-size: var(--fontSizeSmall);
-}
-
-.discount-note {
-    font-size: var(--fontSizeSmallest);
-    color: #216900;
-    font-style: italic;
-}
-
-/* Invoice Total Text */
-#invoice-total {
-    font-weight: bold;
-    text-align: right;
-}
-
-/* Ordering */
-
-.order-confirm-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.order-confirm-modal.active {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.order-confirm-content {
-    background-color: white;
-    color: black;
-    padding: 30px;
-    border-radius: 5px;
-    max-width: 400px;
-    text-align: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.order-confirm-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-top: 20px;
-}
-
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.loading-overlay.active {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.loading-spinner {
-    text-align: center;
-}
-
-.loading-spinner img {
-    width: 50px;
-    height: 50px;
-}
-
-#subs-loader {
-    width: 30px;
-    height: auto;
-}
-
-.order-confirm-modal button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.order-confirm-modal .confirm-button {
-    background-color: #007bff;
-    color: white;
-}
-
-.order-confirm-modal .cancel-button {
-    background-color: #e0e0e0;
-    color: #212529;
-}
-
-.lock-message {
-    z-index: 1;
-}
-
-/* Payment */
-#payment-element-container {
-    margin: 20px 0;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    border: 1px solid #e0e0e0;
-}
-
-#payment-form {
-    margin-bottom: 15px;
-}
-
-#payment-element {
-    margin-bottom: 15px;
-}
-
-#payment-error {
-    color: #216900;
-    background-color: #ffeaea;
-    padding: 10px;
-    border-radius: 4px;
-    margin-top: 10px;
-    display: none;
-}
-
-/* Styling for successful payment */
-#pay-now.success {
-    background-color: #4caf50 !important;
-}
-
-/* Disabled button style */
-#pay-now:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-/* "Pay Now" / "Request Estimate" Button */
-#pay-now {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 3px;
-    background: var(--primaryColor);
-    color: #fff;
-    font-size: var(--fontSizeMedium);
-    cursor: pointer;
-    transition: background 0.3s ease;
-    margin-top: 10px;
-}
-#pay-now:hover {
-    background: var(--secondaryColor);
-}
-
-/* Invoice table sections */
-.invoice-table .section-header td {
-    background-color: #f5f5f5;
-    padding: 10px;
-    font-size: 1.1em;
-    border-top: 2px solid #ddd;
-}
-
-.invoice-table .section-spacer td {
-    height: 20px;
-    border: none;
-}
-
-.invoice-table .subtotal-row td {
-    border-top: 1px solid #eee;
-    padding-top: 8px;
-}
-
-.invoice-table .total-row td {
-    border-top: 2px solid #333;
-    padding-top: 12px;
-    font-size: 1.1em;
-}
-
-/* Recurring indicator */
-.recurring-interval {
-    color: #666;
-    font-size: 0.9em;
-    font-style: italic;
-    margin-top: 4px;
-}
-
-/* Subscription management */
-
-#subscriptions-management {
-    margin: 0 auto;
-    width: 900px;
-    max-width: 90vw;
-    margin-bottom: 5vh;
-}
-
-.subscriptions-container {
-    color: black;
-    margin: 20px 0;
-}
-
-#manage-subs-btn {
-    margin: 0 auto;
-    width: 70% !important;
-    user-select: none;
-}
-
-.subscription-card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-    background: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.subscription-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.subscription-title {
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-.subscription-status {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.85em;
-    font-weight: 500;
-}
-
-.subscription-status.active {
-    background: #d4edda;
-    color: #155724;
-}
-
-.subscription-status.past_due {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.subscription-status.cancelled {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.subscription-details {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin: 15px 0;
-}
-
-.subscription-detail {
-    display: flex;
-    flex-direction: column;
-}
-
-.subscription-detail-label {
-    font-size: 0.85em;
-    color: #666;
-    margin-bottom: 4px;
-}
-
-.subscription-detail-value {
-    font-weight: 500;
-}
-
-.subscription-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.subscription-actions button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: all 0.3s ease;
-}
-
-.subscription-actions .btn-primary {
-    background: #0073aa;
-    color: white;
-}
-
-.subscription-actions .btn-primary:hover {
-    background: #005a87;
-}
-
-.subscription-actions .btn-danger {
-    background: #dc3545;
-    color: white;
-}
-
-.subscription-actions .btn-danger:hover {
-    background: #c82333;
-}
-
-/* Payment method display */
-.payment-method {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 4px;
-    margin-top: 10px;
-}
-
-.payment-method-icon {
-    width: 40px;
-    height: 25px;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-}
-
-.payment-method-icon.visa {
-    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwNTFBNSIvPgo8cGF0aCBkPSJNMTYuNSA5TDEzLjUgMTVIMTEuNUwxMy4yIC45QzEzLjMgOC41IDEzLjcgOCAxNC4yIDhIMTUuNUwxOCAxNUgxNkwxNS42IDEzLjVIMTMuOUwxMy41IDEzLjVIMTYuNVpNMTkgOEgyMUwyMiAxNUgyMEwxOSA4WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+');
-}
-
-.payment-method-icon.mastercard {
-    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwMCIvPgo8Y2lyY2xlIGN4PSIxNiIgY3k9IjEyIiByPSI3IiBmaWxsPSIjRUIwMDFCIi8+CjxjaXJjbGUgY3g9IjI0IiBjeT0iMTIiIHI9IjciIGZpbGw9IiNGNzkzMDAiLz4KPC9zdmc+');
-}
-
-.payment-method-details {
-    flex: 1;
-}
-
-.payment-method-last4 {
-    font-weight: 500;
-}
-
-.payment-method-expiry {
-    font-size: 0.85em;
-    color: #666;
-}
-
-/* Update payment modal */
-.update-payment-modal {
-    color: black;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.update-payment-content,
-#cancel-subscription-content {
-    background: white;
-    padding: 30px;
-    border-radius: 8px;
-    max-width: 500px;
-    width: 90%;
-}
-
-#cancel-subscription-content {
-    display: grid;
-    place-content: center;
-    min-height: 30vh;
-}
-
-#cancel-subscription-content h3 {
-    text-align: center;
-}
-
-.update-payment-content {
-    position: relative;
-    min-height: 90vh;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.update-payment-content h3 {
-    margin-top: 0;
-    margin-bottom: 20px;
-}
-
-#update-payment-element {
-    margin-bottom: 20px;
-}
-
-.update-payment-actions {
-    display: none;
-}
-
-.update-payment-actions,
-.cancel-actions {
-    gap: 10px;
-    justify-content: flex-end;
-}
-
-.update-payment-actions button,
-.cancel-actions button {
-    cursor: pointer;
-}
-
-.cancel-actions button {
-    font-size: 1.1rem;
-    padding: 0.5rem;
-    border-radius: 5px;
-}
-
-.cancel-actions {
-    display: flex;
-    justify-content: space-evenly;
-}
-
-#cancel-modal-loader {
-    width: 30px;
-    height: auto;
-}
-
-#update-modal-loader {
-    width: 30px;
-    height: auto;
-    position: absolute;
-    display: none;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.button-danger {
-    background-color: #dc3545;
-    color: white;
-}
-.button-danger:hover {
-    background-color: #c82333;
-}
-
-.plan-change-section {
-    margin: 15px 0;
-    padding: 15px;
-    background: #f5f5f5;
-    border-radius: 4px;
-}
-
-.plan-select {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.btn-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.subscription-status.past_due {
-    background-color: #dc3545;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.85em;
-}
-
-/* Mixed order warning */
-.mixed-order-warning {
-    background: #fff3cd;
-    border: 1px solid #ffeeba;
-    color: #856404;
-    padding: 12px;
-    border-radius: 4px;
-    margin: 20px 0;
-}
-
-.mixed-order-warning strong {
-    display: block;
-    margin-bottom: 5px;
-}
-
-/* Tooltip styles */
-.tooltip-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px; /* Fixed dimensions */
-  border-radius: 50%;
-  background-color: #ddd;
-  color: #555;
-  font-size: var(--fontSizeSmallest);
-  font-weight: bold;
-  margin: 0 8px 0 8px; /* Even spacing on both sides */
-  padding: 0;
-  cursor: help; /* Special cursor for tooltip */
-  transition: background-color 0.2s ease;
-  position: relative;
-  top: 0; /* Ensure no vertical offset */
-  line-height: 16px; /* Match to height */
-}
-
-.tooltip-icon:hover {
-  background-color: var(--primaryColor);
-  color: white;
-}
-
-.tooltip-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-}
-
-.tooltip-overlay.active {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.3s ease;
-}
-
-.tooltip-content {
-  background-color: white;
-  padding: 15px 20px;
-  border-radius: 5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-width: 300px;
-  transform: translateY(20px);
-  opacity: 0;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-  touch-action: none; /* Prevent browser default touch actions */
-}
-
-.tooltip-overlay.active .tooltip-content {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.tooltip-title {
-  font-weight: bold;
-  margin-bottom: 8px;
-  color: var(--primaryColor);
-  border-bottom: 1px solid #eee;
-  padding-bottom: 5px;
-}
-
-.tooltip-body {
-  font-size: var(--fontSizeSmall);
-  line-height: 1.4;
-  color: #333;
-}
-
-/* Anonymous users */
-
-#anonymous-user-form {
-    width: 900px;
-    max-width: var(--calcMaxWidth);
-    margin: 0 auto;
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    color: black;
-}
-
-#anonymous-user-form h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-.anon-field {
-    margin-bottom: 12px;
-}
-
-.anon-field input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.anon-field input:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.anon-signup-section {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.anon-checkbox-label,
-.anon-radio-label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    margin-bottom: 10px;
-    font-size: 14px;
-}
-
-.anon-checkbox-label input,
-.anon-radio-label input {
-    margin-right: 8px;
-    width: auto;
-}
-
-.anon-radio-group {
-    margin-left: 20px;
-}
-
-.password-field {
-    position: relative;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.password-toggle:hover {
-    opacity: 0.7;
-}
-
-#username-password-fields {
-    margin-left: 20px;
-}
-
-#account-required-section {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f0f8ff;
-    border: 1px solid #007bff;
-    border-radius: 6px;
-}
-
-.account-required-notice {
-    color: #007bff;
-    margin-bottom: 15px;
-    font-size: 14px;
-}
-
-.account-fields .anon-field {
-    margin-bottom: 12px;
-}
-
-.password-field {
-    position: relative;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.password-toggle:hover {
-    opacity: 0.7;
-}
-
-.account-creation-options {
-    margin-top: 15px;
-}
-
-.google-signin-option {
-    margin-bottom: 20px;
-}
-
-.google-signin-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    padding: 12px 16px;
-    background-color: #4285f4;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.google-signin-button:hover {
-    background-color: #3367d6;
-}
-
-.google-signin-button:active {
-    background-color: #2d5aa0;
-}
-
-.auth-divider {
-    display: flex;
-    align-items: center;
-    margin: 20px 0;
-    text-align: center;
-}
-
-.auth-divider::before,
-.auth-divider::after {
+/* theme/templates/default/assets/css/dashboard.css
+   Authenticated dashboard. Page chrome (typography, container, hero,
+   sections) comes from _core_design.css; this file styles the dashboard-
+   specific markup from views/dashboard.php and the JS-generated
+   price-calculator markup from assets/js/dashboard.js.
+
+   All selectors scope under body.firefly-page.page-dashboard.
+*/
+
+/* ---------- Hero variant ----------------------------------------- */
+
+/* Let the atmospheric glow bleed past the hero into the section below.
+   The shared .hero rule sets overflow:hidden; we drop that for the
+   dashboard variant. (Order History does the same in plugin orders.css.) */
+body.firefly-page.page-dashboard .dashboard-hero {
+    padding-bottom: clamp(1rem, 2vw, 2rem);
+    background: var(--ff-bg);
+    overflow: visible;
+}
+
+/* Page-level atmospheric glow. Fixed so it stays anchored to the top
+   of the viewport as the user scrolls the first screen, then fades
+   naturally as they move past. Sits behind everything (z-index: -1),
+   never intercepts clicks. */
+body.firefly-page.page-dashboard::before {
     content: '';
-    flex: 1;
-    height: 1px;
-    background: #ddd;
-}
-
-.auth-divider span {
-    padding: 0 15px;
-    color: #666;
-    font-size: 14px;
-    background: white;
-}
-
-.account-fields {
-    transition: all 0.3s ease;
-}
-
-.account-fields.disabled {
-    opacity: 0.5;
+    position: fixed;
+    top: -20vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(120vw, 1400px);
+    height: min(120vh, 1100px);
+    background: radial-gradient(ellipse at center,
+        rgba(245, 181, 68, 0.16) 0%,
+        rgba(245, 181, 68, 0.08) 28%,
+        rgba(245, 181, 68, 0.03) 50%,
+        transparent 70%);
+    filter: blur(40px);
     pointer-events: none;
+    z-index: -1;
 }
 
-.google-account-status {
+/* Optional intro copy from $postContent */
+
+body.firefly-page.page-dashboard .dashboard-intro {
+    padding-block: 0 clamp(1rem, 2vw, 2rem);
+}
+
+body.firefly-page.page-dashboard .intro-copy p {
+    color: var(--ff-fg-muted);
+    max-width: 60ch;
+}
+
+/* ---------- Section shell ---------------------------------------- */
+
+body.firefly-page.page-dashboard .dashboard-section {
+    padding-block: clamp(2rem, 4vw, 3.5rem);
+}
+
+body.firefly-page.page-dashboard .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 960px) {
+    body.firefly-page.page-dashboard .dashboard-grid {
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+        gap: 1.75rem;
+        align-items: start;
+    }
+}
+
+/* ---------- Dash card (shared shell) ---------- */
+
+body.firefly-page.page-dashboard .dash-card {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.5rem, 3vw, 2rem);
+    box-sizing: border-box;
+    transition: border-color 240ms ease;
+}
+
+body.firefly-page.page-dashboard .dash-card:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .dash-card-head {
     display: flex;
-    align-items: center;
-    padding: 15px;
-    background-color: #e8f5e8;
-    border: 1px solid #4caf50;
-    border-radius: 4px;
-    margin-bottom: 15px;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-bottom: 1.25rem;
 }
 
-.google-icon {
+body.firefly-page.page-dashboard .dash-card-head h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--ff-fg);
+    margin: 0;
+}
+
+/* ---------- Form primitives -------------------------------------- */
+
+body.firefly-page.page-dashboard .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+body.firefly-page.page-dashboard .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .form-label {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .form-static {
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    color: var(--ff-fg);
+    padding: 0.625rem 0;
+}
+
+body.firefly-page.page-dashboard .form-input {
+    width: 100%;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+}
+
+body.firefly-page.page-dashboard .form-input:hover {
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .form-input:focus {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-surface-2);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .form-input::placeholder {
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .form-message {
+    min-height: 0;
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    color: var(--ff-amber);
+    transition: min-height 180ms ease;
+}
+
+body.firefly-page.page-dashboard .form-message:not(:empty) {
+    min-height: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--ff-amber-soft);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-amber);
+}
+
+/* ---------- Buttons ---------------------------------------------- */
+
+body.firefly-page.page-dashboard .btn-row {
+    display: flex;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .btn,
+body.firefly-page.page-dashboard button#update-profile-btn,
+body.firefly-page.page-dashboard button#reset-password-btn,
+body.firefly-page.page-dashboard button#pay-now,
+body.firefly-page.page-dashboard .add-new-feature {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    background-color: #4caf50;
-    color: white;
-    border-radius: 50%;
-    margin-right: 12px;
-    font-size: 14px;
-    font-weight: bold;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    border: 1px solid var(--ff-border);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    transition: background 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease, color 180ms ease;
+    text-decoration: none;
+    line-height: 1.2;
 }
 
-.google-account-status strong {
-    color: #2e7d32;
+body.firefly-page.page-dashboard .btn:hover,
+body.firefly-page.page-dashboard button#reset-password-btn:hover,
+body.firefly-page.page-dashboard .add-new-feature:hover {
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
 }
 
-/* Account required notice styling */
-.account-required-notice {
-    background-color: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 20px;
-    color: #856404;
-    font-size: 14px;
+body.firefly-page.page-dashboard .btn-primary,
+body.firefly-page.page-dashboard button#update-profile-btn,
+body.firefly-page.page-dashboard button#pay-now {
+    background: var(--ff-amber);
+    color: #0a0a0b;
+    border-color: var(--ff-amber);
 }
 
-/* Ensure consistent spacing for anonymous form fields */
-.anon-field {
-    margin-bottom: 15px;
+body.firefly-page.page-dashboard .btn-primary:hover,
+body.firefly-page.page-dashboard button#update-profile-btn:hover,
+body.firefly-page.page-dashboard button#pay-now:hover {
+    background: #ffc14f;
+    border-color: #ffc14f;
+    color: #0a0a0b;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 181, 68, 0.18);
 }
 
-.anon-field input,
-.anon-field select,
-.anon-field textarea {
+body.firefly-page.page-dashboard .btn-ghost,
+body.firefly-page.page-dashboard button#reset-password-btn {
+    background: transparent;
+    border-color: var(--ff-border-strong);
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .btn-danger,
+body.firefly-page.page-dashboard #confirm-cancel-subscription {
+    background: rgba(255, 122, 122, 0.08);
+    border-color: rgba(255, 122, 122, 0.4);
+    color: #ffb4b4;
+}
+
+body.firefly-page.page-dashboard .btn-danger:hover,
+body.firefly-page.page-dashboard #confirm-cancel-subscription:hover {
+    background: rgba(255, 122, 122, 0.18);
+    border-color: rgba(255, 122, 122, 0.6);
+    color: #ff7a7a;
+}
+
+body.firefly-page.page-dashboard .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+body.firefly-page.page-dashboard .btn-pay {
     width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 16px;
-    transition: border-color 0.3s ease;
+    margin-top: 1rem;
 }
 
-.anon-field input:focus,
-.anon-field select:focus,
-.anon-field textarea:focus {
+/* ---------- Loading + empty states ------------------------------- */
+
+body.firefly-page.page-dashboard .dash-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 1rem 0;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .dash-loading p {
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .dash-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--ff-border);
+    border-top-color: var(--ff-amber);
+    border-radius: 50%;
+    animation: dash-spin 720ms linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes dash-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Suppress all legacy loading.gif images on dashboard / order pages.
+   We use the amber CSS spinner everywhere now. */
+body.firefly-page.page-dashboard img[src*="loading.gif"],
+body.firefly-page.page-dashboard img[src*="loading-dark.gif"],
+body.firefly-page.page-order-history img[src*="loading.gif"],
+body.firefly-page.page-order-history img[src*="loading-dark.gif"] {
+    display: none !important;
+}
+
+/* Replace any inline-injected `.loading-spinner` (built by dashboard.js
+   with an <img> inside) with a clean amber CSS spinner. */
+body.firefly-page.page-dashboard .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--ff-border);
+    border-top-color: var(--ff-amber);
+    border-radius: 50%;
+    animation: dash-spin 720ms linear infinite;
+}
+
+body.firefly-page.page-dashboard .empty-state {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ff-fg-muted);
+    border: 1px dashed var(--ff-border);
+    border-radius: var(--ff-radius);
+}
+
+/* ---------- Modals ----------------------------------------------- */
+
+body.firefly-page.page-dashboard .dash-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 11, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 1.5rem;
+}
+
+body.firefly-page.page-dashboard .dash-modal-content {
+    width: 100%;
+    max-width: 460px;
+    background: var(--ff-surface);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.5rem, 3vw, 2rem);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .dash-modal-content h3 {
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.875rem;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .dash-modal-content p {
+    color: var(--ff-fg-muted);
+    line-height: 1.55;
+    margin: 0 0 1rem;
+}
+
+body.firefly-page.page-dashboard .dash-modal-content #update-payment-element {
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    padding: 1rem;
+    min-height: 60px;
+    margin: 0.5rem 0 1rem;
+}
+
+/* ---------- Pay Now form modal (built by createPaymentForm) ----- */
+/* Wider than the default modal — Stripe Elements is more readable
+   with a bit of breathing room. */
+body.firefly-page.page-dashboard .payment-form-modal .payment-form-content {
+    max-width: 520px;
+}
+
+body.firefly-page.page-dashboard .payment-form-content .payment-form-description {
+    color: var(--ff-fg-muted);
+    margin: 0 0 1.25rem;
+}
+
+body.firefly-page.page-dashboard .payment-form-content #payment-element {
+    margin-bottom: 1rem;
+}
+
+body.firefly-page.page-dashboard .payment-form-content #payment-error {
+    color: #ff7a7a;
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+}
+
+body.firefly-page.page-dashboard .payment-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+body.firefly-page.page-dashboard .payment-form-actions .btn-pay {
+    margin-top: 0;
+}
+
+/* ---------- Subscriptions panel ---------------------------------- */
+
+body.firefly-page.page-dashboard .subscriptions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+body.firefly-page.page-dashboard .subscription-item {
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    background: var(--ff-bg);
+    padding: 1rem 1.125rem;
+}
+
+body.firefly-page.page-dashboard .subscription-item h4 {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    margin: 0 0 0.375rem;
+}
+
+body.firefly-page.page-dashboard .subscription-item .meta {
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    color: var(--ff-fg-muted);
+}
+
+/* Subscription header (title + status pill) */
+body.firefly-page.page-dashboard .subscription-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.875rem;
+}
+
+body.firefly-page.page-dashboard .subscription-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.01em;
+}
+
+body.firefly-page.page-dashboard .subscription-status {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--ff-border);
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .subscription-status.active {
+    color: var(--ff-green);
+    border-color: rgba(159, 232, 112, 0.3);
+    background: rgba(159, 232, 112, 0.08);
+}
+
+body.firefly-page.page-dashboard .subscription-status.past_due,
+body.firefly-page.page-dashboard .subscription-status.unpaid {
+    color: #ff7a7a;
+    border-color: rgba(255, 122, 122, 0.3);
+    background: rgba(255, 122, 122, 0.08);
+}
+
+body.firefly-page.page-dashboard .subscription-status.canceled,
+body.firefly-page.page-dashboard .subscription-status.cancelled {
+    color: var(--ff-fg-muted);
+}
+
+/* Subscription details grid */
+body.firefly-page.page-dashboard .subscription-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.875rem 1rem;
+    margin-bottom: 1rem;
+}
+
+body.firefly-page.page-dashboard .subscription-detail-label {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    margin-bottom: 0.25rem;
+}
+
+body.firefly-page.page-dashboard .subscription-detail-value {
+    font-size: 0.875rem;
+    color: var(--ff-fg);
+}
+
+/* Plan-change inline form */
+body.firefly-page.page-dashboard .plan-change-section {
+    margin: 1rem 0;
+    padding: 1rem 1.125rem;
+    background: var(--ff-surface-2, #1a1a1d);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+body.firefly-page.page-dashboard .plan-past-due {
+    color: #ff7a7a;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+body.firefly-page.page-dashboard .plan-change-label {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .plan-select {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fafaf7' stroke-width='2'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px;
+    padding-right: 2.25rem;
+}
+
+body.firefly-page.page-dashboard .plan-select:focus {
     outline: none;
-    border-color: #4285f4;
-    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 2px var(--ff-amber-soft);
 }
 
-.password-field {
+/* Stack of action buttons under details */
+body.firefly-page.page-dashboard .subscription-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    margin-top: 0.5rem;
+}
+
+/* ---------- Campaign banner -------------------------------------- */
+
+body.firefly-page.page-dashboard .campaign-banner {
+    border: 1px solid var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+    border-radius: var(--ff-radius);
+    padding: 1rem 1.25rem;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .campaign-banner p {
+    margin: 0;
+    color: var(--ff-fg);
+}
+
+/* ============================================================== */
+/* PRICE CALCULATOR                                                */
+/* ============================================================== */
+
+body.firefly-page.page-dashboard .calculator-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    body.firefly-page.page-dashboard .calculator-grid {
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        gap: 2rem;
+    }
+}
+
+/* ---------- Features container ----------------------------------- */
+
+body.firefly-page.page-dashboard .features-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Each feature type — generated by dashboard.js renderFeatureInstances() */
+
+body.firefly-page.page-dashboard .feature-type {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    transition: border-color 240ms ease;
     position: relative;
 }
 
-.password-toggle {
+body.firefly-page.page-dashboard .feature-type:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+/* Decorative SVG icon injected by dashboard.js (see updateDashboardIcons()) */
+body.firefly-page.page-dashboard .feature-type-icon {
     position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
+    top: clamp(1.25rem, 2.5vw, 1.75rem);
+    right: clamp(1.25rem, 2.5vw, 1.75rem);
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .feature-type-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+body.firefly-page.page-dashboard .feature-type > h3 {
+    /* Design-system h3 baseline + slightly heavier ceiling so features
+       read as primary product names, not subheadings. */
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--ff-fg);
+    margin: 0 0 0.5rem;
+    padding-right: 3rem;
+}
+
+body.firefly-page.page-dashboard .feature-type > p {
+    color: var(--ff-fg-muted);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    margin: 0 0 1.25rem;
+    padding-right: 3rem;
+}
+
+/* Instances container */
+
+body.firefly-page.page-dashboard .instances-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+/* Each individual feature instance */
+
+body.firefly-page.page-dashboard .feature-fields {
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    background: var(--ff-bg);
+    padding: 1rem 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: border-color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .feature-fields:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+/* User-editable fields are rendered via the shared renderUserFieldRow
+   helper in dashboard.js, which uses the .form-row + .form-input
+   pattern (see line ~104). The legacy .user-field input/textarea/select
+   chrome was duplicating those Profile-card rules at lower specificity
+   and has been removed in favour of the unified pattern. .user-field
+   class is still emitted on the wrapper so .feature-fields-scoped
+   styling has a hook, and .user-display-value is the amber-pill chrome
+   for read-only _display fields. */
+
+body.firefly-page.page-dashboard .user-display-value {
+    display: inline-block;
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius-sm);
+    padding: 0.25rem 0.625rem;
+    letter-spacing: 0.02em;
+}
+
+/* Custom chevron for any remaining <select> inside the calculator —
+   user-field array (dropdown) types still render as native <select>
+   elements with .form-input. The option-picker and price-option
+   selector use custom tile/segmented components, no <select>. */
+body.firefly-page.page-dashboard .feature-type select.form-input,
+body.firefly-page.page-dashboard .feature-fields select.form-input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.875rem center;
+    padding-right: 2rem;
     cursor: pointer;
-    padding: 4px;
-    font-size: 16px;
 }
 
-.password-toggle:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
+/* "Add another <feature>" button — composes .btn .btn-ghost from the
+   design system with an .add-new-feature modifier for the dashed
+   border (so it visually reads as "extend this list, not commit"). */
+body.firefly-page.page-dashboard .add-new-feature {
+    align-self: flex-start;
+    margin-top: 0.75rem;
+    border-style: dashed !important;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .auth-divider span {
-        padding: 0 10px;
-        font-size: 13px;
-    }
-    
-    .google-signin-button {
-        font-size: 15px;
-        padding: 11px 14px;
-    }
-    
-    .account-required-notice {
-        font-size: 13px;
-        padding: 10px;
+/* Remove instance button */
+body.firefly-page.page-dashboard .remove-instance,
+body.firefly-page.page-dashboard .remove-feature {
+    align-self: flex-end;
+    background: transparent;
+    border: 1px solid var(--ff-border);
+    color: var(--ff-fg-dim);
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .remove-instance:hover,
+body.firefly-page.page-dashboard .remove-feature:hover {
+    color: #ff7a7a;
+    border-color: rgba(255, 122, 122, 0.4);
+}
+
+/* ============================================================== */
+/* PRICE CALCULATOR — TILE / CARD UI                               */
+/* All form-element-y bits replaced with custom components that    */
+/* sit on top of the existing render pipeline. Native <input> and  */
+/* <select> elements either disappear or get visually hidden       */
+/* inside a custom card; the data flow in dashboard.js is unchanged.*/
+/* ============================================================== */
+
+/* ---------- Instance shell (the inset panel inside a feature card) ---------- */
+
+body.firefly-page.page-dashboard .feature {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.125rem 1.25rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    transition: border-color 240ms ease;
+}
+
+body.firefly-page.page-dashboard .feature:focus-within {
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .feature .instance-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 0;
+}
+
+body.firefly-page.page-dashboard .feature .instance-eyebrow {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .feature .instance-header:empty {
+    display: none;
+}
+
+/* Icon-only delete button absolutely positioned top-right */
+body.firefly-page.page-dashboard .instance-delete {
+    position: absolute;
+    top: 0.625rem;
+    right: 0.625rem;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-fg-dim);
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .instance-delete:hover,
+body.firefly-page.page-dashboard .instance-delete:focus-visible {
+    color: #ff7a7a;
+    border-color: rgba(255, 122, 122, 0.4);
+    background: rgba(255, 122, 122, 0.08);
+    outline: none;
+}
+
+body.firefly-page.page-dashboard .instance-delete svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---------- Option details panel (rendered after a tile is picked) ----------
+   Vertical rhythm for the stack of sections: description → display
+   fields (tier benefits) → price (or segmented) → threshold track →
+   user fields → quantity stepper → add-ons. Each section gets the
+   same breathing room so the panel reads as a structured form, not a
+   pile of paragraphs. */
+body.firefly-page.page-dashboard .option-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+body.firefly-page.page-dashboard .option-details.is-hidden {
+    display: none;
+}
+
+/* Subtle title (overline) introducing the details section. Acts as
+   the smooth-scroll target when an option is picked — the viewport
+   lands on this label so the user reads "[Option Name]" → description
+   immediately, with the selected tile still in view above. */
+body.firefly-page.page-dashboard .option-details-title {
+    margin: 0;
+    color: var(--ff-amber);
+}
+
+/* Tighten the description's top margin when it directly follows the
+   title so the two read as a single header block, not two stacked
+   sections separated by the panel's 1.25rem gap. */
+body.firefly-page.page-dashboard .option-details-title + .option-summary {
+    margin-top: -0.875rem;
+}
+
+/* ---------- Option-tile picker (replaces <select>) -------------- */
+
+body.firefly-page.page-dashboard .option-tile-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+@media (min-width: 640px) {
+    body.firefly-page.page-dashboard .option-tile-grid {
+        /* Wider min-width so tier-benefit lists have room to breathe
+           without wrapping mid-phrase. Tiles in the same row stretch to
+           the tallest member so a row never looks ragged. */
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     }
 }
 
-@media (min-width: 800px) {
-    #profile-container,
-    #price-calculator,
-    #invoice-container {
-        width: 790px;
-    }
+/* Tile layout is two stacked rows:
+     1. .option-tile-header  — icon + name + meta (price + check)
+     2. bullets / teaser     — gets the full tile width, doesn't fight
+                              the icon or meta columns for room.
+   This is the standard SaaS pricing-card stack and lets benefit text
+   span the entire content width minus tile padding. */
+body.firefly-page.page-dashboard .option-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    width: 100%;
+    height: 100%;
+    padding: 1.125rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 180ms ease, background 240ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
 
-    #price-calculator,
-    #invoice-container {
-        margin-top: 1rem;
+body.firefly-page.page-dashboard .option-tile-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+body.firefly-page.page-dashboard .option-tile:hover {
+    border-color: var(--ff-border-strong);
+    transform: translateY(-1px);
+}
+
+body.firefly-page.page-dashboard .option-tile:focus-visible {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected {
+    border-color: var(--ff-amber);
+    background: linear-gradient(180deg, var(--ff-amber-soft), transparent 70%), var(--ff-surface-2);
+}
+
+body.firefly-page.page-dashboard .option-tile[disabled],
+body.firefly-page.page-dashboard .option-tile.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+body.firefly-page.page-dashboard .option-tile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+body.firefly-page.page-dashboard .option-tile-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+}
+
+/* Plain-paragraph teaser (used when the source isn't a "·"-separated
+   benefit list). Wraps naturally — no truncation. */
+body.firefly-page.page-dashboard .option-tile-teaser {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+/* Benefit list — used whenever the teaser source uses "·" separators
+   (tierBenefits in pricing.json follows this convention). Renders as
+   a checkmark bullet list, which reads as a real pricing-page benefit
+   stack rather than a wrapped paragraph. */
+body.firefly-page.page-dashboard .option-tile-bullets {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+}
+
+body.firefly-page.page-dashboard .option-tile-bullets li {
+    display: grid;
+    grid-template-columns: 14px 1fr;
+    align-items: start;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.45;
+}
+
+body.firefly-page.page-dashboard .option-tile-bullets li svg {
+    width: 14px;
+    height: 14px;
+    margin-top: 0.1875rem;
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected .option-tile-bullets li svg {
+    color: var(--ff-amber);
+}
+
+/* Right meta cluster inside the header row: price chip + selection
+   indicator inline. Sits next to the name on a single header row;
+   bullet list / teaser flows below as a full-width row. */
+body.firefly-page.page-dashboard .option-tile-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .option-tile-price {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.125rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-amber);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .option-tile-period {
+    font-size: 0.6875rem;
+    color: var(--ff-fg-muted);
+    letter-spacing: 0.02em;
+}
+
+body.firefly-page.page-dashboard .option-tile-check {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid var(--ff-border-strong);
+    color: transparent;
+    background: transparent;
+    transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .option-tile.is-selected .option-tile-check {
+    border-color: var(--ff-amber);
+    background: var(--ff-amber);
+    color: #0a0a0b;
+}
+
+body.firefly-page.page-dashboard .option-tile-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+body.firefly-page.page-dashboard .option-tile-disabled-note {
+    margin-left: 0.375rem;
+    font-family: var(--ff-font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+/* ---------- Segmented price-options selector --------------------- */
+
+body.firefly-page.page-dashboard .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+body.firefly-page.page-dashboard .segmented-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: 999px;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-sans);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .segmented-pill:hover {
+    color: var(--ff-fg);
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .segmented-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .segmented-pill.is-selected {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .segmented-pill-label {
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .segmented-pill-price {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+}
+
+body.firefly-page.page-dashboard .segmented-pill.is-selected .segmented-pill-price {
+    opacity: 1;
+}
+
+/* ---------- Addon block (header + list/groups) ------------------ */
+
+body.firefly-page.page-dashboard .addons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+body.firefly-page.page-dashboard .addons-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+body.firefly-page.page-dashboard .addons-head .overline {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .addons-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+/* ---------- Addon card (replaces .addon-item) ------------------- */
+
+body.firefly-page.page-dashboard .addon-card {
+    /* Icon is absolutely positioned in the top-left corner so the body
+       and meta columns get the full card width. padding-left reserves
+       just enough room for the icon badge. */
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.875rem;
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 3.25rem;
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 180ms ease, background 240ms ease, transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-card:hover {
+    border-color: var(--ff-border-strong);
+    transform: translateY(-1px);
+}
+
+body.firefly-page.page-dashboard .addon-card:focus-visible {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected {
+    border-color: var(--ff-amber-ring);
+    background: linear-gradient(180deg, var(--ff-amber-soft), transparent 70%), var(--ff-surface-2);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    transform: none;
+}
+
+/* The native <input type="checkbox"> kept inside the button for
+   enforceMaxAddons / enforceMaxGroupItems queries — visually hidden. */
+body.firefly-page.page-dashboard .addon-card > input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-icon {
+    /* Corner badge — out of grid flow so the body and meta can use the
+       full card width minus the reserved 3.25rem padding-left. */
+    position: absolute;
+    top: 0.875rem;
+    left: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-amber-soft);
+    color: var(--ff-amber);
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.firefly-page.page-dashboard .addon-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    min-width: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-name {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .addon-card-desc {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .addon-card-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .addon-card-price {
+    font-family: var(--ff-font-mono);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-fg);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-price {
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--ff-fg-dim);
+    transition: color 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle svg {
+    width: 22px;
+    height: 22px;
+}
+
+body.firefly-page.page-dashboard .addon-card-toggle .addon-card-toggle-checked {
+    display: none;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle {
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle-empty {
+    display: none;
+}
+
+body.firefly-page.page-dashboard .addon-card.is-selected .addon-card-toggle-checked {
+    display: inline-block;
+}
+
+/* ---------- Addon group panel ----------------------------------- */
+
+body.firefly-page.page-dashboard .addon-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 1rem 1rem 0.875rem;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+}
+
+body.firefly-page.page-dashboard .addon-group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-name {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .addon-group-counter {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .addon-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .addon-group-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .addon-group-status.is-pending {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .addon-group-status.is-active {
+    color: var(--ff-green);
+    background: var(--ff-green-soft);
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+body.firefly-page.page-dashboard .addon-group-status svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* ---------- Quantity stepper ------------------------------------ */
+
+body.firefly-page.page-dashboard .quantity-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .quantity-row .form-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .quantity-metric {
+    font-family: var(--ff-font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .qty-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    height: 40px;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-surface-2);
+    overflow: hidden;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-dashboard .qty-stepper:focus-within {
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--ff-fg-muted);
+    cursor: pointer;
+    transition: color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .qty-step:hover {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step:focus-visible {
+    outline: none;
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .qty-step:disabled {
+    color: var(--ff-fg-dim);
+    cursor: not-allowed;
+    background: transparent;
+}
+
+body.firefly-page.page-dashboard .qty-step svg {
+    width: 14px;
+    height: 14px;
+}
+
+body.firefly-page.page-dashboard .qty-step-input {
+    width: 64px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--ff-border);
+    border-right: 1px solid var(--ff-border);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+    -webkit-appearance: none;
+}
+
+body.firefly-page.page-dashboard .qty-step-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+body.firefly-page.page-dashboard .qty-step-input::-webkit-outer-spin-button,
+body.firefly-page.page-dashboard .qty-step-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ---------- Threshold-discount track ---------------------------- */
+
+/* ---------- Threshold-discount track (chips, not cards) ----------
+   Tiers render as compact inline pills — count + percent on one line,
+   icon shrinks to a small dot/check. No outer panel chrome; the chips
+   sit on a flat row aligned with the rest of the form. */
+body.firefly-page.page-dashboard .threshold-track {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+body.firefly-page.page-dashboard .threshold-track-label {
+    margin: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-track-tiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-tier {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem 0.625rem;
+    background: transparent;
+    border: 1px solid var(--ff-border);
+    border-radius: 999px;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-passed {
+    color: var(--ff-fg-muted);
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-active {
+    color: var(--ff-amber);
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-dashboard .threshold-tier-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 11px;
+    height: 11px;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-icon svg {
+    width: 11px;
+    height: 11px;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-count {
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+}
+
+body.firefly-page.page-dashboard .threshold-tier-pct {
+    color: inherit;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+body.firefly-page.page-dashboard .threshold-tier.is-active .threshold-tier-pct {
+    opacity: 1;
+}
+
+body.firefly-page.page-dashboard .threshold-track-current {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-amber);
+    min-height: 0.6875rem;
+}
+
+body.firefly-page.page-dashboard .threshold-track-current:empty {
+    color: var(--ff-fg-dim);
+}
+
+/* ---------- Display-rows (description / display fields / price) - */
+
+body.firefly-page.page-dashboard .option-summary {
+    margin: 0;
+    color: var(--ff-fg-muted);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+}
+
+body.firefly-page.page-dashboard .display-field-row .user-display-value {
+    align-self: flex-start;
+}
+
+body.firefly-page.page-dashboard .price-row {
+    /* inherits .form-row layout */
+}
+
+body.firefly-page.page-dashboard .option-price-display {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font-family: var(--ff-font-mono);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ff-amber);
+    letter-spacing: -0.005em;
+}
+
+body.firefly-page.page-dashboard .option-price-suffix {
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    margin-left: 0.125rem;
+}
+
+/* ---------- User-field icon (inline beside label) ---------------- */
+
+body.firefly-page.page-dashboard .user-field-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.375rem;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .user-field-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---------- Inline alert (replaces inline-styled red message) --- */
+
+body.firefly-page.page-dashboard .ff-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--ff-radius-sm);
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+}
+
+body.firefly-page.page-dashboard .ff-alert-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-dashboard .ff-alert-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+body.firefly-page.page-dashboard .ff-alert-text {
+    line-height: 1.35;
+}
+
+body.firefly-page.page-dashboard .ff-alert-warning {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-dashboard .ff-alert-info {
+    color: var(--ff-fg-muted);
+    background: transparent;
+    border-color: var(--ff-border-strong);
+}
+
+body.firefly-page.page-dashboard .ff-alert-success {
+    color: var(--ff-green);
+    background: var(--ff-green-soft);
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+/* ---------- Add-new-feature button (icon + ghost variant) ------- */
+
+body.firefly-page.page-dashboard .add-new-feature .add-new-feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .add-new-feature .add-new-feature-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---------- Invoice card (sticky on desktop) --------------------- */
+
+body.firefly-page.page-dashboard .invoice-card {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+    body.firefly-page.page-dashboard .invoice-card {
+        position: sticky;
+        top: 12vh;
     }
 }
 
-@media (min-width: 1000px) {
-    #profile-container,
-    #price-calculator,
-    #invoice-container {
-        width: 900px;
-        margin: 0 auto;
-    }
+body.firefly-page.page-dashboard .invoice-details {
+    margin-bottom: 1rem;
+    min-height: 4rem;
+}
 
-    #price-calculator,
-    #invoice-container {
-        margin-top: 1rem;
+body.firefly-page.page-dashboard .invoice-details:empty::before {
+    content: 'Add a feature to start building your plan.';
+    color: var(--ff-fg-dim);
+    font-style: italic;
+    font-size: 0.875rem;
+    display: block;
+    padding: 0.5rem 0;
+}
+
+/* ---- Invoice table (rendered by updateInvoice in dashboard.js) ----
+   Two columns, thin row dividers, right-aligned prices that don't
+   wrap. Section headers (One-Time / Recurring) use a muted mono
+   uppercase treatment. Totals get a heavier top border. */
+
+body.firefly-page.page-dashboard .invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    color: var(--ff-fg-muted);
+    table-layout: auto;
+}
+
+body.firefly-page.page-dashboard .invoice-table thead th {
+    text-align: left;
+    padding: 0 0 0.5rem;
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .invoice-table thead th:last-child {
+    text-align: right;
+    width: 1%;
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody td {
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--ff-border);
+    vertical-align: top;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody td:last-child {
+    text-align: right;
+    white-space: nowrap;
+    color: var(--ff-fg);
+    font-variant-numeric: tabular-nums;
+    padding-left: 1rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Section header rows (One-Time Charges / Recurring Charges) */
+body.firefly-page.page-dashboard .invoice-table tr.section-header td {
+    padding: 1rem 0 0.375rem;
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-dashboard .invoice-table tr.section-header td strong {
+    font-weight: 500;
+    color: inherit;
+}
+
+/* First section header right after thead has no extra top padding */
+body.firefly-page.page-dashboard .invoice-table thead + tbody tr.section-header:first-child td {
+    padding-top: 0.625rem;
+}
+
+/* Spacer rows between One-Time and Recurring blocks */
+body.firefly-page.page-dashboard .invoice-table tr.section-spacer td {
+    padding: 0;
+    border-bottom: 0;
+    height: 0.5rem;
+}
+
+/* Per-line item composition (built in renderItemRow) */
+body.firefly-page.page-dashboard .invoice-table .item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table .feature-name {
+    color: var(--ff-fg);
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-name {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .invoice-table .recurring-interval {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ff-fg-dim);
+}
+
+body.firefly-page.page-dashboard .invoice-table .option-detail-line {
+    font-size: 0.8125rem;
+    color: var(--ff-fg-dim);
+    line-height: 1.4;
+}
+
+body.firefly-page.page-dashboard .invoice-table .addon-item-name {
+    color: var(--ff-fg-muted);
+}
+
+/* Totals footer (One-Time Total / Recurring Total / Due Today) */
+body.firefly-page.page-dashboard .invoice-table tfoot td {
+    padding: 0.625rem 0;
+    border-top: 1px solid var(--ff-border);
+    font-family: var(--ff-font-sans);
+    color: var(--ff-fg-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot td:last-child {
+    text-align: right;
+    color: var(--ff-fg);
+    white-space: nowrap;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr:not(:first-child) td {
+    border-top: 0;
+    padding-top: 0.25rem;
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr.invoice-grand-total td,
+body.firefly-page.page-dashboard .invoice-table tfoot tr:last-child td {
+    border-top: 1px solid var(--ff-amber-ring);
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .invoice-table tfoot tr:last-child td:last-child {
+    color: var(--ff-amber);
+    font-size: 1.125rem;
+    letter-spacing: -0.01em;
+}
+
+/* Legacy non-table invoice rows (still used in some flows) */
+body.firefly-page.page-dashboard .invoice-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-dashboard .invoice-line strong {
+    color: var(--ff-fg);
+    font-weight: 500;
+}
+
+body.firefly-page.page-dashboard .invoice-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.875rem 0 0.5rem;
+    margin-top: 0.5rem;
+    border-top: 2px solid var(--ff-amber-ring);
+    font-family: var(--ff-font-sans);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+body.firefly-page.page-dashboard .invoice-total .amount,
+body.firefly-page.page-dashboard .invoice-total .total-amount {
+    font-size: 1.5rem;
+    color: var(--ff-amber);
+    letter-spacing: -0.01em;
+}
+
+/* ---- Addon tooltip "?" badge ----
+   Without styling, the literal "?" character bleeds straight into the
+   addon name. Make it a proper circular info badge. */
+body.firefly-page.page-dashboard .tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin: 0 0.5rem 0 0.375rem;
+    border-radius: 50%;
+    border: 1px solid var(--ff-border);
+    background: transparent;
+    color: var(--ff-fg-dim);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+body.firefly-page.page-dashboard .tooltip-icon:hover,
+body.firefly-page.page-dashboard .tooltip-icon:focus-visible {
+    color: var(--ff-amber);
+    border-color: var(--ff-amber-ring);
+    background: var(--ff-amber-soft);
+    outline: none;
+}
+
+/* Order-placed indicator */
+body.firefly-page.page-dashboard .order-placed-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    background: rgba(159, 232, 112, 0.08);
+    border: 1px solid rgba(159, 232, 112, 0.3);
+    border-radius: var(--ff-radius-sm);
+    color: var(--ff-green);
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+}
+
+body.firefly-page.page-dashboard .order-placed-indicator svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Order confirmation modal (created by dashboard.js) */
+body.firefly-page.page-dashboard .order-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 11, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 1.5rem;
+    opacity: 0;
+    transition: opacity 200ms ease;
+}
+
+body.firefly-page.page-dashboard .order-confirm-modal.active {
+    opacity: 1;
+}
+
+body.firefly-page.page-dashboard .order-confirm-modal > * {
+    background: var(--ff-surface);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-lg);
+    padding: 1.5rem;
+    max-width: 460px;
+    width: 100%;
+    color: var(--ff-fg);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* Loading overlay */
+body.firefly-page.page-dashboard .loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 11, 0.7);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+}
+
+body.firefly-page.page-dashboard .loading-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.firefly-page.page-dashboard .loading-overlay::after {
+    content: '';
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ff-border);
+    border-top-color: var(--ff-amber);
+    border-radius: 50%;
+    animation: dash-spin 720ms linear infinite;
+}
+
+/* ---------- Toast (top-right viewport, auto-dismiss) ------------ */
+
+.ff-toast {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: min(360px, calc(100vw - 2.5rem));
+    padding: 0.75rem 1rem;
+    background: var(--ff-surface);
+    color: var(--ff-fg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5),
+                0 2px 6px rgba(0, 0, 0, 0.3);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 240ms ease, transform 240ms ease;
+    pointer-events: none;
+}
+
+.ff-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ff-toast.is-leaving {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+.ff-toast svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.ff-toast-success {
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+.ff-toast-success svg {
+    color: var(--ff-green);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ff-toast {
+        transition: opacity 120ms linear;
+        transform: none !important;
     }
 }
 
-@media (max-width: 800px) {
-    :root {
-        --profileMaxWidth: 90vw;
-    }
-    #campaign-head,
-    #price-calculator,
-    #invoice-container,
-    #anonymous-user-form {
-        width: 90vw;
-    }
-}
+/* ---------- Mobile tweaks ---------------------------------------- */
 
-@media (max-width: 600px) {
-    :root {
-        --fieldColumnWidth: 100%;
-        --fontSizeLarge:    1.4rem;
-        --fontSizeMedium:   1.2rem;
-        --fontSizeSmall:    0.9rem;
-        --fontSizeSmaller:  0.8rem;
-        --fontSizeSmallest: 0.7rem;
+@media (max-width: 640px) {
+    /* Outer cards: tighten container padding so the inner panels have
+       more horizontal room for content. */
+    body.firefly-page.page-dashboard .dash-card,
+    body.firefly-page.page-dashboard .feature-type,
+    body.firefly-page.page-dashboard .invoice-card {
+        padding: 1.125rem;
     }
-    
-    /* Stack fields vertically on mobile */
-    .price-option-selector,
-    .user-field,
-    .quantity-input,
-    .option-details p {
-        grid-template-columns: 1fr;
+
+    body.firefly-page.page-dashboard .feature-type-icon {
+        top: 1.125rem;
+        right: 1.125rem;
+        width: 32px;
+        height: 32px;
     }
-    
-    .price-option-selector strong,
-    .user-field strong,
-    .quantity-input strong {
-        margin-bottom: 5px;
-        padding-bottom: 2px;
-        border-bottom: 1px dotted #eee;
+
+    body.firefly-page.page-dashboard .feature-type-icon svg {
+        width: 16px;
+        height: 16px;
     }
-    
-    .price-option-selector select,
-    .user-field select,
-    .user-field input[type="text"],
-    .user-field input[type="number"],
-    .user-field input[type="date"],
-    .user-field textarea,
-    .quantity-input input {
-        grid-column: 1;
-        width: 100%;
+
+    /* Feature title — clamp already scales down to 1.375rem; give it
+       a hair more breathing room above and the option-tile grid below. */
+    body.firefly-page.page-dashboard .feature-type > h3 {
+        margin-bottom: 0.5rem;
+        padding-right: 2.75rem;
     }
-    
-    .quantity-input input {
-        width: 100%;
+
+    body.firefly-page.page-dashboard .feature-type > p {
+        margin-bottom: 1rem;
+        padding-right: 0;
     }
-    
-    /* Invoice table responsive adjustments */
-    .invoice-table th,
-    .invoice-table td {
-        padding: 8px;
+
+    /* Instance shell — reduce inner padding so feature-card → instance
+       → addon stacking doesn't accumulate ~6rem of horizontal padding. */
+    body.firefly-page.page-dashboard .feature {
+        padding: 1rem 1rem;
+        gap: 0.875rem;
     }
-    
-    .invoice-table th:nth-child(2),
-    .invoice-table td:nth-child(2) {
-        width: 120px;
+
+    /* Instance header / option-2 eyebrow */
+    body.firefly-page.page-dashboard .instance-delete {
+        top: 0.5rem;
+        right: 0.5rem;
     }
-    
-    .feature-name {
-        font-size: var(--fontSizeSmaller);
+
+    /* Option-details rhythm: tighter than desktop but still clearly
+       sectioned so the panel doesn't read as a wall of text. */
+    body.firefly-page.page-dashboard .option-details {
+        gap: 1rem;
     }
-    
-    .option-details {
-        font-size: var(--fontSizeSmaller);
+
+    body.firefly-page.page-dashboard .addons {
+        gap: 0.75rem;
     }
-    
-    .price-with-discount {
-        align-items: flex-end;
+
+    body.firefly-page.page-dashboard .addons-list {
+        gap: 0.5rem;
+    }
+
+    /* Option tiles — single column; tighter padding and gap. */
+    body.firefly-page.page-dashboard .option-tile-grid {
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile {
+        padding: 1rem;
+        gap: 0.75rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-header {
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    body.firefly-page.page-dashboard .option-tile-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Addon card — smaller corner-icon, tighter padding-left clearance. */
+    body.firefly-page.page-dashboard .addon-card {
+        padding: 0.75rem 0.875rem 0.75rem 2.875rem;
+        gap: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-icon {
+        top: 0.75rem;
+        left: 0.75rem;
+        width: 24px;
+        height: 24px;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-name {
+        font-size: 0.9375rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-desc {
+        font-size: 0.8125rem;
+    }
+
+    body.firefly-page.page-dashboard .addon-card-meta {
+        gap: 0.5rem;
+    }
+
+    /* Addon group panel inset — match the tighter card padding. */
+    body.firefly-page.page-dashboard .addon-group {
+        padding: 0.875rem 0.875rem 0.75rem;
+    }
+
+    /* Threshold chips wrap naturally on narrow widths — no extra
+       overrides needed; the desktop pill rules already work at 360px. */
+
+    /* Quantity stepper — full-row treatment so the input is a fat
+       touch target on phones. */
+    body.firefly-page.page-dashboard .qty-stepper {
+        height: 44px;
+    }
+
+    body.firefly-page.page-dashboard .qty-step {
+        width: 44px;
+    }
+
+    body.firefly-page.page-dashboard .qty-step-input {
+        width: 72px;
+        font-size: 1rem;
+    }
+
+    /* Invoice — tighter row padding so the invoice fits comfortably
+       below the calculator on a single mobile column. */
+    body.firefly-page.page-dashboard .invoice-table thead th {
+        font-size: 0.625rem;
+    }
+
+    body.firefly-page.page-dashboard .invoice-table tbody td {
+        padding: 0.5rem 0;
+    }
+
+    body.firefly-page.page-dashboard #pay-now {
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
     }
 }

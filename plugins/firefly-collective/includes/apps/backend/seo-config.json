@@ -1,0 +1,25 @@
+{
+    "defaults": {
+        "og_image_url": "",
+        "title_separator": " - "
+    },
+    "twitter": {
+        "site_handle": "",
+        "creator_handle": "",
+        "card_type": "summary_large_image"
+    },
+    "facebook": {
+        "app_id": ""
+    },
+    "verification": {
+        "google": "",
+        "bing": "",
+        "yandex": "",
+        "pinterest": "",
+        "baidu": ""
+    },
+    "robots": {
+        "default_index": true,
+        "default_follow": true
+    }
+}

@@ -766,6 +766,30 @@
 .file-tree-node.git-modified  { border-left: 3px solid #f0c869; margin-left: -3px; padding-left: 0; }
 .file-tree-node.git-staged    { border-left: 3px solid #8cd49a; margin-left: -3px; padding-left: 0; }
 .file-tree-node.git-untracked { border-left: 3px solid #93c5fd; margin-left: -3px; padding-left: 0; }
+.file-tree-node.git-deleted   { border-left: 3px solid #f87171; margin-left: -3px; padding-left: 0; }
+
+/* Deleted-ghost treatment — file lives in the tree at its old location
+   but is visually marked "gone": greyed text, light red strikethrough.
+   The checkbox stays interactive so the user can opt in/out of the
+   deletion before syncing. */
+.file-tree-node.git-deleted .file-label {
+    color: #94a3b8;
+    text-decoration: line-through;
+    text-decoration-color: rgba(248, 113, 113, 0.65);
+    text-decoration-thickness: 1px;
+}
+
+.file-tree-node.git-deleted .file-icon {
+    opacity: 0.6;
+}
+
+/* The "deleted" badge — red on light-red, matches the accent border. */
+.git-badge-deleted,
+.git-count-chip.git-badge-deleted {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
 
 /* Dim files that have no git status AND aren't checked, when git mode is
    on. Clicking the checkbox un-dims the row (the is-dimmed class is only

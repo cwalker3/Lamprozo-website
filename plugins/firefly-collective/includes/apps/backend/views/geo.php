@@ -18,7 +18,7 @@ if (!current_user_can('manage_options')) {
 <div class="geo-admin-wrap" id="geo-admin-app" v-cloak>
     <h1>
         <span class="dashicons dashicons-visibility"></span>
-        GEO Settings
+        SEO/GEO Settings
     </h1>
     
     <!-- Notification -->
@@ -69,26 +69,26 @@ if (!current_user_can('manage_options')) {
             <div class="geo-sync-header">
                 <h3>
                     <span class="dashicons dashicons-update"></span>
-                    Sync GEO Data
+                    Sync to Remote
                 </h3>
             </div>
             <div class="geo-sync-content">
                 <div class="geo-sync-info">
-                    <p>Push your GEO configuration to remote environments. Files sync via Firefly Projects, data syncs here.</p>
+                    <p>Push your SEO/GEO configuration to remote environments. Two parallel push flows: GEO settings (Organization, location, services) and SEO settings (default OG image, Twitter handles, verification codes).</p>
                 </div>
-                
-                <!-- Environment toggle -->
+
+                <!-- Environment toggle (shared between SEO + GEO sync) -->
                 <div v-if="hasProdEndpoint" class="geo-env-toggle">
                     <label class="geo-toggle-label">Target Environment:</label>
                     <div class="geo-toggle-switch">
-                        <button type="button" 
+                        <button type="button"
                                 :class="['geo-toggle-btn', { active: syncEnv === 'dev' }]"
                                 @click="syncEnv = 'dev'">
                             <span class="dashicons dashicons-desktop"></span>
                             Live Dev
                             <small v-if="devSite">({{ devSite }})</small>
                         </button>
-                        <button type="button" 
+                        <button type="button"
                                 :class="['geo-toggle-btn', { active: syncEnv === 'prod' }]"
                                 @click="syncEnv = 'prod'">
                             <span class="dashicons dashicons-admin-site-alt3"></span>
@@ -97,16 +97,24 @@ if (!current_user_can('manage_options')) {
                         </button>
                     </div>
                 </div>
-                
-                <!-- Sync button -->
+
+                <!-- Sync buttons (parallel: SEO + GEO) -->
                 <div class="geo-sync-actions">
-                    <button type="button" 
+                    <button type="button"
+                            class="button button-primary"
+                            @click="syncSeoConfig"
+                            :disabled="syncingSeo || syncing">
+                        <span class="spinner is-active" v-if="syncingSeo" style="float: none; margin: 0 5px 0 0;"></span>
+                        <span class="dashicons dashicons-upload" v-else></span>
+                        {{ syncingSeo ? 'Syncing SEO...' : 'Sync SEO to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
+                    </button>
+                    <button type="button"
                             class="button button-primary"
                             @click="syncConfig"
-                            :disabled="syncing">
+                            :disabled="syncing || syncingSeo">
                         <span class="spinner is-active" v-if="syncing" style="float: none; margin: 0 5px 0 0;"></span>
                         <span class="dashicons dashicons-upload" v-else></span>
-                        {{ syncing ? 'Syncing...' : 'Sync to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
+                        {{ syncing ? 'Syncing GEO...' : 'Sync GEO to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev') }}
                     </button>
                     <span v-if="!hasProdEndpoint" class="geo-sync-note">
                         <span class="dashicons dashicons-info"></span>
@@ -137,21 +145,125 @@ if (!current_user_can('manage_options')) {
             </div>
         </div>
         
-        <!-- Tab navigation -->
-        <div class="geo-tabs">
-            <button v-for="tab in tabs" 
-                    :key="tab.id"
-                    type="button"
-                    :class="['geo-tab', { active: activeTab === tab.id }]"
-                    @click="setActiveTab(tab.id)">
-                <span class="dashicons" :class="tab.icon"></span>
-                {{ tab.label }}
-            </button>
+        <!-- Tab navigation, split into two visually distinct groups:
+             SEO (site-wide defaults) on the left, GEO (structured-data
+             organization profile) on the right. The divider + section
+             labels make it obvious which settings affect which domain. -->
+        <div class="geo-tabs geo-tabs-split">
+            <div class="geo-tabs-group geo-tabs-group-seo">
+                <span class="geo-tabs-group-label">SEO</span>
+                <button v-for="tab in tabs.filter(t => t.id === 'seo')"
+                        :key="tab.id"
+                        type="button"
+                        :class="['geo-tab', 'geo-tab-seo', { active: activeTab === tab.id }]"
+                        @click="setActiveTab(tab.id)">
+                    <span class="dashicons" :class="tab.icon"></span>
+                    {{ tab.label }}
+                </button>
+            </div>
+            <div class="geo-tabs-divider" aria-hidden="true"></div>
+            <div class="geo-tabs-group geo-tabs-group-geo">
+                <span class="geo-tabs-group-label">GEO</span>
+                <button v-for="tab in tabs.filter(t => t.id !== 'seo')"
+                        :key="tab.id"
+                        type="button"
+                        :class="['geo-tab', 'geo-tab-geo', { active: activeTab === tab.id }]"
+                        @click="setActiveTab(tab.id)">
+                    <span class="dashicons" :class="tab.icon"></span>
+                    {{ tab.label }}
+                </button>
+            </div>
         </div>
         
         <!-- Tab content -->
         <div class="geo-content">
-            
+
+            <!-- SEO Tab — site-wide defaults that compose with per-page _seo_* meta.
+                 Editable values land in wp_ffc_seo_config; the theme's seo-meta.php
+                 reads them via firefly_get_seo_setting() at wp_head time. -->
+            <div :class="['geo-panel', 'geo-panel-seo', { active: activeTab === 'seo' }]">
+                <div class="geo-panel-banner">
+                    <span class="dashicons dashicons-search"></span>
+                    <span><strong>SEO settings</strong> — site-wide defaults applied to every page. Per-page overrides live in each post's Gutenberg SEO panel.</span>
+                </div>
+
+                <h3>Defaults</h3>
+                <div class="geo-field">
+                    <label>Default OG image URL</label>
+                    <input type="url" v-model="seoConfig.defaults.og_image_url" placeholder="https://example.com/og.png">
+                    <p class="description">Used when a page has no <code>_seo_og_image_id</code> override and no featured image. Leave blank to fall back to the active template's <code>default-og.webp</code>.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Title separator</label>
+                    <input type="text" v-model="seoConfig.defaults.title_separator" maxlength="12" placeholder=" - " style="width:120px;">
+                    <p class="description">Joins site name + page title in the &lt;title&gt; tag (e.g. <code> - </code>, <code> | </code>, <code> · </code>). Whitespace is preserved.</p>
+                </div>
+
+                <h3>Twitter / X Card</h3>
+                <div class="geo-field">
+                    <label>Site handle</label>
+                    <input type="text" v-model="seoConfig.twitter.site_handle" placeholder="@yoursite">
+                    <p class="description">Emitted as <code>twitter:site</code>. The <code>@</code> is added automatically if missing.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Creator handle</label>
+                    <input type="text" v-model="seoConfig.twitter.creator_handle" placeholder="@author">
+                    <p class="description">Optional. Emitted as <code>twitter:creator</code> when set.</p>
+                </div>
+                <div class="geo-field">
+                    <label>Card type</label>
+                    <select v-model="seoConfig.twitter.card_type">
+                        <option v-for="opt in twitterCardOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                    <p class="description">Drives how social-card previews render. <em>Summary with large image</em> is the right pick for most marketing sites.</p>
+                </div>
+
+                <h3>Facebook</h3>
+                <div class="geo-field">
+                    <label>Facebook App ID</label>
+                    <input type="text" v-model="seoConfig.facebook.app_id" placeholder="1234567890123456">
+                    <p class="description">Optional. Emitted as <code>fb:app_id</code>. Required only if you want Facebook Insights tracking — eliminates the FB Sharing Debugger warning. Leave blank otherwise.</p>
+                </div>
+
+                <h3>Search-engine verification</h3>
+                <p class="description geo-panel-description">Paste the verification code each provider gives you. Only providers with a non-empty code emit a meta tag.</p>
+                <div class="geo-field">
+                    <label>Google Search Console</label>
+                    <input type="text" v-model="seoConfig.verification.google" placeholder="abc123-google-verification-token">
+                </div>
+                <div class="geo-field">
+                    <label>Bing Webmaster Tools</label>
+                    <input type="text" v-model="seoConfig.verification.bing" placeholder="msvalidate.01 token">
+                </div>
+                <div class="geo-field">
+                    <label>Yandex Webmaster</label>
+                    <input type="text" v-model="seoConfig.verification.yandex" placeholder="yandex-verification token">
+                </div>
+                <div class="geo-field">
+                    <label>Pinterest</label>
+                    <input type="text" v-model="seoConfig.verification.pinterest" placeholder="p:domain_verify token">
+                </div>
+                <div class="geo-field">
+                    <label>Baidu</label>
+                    <input type="text" v-model="seoConfig.verification.baidu" placeholder="baidu-site-verification token">
+                </div>
+
+                <h3>Default robots policy</h3>
+                <p class="description geo-panel-description">These are the site-wide defaults; per-page toggles can override them. Dev / localhost always forces <code>noindex,nofollow</code> regardless.</p>
+                <div class="geo-field geo-field-inline">
+                    <label>
+                        <input type="checkbox" v-model="seoConfig.robots.default_index">
+                        Allow search engines to index pages by default
+                    </label>
+                </div>
+                <div class="geo-field geo-field-inline">
+                    <label>
+                        <input type="checkbox" v-model="seoConfig.robots.default_follow">
+                        Allow search engines to follow links by default
+                    </label>
+                </div>
+            </div>
+
             <!-- Organization Tab -->
             <div :class="['geo-panel', { active: activeTab === 'organization' }]">
                 <div class="geo-section">
@@ -466,6 +578,85 @@ if (!current_user_can('manage_options')) {
             <div class="geo-modal-actions">
                 <button type="button" class="button" @click="showResetModal = false">Cancel</button>
                 <button type="button" class="button button-secondary" @click="resetConfig">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEO sync confirmation modal — explains what "SEO sync" covers and lets
+         the user choose which subset(s) to push. Two checkboxes default to
+         checked; either can be unchecked to skip that subset. Sync button is
+         disabled when both are unchecked. -->
+    <div v-if="showSeoSyncModal" class="geo-modal-overlay" @click.self="!syncingSeo && (showSeoSyncModal = false)">
+        <div class="geo-modal geo-modal-wide geo-modal-sync">
+            <h3>
+                <span class="dashicons dashicons-upload"></span>
+                Sync SEO to {{ syncEnv === 'prod' ? 'Production' : 'Live Dev' }}
+            </h3>
+            <p class="geo-modal-lead">
+                An SEO sync pushes <strong>two kinds of data</strong> to the remote environment.
+                Choose what to include:
+            </p>
+
+            <div class="geo-sync-choices">
+                <label class="geo-sync-choice" :class="{ 'is-checked': seoSyncIncludeAdmin, 'is-disabled': syncingSeo }">
+                    <input type="checkbox" v-model="seoSyncIncludeAdmin" :disabled="syncingSeo">
+                    <span class="geo-sync-choice-body">
+                        <span class="geo-sync-choice-title">
+                            <span class="dashicons dashicons-admin-settings"></span>
+                            Site-wide SEO settings
+                        </span>
+                        <span class="geo-sync-choice-desc">
+                            Default OG image, Twitter handles, search-engine verification codes,
+                            title separator, and default robots policy — everything from the SEO
+                            tab of this admin page.
+                        </span>
+                        <span class="geo-sync-choice-endpoint">→ <code>/seo/receive</code></span>
+                    </span>
+                </label>
+
+                <label class="geo-sync-choice" :class="{ 'is-checked': seoSyncIncludePages, 'is-disabled': syncingSeo }">
+                    <input type="checkbox" v-model="seoSyncIncludePages" :disabled="syncingSeo">
+                    <span class="geo-sync-choice-body">
+                        <span class="geo-sync-choice-title">
+                            <span class="dashicons dashicons-admin-page"></span>
+                            Per-page SEO overrides
+                        </span>
+                        <span class="geo-sync-choice-desc">
+                            Every page and post in the active template — their SEO title,
+                            meta description, canonical, robots toggles, and Open Graph
+                            overrides set in each post's Gutenberg sidebar.
+                        </span>
+                        <span class="geo-sync-choice-endpoint">→ <code>/seo/receive-pages</code></span>
+                    </span>
+                </label>
+            </div>
+
+            <!-- Live status / results -->
+            <div v-if="seoSyncStatus" class="geo-sync-status" :class="'is-' + seoSyncStatus.type">
+                <span v-if="seoSyncStatus.type !== 'done'" class="spinner is-active" style="float:none; margin:0 8px 0 0;"></span>
+                <span>{{ seoSyncStatus.text }}</span>
+                <ul v-if="seoSyncStatus.results" class="geo-sync-results">
+                    <li v-for="(r, idx) in seoSyncStatus.results" :key="idx" :class="r.success ? 'is-success' : 'is-failure'">
+                        <span class="dashicons" :class="r.success ? 'dashicons-yes-alt' : 'dashicons-warning'"></span>
+                        <strong>{{ r.label }}:</strong>
+                        <span>{{ r.message }}</span>
+                        <small v-if="r.sent != null"> ({{ r.applied != null ? (r.applied + '/' + r.sent + ' pages applied') : (r.sent + ' pages sent') }})</small>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="geo-modal-actions">
+                <button type="button" class="button" @click="showSeoSyncModal = false" :disabled="syncingSeo">
+                    {{ seoSyncStatus && seoSyncStatus.type === 'done' ? 'Close' : 'Cancel' }}
+                </button>
+                <button type="button"
+                        class="button button-primary"
+                        @click="executeSeoSync"
+                        :disabled="syncingSeo || (!seoSyncIncludeAdmin && !seoSyncIncludePages)">
+                    <span v-if="syncingSeo" class="spinner is-active" style="float:none; margin:0 5px 0 0;"></span>
+                    <span v-else class="dashicons dashicons-upload"></span>
+                    {{ syncingSeo ? 'Syncing…' : ('Sync to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev')) }}
+                </button>
             </div>
         </div>
     </div>

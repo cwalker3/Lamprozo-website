@@ -9,6 +9,7 @@
         <meta name="mobile-web-app-capable" content="yes">
         <title>FFC App</title>
         <link rel="stylesheet" href="/wp-content/themes/firefly-collective/templates/default/assets/css/_core_custom-properties.css">
+        <link rel="stylesheet" href="/wp-content/themes/firefly-collective/templates/default/assets/css/_core_design.css">
         <link rel="stylesheet" href="/wp-content/themes/firefly-collective/templates/default/assets/css/_core_main.css">
         <link rel="stylesheet" href="/wp-content/themes/firefly-collective/templates/default/assets/css/_core_nav.css">
         <link rel="stylesheet" href="/wp-content/themes/firefly-collective/templates/default/assets/css/_core_animations.css">
@@ -25,7 +26,7 @@
         <script type="text/javascript" src="/wp-content/plugins/firefly-collective/templates/default/assets/js/orders.js" defer></script>
         <script type="text/javascript" src="https://unpkg.com/vue@3/dist/vue.global.js" defer></script>
     </head>
-    <body class="app-shell">
+    <body class="app-shell firefly-page page-app">
         <div id="backdrop"></div>
 
         <header>
@@ -81,6 +82,7 @@
 
         <main>
             <div class="content">
+                <div id="website-app"></div>
                 <div id="app-root"></div>
             </div>
         </main>
@@ -94,6 +96,6 @@
             <h2>Footer</h2>
         </footer>
         
-        <img src="/wp-content/themes/firefly-collective/templates/default/images/loading.gif" id="loader">
+        <div id="loader" class="ff-app-loader" aria-hidden="true"><span class="ff-app-loader-ring"></span></div>
     </body>
 </html>

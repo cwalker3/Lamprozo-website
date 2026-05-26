@@ -25,6 +25,11 @@
     // Include centralised template options (Customizer registration, save, preview, CSS)
     require_once get_template_directory() . '/models/template-options.php';
 
+    // Framework SEO: Open Graph / Twitter + JSON-LD + meta description + canonical + robots.
+    // Per-page _seo_* overrides resolve inside these files; nothing else to wire.
+    require_once get_template_directory() . '/models/seo-meta.php';
+    require_once get_template_directory() . '/models/seo-schema.php';
+
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {
         require_once get_template_directory() . '/models/template-scoping-admin.php';

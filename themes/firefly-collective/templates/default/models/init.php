@@ -20,9 +20,6 @@
      * See templates/default/DESIGN.md for the body-class contract.
      */
     function firefly_default_add_body_class( $classes ) {
-        if ( function_exists('determine_view') && determine_view() === 'app' ) {
-            return $classes;
-        }
         if ( ! in_array('firefly-page', $classes, true) ) {
             $classes[] = 'firefly-page';
         }
@@ -274,8 +271,18 @@
     }
 
     function disable_comments() {
-        // Remove from admin menu
-        remove_menu_page('edit-comments.php');
+        // This file is loaded for both frontend and admin requests.
+        // `remove_menu_page()` relies on the global $menu being initialized;
+        // calling it too early (e.g. on plain `init`) can produce core warnings.
+        if ( ! is_admin() ) {
+            return;
+        }
+
+        // Remove from admin menu (guard against core warning: $menu === null)
+        global $menu;
+        if ( isset($menu) && is_array($menu) ) {
+            remove_menu_page('edit-comments.php');
+        }
         
         // Remove from post and pages
         remove_post_type_support('post', 'comments');
@@ -287,7 +294,8 @@
         }
         add_filter('comments_open', 'disable_all_comments', 10, 2);
     }
-    add_action('init', 'disable_comments');
+    // Ensure WordPress has initialized $menu/$submenu before we try removing pages.
+    add_action('admin_menu', 'disable_comments', 999);
 
     // Remove 'jquery-migrate' as a dependency of WordPress' jQuery
     add_action('wp_default_scripts', function ($scripts) {

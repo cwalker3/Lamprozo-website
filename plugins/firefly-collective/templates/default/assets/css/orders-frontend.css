@@ -1,0 +1,839 @@
+/* plugin/templates/default/assets/css/orders-frontend.css
+
+   Frontend-only Order History view, Vue-mounted via orders.js.
+   Loaded by the theme's view.php on /order-history. The wp-admin
+   Orders page uses the sibling orders.css (plain WP-admin chrome,
+   matches subscriptions/submissions admins).
+
+   All selectors scope under body.firefly-page.page-order-history.
+*/
+
+body.firefly-page.page-order-history .orders-section {
+    padding-block: clamp(2rem, 4vw, 3.5rem);
+}
+
+/* Hero variant — un-clip so the page-level amber glow can extend
+   past the hero into the orders section below. */
+body.firefly-page.page-order-history .orders-hero {
+    padding-bottom: clamp(1rem, 2vw, 2rem);
+    background: var(--ff-bg);
+    overflow: visible;
+}
+
+/* Page-level atmospheric backdrop (matches the dashboard treatment
+   so the two authenticated pages feel like one product). */
+body.firefly-page.page-order-history::before {
+    content: '';
+    position: fixed;
+    top: -20vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(120vw, 1400px);
+    height: min(120vh, 1100px);
+    background: radial-gradient(ellipse at center,
+        rgba(245, 181, 68, 0.16) 0%,
+        rgba(245, 181, 68, 0.08) 28%,
+        rgba(245, 181, 68, 0.03) 50%,
+        transparent 70%);
+    filter: blur(40px);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Suppress any legacy loading.gif images Vue may render. */
+body.firefly-page.page-order-history img[src*="loading.gif"],
+body.firefly-page.page-order-history img[src*="loading-dark.gif"] {
+    display: none !important;
+}
+
+body.firefly-page.page-order-history #ffc-orders-app {
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+}
+
+body.firefly-page.page-order-history #ffc-orders-app[v-cloak] {
+    display: none;
+}
+
+/* ---------- Loading state ---------------------------------------- */
+
+body.firefly-page.page-order-history .ffc-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 4rem 1rem;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-order-history .ffc-loading p {
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+body.firefly-page.page-order-history .ffc-loading .spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--ff-border);
+    border-top-color: var(--ff-amber);
+    border-radius: 50%;
+    background: none;
+    animation: ffc-spin 720ms linear infinite;
+    float: none;
+}
+
+@keyframes ffc-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ---------- Online payments toggle (admin) ----------------------- */
+
+body.firefly-page.page-order-history .ffc-online-payments-toggle-container {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-copy h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--ff-fg);
+    letter-spacing: -0.01em;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-copy p {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--ff-fg-muted);
+    line-height: 1.5;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-control {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-state {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-state.is-on  { color: var(--ff-green); }
+body.firefly-page.page-order-history .ffc-toggle-state.is-off { color: #ff7a7a; }
+
+/* iOS-style switch */
+body.firefly-page.page-order-history .ffc-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--ff-bg);
+    border: 1px solid var(--ff-border);
+    border-radius: 999px;
+    transition: background 220ms ease, border-color 220ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: var(--ff-fg-muted);
+    border-radius: 50%;
+    transition: transform 220ms ease, background 220ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-toggle-switch input:checked + .ffc-toggle-slider {
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-order-history .ffc-toggle-switch input:checked + .ffc-toggle-slider::before {
+    transform: translateX(20px);
+    background: var(--ff-amber);
+}
+
+body.firefly-page.page-order-history .ffc-toggle-message {
+    margin-top: 0.875rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--ff-radius-sm);
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    border: 1px solid var(--ff-border);
+}
+
+body.firefly-page.page-order-history .ffc-toggle-success {
+    background: rgba(159, 232, 112, 0.08);
+    border-color: rgba(159, 232, 112, 0.3);
+    color: var(--ff-green);
+}
+
+body.firefly-page.page-order-history .ffc-toggle-error {
+    background: rgba(255, 122, 122, 0.08);
+    border-color: rgba(255, 122, 122, 0.3);
+    color: #ff7a7a;
+}
+
+/* ---------- Filters ---------------------------------------------- */
+
+body.firefly-page.page-order-history .ffc-filters-container {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+body.firefly-page.page-order-history .ffc-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+}
+
+body.firefly-page.page-order-history .ffc-filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+body.firefly-page.page-order-history .ffc-filter-item label {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-order-history .ffc-filter-item input,
+body.firefly-page.page-order-history .ffc-filter-item select {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+    box-sizing: border-box;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-filter-item select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2rem;
+    cursor: pointer;
+}
+
+body.firefly-page.page-order-history .ffc-filter-item input:focus,
+body.firefly-page.page-order-history .ffc-filter-item select:focus {
+    outline: none;
+    border-color: var(--ff-amber-ring);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+/* ---------- Bulk actions ----------------------------------------- */
+
+body.firefly-page.page-order-history .ffc-bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ff-border);
+    flex-wrap: wrap;
+}
+
+body.firefly-page.page-order-history .ffc-bulk-actions span {
+    font-family: var(--ff-font-mono);
+    font-size: 0.8125rem;
+    color: var(--ff-amber);
+    letter-spacing: 0.02em;
+}
+
+body.firefly-page.page-order-history .ffc-bulk-actions select {
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-sm);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.8125rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23fafaf7' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    cursor: pointer;
+}
+
+/* ---------- Buttons (overrides for WP's .button class) ----------- */
+
+body.firefly-page.page-order-history #ffc-orders-app .button,
+body.firefly-page.page-order-history #ffc-orders-app button.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--ff-radius-sm);
+    border: 1px solid var(--ff-border);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+    text-decoration: none;
+    line-height: 1.2;
+    box-shadow: none;
+    text-shadow: none;
+    height: auto;
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button:hover,
+body.firefly-page.page-order-history #ffc-orders-app button.button:hover {
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+    color: var(--ff-amber);
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button-small {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button-primary,
+body.firefly-page.page-order-history #ffc-orders-app .button.button-primary {
+    background: var(--ff-amber);
+    border-color: var(--ff-amber);
+    color: var(--ff-bg);
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button-primary:hover,
+body.firefly-page.page-order-history #ffc-orders-app .button.button-primary:hover {
+    background: #ffc758;
+    border-color: #ffc758;
+    color: var(--ff-bg);
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button-link-delete,
+body.firefly-page.page-order-history #ffc-orders-app .button.button-link-delete {
+    background: rgba(255, 122, 122, 0.08);
+    border-color: rgba(255, 122, 122, 0.3);
+    color: #ffb4b4;
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button-link-delete:hover {
+    background: rgba(255, 122, 122, 0.18);
+    border-color: rgba(255, 122, 122, 0.5);
+    color: #ff7a7a;
+}
+
+body.firefly-page.page-order-history #ffc-orders-app .button:disabled,
+body.firefly-page.page-order-history #ffc-orders-app .button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ---------- Orders table ----------------------------------------- */
+
+body.firefly-page.page-order-history .ffc-table-container {
+    border: 1px solid var(--ff-border);
+    background: var(--ff-surface);
+    border-radius: var(--ff-radius-lg);
+    overflow: hidden;
+}
+
+body.firefly-page.page-order-history .ffc-orders-table,
+body.firefly-page.page-order-history table.wp-list-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: transparent;
+    color: var(--ff-fg);
+    font-family: var(--ff-font-sans);
+    font-size: 0.875rem;
+}
+
+body.firefly-page.page-order-history .ffc-orders-table th {
+    text-align: left;
+    padding: 0.875rem 1rem;
+    background: var(--ff-surface-2);
+    border-bottom: 1px solid var(--ff-border);
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-orders-table th:hover {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+}
+
+body.firefly-page.page-order-history .ffc-orders-table th.sorted-asc::after  { content: ' ↑'; color: var(--ff-amber); }
+body.firefly-page.page-order-history .ffc-orders-table th.sorted-desc::after { content: ' ↓'; color: var(--ff-amber); }
+
+body.firefly-page.page-order-history .ffc-orders-table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--ff-border);
+    color: var(--ff-fg);
+    vertical-align: middle;
+}
+
+body.firefly-page.page-order-history .ffc-orders-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+body.firefly-page.page-order-history .ffc-order-row {
+    transition: background 180ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-order-row:hover,
+body.firefly-page.page-order-history .ffc-order-row.expanded {
+    background: var(--ff-bg);
+}
+
+body.firefly-page.page-order-history .ffc-order-row.expanded td {
+    border-bottom-color: transparent;
+}
+
+/* WP striped table override */
+body.firefly-page.page-order-history table.striped > tbody > :nth-child(odd) {
+    background: transparent;
+}
+
+/* Status badges */
+body.firefly-page.page-order-history .ffc-status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid;
+    line-height: 1;
+}
+
+body.firefly-page.page-order-history .ffc-status-pending {
+    color: var(--ff-amber);
+    background: var(--ff-amber-soft);
+    border-color: var(--ff-amber-ring);
+}
+
+body.firefly-page.page-order-history .ffc-status-completed,
+body.firefly-page.page-order-history .ffc-status-paid {
+    color: var(--ff-green);
+    background: rgba(159, 232, 112, 0.10);
+    border-color: rgba(159, 232, 112, 0.3);
+}
+
+body.firefly-page.page-order-history .ffc-status-cancelled,
+body.firefly-page.page-order-history .ffc-status-refunded {
+    color: #ff7a7a;
+    background: rgba(255, 122, 122, 0.08);
+    border-color: rgba(255, 122, 122, 0.3);
+}
+
+body.firefly-page.page-order-history .ffc-status-partial {
+    color: var(--ff-fg-muted);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--ff-border);
+}
+
+body.firefly-page.page-order-history .ffc-original-price {
+    display: block;
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    color: var(--ff-fg-dim);
+    text-decoration: line-through;
+    margin-top: 0.125rem;
+}
+
+body.firefly-page.page-order-history .ffc-actions-cell { text-align: right; }
+
+body.firefly-page.page-order-history .ffc-row-actions {
+    display: inline-flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+body.firefly-page.page-order-history .ffc-expand-btn {
+    background: transparent;
+    border: 0;
+    color: var(--ff-amber);
+    cursor: pointer;
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin-left: 0.375rem;
+    border-radius: var(--ff-radius-sm);
+    transition: background 180ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-expand-btn:hover {
+    background: var(--ff-amber-soft);
+}
+
+/* ---------- Expanded order details ------------------------------- */
+
+body.firefly-page.page-order-history .ffc-order-details-row td {
+    padding: 0;
+    background: var(--ff-bg);
+}
+
+body.firefly-page.page-order-history .ffc-order-items {
+    padding: 1rem 1.25rem 1.25rem;
+    border-bottom: 1px solid var(--ff-border);
+}
+
+/* ---------- View Order modal: summary + headings ---------------- */
+
+body.firefly-page.page-order-history .ffc-order-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem 1.25rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    background: var(--ff-surface-2, #1a1a1d);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+}
+
+body.firefly-page.page-order-history .ffc-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-order-history .ffc-summary-item strong {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-order-history .ffc-modal-body > h3 {
+    margin: 1.5rem 0 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-order-history .ffc-modal-body > h3:first-child {
+    margin-top: 0;
+}
+
+body.firefly-page.page-order-history .ffc-user-data {
+    margin-top: 1.25rem;
+}
+
+body.firefly-page.page-order-history .ffc-user-data-item {
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--ff-fg);
+    border-bottom: 1px solid var(--ff-border);
+}
+
+body.firefly-page.page-order-history .ffc-user-data-item:last-child {
+    border-bottom: 0;
+}
+
+body.firefly-page.page-order-history .ffc-user-data-item strong {
+    font-family: var(--ff-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ff-fg-muted);
+    margin-right: 0.5rem;
+}
+
+body.firefly-page.page-order-history .ffc-items-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius);
+    overflow: hidden;
+    font-size: 0.8125rem;
+}
+
+body.firefly-page.page-order-history .ffc-items-table th {
+    background: var(--ff-surface-2);
+    color: var(--ff-fg-muted);
+    font-family: var(--ff-font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--ff-border);
+}
+
+body.firefly-page.page-order-history .ffc-items-table td {
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--ff-border);
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-order-history .ffc-items-table tr:last-child td { border-bottom: 0; }
+
+body.firefly-page.page-order-history .ffc-base-item .ffc-item-name {
+    font-weight: 500;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-order-history .ffc-addon-item {
+    background: rgba(245, 181, 68, 0.04);
+}
+
+body.firefly-page.page-order-history .ffc-addon-name {
+    color: var(--ff-fg-muted);
+    font-size: 0.8125rem;
+}
+
+body.firefly-page.page-order-history .ffc-discount-name {
+    color: var(--ff-green);
+    font-style: italic;
+}
+
+body.firefly-page.page-order-history .refunded-item {
+    opacity: 0.55;
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 122, 122, 0.5);
+}
+
+body.firefly-page.page-order-history .refunded-item .button {
+    text-decoration: none;
+    opacity: 1;
+}
+
+body.firefly-page.page-order-history .item-refund-btn {
+    margin-left: 0.5rem;
+}
+
+/* Empty state */
+body.firefly-page.page-order-history .ffc-no-orders,
+body.firefly-page.page-order-history #ffc-orders-app > p {
+    border: 1px dashed var(--ff-border);
+    border-radius: var(--ff-radius);
+    padding: 2rem;
+    text-align: center;
+    color: var(--ff-fg-muted);
+}
+
+/* Pagination */
+body.firefly-page.page-order-history .ffc-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.625rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+body.firefly-page.page-order-history .ffc-pagination .button.is-current {
+    background: var(--ff-amber);
+    border-color: var(--ff-amber);
+    color: #0a0a0b;
+}
+
+body.firefly-page.page-order-history .ffc-page-info {
+    font-family: var(--ff-font-mono);
+    font-size: 0.75rem;
+    color: var(--ff-fg-muted);
+    letter-spacing: 0.06em;
+}
+
+/* ---------- Modals (Vue-mounted) --------------------------------- */
+/* Markup shape (see views/orders.php):
+   <div class="ffc-modal">                       ← fixed, full-viewport overlay
+     <div class="ffc-modal-content [ffc-small-modal]">  ← centered card
+       <div class="ffc-modal-header">…</div>
+       <div class="ffc-modal-body">…</div>
+       <div class="ffc-modal-footer">…</div>
+     </div>
+   </div>                                                                */
+
+body.firefly-page.page-order-history .ffc-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(10, 10, 11, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    overflow-y: auto;
+}
+
+body.firefly-page.page-order-history .ffc-modal-content {
+    width: 100%;
+    max-width: 720px;
+    max-height: calc(100vh - 3rem);
+    background: var(--ff-surface);
+    color: var(--ff-fg);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-lg);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6),
+                0 4px 12px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body.firefly-page.page-order-history .ffc-small-modal {
+    max-width: 460px;
+}
+
+body.firefly-page.page-order-history .ffc-modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--ff-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+body.firefly-page.page-order-history .ffc-modal-header h2,
+body.firefly-page.page-order-history .ffc-modal-header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-order-history .ffc-modal-close {
+    background: transparent;
+    border: 0;
+    color: var(--ff-fg-muted);
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--ff-radius-sm);
+    transition: color 180ms ease, background 180ms ease;
+}
+
+body.firefly-page.page-order-history .ffc-modal-close:hover {
+    color: var(--ff-fg);
+    background: var(--ff-border);
+}
+
+body.firefly-page.page-order-history .ffc-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    color: var(--ff-fg);
+    line-height: 1.55;
+}
+
+body.firefly-page.page-order-history .ffc-modal-body p {
+    margin: 0 0 1rem;
+    color: var(--ff-fg-muted);
+}
+
+body.firefly-page.page-order-history .ffc-modal-body p:last-child {
+    margin-bottom: 0;
+}
+
+body.firefly-page.page-order-history .ffc-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--ff-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+/* ---------- Mobile ----------------------------------------------- */
+
+@media (max-width: 800px) {
+    body.firefly-page.page-order-history .ffc-orders-table,
+    body.firefly-page.page-order-history .ffc-orders-table thead,
+    body.firefly-page.page-order-history .ffc-orders-table tbody,
+    body.firefly-page.page-order-history .ffc-orders-table tr {
+        display: block;
+    }
+
+    body.firefly-page.page-order-history .ffc-orders-table thead { display: none; }
+
+    body.firefly-page.page-order-history .ffc-order-row {
+        border-bottom: 1px solid var(--ff-border);
+        padding: 0.875rem 1rem;
+    }
+
+    body.firefly-page.page-order-history .ffc-orders-table td {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.375rem 0;
+        border-bottom: 0;
+    }
+
+    body.firefly-page.page-order-history .ffc-actions-cell { text-align: left; }
+    body.firefly-page.page-order-history .ffc-row-actions { justify-content: flex-start; }
+
+    body.firefly-page.page-order-history .ffc-online-payments-toggle-container .ffc-toggle-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.875rem;
+    }
+}

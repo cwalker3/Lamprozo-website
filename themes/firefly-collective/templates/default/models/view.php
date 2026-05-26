@@ -43,7 +43,7 @@
                 $assets['css'][]    = $template_path . '/assets/css/app.css';
                 $assets['css'][]    = $template_path . '/assets/css/auth.css';
                 $assets['css'][]    = $template_path . '/assets/css/dashboard.css';
-                $assets['css'][]    = $plugin_path   . '/assets/css/orders.css';
+                $assets['css'][]    = $plugin_path   . '/assets/css/orders-frontend.css';
                 $assets['js'][]     = $template_path . '/assets/js/signup.js';
                 $assets['js'][]     = $template_path . '/assets/js/auth.js';
                 $assets['js'][]     = $template_path . '/assets/js/app.js';
@@ -79,7 +79,7 @@
                 break;
             
             case 'order-history':
-                $assets['css'][]    = $plugin_path . '/assets/css/orders.css';
+                $assets['css'][]    = $plugin_path . '/assets/css/orders-frontend.css';
                 $assets['js'][]     = $plugin_path . '/assets/js/orders.js';
                 $assets['js'][]     = VUE_REMOTE_CORE;
                 break;

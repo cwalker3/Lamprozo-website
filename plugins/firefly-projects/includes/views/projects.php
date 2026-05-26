@@ -208,6 +208,7 @@ if (!isset($projects_data) || !is_array($projects_data)) {
                         <span v-if="gitStatusCounts.modified" class="git-count-chip git-badge-modified">{{ gitStatusCounts.modified }} modified</span>
                         <span v-if="gitStatusCounts.staged"   class="git-count-chip git-badge-staged">{{ gitStatusCounts.staged }} staged</span>
                         <span v-if="gitStatusCounts.untracked" class="git-count-chip git-badge-untracked">{{ gitStatusCounts.untracked }} new</span>
+                        <span v-if="gitStatusCounts.deleted"   class="git-count-chip git-badge-deleted">{{ gitStatusCounts.deleted }} deleted</span>
                     </span>
                     <span class="git-mode-hint" v-else-if="gitModeEnabled">
                         No local changes detected — nothing to sync

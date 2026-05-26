@@ -1,1 +1,57 @@
-This is the PWA front end page.
+<!-- wp:group {"tagName":"section","className":"hero app-shell-hero","layout":{"type":"default"}} -->
+<section class="wp-block-group hero app-shell-hero"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:group {"className":"hero-copy reveal","layout":{"type":"default"}} -->
+<div class="wp-block-group hero-copy reveal"><!-- wp:firefly/overline {"text":"Member App"} /-->
+
+<!-- wp:heading {"level":1,"className":"hero-headline"} -->
+<h1 class="wp-block-heading hero-headline">WordPress inside. <span class="headline-accent">App</span> outside.</h1>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph {"className":"lead"} -->
+<p class="lead">Every screen in this app is a real WordPress page — defined in a JSON schema, authored as Gutenberg blocks, deployed by a CLI. The shell around it is a service-worker-backed PWA that pulls each view in over REST. Same source of truth, two surfaces.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->
+
+<!-- wp:group {"tagName":"section","className":"dashboard-section pipeline-section","layout":{"type":"default"}} -->
+<section class="wp-block-group dashboard-section pipeline-section"><!-- wp:group {"className":"container","layout":{"type":"default"}} -->
+<div class="wp-block-group container"><!-- wp:group {"className":"pipeline-grid","layout":{"type":"default"}} -->
+<div class="wp-block-group pipeline-grid"><!-- wp:group {"className":"pipeline-card","layout":{"type":"default"}} -->
+<div class="wp-block-group pipeline-card"><!-- wp:firefly/overline {"text":"01 — Define"} /-->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">Schema + snippets</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Pages live in one JSON schema and a folder of Gutenberg HTML snippets. The CLI deploys both into WordPress as real, indexable pages — same content on disk and in the database.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group -->
+
+<!-- wp:group {"className":"pipeline-card","layout":{"type":"default"}} -->
+<div class="wp-block-group pipeline-card"><!-- wp:firefly/overline {"text":"02 — Author"} /-->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">Three editors, one source</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Developers edit files. Marketing edits in wp-admin. AI agents drive the CLI. Every change round-trips through the same schema and snippets, so nothing drifts.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group -->
+
+<!-- wp:group {"className":"pipeline-card","layout":{"type":"default"}} -->
+<div class="wp-block-group pipeline-card"><!-- wp:firefly/overline {"text":"03 — Serve"} /-->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">App shell + view fetches</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>This shell loads once. Each view — dashboard, orders, signup — is rendered server-side from its WordPress page and streamed in over REST. The service worker caches it for offline use.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></div>
+<!-- /wp:group --></section>
+<!-- /wp:group -->

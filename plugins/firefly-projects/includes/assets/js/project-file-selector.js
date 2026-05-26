@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span v-if="gitStatus" :class="'git-badge git-badge-' + gitStatus" :title="gitBadgeTitle">
                             {{ gitBadgeLabel }}
                         </span>
-                        <span v-if="node.type === 'file'" class="file-meta">
+                        <span v-if="node.type === 'file' && !isDeletedGhost" class="file-meta">
                             ({{ formatFileSize(node.size) }}, {{ node.modified }})
                         </span>
                     </label>
@@ -110,20 +110,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 return {
                     staged:    'staged',
                     modified:  'modified',
-                    untracked: 'new'
+                    untracked: 'new',
+                    deleted:   'deleted'
                 }[this.gitStatus] || '';
             },
             gitBadgeTitle() {
                 return {
                     staged:    'Staged for commit',
                     modified:  'Modified, not staged',
-                    untracked: 'New file, not tracked'
+                    untracked: 'New file, not tracked',
+                    deleted:   'Deleted locally — will be removed on the remote when synced'
                 }[this.gitStatus] || '';
+            },
+            // True for ghost nodes injected for git-deleted files. Used
+            // to apply the strikethrough/dimmed treatment and to skip
+            // the size/modified meta (the file doesn't exist on disk).
+            isDeletedGhost() {
+                return this.node && this.node.deleted === true;
             },
             // When git mode is on, dim files that have no git status AND
             // aren't manually checked — keeps focus on the changes. Users
             // can still click-check a dimmed file (it un-dims while checked,
-            // re-dims when unchecked).
+            // re-dims when unchecked). Deleted ghosts are never dimmed —
+            // they already carry their own strikethrough treatment.
             isDimmedByGitMode() {
                 if (!this.gitModeEnabled) return false;
                 if (this.node.type !== 'file') return false;
@@ -264,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gitModeEnabled: false,      // user toggle (persisted in user_meta)
                 gitChangedFiles: [],        // absolute file paths in project scope
                 gitStatusMap: {},           // { "/wp-content/x": "staged" | "modified" | "untracked" }
-                gitStatusCounts: { staged: 0, modified: 0, untracked: 0 },
+                gitStatusCounts: { staged: 0, modified: 0, untracked: 0, deleted: 0 },
                 isLoadingGitStatus: false
             };
         },
@@ -645,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     this.gitModeEnabled   = !!data.git_mode_enabled && this.gitModeAvailable;
                     this.gitChangedFiles  = Array.isArray(data.in_scope_files) ? data.in_scope_files : [];
                     this.gitStatusMap     = (data.status_map && typeof data.status_map === 'object') ? data.status_map : {};
-                    this.gitStatusCounts  = Object.assign({ staged: 0, modified: 0, untracked: 0 }, data.status_counts || {});
+                    this.gitStatusCounts  = Object.assign({ staged: 0, modified: 0, untracked: 0, deleted: 0 }, data.status_counts || {});
 
                     if (this.gitModeEnabled) {
                         this.applyGitSelection();
@@ -708,9 +717,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
 
-            /** Manual re-read of git status (user clicks refresh). */
+            /** Manual flush + re-read (user clicks refresh).
+             *  Re-loads the file tree (refreshes mtimes/sizes) AND re-reads
+             *  git status, while preserving the user's current selection. */
             async refreshGitStatus() {
-                await this.fetchGitStatus();
+                if (!this.selectedProject) {
+                    await this.fetchGitStatus();
+                    return;
+                }
+                // Stash selection + git mode state so reload doesn't drop them.
+                const savedSelection = new Set(this.selectedPaths);
+                const savedGitMode   = this.gitModeEnabled;
+                const savedSyncMode  = this.syncMode;
+
+                await this.loadProjectFiles();
+
+                // loadProjectFiles resets selection state — restore it.
+                this.selectedPaths  = savedSelection;
+                this.gitModeEnabled = savedGitMode;
+                this.syncMode       = savedSyncMode;
+
+                // loadProjectFiles already kicks off fetchGitStatus, but if
+                // git mode is on we want its selection refresh to win.
+                if (savedGitMode) {
+                    await this.fetchGitStatus();
+                }
             },
 
             /** Apply the current gitChangedFiles list as the selection,

@@ -647,8 +647,506 @@ function firefly_plugin_register_rest_endpoints() {
             'permission_callback' => '__return_true' // Uses shared secret for remote, admin for local
         )
     );
+
+    // Sync Log: Read the activity log for a specific post (admin only).
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/sync-log',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_sync_log_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'post_id' => array( 'required' => true,  'type' => 'integer' ),
+                'limit'   => array( 'required' => false, 'type' => 'integer', 'default' => 20 ),
+            ),
+        )
+    );
+
+    // Post Activity (remote-side): expose this remote's view of one page so a
+    // local can merge it into the unified activity timeline. Identified by the
+    // stable cross-env _firefly_page_id meta. Shared-secret auth.
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/post-activity',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_post_activity_endpoint',
+            'permission_callback' => '__return_true', // verified via shared secret inside
+            'args'                => array(
+                'firefly_page_id' => array( 'required' => true,  'type' => 'string' ),
+                'limit'           => array( 'required' => false, 'type' => 'integer', 'default' => 20 ),
+            ),
+        )
+    );
+
+    // Remote Activity (local-side proxy): admin asks for the remote's view of
+    // a local post; we resolve _firefly_page_id and call /post-activity on the
+    // appropriate remote with the shared secret.
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/remote-activity',
+        array(
+            'methods'             => 'GET',
+            'callback'            => 'firefly_projects_remote_activity_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+            'args'                => array(
+                'post_id' => array( 'required' => true,  'type' => 'integer' ),
+                'env'     => array( 'required' => true,  'type' => 'string' ),
+                'limit'   => array( 'required' => false, 'type' => 'integer', 'default' => 20 ),
+            ),
+        )
+    );
+
+    // Restore Local Revision: admin-triggered restore of a local post to one
+    // of its own WP revisions. Writes a 'restore' log row + lets save_post
+    // run so the snippet file on disk re-derives from the restored content.
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/restore-local-revision',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_restore_local_revision_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+        )
+    );
+
+    // Rollback Push (local proxy): admin-triggered rollback of a previously-
+    // executed push. Reads pre_push_revision_id from the log row, calls the
+    // remote /restore-to-revision endpoint with shared secret.
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/rollback-push',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_rollback_push_endpoint',
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+        )
+    );
+
+    // Restore To Revision (remote-side): receiver for rollback-push. Restores
+    // this remote's post to a named revision_id. Shared-secret auth.
+    register_rest_route(
+        'firefly-plugin/v1',
+        '/restore-to-revision',
+        array(
+            'methods'             => 'POST',
+            'callback'            => 'firefly_projects_restore_to_revision_endpoint',
+            'permission_callback' => '__return_true', // verified via shared secret inside
+        )
+    );
 }
 add_action('rest_api_init', 'firefly_plugin_register_rest_endpoints');
+
+/**
+ * REST: GET /sync-log?post_id=X[&limit=N]
+ * Returns the most recent sync log entries for a post, shaped for the UI.
+ */
+function firefly_projects_sync_log_endpoint( WP_REST_Request $request ) {
+    $post_id = (int) $request->get_param( 'post_id' );
+    $limit   = (int) ( $request->get_param( 'limit' ) ?: 20 );
+    if ( $post_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'post_id required.' ), 400 );
+    }
+    if ( ! function_exists( 'firefly_projects_get_sync_log' ) ) {
+        return new WP_REST_Response( array( 'success' => true, 'entries' => array() ), 200 );
+    }
+    $entries = firefly_projects_get_sync_log( $post_id, $limit );
+    return new WP_REST_Response( array( 'success' => true, 'entries' => $entries ), 200 );
+}
+
+/**
+ * Look up a post on this site by its stable cross-env _firefly_page_id.
+ * Shared by every endpoint that takes firefly_page_id as input.
+ */
+function firefly_projects_find_post_by_firefly_page_id( $firefly_page_id ) {
+    if ( ! $firefly_page_id ) return null;
+    $found = get_posts( array(
+        'post_type'            => array( 'page', 'post' ),
+        'post_status'          => 'any',
+        'numberposts'          => 1,
+        'meta_key'             => '_firefly_page_id',
+        'meta_value'           => $firefly_page_id,
+        'firefly_skip_scoping' => true,
+    ) );
+    return $found ? $found[0] : null;
+}
+
+/**
+ * REST: GET /post-activity?firefly_page_id=X[&limit=N] — REMOTE-SIDE.
+ * Returns this remote's sync log + WP revisions + current state for one page,
+ * identified by the cross-env stable id. Shared-secret auth.
+ */
+function firefly_projects_post_activity_endpoint( WP_REST_Request $request ) {
+    $auth_failure = firefly_projects_verify_shared_secret( $request );
+    if ( $auth_failure !== null ) return $auth_failure;
+
+    $firefly_page_id = (string) $request->get_param( 'firefly_page_id' );
+    $limit           = (int) ( $request->get_param( 'limit' ) ?: 20 );
+
+    if ( $firefly_page_id === '' ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'firefly_page_id required.' ), 400 );
+    }
+
+    $post = firefly_projects_find_post_by_firefly_page_id( $firefly_page_id );
+    if ( ! $post ) {
+        // Not an error — local may not have synced this post yet. Empty result.
+        return new WP_REST_Response( array(
+            'success'    => true,
+            'post_id'    => null,
+            'current'    => null,
+            'sync_log'   => array(),
+            'revisions'  => array(),
+        ), 200 );
+    }
+
+    $sync_log  = function_exists( 'firefly_projects_get_sync_log' )
+        ? firefly_projects_get_sync_log( $post->ID, $limit )
+        : array();
+    $revisions = function_exists( 'firefly_projects_get_post_revisions_shaped' )
+        ? firefly_projects_get_post_revisions_shaped( $post->ID, $limit )
+        : array();
+
+    $latest_rev_id = ! empty( $revisions ) ? (int) $revisions[0]['revision_id'] : null;
+
+    $modified_gmt = $post->post_modified_gmt;
+    $ts_gmt       = $modified_gmt ? strtotime( $modified_gmt . ' UTC' ) : null;
+
+    return new WP_REST_Response( array(
+        'success'   => true,
+        'post_id'   => (int) $post->ID,
+        'current'   => array(
+            'post_modified_gmt'   => $modified_gmt,
+            'post_modified_human' => $ts_gmt ? human_time_diff( $ts_gmt, time() ) . ' ago' : '',
+            'latest_revision_id'  => $latest_rev_id,
+        ),
+        'sync_log'  => $sync_log,
+        'revisions' => $revisions,
+    ), 200 );
+}
+
+/**
+ * REST: GET /remote-activity?post_id=X&env=dev|prod[&limit=N] — LOCAL-SIDE.
+ * Proxies the remote's /post-activity for the local post's _firefly_page_id.
+ * Graceful degradation when the post hasn't been synced or the remote is down.
+ */
+function firefly_projects_remote_activity_endpoint( WP_REST_Request $request ) {
+    $post_id = (int) $request->get_param( 'post_id' );
+    $env     = (string) $request->get_param( 'env' );
+    $limit   = (int) ( $request->get_param( 'limit' ) ?: 20 );
+
+    if ( $post_id <= 0 || ! in_array( $env, array( 'dev', 'prod' ), true ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'post_id and env (dev|prod) required.' ), 400 );
+    }
+
+    $firefly_page_id = get_post_meta( $post_id, '_firefly_page_id', true );
+    if ( ! $firefly_page_id ) {
+        return new WP_REST_Response( array(
+            'success'  => true,
+            'entries'  => array(),
+            'warning'  => 'Post is not yet registered for cross-environment sync.',
+            'env'      => $env,
+        ), 200 );
+    }
+
+    $endpoint = ( $env === 'prod' )
+        ? ( defined( 'PROD_ENDPOINT' ) ? PROD_ENDPOINT : '' )
+        : ( defined( 'LIVE_DEV_ENDPOINT' ) ? LIVE_DEV_ENDPOINT : '' );
+
+    if ( ! $endpoint ) {
+        return new WP_REST_Response( array(
+            'success' => true,
+            'entries' => array(),
+            'warning' => 'No ' . ( $env === 'prod' ? 'Production' : 'Live Dev' ) . ' endpoint configured.',
+            'env'     => $env,
+        ), 200 );
+    }
+
+    // Extract base URL and build the activity endpoint URL.
+    $base = '';
+    if ( preg_match( '/(https?:\/\/[^\/]+)/', $endpoint, $m ) ) {
+        $base = $m[1];
+    }
+    if ( ! $base ) {
+        return new WP_REST_Response( array(
+            'success' => true,
+            'entries' => array(),
+            'warning' => 'Could not derive base URL for ' . $env . '.',
+            'env'     => $env,
+        ), 200 );
+    }
+
+    $url = $base . '/wp-json/firefly-plugin/v1/post-activity?firefly_page_id=' . rawurlencode( $firefly_page_id ) . '&limit=' . $limit;
+    $response = wp_remote_get( $url, array(
+        'headers' => array( 'X-Firefly-Secret' => FIREFLY_SHARED_SECRET ),
+        'timeout' => 15,
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_REST_Response( array(
+            'success' => true,
+            'entries' => array(),
+            'warning' => 'Could not reach ' . ( $env === 'prod' ? 'Production' : 'Live Dev' ) . ': ' . $response->get_error_message(),
+            'env'     => $env,
+        ), 200 );
+    }
+
+    $code = wp_remote_retrieve_response_code( $response );
+    $body = wp_remote_retrieve_body( $response );
+    $data = json_decode( $body, true );
+
+    if ( $code !== 200 || ! is_array( $data ) || empty( $data['success'] ) ) {
+        $msg = is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'HTTP ' . $code;
+        return new WP_REST_Response( array(
+            'success' => true,
+            'entries' => array(),
+            'warning' => 'Remote returned an error (' . $msg . ').',
+            'env'     => $env,
+        ), 200 );
+    }
+
+    // Pass through with an env_label for the UI.
+    $data['env']       = $env;
+    $data['env_label'] = ( $env === 'prod' ) ? 'Production' : 'Live Dev';
+    return new WP_REST_Response( $data, 200 );
+}
+
+/**
+ * REST: POST /restore-local-revision  body: { post_id, revision_id }
+ * Admin-triggered restore of a local post to one of its own WP revisions.
+ * save_post runs (NOT suppressed) so the snippet file on disk updates.
+ */
+function firefly_projects_restore_local_revision_endpoint( WP_REST_Request $request ) {
+    $body        = $request->get_json_params() ?: array();
+    $post_id     = isset( $body['post_id'] ) ? (int) $body['post_id'] : 0;
+    $revision_id = isset( $body['revision_id'] ) ? (int) $body['revision_id'] : 0;
+
+    if ( $post_id <= 0 || $revision_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'post_id and revision_id required.' ), 400 );
+    }
+
+    // Confirm the revision belongs to this post — defends against operators
+    // sliding in an arbitrary revision_id from another post.
+    $revision = wp_get_post_revision( $revision_id );
+    if ( ! $revision || (int) $revision->post_parent !== $post_id ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Revision not found for this post.' ), 404 );
+    }
+
+    $restored_id = wp_restore_post_revision( $revision_id );
+    if ( is_wp_error( $restored_id ) || ! $restored_id ) {
+        $msg = is_wp_error( $restored_id ) ? $restored_id->get_error_message() : 'Restore failed.';
+        return new WP_REST_Response( array( 'success' => false, 'message' => $msg ), 500 );
+    }
+
+    // Log the restore action.
+    if ( function_exists( 'firefly_projects_log_sync' ) ) {
+        $post = get_post( $post_id );
+        firefly_projects_log_sync( array(
+            'post_id'     => $post_id,
+            'post_type'   => $post ? $post->post_type : 'page',
+            'direction'   => 'restore',
+            'env'         => 'local',
+            'user_id'     => get_current_user_id() ?: null,
+            'status'      => 'success',
+            'revision_id' => $revision_id,
+            'files_count' => 0,
+            'summary'     => array(
+                'action'              => 'restore_local',
+                'source_revision_id'  => $revision_id,
+            ),
+        ) );
+    }
+
+    return new WP_REST_Response( array(
+        'success'        => true,
+        'message'        => 'Local restored to revision #' . $revision_id . '.',
+        'post_id'        => $post_id,
+        'revision_id'    => $revision_id,
+    ), 200 );
+}
+
+/**
+ * REST: POST /rollback-push  body: { log_id } — LOCAL-SIDE PROXY.
+ * Reads pre_push_revision_id from the log row's summary, hits the remote's
+ * /restore-to-revision, then writes a 'rollback' log row locally.
+ */
+function firefly_projects_rollback_push_endpoint( WP_REST_Request $request ) {
+    global $wpdb;
+    $body   = $request->get_json_params() ?: array();
+    $log_id = isset( $body['log_id'] ) ? (int) $body['log_id'] : 0;
+    if ( $log_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'log_id required.' ), 400 );
+    }
+
+    $table = function_exists( 'firefly_projects_sync_log_table' ) ? firefly_projects_sync_log_table() : ( $wpdb->prefix . 'firefly_sync_log' );
+    $row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $log_id ), ARRAY_A );
+    if ( ! $row ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Log row not found.' ), 404 );
+    }
+    if ( $row['direction'] !== 'push' || $row['status'] !== 'success' ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Can only roll back a successful push.' ), 400 );
+    }
+
+    $summary = $row['summary'] ? json_decode( $row['summary'], true ) : array();
+    $pre_id  = isset( $summary['pre_push_revision_id'] ) ? (int) $summary['pre_push_revision_id'] : 0;
+    if ( $pre_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'No pre-push revision recorded (this push created the post on the remote, or predates the rollback feature).' ), 400 );
+    }
+
+    $post_id = (int) $row['post_id'];
+    $firefly_page_id = get_post_meta( $post_id, '_firefly_page_id', true );
+    if ( ! $firefly_page_id ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Post has no _firefly_page_id meta.' ), 400 );
+    }
+
+    $env      = $row['env'];
+    $endpoint = ( $env === 'prod' )
+        ? ( defined( 'PROD_ENDPOINT' ) ? PROD_ENDPOINT : '' )
+        : ( defined( 'LIVE_DEV_ENDPOINT' ) ? LIVE_DEV_ENDPOINT : '' );
+    if ( ! $endpoint ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'No endpoint configured for ' . $env . '.' ), 500 );
+    }
+    $base = '';
+    if ( preg_match( '/(https?:\/\/[^\/]+)/', $endpoint, $m ) ) $base = $m[1];
+    if ( ! $base ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Could not derive remote base URL.' ), 500 );
+    }
+    $url = $base . '/wp-json/firefly-plugin/v1/restore-to-revision';
+
+    $response = wp_remote_post( $url, array(
+        'headers' => array(
+            'Content-Type'      => 'application/json',
+            'X-Firefly-Secret'  => FIREFLY_SHARED_SECRET,
+        ),
+        'body'    => wp_json_encode( array(
+            'firefly_page_id' => $firefly_page_id,
+            'revision_id'     => $pre_id,
+        ) ),
+        'timeout' => 30,
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Remote unreachable: ' . $response->get_error_message() ), 500 );
+    }
+    $code = wp_remote_retrieve_response_code( $response );
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( $code !== 200 || ! is_array( $data ) || empty( $data['success'] ) ) {
+        $msg = is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'HTTP ' . $code;
+        // Log the failure too — admins want to see failed rollback attempts.
+        if ( function_exists( 'firefly_projects_log_sync' ) ) {
+            firefly_projects_log_sync( array(
+                'post_id'     => $post_id,
+                'post_type'   => $row['post_type'],
+                'direction'   => 'rollback',
+                'env'         => $env,
+                'user_id'     => get_current_user_id() ?: null,
+                'status'      => 'failure',
+                'revision_id' => null,
+                'files_count' => 0,
+                'summary'     => array(
+                    'rolled_back_log_id'        => $log_id,
+                    'target_revision_id'        => $pre_id,
+                    'error_message'             => $msg,
+                ),
+            ) );
+        }
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Remote rejected the rollback: ' . $msg ), $code === 200 ? 500 : $code );
+    }
+
+    // Success — log it.
+    if ( function_exists( 'firefly_projects_log_sync' ) ) {
+        firefly_projects_log_sync( array(
+            'post_id'     => $post_id,
+            'post_type'   => $row['post_type'],
+            'direction'   => 'rollback',
+            'env'         => $env,
+            'user_id'     => get_current_user_id() ?: null,
+            'status'      => 'success',
+            'revision_id' => null,
+            'files_count' => 0,
+            'summary'     => array(
+                'rolled_back_log_id'        => $log_id,
+                'target_revision_id'        => $pre_id,
+                'remote_response'           => isset( $data['message'] ) ? $data['message'] : null,
+            ),
+        ) );
+    }
+
+    return new WP_REST_Response( array(
+        'success'  => true,
+        'message'  => 'Remote ' . ( $env === 'prod' ? 'Production' : 'Live Dev' ) . ' rolled back to revision #' . $pre_id . '.',
+    ), 200 );
+}
+
+/**
+ * REST: POST /restore-to-revision  body: { firefly_page_id, revision_id } — REMOTE-SIDE.
+ * Receiver for the rollback flow. Restores this remote's post to the given
+ * revision and logs the rollback locally. Suppresses snippet-write hook
+ * because we don't have the corresponding snippet content for this revision.
+ */
+function firefly_projects_restore_to_revision_endpoint( WP_REST_Request $request ) {
+    $auth_failure = firefly_projects_verify_shared_secret( $request );
+    if ( $auth_failure !== null ) return $auth_failure;
+
+    $body            = $request->get_json_params() ?: array();
+    $firefly_page_id = isset( $body['firefly_page_id'] ) ? (string) $body['firefly_page_id'] : '';
+    $revision_id     = isset( $body['revision_id'] ) ? (int) $body['revision_id'] : 0;
+
+    if ( $firefly_page_id === '' || $revision_id <= 0 ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'firefly_page_id and revision_id required.' ), 400 );
+    }
+
+    $post = firefly_projects_find_post_by_firefly_page_id( $firefly_page_id );
+    if ( ! $post ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Post not found on this site.' ), 404 );
+    }
+
+    $revision = wp_get_post_revision( $revision_id );
+    if ( ! $revision || (int) $revision->post_parent !== (int) $post->ID ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Revision not found or does not belong to this post (it may have been pruned).' ), 404 );
+    }
+
+    // Suppress the snippet-write hook for this restore — we don't have the
+    // sender's snippet content for this revision, so re-deriving from
+    // post_content is fine on the remote (the snippet auto-export will run
+    // naturally from save_post since we DON'T define the flag inbound here…)
+    //
+    // Actually: we DO want the remote's snippet to update to match the
+    // restored content. The remote's save_post → firefly_save_snippet will
+    // re-derive correctly from post_content. So intentionally NO suppression.
+
+    $restored_id = wp_restore_post_revision( $revision_id );
+    if ( is_wp_error( $restored_id ) || ! $restored_id ) {
+        $msg = is_wp_error( $restored_id ) ? $restored_id->get_error_message() : 'Restore failed on this site.';
+        return new WP_REST_Response( array( 'success' => false, 'message' => $msg ), 500 );
+    }
+
+    if ( function_exists( 'firefly_projects_log_sync' ) ) {
+        firefly_projects_log_sync( array(
+            'post_id'     => (int) $post->ID,
+            'post_type'   => $post->post_type,
+            'direction'   => 'rollback_applied',
+            'env'         => 'local', // 'local' from this remote's POV — it's a local change on this site
+            'user_id'     => null, // initiated by a remote local-dev, no local user
+            'status'      => 'success',
+            'revision_id' => $revision_id,
+            'files_count' => 0,
+            'summary'     => array(
+                'action'              => 'rollback_applied',
+                'restored_to_revision'=> $revision_id,
+                'firefly_page_id'     => $firefly_page_id,
+            ),
+        ) );
+    }
+
+    return new WP_REST_Response( array(
+        'success'     => true,
+        'message'     => 'Restored to revision #' . $revision_id . '.',
+        'post_id'     => (int) $post->ID,
+        'revision_id' => $revision_id,
+    ), 200 );
+}
 
 /**
  * Sync page content to remote site
@@ -1125,6 +1623,25 @@ function firefly_projects_pull_page($request) {
     $result = firefly_projects_import_pulled_page($data, $source_env);
 
     if ($result['success']) {
+        // Activity log row — pull, success.
+        if ( function_exists( 'firefly_projects_log_sync' ) && ! empty( $result['post_id'] ) ) {
+            $pulled = get_post( (int) $result['post_id'] );
+            firefly_projects_log_sync(array(
+                'post_id'     => (int) $result['post_id'],
+                'post_type'   => $pulled ? $pulled->post_type : 'page',
+                'direction'   => 'pull',
+                'env'         => ( $source_env === 'prod' ) ? 'prod' : 'dev',
+                'user_id'     => get_current_user_id() ?: null,
+                'status'      => 'success',
+                'revision_id' => null,
+                'files_count' => 0,
+                'summary'     => array(
+                    'source_host' => parse_url( $endpoint, PHP_URL_HOST ),
+                    'slug'        => $post_slug,
+                ),
+            ));
+        }
+
         return new WP_REST_Response(array(
             'success' => true,
             'message' => $result['message'],
@@ -1132,6 +1649,28 @@ function firefly_projects_pull_page($request) {
             'details' => isset($result['details']) ? $result['details'] : null
         ), 200);
     } else {
+        // Activity log row — pull, failure. We may not know the local post_id
+        // yet (it could be a not-yet-existing page), so look it up by slug.
+        if ( function_exists( 'firefly_projects_log_sync' ) ) {
+            $local = get_page_by_path( $post_slug, OBJECT, array( 'page', 'post' ) );
+            if ( $local ) {
+                firefly_projects_log_sync(array(
+                    'post_id'     => (int) $local->ID,
+                    'post_type'   => $local->post_type,
+                    'direction'   => 'pull',
+                    'env'         => ( $source_env === 'prod' ) ? 'prod' : 'dev',
+                    'user_id'     => get_current_user_id() ?: null,
+                    'status'      => 'failure',
+                    'revision_id' => null,
+                    'files_count' => 0,
+                    'summary'     => array(
+                        'source_host'   => parse_url( $endpoint, PHP_URL_HOST ),
+                        'slug'          => $post_slug,
+                        'error_message' => $result['message'],
+                    ),
+                ));
+            }
+        }
         return new WP_REST_Response(array(
             'success' => false,
             'message' => $result['message']

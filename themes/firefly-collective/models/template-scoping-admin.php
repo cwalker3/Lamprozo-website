@@ -28,7 +28,12 @@ function firefly_add_template_meta_box() {
             'firefly_template_meta_box_callback',
             $screen,
             'side',
-            'high'
+            'high',
+            // Mark as back-compat so Gutenberg hides the legacy box from the
+            // Document sidebar. A native PluginDocumentSettingPanel replaces
+            // it (see assets/js/template-tools-panel.js). Classic editor
+            // (if anyone still uses it) still gets the old metabox.
+            array( '__back_compat_meta_box' => true )
         );
     }
 }
@@ -466,7 +471,9 @@ function firefly_add_snippet_export_meta_box() {
         'firefly_snippet_export_meta_box_callback',
         'page',
         'side',
-        'default'
+        'default',
+        // Hidden from Gutenberg; a native PluginDocumentSettingPanel replaces it.
+        array( '__back_compat_meta_box' => true )
     );
 }
 
@@ -575,4 +582,71 @@ function firefly_ajax_export_snippet() {
     } else {
         wp_send_json_error(array('message' => 'Export function not available.'));
     }
+}
+
+/**
+ * Enqueue the Gutenberg-native Template Tools panel + the session-fresh
+ * panel-defaults manager. Replaces the classic metaboxes (which are hidden
+ * via __back_compat_meta_box). The defaults manager runs across ALL firefly
+ * Gutenberg panels — not just template-tools — so it lives here, where it
+ * loads on every block-editor screen alongside the tools panel.
+ */
+add_action( 'enqueue_block_editor_assets', 'firefly_enqueue_template_tools_panel' );
+
+function firefly_enqueue_template_tools_panel() {
+    $tools_js     = get_template_directory() . '/assets/js/template-tools-panel.js';
+    $defaults_js  = get_template_directory() . '/assets/js/panel-defaults.js';
+    $tools_ver    = file_exists( $tools_js )    ? filemtime( $tools_js )    : '1';
+    $defaults_ver = file_exists( $defaults_js ) ? filemtime( $defaults_js ) : '1';
+
+    // Panel-defaults runs first so its sessionStorage check completes before
+    // any user-driven open/close interactions race it.
+    wp_enqueue_script(
+        'firefly-panel-defaults',
+        get_template_directory_uri() . '/assets/js/panel-defaults.js',
+        array( 'wp-data', 'wp-dom-ready' ),
+        $defaults_ver,
+        true
+    );
+
+    wp_enqueue_script(
+        'firefly-template-tools-panel',
+        get_template_directory_uri() . '/assets/js/template-tools-panel.js',
+        array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'wp-i18n' ),
+        $tools_ver,
+        true
+    );
+
+    // Resolve the snippet info server-side so the panel doesn't need a second
+    // REST hop just to display the path / mtime.
+    global $post;
+    $post_id   = $post ? $post->ID : ( isset( $_GET['post'] ) ? (int) $_GET['post'] : 0 );
+    $post_type = $post_id ? get_post_type( $post_id ) : '';
+
+    $snippet_info = null;
+    if ( $post_type === 'page' && $post_id ) {
+        if ( ! get_post_meta( $post_id, FIREFLY_TEMPLATE_META_KEY, true ) ) {
+            $snippet_info = array( 'warning' => __( 'No template assigned to this page.', 'firefly-collective' ) );
+        } elseif ( function_exists( 'firefly_get_page_snippet_path' ) ) {
+            $snippet_path = firefly_get_page_snippet_path( $post_id );
+            if ( $snippet_path ) {
+                $rel        = str_replace( get_template_directory() . '/', '', $snippet_path );
+                $modified   = file_exists( $snippet_path ) ? date( 'Y-m-d H:i:s', filemtime( $snippet_path ) ) : null;
+                $snippet_info = array( 'path' => $rel, 'modified' => $modified );
+            } else {
+                $snippet_info = array( 'warning' => __( 'This page is not linked to a snippet file in the schema.', 'firefly-collective' ) );
+            }
+        }
+    }
+
+    $valid_templates = function_exists( 'firefly_get_valid_templates' ) ? firefly_get_valid_templates() : array();
+    $default_template = function_exists( 'firefly_get_scoping_template' ) ? firefly_get_scoping_template() : '';
+
+    wp_localize_script( 'firefly-template-tools-panel', 'fireflyTemplateTools', array(
+        'templates'        => array_values( $valid_templates ),
+        'defaultTemplate'  => $default_template,
+        'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+        'exportNonce'      => wp_create_nonce( 'firefly_export_snippet' ),
+        'snippetInfo'      => $snippet_info,
+    ) );
 }

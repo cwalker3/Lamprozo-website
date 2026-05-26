@@ -23,13 +23,13 @@ function isValidPhoneNumber(phoneNumber) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    if ( isPWA || window.location.href.match(/(login|admin)\.php/) ) return;
-    if (logoNameEle) logoNameEle.addEventListener('pointerup', ()=>{window.location="/"});
+    if (isPWA || window.location.href.match(/(login|admin)\.php/)) return;
+    if (logoNameEle) logoNameEle.addEventListener('pointerup', () => { window.location = "/"; });
     handleContactSticky();
     function handleContactSticky() {
         if (page === 'contact' || page === 'request-an-appointment' || page === 'dashboard' || page === 'app') return;
         const contactSticky = document.querySelector('#contact-sticky');
-    if (contactSticky) contactSticky.addEventListener('pointerup', ()=>{window.location='/request-a-quote';});
+        if (contactSticky) contactSticky.addEventListener('pointerup', () => { window.location = '/request-a-quote'; });
         let isVisible = false;
         function toggleContactSticky() {
             if (!isVisible && window.scrollY > 1000 && contactSticky) {

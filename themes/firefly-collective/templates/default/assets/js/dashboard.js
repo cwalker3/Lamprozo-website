@@ -1,6 +1,195 @@
 // plugin/assets/js/dashboard.js
 
 (function() {
+    // ---------- SVG icon picker for price-calculator feature cards ----------
+    // Maps a feature.featureName to an inline SVG marker so each feature-type
+    // card reads as a configured product, not raw form fields. Keywords are
+    // matched lowercase substring; falls through to a generic "layers" icon.
+    var FEATURE_ICONS = {
+        membership: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m11.42 2.86-1.81 3.66-4.05.59c-.73.1-1.02.99-.49 1.5l2.93 2.85-.69 4.02c-.13.72.63 1.27 1.28.93l3.61-1.9 3.61 1.9c.65.34 1.41-.21 1.28-.93l-.69-4.02 2.93-2.85c.53-.51.24-1.4-.49-1.5l-4.05-.59-1.81-3.66a.832.832 0 0 0-1.49 0Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        member: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+        subscription: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12a9 9 0 1 1-3.75-7.31M21 4v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        plan: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 12h6M9 16h4M7 4h7l5 5v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        addon: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+        addons: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+        booking: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        appointment: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        donation: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        donate: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        product: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        service: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        bonus: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7Zm0 0h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+    var DEFAULT_FEATURE_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m3 7 9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function pickFeatureIcon(name) {
+        var key = String(name || '').toLowerCase();
+        for (var k in FEATURE_ICONS) {
+            if (key.indexOf(k) !== -1) return FEATURE_ICONS[k];
+        }
+        return DEFAULT_FEATURE_ICON;
+    }
+
+    // ---------- SVG icon picker for option-tile cards ----------
+    // Maps an option.optionName to an inline SVG. Defaults to whatever the
+    // parent feature picks, so option tiles stay visually unified.
+    var OPTION_ICONS = {
+        free:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/></svg>',
+        starter:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/></svg>',
+        basic:      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/></svg>',
+        plus:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        pro:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        premium:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l4 5 5-7 5 7 4-5v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        enterprise: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l4 5 5-7 5 7 4-5v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        gold:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l4 5 5-7 5 7 4-5v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        team:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-8 0a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1m0-1a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        cohort:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-8 0a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1m0-1a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        solo:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.7-7 5v1h14v-1c0-3.3-3.7-5-7-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        self:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.7-7 5v1h14v-1c0-3.3-3.7-5-7-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+
+    function pickOptionIcon(option, feature) {
+        var key = String((option && option.optionName) || '').toLowerCase();
+        for (var k in OPTION_ICONS) {
+            if (key.indexOf(k) !== -1) return OPTION_ICONS[k];
+        }
+        // Fall back to the parent feature's icon so the tiles still feel
+        // typed even when option names are bespoke.
+        return pickFeatureIcon((feature && feature.featureName) || (option && option.optionName) || '');
+    }
+
+    // ---------- SVG icon picker for addon cards ----------
+    // Priority: addon.addOnMetric → keyword in addonName → default plus.
+    var ADDON_ICONS = {
+        perk:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        bonus:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        service:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        support:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        consult:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        upgrade:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        boost:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        extra:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+        feature:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+        package:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7l9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        kit:      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7l9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        time:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        hour:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        session:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        call:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        meeting:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        file:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        download: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        template: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        course:   '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2V4Zm20 0h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8V4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        program:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2V4Zm20 0h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8V4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        research: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20h16M7 17v-7M12 17V5M17 17v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        report:   '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20h16M7 17v-7M12 17V5M17 17v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+        addon:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+    };
+    var DEFAULT_ADDON_ICON = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+    function pickAddonIcon(addon) {
+        var metric = String((addon && addon.addOnMetric) || '').toLowerCase();
+        if (metric && ADDON_ICONS[metric]) return ADDON_ICONS[metric];
+        var nameKey = String((addon && addon.addonName) || '').toLowerCase();
+        for (var k in ADDON_ICONS) {
+            if (nameKey.indexOf(k) !== -1) return ADDON_ICONS[k];
+        }
+        return DEFAULT_ADDON_ICON;
+    }
+
+    // ---------- SVG icon picker for user-input field labels ----------
+    // Returns null when no keyword matches — caller renders the label
+    // without an icon rather than forcing one.
+    var USERFIELD_ICONS = {
+        date:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        birthday:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        anniversary: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        name:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.7-7 5v1h14v-1c0-3.3-3.7-5-7-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        firstname:   '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.7-7 5v1h14v-1c0-3.3-3.7-5-7-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        lastname:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.7-7 5v1h14v-1c0-3.3-3.7-5-7-5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        email:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        phone:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        tel:         '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        address:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg>',
+        city:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg>',
+        zip:         '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg>',
+        notes:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        message:     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        comments:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m4 20 4-1 11-11-3-3L5 16l-1 4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        focus:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>'
+    };
+
+    function pickUserFieldIcon(label) {
+        var key = String(label || '').toLowerCase().replace(/[^a-z]/g, '');
+        if (!key) return null;
+        for (var k in USERFIELD_ICONS) {
+            if (key.indexOf(k) !== -1) return USERFIELD_ICONS[k];
+        }
+        return null;
+    }
+
+    // ---------- Utility icons ----------
+    // Direct lookup, used by stepper, toggles, alerts, instance-delete,
+    // threshold-track, etc. No picker — call UTILITY_ICONS.x directly.
+    var UTILITY_ICONS = {
+        check:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        circle:       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/></svg>',
+        circleCheck:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="m8 12 3 3 5-6" stroke="#0a0a0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        plus:         '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+        minus:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+        x:            '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+        warning:      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4 2 20h20L12 4Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor"/></svg>',
+        info:         '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="8" r="0.9" fill="currentColor"/></svg>',
+        chevronUp:    '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6 14 6-6 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        chevronDown:  '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m6 10 6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        arrowUpRight: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        crown:        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l4 5 5-7 5 7 4-5v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        sparkle:      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+    };
+
+    // Shared dark/amber appearance for every Stripe Elements instance we
+    // mount. Stripe's `theme: 'night'` gives a dark base; the variable
+    // overrides bring it inline with the Firefly token palette so card-
+    // number/expiry labels render off-white on the dark surface.
+    function fireflyStripeAppearance() {
+        return {
+            theme: 'night',
+            variables: {
+                colorPrimary:    '#f5b544',
+                colorBackground: '#0a0a0b',
+                colorText:       '#fafaf7',
+                colorTextSecondary: 'rgba(250,250,247,0.72)',
+                colorTextPlaceholder: 'rgba(250,250,247,0.38)',
+                colorDanger:     '#ff7a7a',
+                colorIconTab:    '#fafaf7',
+                colorIconTabSelected: '#0a0a0b',
+                fontFamily:      'Geist, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                fontSizeBase:    '15px',
+                spacingUnit:     '4px',
+                borderRadius:    '6px'
+            },
+            rules: {
+                '.Tab, .Input, .Block': {
+                    backgroundColor: '#141416',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: 'none'
+                },
+                '.Tab:hover, .Input:hover': {
+                    borderColor: 'rgba(245,181,68,0.28)'
+                },
+                '.Tab--selected, .Input:focus': {
+                    borderColor: '#f5b544',
+                    boxShadow: '0 0 0 1px rgba(245,181,68,0.4)'
+                },
+                '.Label': {
+                    color: 'rgba(250,250,247,0.72)',
+                    fontWeight: '500'
+                }
+            }
+        };
+    }
+
     // Store initialization state globally to persist across re-renders
     if (typeof window.dashboardInitialized === 'undefined') {
         window.dashboardInitialized = false;
@@ -117,8 +306,9 @@
                     btn.style.display = 'none';
                 });
                 
-                // Also hide delete instance buttons
-                document.querySelectorAll('.delete-instance').forEach(btn => {
+                // Also hide delete instance buttons (.instance-delete is
+                // the new name; .delete-instance kept for legacy paths).
+                document.querySelectorAll('.instance-delete, .delete-instance').forEach(btn => {
                     btn.style.display = 'none';
                 });
             }, 100);
@@ -620,6 +810,18 @@
         }
 
         const updateModal = document.getElementById('update-payment-modal');
+
+        // Backdrop-click closes the static dashboard modals (cancel-sub
+        // wires its own listener inside cancelSubscription, but update-
+        // payment is opened from multiple places — install once here).
+        if (updateModal) {
+            updateModal.addEventListener('click', function(e) {
+                if (e.target === updateModal) {
+                    closeUpdatePaymentModal();
+                }
+            });
+        }
+
         const invoiceDetails = document.getElementById('invoice-details');
         const invoiceTotal = document.getElementById('invoice-total');
         const themePath = dashboardData.theme_path;
@@ -714,41 +916,41 @@
                 featuresContainer.style.pointerEvents = 'none';
                 featuresContainer.style.opacity = '0.7';
             }
-            
-            // Optionally add a subtle visual indicator that the form is locked
-            const lockIndicator = document.createElement('div');
-            lockIndicator.className = 'order-placed-indicator';
-            lockIndicator.innerHTML = `
-                <div class="lock-message">
-                    <i class="fa fa-check-circle"></i> Order placed successfully! Pay Below.
-                </div>
+
+            // Show a viewport-level toast in the top-right corner.
+            // Auto-dismisses after a few seconds with a fade.
+            showOrderPlacedToast();
+        }
+
+        // Pop a one-shot success toast in the top-right of the viewport.
+        // Reuses the .ff-toast structure styled in dashboard.css.
+        function showOrderPlacedToast() {
+            // De-dup if user clicks twice in quick succession.
+            const existing = document.getElementById('ff-order-toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'ff-order-toast';
+            toast.className = 'ff-toast ff-toast-success';
+            toast.setAttribute('role', 'status');
+            toast.setAttribute('aria-live', 'polite');
+            toast.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Order placed successfully. Pay below.</span>
             `;
-            
-            // Style the indicator
-            lockIndicator.style.position = 'absolute';
-            lockIndicator.style.top = '10px';
-            lockIndicator.style.right = '10px';
-            lockIndicator.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
-            lockIndicator.style.color = 'white';
-            lockIndicator.style.padding = '8px (--fontSizeSmallest)';
-            lockIndicator.style.borderRadius = '4px';
-            lockIndicator.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-            lockIndicator.style.zIndex = '1';
-            lockIndicator.style.fontSize = '14px';
-            
-            // Find a good container to append to
-            const container = document.querySelector('.price-calculator-container') || 
-                            document.querySelector('.dashboard-content') ||
-                            featuresContainer.parentNode;
-                            
-            if (container) {
-                // Check if we already added the indicator
-                const existingIndicator = document.querySelector('.order-placed-indicator');
-                if (!existingIndicator) {
-                    container.style.position = 'relative';
-                    container.appendChild(lockIndicator);
-                }
-            }
+            document.body.appendChild(toast);
+
+            // Slide in on next frame.
+            requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+            // Fade + slide out, then remove.
+            setTimeout(() => {
+                toast.classList.remove('is-visible');
+                toast.classList.add('is-leaving');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
         }
 
         function showOrderConfirmation() {
@@ -1780,308 +1982,1066 @@
         function renderFeatureLevelFields(feature, fIndex, instanceDiv, instance) {
             const featureFieldsDiv = document.createElement('div');
             featureFieldsDiv.classList.add('feature-fields');
-            featureFieldsDiv.id = feature.featureName.toLowerCase();
-            featureFieldsDiv.id = `feature-${featureFieldsDiv.id.replace(/\s/, '-')}`;
-            
-            let hasUserFields = false;
-            
-            // Loop through feature properties to find user fields
-            for (const key in feature) {
-                // Check if it's a user field
-                if ((key.endsWith('_user') || key.endsWith('_display')) && feature[key] !== null) {
-                    
-                    hasUserFields = true;
-                    
-                    try {
-                        let fieldData;
-                        let fieldType = 'normal-text'; // Default fallback
-                        let fieldValue = '';
-                        let placeholder = '';
-                        let dropdownOptions = [];
-                        let originalKey = key;
-                        let isDisplayField = key.endsWith('_display') || 
-                                            (typeof feature[key] === 'object' && 
-                                            feature[key].level === 'user-display');
-                        
-                        // Standardize field data format
-                        if (typeof feature[key] === 'string') {
-                            try {
-                                // Parse the JSON string into an object
-                                fieldData = JSON.parse(feature[key]);
-                                
-                                // Extract ui_type, value, and placeholder if they exist
-                                if (fieldData) {
-                                    fieldType = fieldData.ui_type || 'normal-text';
-                                    
-                                    // Special handling for array/dropdown type
-                                    if (fieldType === 'array') {
-                                        if (fieldData.types && Array.isArray(fieldData.types)) {
-                                            dropdownOptions = fieldData.types;
-                                        } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
-                                            dropdownOptions = fieldData.value.types;
-                                        }
-                                    } else {
-                                        fieldValue = fieldData.value !== undefined ? fieldData.value : '';
-                                    }
-                                    
-                                    placeholder = fieldData.placeholder || '';
-                                }
-                            } catch (e) {
-                                // If parsing fails, use the string directly
-                                console.warn(`Failed to parse feature user field ${key}:`, e);
-                                fieldValue = feature[key];
-                            }
-                        } else if (typeof feature[key] === 'object') {
-                            fieldData = feature[key];
-                            
-                            // Handle object format for the field with a "level" property (indicating it's from the JSON)
-                            if (fieldData.level === 'user') {
-                                fieldType = fieldData.ui_type || 'normal-text';
-                                
-                                // Special handling for array/dropdown type
-                                if (fieldType === 'array') {
-                                    if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
-                                        dropdownOptions = fieldData.value.types;
-                                    }
-                                } else {
-                                    fieldValue = fieldData.value !== undefined ? fieldData.value : '';
-                                }
-                                
-                                placeholder = fieldData.placeholder || '';
-                                originalKey = key.replace(/^(.+)(_user)?$/, '$1');
-                            }
-                            // Handling for already processed JSON user fields
-                            else if (fieldData.ui_type) {
-                                fieldType = fieldData.ui_type;
-                                
-                                if (fieldType === 'array') {
-                                    if (fieldData.types && Array.isArray(fieldData.types)) {
-                                        dropdownOptions = fieldData.types;
-                                    } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
-                                        dropdownOptions = fieldData.value.types;
-                                    }
-                                } else {
-                                    fieldValue = fieldData.value !== undefined ? fieldData.value : '';
-                                }
-                                
-                                placeholder = fieldData.placeholder || '';
-                            }
-                        } else {
-                            // Direct value (number, boolean, etc.)
-                            fieldValue = feature[key];
-                            fieldType = typeof fieldValue === 'number' ? 'int-float' : 'normal-text';
-                        }
-                        
-                        // Format the field name for display
-                        // Remove _user suffix and convert camelCase to Title Case
-                        const fieldName = originalKey.replace(/(_user)?$/, '');
-                        const displayName = formatFieldLabel(fieldName);
-                        
-                        // Create container for the field
-                        const userFieldDiv = document.createElement('div');
-                        userFieldDiv.classList.add('user-field', 'feature-level-field');
-                        
-                        // Create label
-                        const label = document.createElement('label');
-                        label.innerHTML = `<strong>${displayName}:</strong> `;
-                        
-                        let inputElement;
-                        
-                        // Initialize featureFields object if it doesn't exist
-                        if (!instance.featureFields) {
-                            instance.featureFields = {};
-                        }
-                        
-                        // Create the appropriate input based on ui_type
-                        if (isDisplayField) {
-                            // For display-only fields, create a static text display instead of an input
-                            const displaySpan = document.createElement('span');
-                            displaySpan.className = 'user-display-value';
-                            
-                            // Format the display value based on field type
-                            if (fieldType === 'array' && dropdownOptions.length > 0) {
-                                // Try to get the selected index from different possible locations
-                                let selectedIndex = 0;
-                                
-                                if (fieldData && typeof fieldData === 'object') {
-                                    if (fieldData.selected !== undefined) {
-                                        selectedIndex = fieldData.selected;
-                                    } else if (fieldData.value && fieldData.value.selected !== undefined) {
-                                        selectedIndex = fieldData.value.selected;
-                                    }
-                                }
-                                
-                                displaySpan.textContent = dropdownOptions[selectedIndex] || '';
-                            } else {
-                                displaySpan.textContent = fieldValue || '';
-                            }
-                            
-                            // Use the span as our "input element" for consistent handling
-                            inputElement = displaySpan;
-                        } else {
-                            // Original switch statement for regular user fields
-                            switch (fieldType) {
-                                case 'array':
-                                // It's a dropdown/select field
-                                inputElement = document.createElement('select');
-                                inputElement.id = `feature-field-${fIndex}-${fieldName}`;
-                                
-                                // Make sure we have an array to work with
-                                if (!dropdownOptions.length) {
-                                    dropdownOptions = ['No options available'];
-                                }
-                                
-                                // Initialize selection if undefined
-                                if (instance.featureFields[fieldName] === undefined) {
-                                    instance.featureFields[fieldName] = 0;
-                                }
-                                
-                                // Create options
-                                dropdownOptions.forEach((option, i) => {
-                                    const opt = document.createElement('option');
-                                    opt.value = i;
-                                    opt.textContent = option;
-                                    if (i === instance.featureFields[fieldName]) {
-                                        opt.selected = true;
-                                    }
-                                    inputElement.appendChild(opt);
-                                });
-                                
-                                // Set up change event
-                                inputElement.addEventListener('change', function() {
-                                    instance.featureFields[fieldName] = parseInt(this.value);
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'long-text':
-                                // Create textarea
-                                inputElement = document.createElement('textarea');
-                                inputElement.id = `feature-field-${fIndex}-${fieldName}`;
-                                inputElement.rows = 3;
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.featureFields[fieldName] === undefined) {
-                                    instance.featureFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.featureFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    instance.featureFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'int-float':
-                                // Create number input
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'number';
-                                inputElement.id = `feature-field-${fIndex}-${fieldName}`;
-                                inputElement.step = 'any'; // Allow decimal points
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.featureFields[fieldName] === undefined) {
-                                    instance.featureFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.featureFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    const val = parseFloat(this.value);
-                                    instance.featureFields[fieldName] = isNaN(val) ? 0 : val;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'date':
-                                // Create date input
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'date';
-                                inputElement.id = `feature-field-${fIndex}-${fieldName}`;
-                                
-                                // Initialize value if undefined
-                                if (instance.featureFields[fieldName] === undefined) {
-                                    instance.featureFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.featureFields[fieldName];
-                                
-                                // Set up change event
-                                inputElement.addEventListener('change', function() {
-                                    instance.featureFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'normal-text':
-                            default:
-                                // Create text input (default)
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'text';
-                                inputElement.id = `feature-field-${fIndex}-${fieldName}`;
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.featureFields[fieldName] === undefined) {
-                                    instance.featureFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.featureFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    instance.featureFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                        }
+            featureFieldsDiv.id = `feature-${feature.featureName.toLowerCase().replace(/\s+/g, '-')}`;
 
-                    }
-                        
-                        // Append input to label
-                        label.appendChild(inputElement);
-                        userFieldDiv.appendChild(label);
-                        featureFieldsDiv.appendChild(userFieldDiv);
-                        
+            let hasUserFields = false;
+
+            // Loop through feature properties; render via the shared
+            // renderUserFieldRow helper so feature-level fields visually
+            // match option-level fields and wp-admin Profile inputs.
+            // State bucket = 'featureFields' so the order payload still
+            // distinguishes feature-level vs option-level user input.
+            for (const key in feature) {
+                if ((key.endsWith('_user') || key.endsWith('_display')) && feature[key] !== null) {
+                    hasUserFields = true;
+                    try {
+                        const suffix = key.endsWith('_display') ? '_display' : '_user';
+                        featureFieldsDiv.appendChild(
+                            renderUserFieldRow(feature[key], key, fIndex, 0, instance, suffix, 'featureFields')
+                        );
                     } catch (e) {
                         console.error(`Error processing feature user field ${key}:`, e);
                     }
                 }
             }
-            
+
             if (hasUserFields) instanceDiv.appendChild(featureFieldsDiv);
-            
             return hasUserFields;
         }
 
         // Render a single instance in the UI (option details)
+        // ---------- Option-tile picker (replaces native <select>) ----------
+        // Builds a radiogroup of clickable tile cards. Click toggles
+        // selection (click selected tile again → deselect, mirroring the
+        // legacy <option value="">None</option>). Arrow keys move focus
+        // and selection (radio roving-tabindex pattern).
+        //
+        // The change-handler logic is captured in `selectOption(oIndex)`
+        // — same code path is used by initial-render auto-selection,
+        // tile click, and keyboard activation.
+        function renderOptionTiles(feature, fIndex, instIndex, instance, instanceDiv, optionDetailsDiv) {
+            const grid = document.createElement('div');
+            grid.classList.add('option-tile-grid');
+            grid.setAttribute('role', 'radiogroup');
+            grid.setAttribute('aria-label', `Choose a ${feature.featureName} option`);
+
+            const subDetails = dashboardData.subscription_status &&
+                               dashboardData.subscription_status.has_active_subscription &&
+                               dashboardData.subscription_status.subscription_details;
+            const subscribedOptionId = subDetails ? parseInt(subDetails.option_id) : null;
+
+            function teaserFor(option) {
+                // Prefer a curated tierBenefits _display field; fall back
+                // to the first sentence of the option description.
+                const benefits = option.tierBenefits_display || option.tierBenefits;
+                if (benefits) {
+                    try {
+                        const parsed = typeof benefits === 'string' ? JSON.parse(benefits) : benefits;
+                        if (parsed && parsed.value) return String(parsed.value).trim();
+                    } catch (_) { /* fall through */ }
+                    if (typeof benefits === 'string') return benefits.trim();
+                }
+                const desc = getDescriptionText(option.description) || '';
+                if (!desc) return '';
+                const first = String(desc).split(/(?<=[.!?])\s+/)[0] || desc;
+                return first;
+            }
+
+            // Tier-benefit teasers in pricing.json conventionally use the
+            // middle-dot " · " as a separator. When present we render a
+            // checkmark feature list — way more readable than a wrapped
+            // paragraph and matches typical SaaS tier-card aesthetic.
+            function teaserAsBullets(text) {
+                if (!text) return null;
+                if (text.indexOf('·') === -1) return null;
+                const parts = text.split('·')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                return parts.length >= 2 ? parts : null;
+            }
+
+            function priceLabel(option, recurring) {
+                let basePrice = parseSafe(option.staticPrice, 0);
+                // If pricingType is price-options, surface the lowest tier
+                // as the "starting at" price on the tile.
+                let priceOpts = [];
+                if (option.priceOptions) {
+                    try {
+                        const po = typeof option.priceOptions === 'string'
+                            ? JSON.parse(option.priceOptions)
+                            : option.priceOptions;
+                        priceOpts = (po && po.types) || [];
+                    } catch (_) {}
+                }
+                let pricingType = option.pricingType;
+                if (pricingType && typeof pricingType === 'object') {
+                    if (pricingType.value && pricingType.value.types) {
+                        pricingType = pricingType.value.types[pricingType.value.selected];
+                    } else if (pricingType.types) {
+                        pricingType = pricingType.types[pricingType.selected];
+                    }
+                }
+                if (pricingType === 'price options' && priceOpts.length > 0) {
+                    const cheapest = priceOpts.reduce((min, p) => {
+                        const v = parseSafe(p.price, Infinity);
+                        return v < min ? v : min;
+                    }, Infinity);
+                    return {
+                        amount: '$' + (Number.isFinite(cheapest) ? cheapest.toFixed(0) : '0'),
+                        period: recurring ? '/' + (option.interval || 'mo') : '+',
+                        prefix: 'from '
+                    };
+                }
+                return {
+                    amount: '$' + basePrice.toFixed(basePrice % 1 === 0 ? 0 : 2),
+                    period: recurring ? '/' + (option.interval || 'mo') : '',
+                    prefix: ''
+                };
+            }
+
+            function selectOption(oIndex) {
+                const featureFieldsDivId = feature.featureName.toLowerCase().replace(/\s+/g, '-');
+                const featureFieldsDiv = instanceDiv.querySelector(`#feature-${featureFieldsDivId}`);
+
+                if (oIndex === undefined || oIndex === null || oIndex === '' || isNaN(oIndex)) {
+                    instance.optionIndex = undefined;
+                    if (featureFieldsDiv) featureFieldsDiv.style.display = 'none';
+                } else {
+                    instance.optionIndex = parseInt(oIndex);
+                    if (featureFieldsDiv) featureFieldsDiv.style.display = 'block';
+                }
+
+                // Reset addons and quantity when the option changes.
+                instance.addons = [];
+                if (!feature.recurring) {
+                    instance.quantity = 1;
+                }
+                instance.priceOptionIndex = undefined;
+
+                // Sync tile UI state
+                const tiles = grid.querySelectorAll('.option-tile');
+                tiles.forEach((tile) => {
+                    const tIdx = parseInt(tile.getAttribute('data-oindex'));
+                    const isSel = tIdx === instance.optionIndex;
+                    tile.classList.toggle('is-selected', isSel);
+                    tile.setAttribute('aria-checked', isSel ? 'true' : 'false');
+                    tile.setAttribute('tabindex', isSel ? '0' : '-1');
+                });
+                // No selection → first tile gets focus tabindex
+                if (instance.optionIndex === undefined && tiles.length) {
+                    tiles[0].setAttribute('tabindex', '0');
+                }
+
+                renderOptionDetails(fIndex, instIndex, feature, optionDetailsDiv);
+                if (instance.optionIndex !== undefined && !isNaN(instance.optionIndex)) {
+                    // Land the viewport on the details panel (its first
+                    // child is the .option-details-title overline + the
+                    // description) instead of the top of the feature
+                    // card. The selected tile remains visible just above.
+                    smoothScrollToElement(optionDetailsDiv, 140);
+                }
+                saveSelections();
+            }
+
+            feature.options.forEach((option, oIndex) => {
+                const tile = document.createElement('button');
+                tile.type = 'button';
+                tile.classList.add('option-tile');
+                tile.setAttribute('role', 'radio');
+                tile.setAttribute('data-oindex', String(oIndex));
+                const isSelected = parseInt(instance.optionIndex) === oIndex;
+                tile.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+                tile.setAttribute('tabindex', isSelected ? '0' : '-1');
+                if (isSelected) tile.classList.add('is-selected');
+
+                const isSubscribed = feature.recurring && subscribedOptionId !== null
+                    && parseInt(option.id) === subscribedOptionId;
+                if (isSubscribed) {
+                    tile.disabled = true;
+                    tile.classList.add('is-disabled');
+                    tile.setAttribute('aria-disabled', 'true');
+                }
+
+                // ----- Header row: icon + name + price + check -----
+                const header = document.createElement('span');
+                header.classList.add('option-tile-header');
+
+                const iconEl = document.createElement('span');
+                iconEl.classList.add('option-tile-icon');
+                iconEl.setAttribute('aria-hidden', 'true');
+                iconEl.innerHTML = pickOptionIcon(option, feature);
+
+                const nameEl = document.createElement('span');
+                nameEl.classList.add('option-tile-name');
+                nameEl.textContent = option.optionName;
+                if (isSubscribed) {
+                    const sub = document.createElement('span');
+                    sub.classList.add('option-tile-disabled-note');
+                    sub.textContent = 'Subscribed';
+                    nameEl.appendChild(sub);
+                }
+
+                const meta = document.createElement('span');
+                meta.classList.add('option-tile-meta');
+
+                const priceEl = document.createElement('span');
+                priceEl.classList.add('option-tile-price');
+                const p = priceLabel(option, feature.recurring);
+                priceEl.textContent = (p.prefix || '') + p.amount;
+                if (p.period) {
+                    const period = document.createElement('span');
+                    period.classList.add('option-tile-period');
+                    period.textContent = p.period;
+                    priceEl.appendChild(period);
+                }
+                meta.appendChild(priceEl);
+
+                const check = document.createElement('span');
+                check.classList.add('option-tile-check');
+                check.setAttribute('aria-hidden', 'true');
+                check.innerHTML = UTILITY_ICONS.check;
+                meta.appendChild(check);
+
+                header.appendChild(iconEl);
+                header.appendChild(nameEl);
+                header.appendChild(meta);
+                tile.appendChild(header);
+
+                // ----- Body row: bullets or teaser, full tile width -----
+                const teaser = teaserFor(option);
+                const bullets = teaserAsBullets(teaser);
+                if (bullets) {
+                    const ul = document.createElement('ul');
+                    ul.classList.add('option-tile-bullets');
+                    bullets.forEach((item) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = UTILITY_ICONS.check + '<span>' + item + '</span>';
+                        ul.appendChild(li);
+                    });
+                    tile.appendChild(ul);
+                } else if (teaser) {
+                    const teaserEl = document.createElement('span');
+                    teaserEl.classList.add('option-tile-teaser');
+                    teaserEl.textContent = teaser;
+                    tile.appendChild(teaserEl);
+                }
+
+                // Click to select / re-click to deselect
+                tile.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (tile.disabled) return;
+                    const currentlySelected = parseInt(instance.optionIndex) === oIndex;
+                    selectOption(currentlySelected ? undefined : oIndex);
+                });
+
+                grid.appendChild(tile);
+            });
+
+            // Roving-tabindex keyboard navigation
+            grid.addEventListener('keydown', function(e) {
+                const tiles = Array.from(grid.querySelectorAll('.option-tile:not([disabled])'));
+                if (!tiles.length) return;
+                const currentIdx = tiles.indexOf(document.activeElement);
+                let nextIdx = currentIdx;
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        nextIdx = (currentIdx + 1) % tiles.length;
+                        break;
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        nextIdx = (currentIdx - 1 + tiles.length) % tiles.length;
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        nextIdx = 0;
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        nextIdx = tiles.length - 1;
+                        break;
+                    case ' ':
+                    case 'Enter': {
+                        e.preventDefault();
+                        const focused = tiles[currentIdx];
+                        if (!focused) return;
+                        const oIdx = parseInt(focused.getAttribute('data-oindex'));
+                        const currentlySelected = parseInt(instance.optionIndex) === oIdx;
+                        selectOption(currentlySelected ? undefined : oIdx);
+                        return;
+                    }
+                    default:
+                        return;
+                }
+                if (nextIdx !== currentIdx && tiles[nextIdx]) {
+                    tiles.forEach((t, i) => t.setAttribute('tabindex', i === nextIdx ? '0' : '-1'));
+                    tiles[nextIdx].focus();
+                }
+            });
+
+            return grid;
+        }
+
+        // ---------- Segmented price-options selector ----------
+        // Replaces the inner <select> for pricingType: "price options".
+        // Pill-row of buttons, one per priceOption type. Single-select
+        // via role="radiogroup". Wrapped in a .form-row so it inherits
+        // the Profile-card label aesthetic.
+        function renderSegmentedPriceOptions(fIndex, instIndex, instance, priceOptionsArray) {
+            const row = document.createElement('div');
+            row.classList.add('form-row', 'price-option-row');
+
+            const label = document.createElement('span');
+            label.classList.add('form-label');
+            label.textContent = 'Format';
+            row.appendChild(label);
+
+            const group = document.createElement('div');
+            group.classList.add('segmented');
+            group.setAttribute('role', 'radiogroup');
+            group.setAttribute('aria-label', 'Format');
+
+            function selectPill(idx) {
+                instance.priceOptionIndex = idx;
+                const pills = group.querySelectorAll('.segmented-pill');
+                pills.forEach((p) => {
+                    const pIdx = parseInt(p.getAttribute('data-pidx'));
+                    const isSel = pIdx === idx;
+                    p.classList.toggle('is-selected', isSel);
+                    p.setAttribute('aria-checked', isSel ? 'true' : 'false');
+                    p.setAttribute('tabindex', isSel ? '0' : '-1');
+                });
+                saveSelections();
+                updateInvoice();
+            }
+
+            priceOptionsArray.forEach((optData, idx) => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.classList.add('segmented-pill');
+                pill.setAttribute('role', 'radio');
+                pill.setAttribute('data-pidx', String(idx));
+                const isSelected = idx === instance.priceOptionIndex;
+                pill.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+                pill.setAttribute('tabindex', isSelected ? '0' : '-1');
+                if (isSelected) pill.classList.add('is-selected');
+
+                const labelEl = document.createElement('span');
+                labelEl.classList.add('segmented-pill-label');
+                labelEl.textContent = optData.label;
+
+                const priceEl = document.createElement('span');
+                priceEl.classList.add('segmented-pill-price');
+                priceEl.textContent = '$' + parseSafe(optData.price).toFixed(parseSafe(optData.price) % 1 === 0 ? 0 : 2);
+
+                pill.appendChild(labelEl);
+                pill.appendChild(priceEl);
+
+                pill.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    selectPill(idx);
+                });
+
+                group.appendChild(pill);
+            });
+
+            // Roving-tabindex keyboard navigation
+            group.addEventListener('keydown', function(e) {
+                const pills = Array.from(group.querySelectorAll('.segmented-pill'));
+                if (!pills.length) return;
+                const currentIdx = pills.indexOf(document.activeElement);
+                let nextIdx = currentIdx;
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        nextIdx = (currentIdx + 1) % pills.length;
+                        break;
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        nextIdx = (currentIdx - 1 + pills.length) % pills.length;
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        nextIdx = 0;
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        nextIdx = pills.length - 1;
+                        break;
+                    case ' ':
+                    case 'Enter': {
+                        e.preventDefault();
+                        const focused = pills[currentIdx];
+                        if (!focused) return;
+                        selectPill(parseInt(focused.getAttribute('data-pidx')));
+                        return;
+                    }
+                    default:
+                        return;
+                }
+                if (nextIdx !== currentIdx && pills[nextIdx]) {
+                    pills.forEach((p, i) => p.setAttribute('tabindex', i === nextIdx ? '0' : '-1'));
+                    pills[nextIdx].focus();
+                }
+            });
+
+            row.appendChild(group);
+            return row;
+        }
+
+        // ---------- Display-row helpers ----------
+        // Replace the legacy `<p><strong>X:</strong> Y</p>` pattern with
+        // the same .form-row + .form-label structure used by the Profile
+        // card. Description gets a flat .option-summary paragraph (no
+        // "Description:" prefix); _display fields render label + amber
+        // pill; the price row gets a mono amber price treatment.
+
+        function renderOptionSummary(text) {
+            const p = document.createElement('p');
+            p.classList.add('option-summary');
+            p.textContent = text || '';
+            return p;
+        }
+
+        function renderDisplayFieldRow(label, value) {
+            const row = document.createElement('div');
+            row.classList.add('form-row', 'display-field-row');
+            const labelEl = document.createElement('span');
+            labelEl.classList.add('form-label');
+            labelEl.textContent = label;
+            const pill = document.createElement('span');
+            pill.classList.add('user-display-value');
+            pill.textContent = value;
+            row.appendChild(labelEl);
+            row.appendChild(pill);
+            return row;
+        }
+
+        function renderPriceRow(text, recurring, interval) {
+            const row = document.createElement('div');
+            row.classList.add('form-row', 'price-row');
+            const labelEl = document.createElement('span');
+            labelEl.classList.add('form-label');
+            labelEl.textContent = 'Price';
+            const display = document.createElement('span');
+            display.classList.add('option-price-display');
+            const valueEl = document.createElement('span');
+            valueEl.classList.add('option-price-value');
+            valueEl.textContent = text;
+            display.appendChild(valueEl);
+            if (recurring) {
+                const suffix = document.createElement('span');
+                suffix.classList.add('option-price-suffix');
+                suffix.textContent = '/ ' + (interval || 'mo');
+                display.appendChild(suffix);
+            }
+            row.appendChild(labelEl);
+            row.appendChild(display);
+            return row;
+        }
+
+        // ---------- User-field row (shared for instance + feature-level) ----------
+        // Replaces the duplicated switch in renderOptionDetails and
+        // renderFeatureLevelFields. Promotes inputs to the .form-input
+        // pattern (Profile card aesthetic) and adds an optional leading
+        // icon next to the label based on the field name.
+        //
+        // bucket = 'userFields' (option-level) or 'featureFields'
+        // (feature-level) — controls which sub-object on the instance
+        // stores user input. Both buckets travel into the order payload
+        // unchanged.
+        function renderUserFieldRow(rawField, key, fIndex, instIndex, instance, suffix, bucket) {
+            const stateBucket = bucket || 'userFields';
+            // suffix = '_user' or '_display' — strip from field key for storage.
+            const fieldName = key.replace(suffix, '');
+            const isDisplay = suffix === '_display';
+            const displayName = formatFieldLabel(key);
+
+            // Parse the wrapper into {ui_type, value, types, placeholder}
+            let fieldData = rawField;
+            let fieldType = 'normal-text';
+            let fieldValue = '';
+            let placeholder = '';
+            let dropdownOptions = [];
+            try {
+                if (typeof rawField === 'string') {
+                    try { fieldData = JSON.parse(rawField); } catch (_) { fieldData = { value: rawField }; }
+                }
+                if (fieldData && typeof fieldData === 'object') {
+                    if (fieldData.ui_type) fieldType = fieldData.ui_type;
+                    if (fieldType === 'array') {
+                        if (Array.isArray(fieldData.types)) {
+                            dropdownOptions = fieldData.types;
+                        } else if (fieldData.value && Array.isArray(fieldData.value.types)) {
+                            dropdownOptions = fieldData.value.types;
+                        }
+                    } else if (fieldData.value !== undefined) {
+                        fieldValue = fieldData.value;
+                    }
+                    if (fieldData.placeholder) placeholder = fieldData.placeholder;
+                } else {
+                    fieldValue = rawField;
+                    fieldType = typeof fieldValue === 'number' ? 'int-float' : 'normal-text';
+                }
+            } catch (e) {
+                console.warn(`Failed to parse field ${key}:`, e);
+                fieldValue = rawField;
+            }
+
+            if (!instance[stateBucket]) instance[stateBucket] = {};
+
+            // Wrapper — <label class="form-row user-field"> for inputs,
+            // or <div class="form-row display-field-row"> for read-only.
+            const tagName = isDisplay ? 'div' : 'label';
+            const row = document.createElement(tagName);
+            row.classList.add('form-row', 'user-field');
+            if (isDisplay) row.classList.add('display-field-row');
+
+            // Label with optional leading icon
+            const labelSpan = document.createElement('span');
+            labelSpan.classList.add('form-label');
+            const iconSvg = pickUserFieldIcon(displayName);
+            if (iconSvg) {
+                const iconEl = document.createElement('span');
+                iconEl.classList.add('user-field-icon');
+                iconEl.setAttribute('aria-hidden', 'true');
+                iconEl.innerHTML = iconSvg;
+                labelSpan.appendChild(iconEl);
+            }
+            labelSpan.appendChild(document.createTextNode(displayName));
+            row.appendChild(labelSpan);
+
+            // Display fields → amber pill, no input.
+            if (isDisplay) {
+                const pill = document.createElement('span');
+                pill.classList.add('user-display-value');
+                if (fieldType === 'array' && dropdownOptions.length) {
+                    const selIdx = instance[stateBucket][fieldName] || (fieldData && fieldData.selected) || 0;
+                    pill.textContent = dropdownOptions[selIdx] || '';
+                } else {
+                    pill.textContent = fieldValue || '';
+                }
+                row.appendChild(pill);
+                return row;
+            }
+
+            // Editable inputs — all get .form-input.
+            let input;
+            const inputId = `user-field-${fIndex}-${instIndex}-${fieldName}`;
+            switch (fieldType) {
+                case 'array': {
+                    input = document.createElement('select');
+                    input.classList.add('form-input');
+                    input.id = inputId;
+                    if (!dropdownOptions.length) dropdownOptions = ['No options available'];
+                    if (instance[stateBucket][fieldName] === undefined) instance[stateBucket][fieldName] = 0;
+                    dropdownOptions.forEach((opt, i) => {
+                        const o = document.createElement('option');
+                        o.value = i;
+                        o.textContent = opt;
+                        if (i === instance[stateBucket][fieldName]) o.selected = true;
+                        input.appendChild(o);
+                    });
+                    input.addEventListener('change', function() {
+                        instance[stateBucket][fieldName] = parseInt(this.value);
+                        saveSelections();
+                        updateInvoice();
+                    });
+                    break;
+                }
+                case 'long-text': {
+                    input = document.createElement('textarea');
+                    input.classList.add('form-input');
+                    input.id = inputId;
+                    input.rows = 3;
+                    if (placeholder) input.placeholder = placeholder;
+                    if (instance[stateBucket][fieldName] === undefined) instance[stateBucket][fieldName] = fieldValue;
+                    input.value = instance[stateBucket][fieldName] || '';
+                    input.addEventListener('input', function() {
+                        instance[stateBucket][fieldName] = this.value;
+                        saveSelections();
+                        updateInvoice();
+                    });
+                    break;
+                }
+                case 'int-float': {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.classList.add('form-input');
+                    input.id = inputId;
+                    input.step = 'any';
+                    if (placeholder) input.placeholder = placeholder;
+                    if (instance[stateBucket][fieldName] === undefined) instance[stateBucket][fieldName] = fieldValue;
+                    input.value = instance[stateBucket][fieldName];
+                    input.addEventListener('input', function() {
+                        const val = parseFloat(this.value);
+                        instance[stateBucket][fieldName] = isNaN(val) ? 0 : val;
+                        saveSelections();
+                        updateInvoice();
+                    });
+                    break;
+                }
+                case 'date': {
+                    input = document.createElement('input');
+                    input.type = 'date';
+                    input.classList.add('form-input');
+                    input.id = inputId;
+                    if (instance[stateBucket][fieldName] === undefined) instance[stateBucket][fieldName] = fieldValue;
+                    input.value = instance[stateBucket][fieldName];
+                    input.addEventListener('change', function() {
+                        instance[stateBucket][fieldName] = this.value;
+                        saveSelections();
+                        updateInvoice();
+                    });
+                    break;
+                }
+                case 'normal-text':
+                default: {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.classList.add('form-input');
+                    input.id = inputId;
+                    if (placeholder) input.placeholder = placeholder;
+                    if (instance[stateBucket][fieldName] === undefined) instance[stateBucket][fieldName] = fieldValue;
+                    input.value = instance[stateBucket][fieldName] || '';
+                    input.addEventListener('input', function() {
+                        instance[stateBucket][fieldName] = this.value;
+                        saveSelections();
+                        updateInvoice();
+                    });
+                    break;
+                }
+            }
+
+            row.appendChild(input);
+            return row;
+        }
+
+        // ---------- Inline alert (replaces inline-styled red message) ----------
+        // Variant: 'warning' | 'info' | 'success'. Returns a DOM node.
+        function renderInlineAlert(text, variant) {
+            const alert = document.createElement('div');
+            alert.classList.add('ff-alert', 'ff-alert-' + (variant || 'info'));
+            alert.setAttribute('role', 'status');
+
+            const iconEl = document.createElement('span');
+            iconEl.classList.add('ff-alert-icon');
+            iconEl.setAttribute('aria-hidden', 'true');
+            iconEl.innerHTML = variant === 'success'
+                ? UTILITY_ICONS.check
+                : (variant === 'warning' ? UTILITY_ICONS.warning : UTILITY_ICONS.info);
+
+            const textEl = document.createElement('span');
+            textEl.classList.add('ff-alert-text');
+            textEl.textContent = text;
+
+            alert.appendChild(iconEl);
+            alert.appendChild(textEl);
+            return alert;
+        }
+
+        // ---------- Addon card (replaces .addon-item + tooltip "?") ----------
+        // The native <input type=checkbox> is kept inside the button (CSS
+        // visually hides it) so existing addonsDiv.querySelectorAll(
+        // 'input[type="checkbox"]') queries in enforceMaxAddons /
+        // enforceMaxGroupItems continue to match without rewrite.
+        function renderAddonCard(addon, aIndex, fIndex, instIndex, instance) {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.classList.add('addon-card');
+            card.setAttribute('role', 'checkbox');
+            card.setAttribute('data-addon-id', String(addon.id));
+            if (addon.groupName) card.dataset.group = addon.groupName;
+
+            const isSelected = !!(instance.addons && instance.addons.includes(addon.id));
+            card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+            if (isSelected) card.classList.add('is-selected');
+
+            // Visually-hidden checkbox — still used by the existing
+            // selectors in enforceMaxAddons / enforceMaxGroupItems.
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.tabIndex = -1;
+            checkbox.value = addon.id;
+            checkbox.id = `addon-checkbox-${fIndex}-${instance.optionIndex}-${addon.id}`;
+            checkbox.classList.add('addon-checkbox');
+            if (addon.groupName) checkbox.dataset.group = addon.groupName;
+            checkbox.checked = isSelected;
+            checkbox.setAttribute('aria-hidden', 'true');
+            card.appendChild(checkbox);
+
+            // Icon
+            const iconEl = document.createElement('span');
+            iconEl.classList.add('addon-card-icon');
+            iconEl.setAttribute('aria-hidden', 'true');
+            iconEl.innerHTML = pickAddonIcon(addon);
+            card.appendChild(iconEl);
+
+            // Body — name + (optional) description
+            const body = document.createElement('span');
+            body.classList.add('addon-card-body');
+
+            const nameEl = document.createElement('span');
+            nameEl.classList.add('addon-card-name');
+            nameEl.textContent = addon.addonName || '';
+            body.appendChild(nameEl);
+
+            const descText = getDescriptionText(addon.description);
+            if (descText) {
+                const descEl = document.createElement('span');
+                descEl.classList.add('addon-card-desc');
+                descEl.textContent = descText;
+                body.appendChild(descEl);
+            }
+            card.appendChild(body);
+
+            // Meta — price + toggle indicator
+            const meta = document.createElement('span');
+            meta.classList.add('addon-card-meta');
+
+            const priceEl = document.createElement('span');
+            priceEl.classList.add('addon-card-price');
+            const floorVal = parseSafe(addon.floorPriceMod);
+            const ceilVal = parseSafe(addon.ceilingPriceMod);
+            const symbol = isMultiply(addon) ? '×' : '+';
+            if (floorVal !== 0 || ceilVal !== 0) {
+                priceEl.textContent = `${symbol}$${floorVal.toFixed(2)} – $${ceilVal.toFixed(2)}`;
+            } else {
+                const addonStatic = parseSafe(addon.staticPriceMod, 0);
+                if (isMultiply(addon)) {
+                    priceEl.textContent = `× ${addonStatic}`;
+                } else {
+                    priceEl.textContent = `+$${addonStatic.toFixed(addonStatic % 1 === 0 ? 0 : 2)}`;
+                }
+            }
+            meta.appendChild(priceEl);
+
+            const toggle = document.createElement('span');
+            toggle.classList.add('addon-card-toggle');
+            toggle.setAttribute('aria-hidden', 'true');
+            toggle.innerHTML =
+                '<span class="addon-card-toggle-empty">' + UTILITY_ICONS.circle + '</span>' +
+                '<span class="addon-card-toggle-checked">' + UTILITY_ICONS.circleCheck + '</span>';
+            meta.appendChild(toggle);
+
+            card.appendChild(meta);
+
+            // Toggle handler — clicks the hidden checkbox so the existing
+            // change handler on it fires (which mutates instance.addons,
+            // calls enforceMax… and updateInvoice).
+            function toggle_state() {
+                if (card.classList.contains('is-disabled')) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                card.classList.toggle('is-selected', checkbox.checked);
+                card.setAttribute('aria-checked', checkbox.checked ? 'true' : 'false');
+            }
+
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                toggle_state();
+            });
+            card.addEventListener('keydown', function(e) {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    toggle_state();
+                }
+            });
+
+            // Same change-handler logic as the legacy createAddonCheckboxItem.
+            checkbox.addEventListener('change', function() {
+                if (!instance.addons) instance.addons = [];
+                if (this.checked) {
+                    if (!instance.addons.includes(addon.id)) {
+                        instance.addons.push(addon.id);
+                    }
+                } else {
+                    const idx = instance.addons.indexOf(addon.id);
+                    if (idx !== -1) instance.addons.splice(idx, 1);
+                }
+                const addonsDiv = card.closest('.addons');
+                if (addonsDiv) {
+                    enforceMaxAddons(fIndex, instIndex, addonsDiv);
+                    enforceMaxGroupItems(fIndex, instIndex, addonsDiv);
+                    updateGroupDiscountDisplay(fIndex, instIndex, addonsDiv);
+                }
+                saveSelections();
+                updateInvoice();
+            });
+
+            return card;
+        }
+
+        // ---------- Threshold-discount track ----------
+        // Replaces the bullet <ul> of "20% off when you order 25+".
+        // Returns the element + an `update(qty)` closure stored on
+        // instance.__thresholdUpdater so the qty stepper can refresh
+        // the active tier without re-rendering the whole panel.
+        function renderThresholdTrack(thresholds, fIndex, instIndex, instance, optionMetric) {
+            // Sort by itemCount asc, filter empty rows
+            const sorted = thresholds
+                .filter((t) => t.itemCount && t.discount)
+                .map((t) => ({ itemCount: parseInt(t.itemCount), discount: parseFloat(t.discount) }))
+                .sort((a, b) => a.itemCount - b.itemCount);
+            if (!sorted.length) return null;
+
+            const wrap = document.createElement('div');
+            wrap.classList.add('threshold-track');
+
+            const label = document.createElement('span');
+            label.classList.add('overline', 'threshold-track-label');
+            label.textContent = 'Bulk discount';
+            wrap.appendChild(label);
+
+            const tiers = document.createElement('ol');
+            tiers.classList.add('threshold-track-tiers');
+            const tileEls = sorted.map((tier) => {
+                const li = document.createElement('li');
+                li.classList.add('threshold-tier');
+                li.dataset.min = String(tier.itemCount);
+                li.dataset.pct = String(tier.discount);
+
+                const iconEl = document.createElement('span');
+                iconEl.classList.add('threshold-tier-icon');
+                iconEl.setAttribute('aria-hidden', 'true');
+                iconEl.innerHTML = UTILITY_ICONS.circle;
+
+                const count = document.createElement('span');
+                count.classList.add('threshold-tier-count');
+                count.textContent = `${tier.itemCount}+`;
+
+                const pct = document.createElement('span');
+                pct.classList.add('threshold-tier-pct');
+                pct.textContent = `${tier.discount}% off`;
+
+                li.appendChild(iconEl);
+                li.appendChild(count);
+                li.appendChild(pct);
+                tiers.appendChild(li);
+                return li;
+            });
+            wrap.appendChild(tiers);
+
+            const current = document.createElement('span');
+            current.classList.add('threshold-track-current');
+            wrap.appendChild(current);
+
+            function update(qty) {
+                const q = Math.max(1, parseInt(qty) || 1);
+                let activeIdx = -1;
+                tileEls.forEach((li, i) => {
+                    const min = parseInt(li.dataset.min);
+                    li.classList.remove('is-passed', 'is-active');
+                    const icon = li.querySelector('.threshold-tier-icon');
+                    if (q >= min) {
+                        li.classList.add('is-passed');
+                        if (icon) icon.innerHTML = UTILITY_ICONS.check;
+                        activeIdx = i;
+                    } else if (icon) {
+                        icon.innerHTML = UTILITY_ICONS.circle;
+                    }
+                });
+                if (activeIdx >= 0) {
+                    tileEls[activeIdx].classList.remove('is-passed');
+                    tileEls[activeIdx].classList.add('is-active');
+                    const tier = sorted[activeIdx];
+                    const unit = optionMetric ? optionMetric : 'item';
+                    current.textContent = `Saving ${tier.discount}% on ${q} ${unit}${q === 1 ? '' : 's'}`;
+                } else {
+                    const next = sorted[0];
+                    if (next) {
+                        const unit = optionMetric ? optionMetric : 'item';
+                        const need = next.itemCount - q;
+                        current.textContent = `${need} more ${unit}${need === 1 ? '' : 's'} for ${next.discount}% off`;
+                    } else {
+                        current.textContent = '';
+                    }
+                }
+            }
+
+            // Initial paint with current quantity
+            const startQty = parseInt(instance.quantity) || 1;
+            update(startQty);
+
+            // Stash on the instance so the qty stepper can call it.
+            instance.__thresholdUpdater = update;
+
+            return wrap;
+        }
+
+        // ---------- Quantity stepper ----------
+        // [−] N [+] flex control. The native <input type="number"> is
+        // kept inside (CSS hides webkit spinners) so the input is still
+        // typeable and accessible. Buttons mutate the input value and
+        // dispatch a 'change' so any other listeners (and the threshold
+        // updater) fire identically to keyboard typing.
+        function renderQuantityStepper(fIndex, instIndex, instance, feature, selectedOption) {
+            let qty = parseInt(instance.quantity) || 1;
+            if (qty < 1) qty = 1;
+            instance.quantity = qty;
+
+            const row = document.createElement('div');
+            row.classList.add('form-row', 'quantity-row');
+
+            const labelEl = document.createElement('span');
+            labelEl.classList.add('form-label');
+            labelEl.appendChild(document.createTextNode('Quantity'));
+            if (selectedOption && selectedOption.optionMetric) {
+                const metric = document.createElement('span');
+                metric.classList.add('quantity-metric');
+                metric.textContent = selectedOption.optionMetric;
+                labelEl.appendChild(metric);
+            }
+            row.appendChild(labelEl);
+
+            const stepper = document.createElement('div');
+            stepper.classList.add('qty-stepper');
+            stepper.setAttribute('role', 'group');
+            stepper.setAttribute('aria-label', 'Quantity');
+
+            const dec = document.createElement('button');
+            dec.type = 'button';
+            dec.classList.add('qty-step', 'qty-step-dec');
+            dec.setAttribute('aria-label', 'Decrease quantity');
+            dec.innerHTML = UTILITY_ICONS.minus;
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.classList.add('qty-step-input');
+            input.min = '1';
+            input.value = String(qty);
+            input.inputMode = 'numeric';
+
+            const inc = document.createElement('button');
+            inc.type = 'button';
+            inc.classList.add('qty-step', 'qty-step-inc');
+            inc.setAttribute('aria-label', 'Increase quantity');
+            inc.innerHTML = UTILITY_ICONS.plus;
+
+            function commit(val) {
+                let next = parseInt(val);
+                if (isNaN(next) || next < 1) next = 1;
+                input.value = String(next);
+                instance.quantity = next;
+                dec.disabled = next <= 1;
+                if (typeof instance.__thresholdUpdater === 'function') {
+                    instance.__thresholdUpdater(next);
+                }
+                saveSelections();
+                updateInvoice();
+            }
+
+            dec.addEventListener('click', function() {
+                commit((parseInt(input.value) || 1) - 1);
+            });
+            inc.addEventListener('click', function() {
+                commit((parseInt(input.value) || 1) + 1);
+            });
+            input.addEventListener('change', function() {
+                commit(this.value);
+            });
+            input.addEventListener('input', function() {
+                // Live update so the threshold-track tier highlights
+                // mid-typing — saveSelections / invoice still wait for
+                // the change event to debounce.
+                const live = parseInt(this.value);
+                if (Number.isFinite(live) && live >= 1 && typeof instance.__thresholdUpdater === 'function') {
+                    instance.__thresholdUpdater(live);
+                }
+            });
+
+            // Initial disabled state for dec when at 1
+            dec.disabled = qty <= 1;
+
+            stepper.appendChild(dec);
+            stepper.appendChild(input);
+            stepper.appendChild(inc);
+            row.appendChild(stepper);
+
+            return row;
+        }
+
+        // ---------- Addon group panel (replaces inline-styled .addon-group) ----------
+        function renderAddonGroup(group, fIndex, instIndex, instance, selectedOption) {
+            const container = document.createElement('section');
+            container.classList.add('addon-group');
+            container.dataset.groupName = group.name;
+            container.dataset.maxItems = group.maxItems;
+
+            // Header: group name + counter
+            const header = document.createElement('header');
+            header.classList.add('addon-group-head');
+
+            const nameEl = document.createElement('span');
+            nameEl.classList.add('overline', 'addon-group-name');
+            nameEl.textContent = group.name;
+            header.appendChild(nameEl);
+
+            const counter = document.createElement('span');
+            counter.classList.add('addon-group-counter');
+            const selectedCount = getSelectedGroupCount(instance, group.name, selectedOption.addons);
+            const totalInGroup = group.addons.length;
+            const maxLabel = group.maxItems > 0 ? group.maxItems : totalInGroup;
+            counter.textContent = `${selectedCount} / ${maxLabel} selected`;
+            header.appendChild(counter);
+
+            container.appendChild(header);
+
+            // Items
+            const items = document.createElement('div');
+            items.classList.add('addon-group-items');
+            group.addons.forEach(({ addon, index: aIndex }) => {
+                items.appendChild(renderAddonCard(addon, aIndex, fIndex, instIndex, instance));
+            });
+            container.appendChild(items);
+
+            // Footer with discount status pill (filled in by
+            // updateGroupDiscountDisplay; placeholder in .is-empty state).
+            if (group.thresholdDiscounts && group.thresholdDiscounts.length) {
+                const footer = document.createElement('footer');
+                footer.classList.add('addon-group-footer');
+
+                const status = document.createElement('span');
+                status.classList.add('addon-group-status', 'is-empty');
+                status.innerHTML =
+                    '<span class="addon-group-status-icon" aria-hidden="true">' + UTILITY_ICONS.sparkle + '</span>' +
+                    '<span class="addon-group-status-text"></span>';
+                footer.appendChild(status);
+
+                container.appendChild(footer);
+            }
+
+            return container;
+        }
+
         function renderInstance(feature, fIndex, instIndex, instance) {
             const instanceDiv = document.createElement('div');
             instanceDiv.classList.add('feature');
 
-            // Header with "New X" or feature name
+            // Header — only show an eyebrow on additional instances
+            // ("Option 2 / Option 3 …") so the first instance reads as
+            // the default config. The delete button is icon-only and
+            // absolutely positioned via CSS regardless of header content.
             const headerDiv = document.createElement('div');
             headerDiv.classList.add('instance-header');
-            const headerTitle = document.createElement('span');
-            headerTitle.textContent = 'Options:';
-            headerDiv.appendChild(headerTitle);
 
-            // Show delete button if there's more than one instance
+            if (instIndex > 0) {
+                const eyebrow = document.createElement('span');
+                eyebrow.classList.add('overline', 'instance-eyebrow');
+                eyebrow.textContent = `Option ${instIndex + 1}`;
+                headerDiv.appendChild(eyebrow);
+            }
+
             if (selections[fIndex] && selections[fIndex].length > 1) {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.type = 'button';
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.classList.add('delete-instance');
+                deleteBtn.classList.add('instance-delete');
+                deleteBtn.setAttribute('aria-label', 'Remove this option');
+                deleteBtn.innerHTML = UTILITY_ICONS.x;
                 deleteBtn.addEventListener('click', function() {
                     selections[fIndex].splice(instIndex, 1);
                     saveSelections();
@@ -2092,72 +3052,20 @@
             }
             instanceDiv.appendChild(headerDiv);
 
-            // Render feature-level user fields before the options dropdown
+            // Render feature-level user fields before the option tiles
             renderFeatureLevelFields(feature, fIndex, instanceDiv, instance);
 
-            // Dropdown for options
-            const select = document.createElement('select');
-            const defaultOption = document.createElement('option');
-            defaultOption.textContent = 'None';
-            defaultOption.value = '';
-            select.appendChild(defaultOption);
-
-            feature.options.forEach((option, oIndex) => {
-                const opt = document.createElement('option');
-                opt.value = oIndex;
-                opt.textContent = option.optionName;
-
-                // Check if this is a recurring feature and if user has active subscription for this option
-                if (feature.recurring && 
-                    dashboardData.subscription_status && 
-                    dashboardData.subscription_status.has_active_subscription &&
-                    dashboardData.subscription_status.subscription_details &&
-                    parseInt( dashboardData.subscription_status.subscription_details.option_id) === parseInt(option.id) ) {
-                    opt.disabled = true;
-                    opt.textContent += ' (Already Subscribed)';
-                }
-                
-                select.appendChild(opt);
-            });
-
-            // Handle "None" gracefully
-            if (instance.optionIndex === undefined) {
-                select.value = '';
-            } else {
-                select.value = instance.optionIndex;
-            }
-
-            instanceDiv.appendChild(select);
-
-            // Container for option details
+            // Container for option details (rendered below the tiles).
+            // .is-hidden controls visibility instead of inline display
+            // so the CSS rule's `display: flex; gap: 1.25rem` survives
+            // when the panel is shown.
             const optionDetailsDiv = document.createElement('div');
-            optionDetailsDiv.classList.add('option-details');
-            optionDetailsDiv.style.display = 'none';
+            optionDetailsDiv.classList.add('option-details', 'is-hidden');
+            // Append option-details AFTER the tile grid so DOM order
+            // matches reading order.
+            const tileGrid = renderOptionTiles(feature, fIndex, instIndex, instance, instanceDiv, optionDetailsDiv);
+            instanceDiv.appendChild(tileGrid);
             instanceDiv.appendChild(optionDetailsDiv);
-
-            // On dropdown change
-            select.addEventListener('change', function() {
-                let featureFieldsDivId = feature.featureName.toLowerCase();
-                featureFieldsDivId = featureFieldsDivId.replace(/\s/, '-');
-                let featureFieldsDiv = document.querySelector(`#feature-${featureFieldsDivId}`);
-                if (this.value === '') {
-                    instance.optionIndex = undefined;
-                    if (featureFieldsDiv) featureFieldsDiv.style.display = 'none';
-                } else {
-                    instance.optionIndex = parseInt(this.value);
-                    if (featureFieldsDiv) featureFieldsDiv.style.display = 'block';
-                }
-                // Reset addons and quantity if the user changes the option
-                instance.addons = [];
-                if (!feature.recurring) {
-                    instance.quantity = 1;
-                }
-                renderOptionDetails(fIndex, instIndex, feature, optionDetailsDiv);
-                if (instance.optionIndex !== undefined && !isNaN(instance.optionIndex)) {
-                    smoothScrollToElement(instanceDiv, 120);
-                }
-                saveSelections();
-            });
 
             // Render details if there's already a saved option
             if (instance.optionIndex !== undefined) {
@@ -2171,38 +3079,56 @@
         function enforceMaxAddons(fIndex, instIndex, addonsDiv) {
             const instance = selections[fIndex][instIndex];
             const option = dashboardData.features[fIndex].options[instance.optionIndex];
-            
-            // If no max addons constraint or unlimited (-1), enable all checkboxes
-            if (!option || !option.maxAddons || option.maxAddons < 0) return;
-            
+
+            // No constraint or unlimited (-1) → re-enable everything and
+            // remove any lingering alert.
+            if (!option || !option.maxAddons || option.maxAddons < 0) {
+                const lingering = addonsDiv.querySelector('.max-addons-alert');
+                if (lingering) lingering.remove();
+                addonsDiv.querySelectorAll('.addon-card').forEach((card) => {
+                    const cb = card.querySelector('input[type="checkbox"]');
+                    if (cb && !cb.checked) {
+                        card.classList.remove('is-disabled');
+                        cb.disabled = false;
+                    }
+                });
+                return;
+            }
+
             const maxAllowed = parseInt(option.maxAddons);
             const checkboxes = addonsDiv.querySelectorAll('input[type="checkbox"]');
-            
-            // Count checked addons
             const checkedCount = (instance.addons || []).length;
-            
-            // Disable unchecked boxes if limit reached, otherwise enable all
-            checkboxes.forEach(checkbox => {
+
+            // Lock unchecked cards if the limit is reached; unlock when
+            // the user deselects something. Mirror the disabled state on
+            // both the hidden checkbox and the .addon-card wrapper so the
+            // CSS .is-disabled treatment kicks in.
+            checkboxes.forEach((checkbox) => {
+                const card = checkbox.closest('.addon-card');
                 if (!checkbox.checked) {
-                    checkbox.disabled = checkedCount >= maxAllowed;
+                    const shouldDisable = checkedCount >= maxAllowed;
+                    checkbox.disabled = shouldDisable;
+                    if (card) card.classList.toggle('is-disabled', shouldDisable);
+                } else {
+                    checkbox.disabled = false;
+                    if (card) card.classList.remove('is-disabled');
                 }
             });
-            
-            // Add a message if needed
-            let maxAddonsMessage = addonsDiv.querySelector('.max-addons-message');
+
+            // Inline alert: show only when at the limit.
+            let alertEl = addonsDiv.querySelector('.max-addons-alert');
             if (checkedCount >= maxAllowed) {
-                if (!maxAddonsMessage) {
-                    maxAddonsMessage = document.createElement('div');
-                    maxAddonsMessage.className = 'max-addons-message';
-                    maxAddonsMessage.style.color = '#d83838';
-                    maxAddonsMessage.style.fontSize = '(--fontSizeSmallest)';
-                    maxAddonsMessage.style.marginTop = '8px';
-                    maxAddonsMessage.style.fontWeight = 'bold';
-                    addonsDiv.appendChild(maxAddonsMessage);
+                const message = `Maximum of ${maxAllowed} add-on${maxAllowed === 1 ? '' : 's'} selected.`;
+                if (!alertEl) {
+                    alertEl = renderInlineAlert(message, 'warning');
+                    alertEl.classList.add('max-addons-alert');
+                    addonsDiv.appendChild(alertEl);
+                } else {
+                    const t = alertEl.querySelector('.ff-alert-text');
+                    if (t) t.textContent = message;
                 }
-                maxAddonsMessage.textContent = `Maximum of ${maxAllowed} toppings reached.`;
-            } else if (maxAddonsMessage) {
-                maxAddonsMessage.remove();
+            } else if (alertEl) {
+                alertEl.remove();
             }
         }
 
@@ -2211,19 +3137,19 @@
             optionDetailsDiv.innerHTML = '';
             const instance = selections[fIndex][instIndex];
             if (instance.optionIndex === undefined || isNaN(instance.optionIndex)) {
-                optionDetailsDiv.style.display = 'none';
+                optionDetailsDiv.classList.add('is-hidden');
                 saveSelections();
                 updateInvoice();
                 return;
             }
             const selectedOption = feature.options[instance.optionIndex];
             if (!selectedOption) {
-                optionDetailsDiv.style.display = 'none';
+                optionDetailsDiv.classList.add('is-hidden');
                 saveSelections();
                 updateInvoice();
                 return;
             }
-            optionDetailsDiv.style.display = 'block';
+            optionDetailsDiv.classList.remove('is-hidden');
 
             // Show the raw option data. If it has a range, show that. Otherwise, show static.
             const descText = getDescriptionText(selectedOption.description);
@@ -2240,87 +3166,80 @@
                 optionPriceText = `$${staticP.toFixed(2)}`;
             }
 
-            let detailsHTML = `<p><strong>Description:</strong> ${descText}</p>`;
+            // Subtle title — option name in overline style. Acts as the
+            // scroll-target marker so picking a tile lands the viewport
+            // here, not at the top of the feature card.
+            const titleEl = document.createElement('p');
+            titleEl.classList.add('overline', 'option-details-title');
+            titleEl.textContent = selectedOption.optionName || '';
+            optionDetailsDiv.appendChild(titleEl);
 
-            // Process display fields first and add them immediately after description
+            // Description as a flat paragraph (no "Description:" prefix).
+            if (descText) optionDetailsDiv.appendChild(renderOptionSummary(descText));
+
+            // _display fields → label + amber pill (Profile-card aesthetic).
             for (const key in selectedOption) {
-                // Only process display fields here
                 if (key.endsWith('_display') && selectedOption[key] !== null) {
                     try {
                         let fieldData;
                         let fieldType = 'normal-text';
                         let displayValue = '';
-                        
-                        // Try to parse the field data
                         if (typeof selectedOption[key] === 'string') {
                             try {
                                 fieldData = JSON.parse(selectedOption[key]);
                                 if (fieldData) {
                                     fieldType = fieldData.ui_type || 'normal-text';
-                                    
-                                    // Handle array type (dropdown)
-                                    if (fieldType === 'array' && fieldData.types && Array.isArray(fieldData.types)) {
-                                        // Get selected index (default to 0)
-                                        const selectedIndex = fieldData.selected || 0;
-                                        displayValue = fieldData.types[selectedIndex] || '';
+                                    if (fieldType === 'array' && Array.isArray(fieldData.types)) {
+                                        const selIdx = fieldData.selected || 0;
+                                        displayValue = fieldData.types[selIdx] || '';
                                     } else {
-                                        // For other types, use the value directly
                                         displayValue = fieldData.value || '';
                                     }
                                 }
                             } catch (e) {
-                                console.warn(`Failed to parse display field ${key}:`, e);
                                 displayValue = selectedOption[key];
                             }
                         } else if (typeof selectedOption[key] === 'object') {
                             fieldData = selectedOption[key];
-                            
-                            if (fieldData.ui_type === 'array' && fieldData.types && Array.isArray(fieldData.types)) {
-                                const selectedIndex = fieldData.selected || 0;
-                                displayValue = fieldData.types[selectedIndex] || '';
+                            if (fieldData.ui_type === 'array' && Array.isArray(fieldData.types)) {
+                                const selIdx = fieldData.selected || 0;
+                                displayValue = fieldData.types[selIdx] || '';
                             } else if (fieldData.value !== undefined) {
                                 displayValue = fieldData.value;
                             }
                         } else {
                             displayValue = selectedOption[key];
                         }
-                        
-                        // Format the field name for display
-                        const fieldName = formatFieldLabel(key);
-                        
-                        // Add to detailsHTML
-                        detailsHTML += `<p><strong>${fieldName}:</strong> ${displayValue}</p>`;
+                        optionDetailsDiv.appendChild(
+                            renderDisplayFieldRow(formatFieldLabel(key), displayValue)
+                        );
                     } catch (e) {
                         console.error(`Error processing display field ${key}:`, e);
                     }
                 }
             }
 
-            // Check if pricingType is set to "price options" before showing dropdown
+            // Detect pricingType=price options to skip the static price row.
             let showPriceOptions = false;
             if (selectedOption.pricingType) {
                 try {
-                    // Handle both simple string values and complex objects
                     if (typeof selectedOption.pricingType === 'string') {
-                        // If it's a plain string (from database), use it directly
                         showPriceOptions = (selectedOption.pricingType === 'price options');
                     } else if (typeof selectedOption.pricingType === 'object') {
-                        // If it's a complex object (from JSON), parse the structure
-                        const pricingTypeData = selectedOption.pricingType;
-                        if (pricingTypeData.value && pricingTypeData.value.types && pricingTypeData.value.selected !== undefined) {
-                            const selectedType = pricingTypeData.value.types[pricingTypeData.value.selected];
-                            showPriceOptions = (selectedType === 'price options');
+                        const pt = selectedOption.pricingType;
+                        if (pt.value && pt.value.types && pt.value.selected !== undefined) {
+                            showPriceOptions = (pt.value.types[pt.value.selected] === 'price options');
                         }
                     }
-                } catch(e) {
-                    console.error("Error parsing pricingType:", e);
-                    // Fallback: if there's an error, don't show price options
-                    showPriceOptions = false;
-                }
+                } catch (e) { showPriceOptions = false; }
             }
 
-            if (!showPriceOptions) detailsHTML += `<p><strong>Price:</strong> ${optionPriceText}</p>`;
-            optionDetailsDiv.innerHTML = detailsHTML;
+            // Static / range price → label + amber price chip.
+            if (!showPriceOptions) {
+                optionDetailsDiv.appendChild(
+                    renderPriceRow(optionPriceText, !!feature.recurring, selectedOption.interval)
+                );
+            }
             
             let priceOptionsArray = [];
             if (selectedOption.priceOptions) {
@@ -2336,55 +3255,27 @@
                 }
             }
 
-            // Only show price options dropdown if pricing type is "price options" AND we have options data
+            // Only show price options selector if pricingType is "price options" AND we have options data
             if (showPriceOptions && priceOptionsArray && priceOptionsArray.length > 0) {
-                const priceOptionDiv = document.createElement('div');
-                priceOptionDiv.classList.add('price-option-selector');
-                priceOptionDiv.style.marginTop = '10px';
-                
-                const label = document.createElement('label');
-                label.innerHTML = '<strong>Price Option:</strong> ';
-                
-                const select = document.createElement('select');
-                select.id = `price-option-select-${fIndex}-${instIndex}`;
-                
-                // Initialize the selection
                 if (instance.priceOptionIndex === undefined) {
-                    // Default to first option (usually cheapest)
                     instance.priceOptionIndex = 0;
                 }
-                
-                priceOptionsArray.forEach((optData, idx) => {
-                    const opt = document.createElement('option');
-                    opt.value = idx;
-                    opt.textContent = `${optData.label} - $${parseSafe(optData.price).toFixed(2)}`;
-                    if (idx === instance.priceOptionIndex) {
-                        opt.selected = true;
-                    }
-                    select.appendChild(opt);
-                });
-                    const instanceDiv = optionDetailsDiv.parentNode;
-                    const featureFieldsDiv = instanceDiv.querySelector(
+
+                const instanceDiv = optionDetailsDiv.parentNode;
+                const featureFieldsDiv = instanceDiv.querySelector(
                     `#feature-${feature.featureName.toLowerCase().replace(/\s+/g, '-')}`
                 );
+                if (featureFieldsDiv) featureFieldsDiv.style.display = 'block';
 
-                if (featureFieldsDiv) {
-                    featureFieldsDiv.style.display = 'block';
-                }
-
-                
-                select.addEventListener('change', function() {
-                    instance.priceOptionIndex = parseInt(this.value);
-                    saveSelections();
-                    updateInvoice();
-                });
-                
-                label.appendChild(select);
-                priceOptionDiv.appendChild(label);
-                optionDetailsDiv.appendChild(priceOptionDiv);
+                optionDetailsDiv.appendChild(
+                    renderSegmentedPriceOptions(fIndex, instIndex, instance, priceOptionsArray)
+                );
             }
 
-            // Check for threshold discounts (this should always show regardless of pricing type)
+            // Threshold-discount track (shows always when thresholds defined,
+            // not just for non-recurring — server-side calc respects qty=1
+            // for recurring features so the track just sits at the
+            // "0 → first tier" call-out).
             if (selectedOption.thresholdDiscounts) {
                 try {
                     let thresholds = [];
@@ -2395,424 +3286,84 @@
                     } else if (Array.isArray(selectedOption.thresholdDiscounts)) {
                         thresholds = selectedOption.thresholdDiscounts;
                     }
-                    
-                    if (Array.isArray(thresholds) && thresholds.length > 0 && thresholds.some(t => t.itemCount && t.discount)) {
-                        const discountDiv = document.createElement('div');
-                        discountDiv.className = 'quantity-discounts';
-                        discountDiv.style.marginTop = '(--fontSizeSmallest)';
-                        discountDiv.style.padding = '8px';
-                        discountDiv.style.backgroundColor = '#f8f8f8';
-                        discountDiv.style.borderRadius = '4px';
-                        discountDiv.style.border = '1px solid #e0e0e0';
-                        
-                        const discountTitle = document.createElement('div');
-                        discountTitle.style.fontWeight = 'bold';
-                        discountTitle.style.marginBottom = '6px';
-                        discountTitle.textContent = 'Quantity Discounts Available:';
-                        discountDiv.appendChild(discountTitle);
-                        
-                        const discountList = document.createElement('ul');
-                        discountList.style.margin = '0';
-                        discountList.style.paddingLeft = '20px';
-                        discountList.style.fontSize = '(--fontSizeSmallest)';
-                        
-                        // Sort by item count
-                        thresholds.sort((a, b) => parseInt(a.itemCount) - parseInt(b.itemCount))
-                                .filter(t => t.itemCount && t.discount)
-                                .forEach(threshold => {
-                            const item = document.createElement('li');
-                            item.textContent = `${threshold.discount}% off when you order ${threshold.itemCount} or more`;
-                            discountList.appendChild(item);
-                        });
-                        
-                        discountDiv.appendChild(discountList);
-                        optionDetailsDiv.appendChild(discountDiv);
+
+                    if (Array.isArray(thresholds) && thresholds.some((t) => t.itemCount && t.discount)) {
+                        const track = renderThresholdTrack(
+                            thresholds,
+                            fIndex,
+                            instIndex,
+                            instance,
+                            selectedOption.optionMetric || ''
+                        );
+                        if (track) optionDetailsDiv.appendChild(track);
                     }
                 } catch (e) {
-                    console.error("Error displaying threshold discounts:", e);
+                    console.error('Error rendering threshold-track:', e);
                 }
             }
 
+            // _user fields → shared renderUserFieldRow helper. Promotes
+            // every input to the .form-input pattern so the calculator's
+            // inputs match the Profile card aesthetic exactly.
             for (const key in selectedOption) {
-                // Check if it's a user field or display field
                 if (key.endsWith('_user') && !key.endsWith('_display') && selectedOption[key] !== null) {
                     try {
-                        let fieldData;
-                        let fieldType = 'normal-text'; // Default fallback
-                        let fieldValue = '';
-                        let placeholder = '';
-                        let dropdownOptions = [];
-                        let isDisplayField = key.endsWith('_display');
-                        
-                        // Try to parse the field data
-                        if (typeof selectedOption[key] === 'string') {
-                            try {
-                                // Parse the JSON string into an object
-                                fieldData = JSON.parse(selectedOption[key]);
-                                
-                                // Extract ui_type, value, and placeholder if they exist
-                                if (fieldData) {
-                                    if (fieldData.ui_type) {
-                                        fieldType = fieldData.ui_type;
-                                    }
-                                    
-                                    // Special handling for array/dropdown type
-                                    if (fieldType === 'array') {
-                                        // Look for types array in different possible locations
-                                        if (fieldData.types && Array.isArray(fieldData.types)) {
-                                            dropdownOptions = fieldData.types;
-                                        } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
-                                            dropdownOptions = fieldData.value.types;
-                                        }
-                                    } else {
-                                        // For non-array types, get the value
-                                        if (fieldData.value !== undefined) {
-                                            fieldValue = fieldData.value;
-                                        }
-                                    }
-                                    
-                                    if (fieldData.placeholder) {
-                                        placeholder = fieldData.placeholder;
-                                    }
-                                }
-                            } catch (e) {
-                                // If parsing fails, use the string directly
-                                console.warn(`Failed to parse user field ${key}:`, e);
-                                fieldValue = selectedOption[key];
-                            }
-                        } else if (typeof selectedOption[key] === 'object') {
-                            fieldData = selectedOption[key];
-                            
-                            // Handle object format
-                            if (fieldData.ui_type) {
-                                fieldType = fieldData.ui_type;
-                            }
-                            
-                            // Special handling for array/dropdown type
-                            if (fieldType === 'array') {
-                                if (fieldData.types && Array.isArray(fieldData.types)) {
-                                    dropdownOptions = fieldData.types;
-                                } else if (fieldData.value && fieldData.value.types && Array.isArray(fieldData.value.types)) {
-                                    dropdownOptions = fieldData.value.types;
-                                }
-                            } else {
-                                // For non-array types, get the value
-                                if (fieldData.value !== undefined) {
-                                    fieldValue = fieldData.value;
-                                }
-                            }
-                            
-                            if (fieldData.placeholder) {
-                                placeholder = fieldData.placeholder;
-                            }
-                        } else {
-                            // Direct value (number, boolean, etc.)
-                            fieldValue = selectedOption[key];
-                            fieldType = typeof fieldValue === 'number' ? 'int-float' : 'normal-text';
-                        }
-                        
-                        // Format the field name for display
-                        const fieldName = key.replace('_user', '');
-                        const displayName = formatFieldLabel(key);
-                        
-                        // Create container for the field
-                        const userFieldDiv = document.createElement('div');
-                        userFieldDiv.classList.add('user-field');
-                        
-                        // Create label
-                        const label = document.createElement('label');
-                        label.innerHTML = `<strong>${displayName}:</strong> `;
-                        
-                        let inputElement;
-                        
-                        // Initialize userFields object if it doesn't exist
-                        if (!instance.userFields) {
-                            instance.userFields = {};
-                        }
-                        
-                        // Create the appropriate input based on ui_type
-                        if (isDisplayField) {
-                            // For display-only fields, create a static text display instead of an input
-                            const displaySpan = document.createElement('span');
-                            displaySpan.className = 'user-display-value';
-                            
-                            // Format the display value based on field type
-                            if (fieldType === 'array' && dropdownOptions.length > 0) {
-                                // For dropdown fields, show the selected option text
-                                const selectedIndex = instance.userFields[fieldName] || 0;
-                                displaySpan.textContent = dropdownOptions[selectedIndex] || '';
-                            } else {
-                                displaySpan.textContent = fieldValue || '';
-                            }
-                            
-                            // Use the span as our "input element" for consistent handling
-                            inputElement = displaySpan;
-                        } else {
-                            // Original switch statement for regular user fields
-                            switch (fieldType) {
-                                case 'array':
-                                // It's a dropdown/select field
-                                inputElement = document.createElement('select');
-                                inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
-                                
-                                // Make sure we have an array to work with
-                                if (!dropdownOptions.length) {
-                                    dropdownOptions = ['No options available'];
-                                }
-                                
-                                // Initialize selection if undefined
-                                if (instance.userFields[fieldName] === undefined) {
-                                    instance.userFields[fieldName] = 0;
-                                }
-                                
-                                // Create options
-                                dropdownOptions.forEach((option, i) => {
-                                    const opt = document.createElement('option');
-                                    opt.value = i;
-                                    opt.textContent = option;
-                                    if (i === instance.userFields[fieldName]) {
-                                        opt.selected = true;
-                                    }
-                                    inputElement.appendChild(opt);
-                                });
-                                
-                                // Set up change event
-                                inputElement.addEventListener('change', function() {
-                                    instance.userFields[fieldName] = parseInt(this.value);
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'long-text':
-                                // Create textarea
-                                inputElement = document.createElement('textarea');
-                                inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
-                                inputElement.rows = 3;
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.userFields[fieldName] === undefined) {
-                                    instance.userFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.userFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    instance.userFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'int-float':
-                                // Create number input
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'number';
-                                inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
-                                inputElement.step = 'any'; // Allow decimal points
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.userFields[fieldName] === undefined) {
-                                    instance.userFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.userFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    const val = parseFloat(this.value);
-                                    instance.userFields[fieldName] = isNaN(val) ? 0 : val;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'date':
-                                // Create date input
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'date';
-                                inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
-                                
-                                // Initialize value if undefined
-                                if (instance.userFields[fieldName] === undefined) {
-                                    instance.userFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.userFields[fieldName];
-                                
-                                // Set up change event
-                                inputElement.addEventListener('change', function() {
-                                    instance.userFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                            
-                            case 'normal-text':
-                            default:
-                                // Create text input (default)
-                                inputElement = document.createElement('input');
-                                inputElement.type = 'text';
-                                inputElement.id = `user-field-${fIndex}-${instIndex}-${fieldName}`;
-                                inputElement.placeholder = placeholder;
-                                
-                                // Initialize value if undefined
-                                if (instance.userFields[fieldName] === undefined) {
-                                    instance.userFields[fieldName] = fieldValue;
-                                }
-                                
-                                inputElement.value = instance.userFields[fieldName];
-                                
-                                // Set up input event
-                                inputElement.addEventListener('input', function() {
-                                    instance.userFields[fieldName] = this.value;
-                                    saveSelections();
-                                    updateInvoice();
-                                });
-                                break;
-                        }
-                    }
-                        
-                        // Append input to label
-                        label.appendChild(inputElement);
-                        userFieldDiv.appendChild(label);
-                        optionDetailsDiv.appendChild(userFieldDiv);
-                        
+                        optionDetailsDiv.appendChild(
+                            renderUserFieldRow(selectedOption[key], key, fIndex, instIndex, instance, '_user')
+                        );
                     } catch (e) {
                         console.error(`Error processing user field ${key}:`, e);
                     }
                 }
             }
 
-            // If non-recurring, let the user set quantity
+            // Quantity stepper for non-recurring features.
             if (!feature.recurring) {
-                let quantity = parseInt(instance.quantity) || 1;
-                if (quantity < 1) quantity = 1;
-                instance.quantity = quantity;
-
-                const qtyDiv = document.createElement('div');
-                qtyDiv.classList.add('quantity-input');
-                qtyDiv.innerHTML = `
-                    <label><strong>Quantity:</strong>
-                        <input type="number" min="1" value="${quantity}">
-                    </label>
-                `;
-                const qtyInput = qtyDiv.querySelector('input');
-                qtyInput.addEventListener('change', function() {
-                    let val = parseInt(this.value);
-                    if (isNaN(val) || val < 1) {
-                        val = 1;
-                        this.value = 1;
-                    }
-                    instance.quantity = val;
-                    saveSelections();
-                    updateInvoice();
-                });
-                optionDetailsDiv.appendChild(qtyDiv);
+                optionDetailsDiv.appendChild(
+                    renderQuantityStepper(fIndex, instIndex, instance, feature, selectedOption)
+                );
             }
 
-            // If there are addons, display their raw data (range or static)
+            // ---------- Addons block ----------
+            // Header (overline) + ungrouped list + per-group panels.
+            // Each addon renders via renderAddonCard; groups via
+            // renderAddonGroup. Discount status pills inside groups are
+            // populated by updateGroupDiscountDisplay below.
             if (selectedOption.addons && selectedOption.addons.length > 0) {
                 const addonsDiv = document.createElement('div');
                 addonsDiv.classList.add('addons');
-                const addonsTitle = document.createElement('h4');
-                addonsTitle.textContent = 'Addons';
-                addonsDiv.appendChild(addonsTitle);
 
-                // Organize addons by group
+                const addonsHead = document.createElement('div');
+                addonsHead.classList.add('addons-head');
+                const addonsLabel = document.createElement('span');
+                addonsLabel.classList.add('overline');
+                addonsLabel.textContent = 'Add-ons';
+                addonsHead.appendChild(addonsLabel);
+                addonsDiv.appendChild(addonsHead);
+
                 const { groups, ungrouped } = organizeAddonsByGroup(selectedOption.addons);
-                
-                // First render the ungrouped addons
-                ungrouped.forEach(({addon, index: aIndex}) => {
-                const addonItem = createAddonCheckboxItem(addon, aIndex, fIndex, instIndex, instance);
-                addonsDiv.appendChild(addonItem);
-                });
-                
-                // Then render each group with its own container
-                Object.values(groups).forEach(group => {
-                // Create group container
-                const groupContainer = document.createElement('div');
-                groupContainer.classList.add('addon-group');
-                groupContainer.style.border = '1px solid #ccc';
-                groupContainer.style.borderRadius = '4px';
-                groupContainer.style.padding = '10px';
-                groupContainer.style.marginTop = '15px';
-                groupContainer.style.marginBottom = '15px';
-                
-                // Group header
-                const groupHeader = document.createElement('div');
-                groupHeader.classList.add('addon-group-header');
-                groupHeader.textContent = group.name;
-                groupHeader.style.fontWeight = 'bold';
-                groupHeader.style.marginBottom = '10px';
-                groupContainer.appendChild(groupHeader);
-                
-                // Add description of max items if applicable
-                if (group.maxItems > 0) {
-                    const maxItemsDesc = document.createElement('div');
-                    maxItemsDesc.classList.add('max-group-items-desc');
-                    maxItemsDesc.textContent = `Select up to ${group.maxItems} items`;
-                    maxItemsDesc.style.fontSize = '(--fontSizeSmallest)';
-                    maxItemsDesc.style.fontStyle = 'italic';
-                    maxItemsDesc.style.marginBottom = '8px';
-                    groupContainer.appendChild(maxItemsDesc);
+
+                if (ungrouped.length) {
+                    const list = document.createElement('div');
+                    list.classList.add('addons-list');
+                    ungrouped.forEach(({ addon, index: aIndex }) => {
+                        list.appendChild(renderAddonCard(addon, aIndex, fIndex, instIndex, instance));
+                    });
+                    addonsDiv.appendChild(list);
                 }
-                
-                // Add the addons to this group
-                group.addons.forEach(({addon, index: aIndex}) => {
-                    const addonItem = createAddonCheckboxItem(addon, aIndex, fIndex, instIndex, instance);
-                    groupContainer.appendChild(addonItem);
-                });
-                
-                // Add threshold discounts info if applicable
-                if (group.thresholdDiscounts && group.thresholdDiscounts.length > 0) {
-                    const discountInfo = document.createElement('div');
-                    discountInfo.classList.add('group-discount-info');
-                    discountInfo.style.fontSize = '(--fontSizeSmallest)';
-                    discountInfo.style.marginTop = '8px';
-                    discountInfo.style.color = '#d83838';
-                    
-                    // Sort discounts by item count
-                    const sortedDiscounts = [...group.thresholdDiscounts].sort((a, b) => 
-                        a.itemCount - b.itemCount
+
+                Object.values(groups).forEach((group) => {
+                    addonsDiv.appendChild(
+                        renderAddonGroup(group, fIndex, instIndex, instance, selectedOption)
                     );
-                    
-                    // Get selected count
-                    const selectedCount = getSelectedGroupCount(instance, group.name, selectedOption.addons);
-                    
-                    // Find applicable discount if any
-                    const applicableDiscount = sortedDiscounts.filter(d => selectedCount >= d.itemCount)
-                        .pop();
-                    
-                    if (applicableDiscount) {
-                        discountInfo.innerHTML = `<strong>${applicableDiscount.discount}% discount</strong> applied for selecting ${selectedCount} items`;
-                    } else {
-                        // Show next available discount
-                        const nextDiscount = sortedDiscounts.find(d => selectedCount < d.itemCount);
-                        if (nextDiscount) {
-                            discountInfo.innerHTML = `Select ${nextDiscount.itemCount} items for a <strong>${nextDiscount.discount}% discount</strong>`;
-                        }
-                    }
-                    
-                    groupContainer.appendChild(discountInfo);
-                }
-                
-                // Add group container to addons div
-                addonsDiv.appendChild(groupContainer);
-                
-                // Store a reference to this group on the container for easier access
-                groupContainer.dataset.groupName = group.name;
-                groupContainer.dataset.maxItems = group.maxItems;
                 });
-                
+
                 optionDetailsDiv.appendChild(addonsDiv);
-                
-                // Apply constraints
+
+                // Initial constraint + discount-display pass.
                 enforceMaxAddons(fIndex, instIndex, addonsDiv);
                 enforceMaxGroupItems(fIndex, instIndex, addonsDiv);
+                updateGroupDiscountDisplay(fIndex, instIndex, addonsDiv);
             }
             
             saveSelections();
@@ -2913,69 +3464,77 @@
             return container;
             }
 
-            // Update the discount displays
+            // Update the discount status pill + counter on each group panel.
             function updateGroupDiscountDisplay(fIndex, instIndex, addonsDiv) {
                 const instance = selections[fIndex][instIndex];
                 const option = dashboardData.features[fIndex].options[instance.optionIndex];
                 if (!option || !option.addons) return;
-                
-                // Find all group containers
+
                 const groupContainers = addonsDiv.querySelectorAll('.addon-group');
-                
-                groupContainers.forEach(container => {
+
+                groupContainers.forEach((container) => {
                     const groupName = container.dataset.groupName;
                     if (!groupName) return;
-                    
-                    // Find the discount info div
-                    let discountInfo = container.querySelector('.group-discount-info');
-                    if (!discountInfo) {
-                        // Create it if it doesn't exist
-                        discountInfo = document.createElement('div');
-                        discountInfo.classList.add('group-discount-info');
-                        discountInfo.style.fontSize = '(--fontSizeSmallest)';
-                        discountInfo.style.marginTop = '8px';
-                        discountInfo.style.color = '#d83838';
-                        container.appendChild(discountInfo);
-                    }
-                    
-                    // Get the addons in this group
-                    const groupAddons = option.addons.filter(a => a.groupName === groupName && a.enableGrouping);
-                    if (!groupAddons.length) {
-                        discountInfo.style.display = 'none';
-                        return;
-                    }
-                    
-                    // Get the thresholds from the first addon in this group (they should all be the same)
-                    const thresholdDiscounts = parseThresholdDiscounts(groupAddons[0].groupThresholdDiscounts);
-                    if (!thresholdDiscounts.length) {
-                        discountInfo.style.display = 'none';
-                        return;
-                    }
-                    
-                    // Get selected count
-                    const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
-                    
-                    // Sort discounts by item count
-                    const sortedDiscounts = [...thresholdDiscounts].sort((a, b) => 
-                        a.itemCount - b.itemCount
+
+                    const groupAddons = option.addons.filter(
+                        (a) => a.groupName === groupName && a.enableGrouping
                     );
-                    
-                    // Find applicable discount if any
-                    const applicableDiscount = sortedDiscounts.filter(d => selectedCount >= d.itemCount)
-                        .pop();
-                    
-                    if (applicableDiscount) {
-                        discountInfo.style.display = 'block';
-                        discountInfo.innerHTML = `<strong>${applicableDiscount.discount}% discount</strong> applied for selecting ${selectedCount} items`;
-                    } else {
-                        // Show next available discount
-                        const nextDiscount = sortedDiscounts.find(d => selectedCount < d.itemCount);
-                        if (nextDiscount) {
-                            discountInfo.style.display = 'block';
-                            discountInfo.innerHTML = `Select ${nextDiscount.itemCount} items for a <strong>${nextDiscount.discount}% discount</strong>`;
-                        } else {
-                            discountInfo.style.display = 'none';
+                    const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
+
+                    // Counter: "X / Y selected" — Y is maxItems if set,
+                    // else total in group.
+                    const counter = container.querySelector('.addon-group-counter');
+                    if (counter) {
+                        const maxItems = parseInt(container.dataset.maxItems);
+                        const cap = Number.isFinite(maxItems) && maxItems > 0
+                            ? maxItems
+                            : groupAddons.length;
+                        counter.textContent = `${selectedCount} / ${cap} selected`;
+                    }
+
+                    // Status pill (only present when group has thresholds).
+                    const status = container.querySelector('.addon-group-status');
+                    if (!status) return;
+
+                    const statusText = status.querySelector('.addon-group-status-text');
+                    const statusIcon = status.querySelector('.addon-group-status-icon');
+                    status.classList.remove('is-active', 'is-pending', 'is-empty');
+
+                    const thresholdDiscounts = groupAddons.length
+                        ? parseThresholdDiscounts(groupAddons[0].groupThresholdDiscounts)
+                        : [];
+                    if (!thresholdDiscounts.length) {
+                        status.classList.add('is-empty');
+                        if (statusText) statusText.textContent = '';
+                        return;
+                    }
+
+                    const sorted = [...thresholdDiscounts].sort((a, b) => a.itemCount - b.itemCount);
+                    const passed = sorted.filter((d) => selectedCount >= d.itemCount);
+                    const applicable = passed.length ? passed[passed.length - 1] : null;
+                    const next = sorted.find((d) => selectedCount < d.itemCount);
+
+                    // Highest tier reached → green "active"; partway → amber
+                    // "pending"; none reached and no next tier → empty.
+                    if (applicable && !next) {
+                        status.classList.add('is-active');
+                        if (statusIcon) statusIcon.innerHTML = UTILITY_ICONS.check;
+                        if (statusText) statusText.textContent = `${applicable.discount}% group discount unlocked`;
+                    } else if (applicable) {
+                        status.classList.add('is-active');
+                        if (statusIcon) statusIcon.innerHTML = UTILITY_ICONS.check;
+                        if (statusText) {
+                            statusText.textContent = `${applicable.discount}% off · pick ${next.itemCount - selectedCount} more for ${next.discount}%`;
                         }
+                    } else if (next) {
+                        status.classList.add('is-pending');
+                        if (statusIcon) statusIcon.innerHTML = UTILITY_ICONS.sparkle;
+                        if (statusText) {
+                            statusText.textContent = `Pick ${next.itemCount - selectedCount} more for ${next.discount}% off`;
+                        }
+                    } else {
+                        status.classList.add('is-empty');
+                        if (statusText) statusText.textContent = '';
                     }
                 });
             }
@@ -2995,41 +3554,42 @@
             const instance = selections[fIndex][instIndex];
             const option = dashboardData.features[fIndex].options[instance.optionIndex];
             if (!option || !option.addons) return;
-            
-            // Find all group containers
+
             const groupContainers = addonsDiv.querySelectorAll('.addon-group');
-            
-            groupContainers.forEach(container => {
+
+            groupContainers.forEach((container) => {
                 const groupName = container.dataset.groupName;
                 const maxItems = parseInt(container.dataset.maxItems);
-                
-                // Skip groups with no limit
-                if (!groupName || maxItems <= 0 || isNaN(maxItems)) return;
-                
-                // Count selected items in this group
-                const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
-                
-                // Find all checkboxes for this group
                 const groupCheckboxes = container.querySelectorAll('input[type="checkbox"]');
-                
-                // Disable unchecked boxes if limit reached, otherwise enable all
-                groupCheckboxes.forEach(checkbox => {
-                if (!checkbox.checked) {
-                    checkbox.disabled = selectedCount >= maxItems;
+
+                // No per-group cap → make sure every unchecked card in
+                // this group is re-enabled (option-level enforceMaxAddons
+                // may still disable them later if the option-level cap
+                // is reached).
+                if (!groupName || !Number.isFinite(maxItems) || maxItems <= 0) {
+                    groupCheckboxes.forEach((checkbox) => {
+                        const card = checkbox.closest('.addon-card');
+                        if (!checkbox.checked) {
+                            checkbox.disabled = false;
+                            if (card) card.classList.remove('is-disabled');
+                        }
+                    });
+                    return;
                 }
+
+                const selectedCount = getSelectedGroupCount(instance, groupName, option.addons);
+
+                groupCheckboxes.forEach((checkbox) => {
+                    const card = checkbox.closest('.addon-card');
+                    if (!checkbox.checked) {
+                        const shouldDisable = selectedCount >= maxItems;
+                        checkbox.disabled = shouldDisable;
+                        if (card) card.classList.toggle('is-disabled', shouldDisable);
+                    } else {
+                        checkbox.disabled = false;
+                        if (card) card.classList.remove('is-disabled');
+                    }
                 });
-                
-                // Update message if present
-                const maxItemsMessage = container.querySelector('.max-group-items-desc');
-                if (maxItemsMessage) {
-                if (selectedCount >= maxItems) {
-                    maxItemsMessage.style.color = '#d83838';
-                    maxItemsMessage.style.fontWeight = 'bold';
-                } else {
-                    maxItemsMessage.style.color = '';
-                    maxItemsMessage.style.fontWeight = '';
-                }
-                }
             });
         }
 
@@ -3171,6 +3731,16 @@
             const featureTypeDiv = document.createElement('div');
             featureTypeDiv.classList.add('feature-type');
 
+            // Decorative icon — picks a relevant SVG based on featureName
+            // keywords so the price calculator reads as a real product
+            // configurator rather than raw form fields. CSS positions it
+            // top-right of the .feature-type card.
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'feature-type-icon';
+            iconWrap.setAttribute('aria-hidden', 'true');
+            iconWrap.innerHTML = pickFeatureIcon(feature.featureName);
+            featureTypeDiv.appendChild(iconWrap);
+
             // Header with feature name + description
             const header = document.createElement('h3');
             header.textContent = feature.featureName;
@@ -3191,11 +3761,19 @@
             });
             featureTypeDiv.appendChild(instancesContainer);
 
-            // "Add new" button
+            // "Add new" button — uses the .btn .btn-ghost design-system
+            // styling plus the dashed-border .add-new-feature modifier.
+            // The leading "+" glyph is now an inline SVG (utility icon)
+            // instead of the legacy ::before content rule.
             const addNewBtn = document.createElement('button');
             addNewBtn.type = 'button';
-            addNewBtn.textContent = `Add new ${feature.featureName}`;
-            addNewBtn.classList.add('add-new-feature');
+            addNewBtn.classList.add('btn', 'btn-ghost', 'add-new-feature');
+            const addIcon = document.createElement('span');
+            addIcon.classList.add('add-new-feature-icon');
+            addIcon.setAttribute('aria-hidden', 'true');
+            addIcon.innerHTML = UTILITY_ICONS.plus;
+            addNewBtn.appendChild(addIcon);
+            addNewBtn.appendChild(document.createTextNode(`Add another ${feature.featureName.toLowerCase()}`));
             addNewBtn.addEventListener('click', function() {
                 selections[fIndex].push({});
                 saveSelections();
@@ -3205,6 +3783,12 @@
             featureTypeDiv.appendChild(addNewBtn);
 
             featuresContainer.appendChild(featureTypeDiv);
+
+            // Reveal animation — stagger feature cards as they appear.
+            featureTypeDiv.classList.add('reveal');
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => featureTypeDiv.classList.add('is-in'));
+            });
         });
 
         // Update profile handler
@@ -3486,59 +4070,92 @@
             }
         }
         
-        // Create and mount the Stripe payment form
+        // Create and mount the Stripe payment form. The form lives in a
+        // centered overlay modal — backdrop, blur, all chrome matches the
+        // existing .dash-modal pattern. The Pay Now button is relocated
+        // into the modal so it's reachable above the backdrop, then
+        // restored to its origin if the user cancels.
         function createPaymentForm(clientSecret) {
             if (isOrderPaid()) {
                 showPaymentSuccess();
                 return;
             }
 
-            // Create container + form + error div
-            const paymentContainer = document.createElement('div');
-            paymentContainer.id = 'payment-element-container';
-            paymentContainer.style.marginBottom = '20px';
+            const payNowBtn = document.getElementById('pay-now');
+            // Remember where Pay Now lived so Cancel can put it back.
+            const payNowOrigin = {
+                parent: payNowBtn.parentNode,
+                next:   payNowBtn.nextSibling
+            };
+
+            // Build the modal shell.
+            const modal = document.createElement('div');
+            modal.id = 'payment-form-modal';
+            modal.className = 'dash-modal payment-form-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'payment-form-title');
+
+            const content = document.createElement('div');
+            content.className = 'dash-modal-content payment-form-content';
+
+            const heading = document.createElement('h3');
+            heading.id = 'payment-form-title';
+            heading.textContent = 'Complete payment';
+            content.appendChild(heading);
+
+            const description = document.createElement('p');
+            description.className = 'payment-form-description';
+            description.textContent = 'Enter your card details to finish placing your order.';
+            content.appendChild(description);
 
             const form = document.createElement('form');
             form.id = 'payment-form';
-            
-            // Create the payment element container
+
             const paymentElementDiv = document.createElement('div');
             paymentElementDiv.id = 'payment-element';
             form.appendChild(paymentElementDiv);
 
             const errorDiv = document.createElement('div');
             errorDiv.id = 'payment-error';
-            errorDiv.style.color = 'red';
-            errorDiv.style.marginTop = '10px';
+            errorDiv.className = 'form-message';
             errorDiv.style.display = 'none';
             form.appendChild(errorDiv);
 
-            paymentContainer.appendChild(form);
+            content.appendChild(form);
 
-            const payNowBtn = document.getElementById('pay-now');
-            payNowBtn.parentNode.insertBefore(paymentContainer, payNowBtn);
+            // Action row: Cancel + relocated Pay Now button.
+            const btnRow = document.createElement('div');
+            btnRow.className = 'btn-row payment-form-actions';
 
-            // Initialize Stripe Elements
-            elements = stripe.elements({
-                clientSecret: clientSecret,
-                appearance: {
-                    theme: 'stripe',
-                    variables: {
-                        colorPrimary: '#0073aa',
-                        colorBackground: '#ffffff',
-                        colorText: '#333333',
-                        colorDanger: '#d83838',
-                        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                        borderRadius: '4px'
-                    }
-                }
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn btn-ghost';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.addEventListener('click', closePaymentFormModal);
+
+            btnRow.appendChild(cancelBtn);
+            btnRow.appendChild(payNowBtn);
+            content.appendChild(btnRow);
+
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            // Backdrop click dismisses too.
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closePaymentFormModal();
             });
 
-            // Mount the Payment Element
+            // Initialize Stripe Elements with our shared dark/amber appearance.
+            elements = stripe.elements({
+                clientSecret: clientSecret,
+                appearance: fireflyStripeAppearance()
+            });
+
             paymentElement = elements.create('payment');
             paymentElement.mount('#payment-element');
 
-            // Re-enable “Pay Now” and only disable on click
+            // Re-enable Pay Now and wire it to the payment handler.
             payNowBtn.textContent = 'Pay Now';
             payNowBtn.disabled = false;
             payNowBtn.onclick = function(e) {
@@ -3548,9 +4165,25 @@
                 handlePayment(e);
             };
 
-            setTimeout(() => {
-                smoothScrollToElement(paymentContainer, 120);
-            }, 100);
+            // Stash the cleanup so handlers can call it on success/error.
+            window._closePaymentFormModal = closePaymentFormModal;
+
+            function closePaymentFormModal() {
+                if (paymentElement) {
+                    try { paymentElement.unmount(); } catch (e) { /* ignore */ }
+                    paymentElement = null;
+                }
+                elements = null;
+
+                // Restore Pay Now to its original location.
+                if (payNowOrigin.parent) {
+                    payNowBtn.disabled = false;
+                    payNowBtn.textContent = 'Pay now';
+                    payNowOrigin.parent.insertBefore(payNowBtn, payNowOrigin.next);
+                }
+                modal.remove();
+                window._closePaymentFormModal = null;
+            }
         }
         
         // Handle the payment submission
@@ -3825,6 +4458,12 @@
         }
 
         function showPaymentSuccess() {
+            // Close the centered payment-form modal if it's still open.
+            // (Pay Now button is restored to its origin as part of close.)
+            if (typeof window._closePaymentFormModal === 'function') {
+                window._closePaymentFormModal();
+            }
+
             const payNowBtn = document.getElementById('pay-now');
 
             // Disable form interaction immediately
@@ -4067,47 +4706,47 @@
                     </div>
                     
                     ${(availablePlans.length > 0 || isPastDue) ? `
-                        <div class="plan-change-section" style="margin: 15px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
-                            ${isPastDue ? 
-                                `<div style="color: #d83838; margin-bottom: 10px; font-weight: bold;">
+                        <div class="plan-change-section">
+                            ${isPastDue ?
+                                `<div class="plan-past-due">
                                     Your subscription is past due. Please renew to continue service.
                                 </div>` : ''
                             }
-                            
+
                             ${availablePlans.length > 0 ? `
-                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">
-                                    ${isPastDue ? 'Renew with a different plan:' : 'Change Plan:'}
+                                <label class="plan-change-label">
+                                    ${isPastDue ? 'Renew with a different plan' : 'Change plan'}
                                 </label>
-                                <select class="plan-select" data-subscription-id="${sub.subscription_id}" 
-                                        data-current-option="${currentOptionId}"
-                                        style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                                    <option value="">Select a plan...</option>
+                                <select class="plan-select form-input"
+                                        data-subscription-id="${sub.subscription_id}"
+                                        data-current-option="${currentOptionId}">
+                                    <option value="">Select a plan…</option>
                                     ${availablePlans.map(plan => `
                                         <option value="${plan.id}">
-                                            ${plan.optionName} - $${plan.staticPrice}/${plan.interval || 'month'}
+                                            ${plan.optionName} — $${plan.staticPrice}/${plan.interval || 'month'}
                                         </option>
                                     `).join('')}
                                 </select>
                             ` : ''}
-                            
-                            <button class="btn-primary ${isPastDue ? 'renew-subscription' : 'change-plan'}" 
+
+                            <button class="btn btn-primary ${isPastDue ? 'renew-subscription' : 'change-plan'}"
                                     data-subscription-id="${sub.subscription_id}"
                                     ${availablePlans.length > 0 ? 'disabled' : ''}>
-                                ${isPastDue ? 'Renew Subscription' : 'Change Plan'}
+                                ${isPastDue ? 'Renew subscription' : 'Change plan'}
                             </button>
                         </div>
                     ` : ''}
                     
                     <div class="subscription-actions">
-                        <button class="btn-primary update-payment-btn" 
+                        <button class="btn btn-primary update-payment-btn"
                                 ${isPastDue > 0 ? 'disabled ' : ''}
                                 data-subscription-id="${sub.subscription_id}">
-                            Update Payment Method
+                            Update payment method
                         </button>
-                        ${sub.subscription_status === 'active' && !isPastDue ? 
-                            `<button class="btn-danger cancel-sub-btn" data-subscription-id="${sub.subscription_id}">
-                                Cancel Subscription
-                            </button>` 
+                        ${sub.subscription_status === 'active' && !isPastDue ?
+                            `<button class="btn btn-danger cancel-sub-btn" data-subscription-id="${sub.subscription_id}">
+                                Cancel subscription
+                            </button>`
                             : ''}
                     </div>
                 `;
@@ -4342,9 +4981,7 @@
                     // Create elements for updating payment method
                     updatePaymentElements = stripe.elements({
                         clientSecret: data.clientSecret,
-                        appearance: {
-                            theme: 'stripe'
-                        }
+                        appearance: fireflyStripeAppearance()
                     });
                     
                     updatePaymentElement = updatePaymentElements.create('payment');
@@ -4528,9 +5165,7 @@
                     // Create elements for plan change
                     updatePaymentElements = stripe.elements({
                         clientSecret: data.clientSecret,
-                        appearance: {
-                            theme: 'stripe'
-                        }
+                        appearance: fireflyStripeAppearance()
                     });
                     
                     updatePaymentElement = updatePaymentElements.create('payment');

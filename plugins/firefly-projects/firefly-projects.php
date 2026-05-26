@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FIREFLY_PROJECTS_VERSION', '1.0.21');
+define('FIREFLY_PROJECTS_VERSION', '1.0.22');
 define('FIREFLY_PROJECTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FIREFLY_PROJECTS_PLUGIN_FILE', __FILE__);
@@ -36,6 +36,8 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/projects.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/git-mode.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/seo-post.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/sync-log.php';
 
 /**
  * Activation hook - Create necessary directories
@@ -52,6 +54,11 @@ function firefly_projects_activate() {
 
     if (!file_exists($temp_dir)) {
         wp_mkdir_p($temp_dir);
+    }
+
+    // Create / upgrade the sync activity log table.
+    if (function_exists('firefly_projects_install_sync_log_table')) {
+        firefly_projects_install_sync_log_table();
     }
 
     // Flush rewrite rules for REST API
@@ -239,6 +246,68 @@ function firefly_projects_enqueue_geo_assets() {
 }
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_gutenberg_assets');
 add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_geo_assets');
+add_action('enqueue_block_editor_assets', 'firefly_projects_enqueue_seo_assets');
+
+/**
+ * Enqueue the per-page SEO sidebar panel + its styles.
+ *
+ * Loads on the block editor for both pages and posts (every post type that
+ * has _seo_* meta registered). Localizes the post's current permalink + the
+ * publisher org name into JS so the live SERP preview can render accurately
+ * even before the user types anything.
+ */
+function firefly_projects_enqueue_seo_assets() {
+    global $post;
+    $post_id = $post ? $post->ID : ( isset( $_GET['post'] ) ? (int) $_GET['post'] : 0 );
+
+    $current_post_type = '';
+    if ( $post ) {
+        $current_post_type = $post->post_type;
+    } elseif ( isset( $_GET['post'] ) ) {
+        $current_post_type = get_post_type( (int) $_GET['post'] );
+    } elseif ( isset( $_GET['post_type'] ) ) {
+        $current_post_type = sanitize_key( $_GET['post_type'] );
+    }
+
+    // Only on page + post editors; other CPTs don't have _seo_* meta registered.
+    if ( ! in_array( $current_post_type, array( 'page', 'post' ), true ) ) {
+        return;
+    }
+
+    $js_file  = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/js/seo-post-panel.js';
+    $css_file = FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/assets/css/seo-post.css';
+    $js_ver   = file_exists( $js_file )  ? filemtime( $js_file )  : FIREFLY_PROJECTS_VERSION;
+    $css_ver  = file_exists( $css_file ) ? filemtime( $css_file ) : FIREFLY_PROJECTS_VERSION;
+
+    wp_enqueue_script(
+        'firefly-seo-post-panel',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/js/seo-post-panel.js',
+        array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'wp-i18n', 'wp-media-utils' ),
+        $js_ver,
+        true
+    );
+
+    wp_enqueue_style(
+        'firefly-seo-post',
+        FIREFLY_PROJECTS_PLUGIN_URL . 'includes/assets/css/seo-post.css',
+        array(),
+        $css_ver
+    );
+
+    // wp.media() needs its own enqueue for the OG image picker.
+    wp_enqueue_media();
+
+    $publisher = function_exists( 'firefly_get_publisher_organization' )
+        ? firefly_get_publisher_organization()
+        : array( 'name' => get_bloginfo( 'name' ), 'logo_url' => '' );
+
+    wp_localize_script( 'firefly-seo-post-panel', 'fireflySeoPanel', array(
+        'siteName'       => get_bloginfo( 'name' ),
+        'publisherName'  => $publisher['name'],
+        'postPermalink'  => $post_id ? get_permalink( $post_id ) : home_url( '/' ),
+        'homeUrl'        => home_url( '/' ),
+    ) );
+}
 
 /**
  * Register post meta for REST API access
@@ -261,8 +330,28 @@ function firefly_projects_register_meta() {
             }
         ));
 
+        // Attribution: user_id who triggered the last Live Dev push.
+        register_post_meta($post_type, '_firefly_last_sync_dev_by', array(
+            'show_in_rest'  => true,
+            'single'        => true,
+            'type'          => 'integer',
+            'auth_callback' => function() {
+                return current_user_can('edit_posts');
+            }
+        ));
+
         // Last sync to Production
         register_post_meta($post_type, '_firefly_last_sync_prod', array(
+            'show_in_rest'  => true,
+            'single'        => true,
+            'type'          => 'integer',
+            'auth_callback' => function() {
+                return current_user_can('edit_posts');
+            }
+        ));
+
+        // Attribution: user_id who triggered the last Production push.
+        register_post_meta($post_type, '_firefly_last_sync_prod_by', array(
             'show_in_rest'  => true,
             'single'        => true,
             'type'          => 'integer',
@@ -516,6 +605,22 @@ function firefly_projects_add_page_sync_row_action($actions, $post) {
         esc_attr($last_sync_dev),
         esc_attr($last_sync_prod),
         __('Sync to Remote', 'firefly-projects')
+    );
+
+    // Chevron toggle that opens a per-row activity-log panel below the row.
+    // Data attributes feed the JS drift indicator: it compares
+    // post_modified_gmt (a unix timestamp here) to _firefly_last_sync_<env>
+    // and lights an amber dot when local has changed since the last push.
+    $post_modified_unix = (int) get_post_time( 'U', true, $post->ID );
+    $chevron_svg = '<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true" class="firefly-sync-log-chevron"><polyline points="5 8 10 13 15 8"/></svg>';
+    $actions['firefly_sync_log'] = sprintf(
+        '<a href="#" class="firefly-sync-log-link" data-post-id="%d" data-post-modified="%d" data-last-sync-dev="%s" data-last-sync-prod="%s" aria-expanded="false">%s<span class="firefly-sync-log-label">%s</span><span class="firefly-sync-log-drift-dot" aria-hidden="true"></span></a>',
+        $post->ID,
+        $post_modified_unix,
+        esc_attr( $last_sync_dev ),
+        esc_attr( $last_sync_prod ),
+        $chevron_svg,
+        __( 'Sync activity', 'firefly-projects' )
     );
 
     return $actions;

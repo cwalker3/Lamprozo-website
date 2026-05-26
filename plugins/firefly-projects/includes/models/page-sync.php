@@ -148,7 +148,15 @@ function firefly_projects_package_page($post, $include_assets = true) {
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
+    $allowed_underscore_keys = array(
+        '_thumbnail_id', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint',
+        // GEO meta
+        '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq',
+        // SEO meta (per-page overrides — see seo-post.php for the registration)
+        '_seo_title', '_seo_description', '_seo_canonical',
+        '_seo_robots_noindex', '_seo_robots_nofollow',
+        '_seo_og_image_id', '_seo_og_title', '_seo_og_description',
+    );
     foreach ($meta as $key => $values) {
         // Skip internal meta keys (except whitelisted ones)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -176,6 +184,196 @@ function firefly_projects_package_page($post, $include_assets = true) {
     }
 
     return $package;
+}
+
+/**
+ * Collect the theme-side files associated with a page/post for sync.
+ *
+ * The DB sync alone ships post_content + meta + uploads — but the snippet HTML
+ * and schema entry live on disk in the theme tree. Save_post on the receiver
+ * would normally regenerate them, except it fires before _firefly_template
+ * meta is applied, so it bails. We ship the files explicitly here.
+ *
+ * Returns:
+ *   array(
+ *     'snippet'      => array(rel_path, content)   // omitted if file missing
+ *     'schema_entry' => array(template, kind, slug, entry, schema_rel_path)
+ *     'warnings'     => string[]
+ *   )
+ * or array('warnings' => [...]) when no template assignment exists.
+ */
+function firefly_projects_collect_associated_files( $post ) {
+    $out = array( 'warnings' => array() );
+
+    $template = get_post_meta( $post->ID, '_firefly_template', true );
+    if ( empty( $template ) ) {
+        $out['warnings'][] = 'No _firefly_template meta on post; skipped associated files.';
+        return $out;
+    }
+
+    // Snippet — reuse the canonical path resolver from the theme.
+    if ( function_exists( 'firefly_get_snippet_path' ) ) {
+        $snippet_abs = firefly_get_snippet_path( $post->ID, $post->post_type );
+        if ( $snippet_abs && file_exists( $snippet_abs ) ) {
+            $content_root = trailingslashit( WP_CONTENT_DIR );
+            // Convert absolute → wp-content-relative for the receiver to land at.
+            if ( strpos( $snippet_abs, $content_root ) === 0 ) {
+                $rel = substr( $snippet_abs, strlen( $content_root ) );
+                $out['snippet'] = array(
+                    'rel_path' => $rel,                         // e.g. themes/firefly-collective/templates/default/snippets/pages/about.html
+                    'content'  => file_get_contents( $snippet_abs ),
+                );
+            } else {
+                $out['warnings'][] = 'Snippet path is outside wp-content: ' . $snippet_abs;
+            }
+        } else {
+            $out['warnings'][] = 'Snippet file missing on sender: ' . ( $snippet_abs ? $snippet_abs : '(unresolved)' );
+        }
+    }
+
+    // Schema entry — pluck the slug's record from the active schema JSON.
+    $schema_abs = get_template_directory() . '/data/schemas/' . $template . '-schema.json';
+    if ( file_exists( $schema_abs ) ) {
+        $raw = file_get_contents( $schema_abs );
+        $schema = json_decode( $raw, true );
+        if ( is_array( $schema ) ) {
+            $kind = ( $post->post_type === 'post' ) ? 'posts' : 'pages';
+            $slug = $post->post_name;
+            $entry = null;
+            $base_slug = preg_replace( '/-\d+$/', '', $slug );
+            if ( isset( $schema[ $kind ] ) && is_array( $schema[ $kind ] ) ) {
+                foreach ( $schema[ $kind ] as $row ) {
+                    if ( ! isset( $row['slug'] ) ) continue;
+                    if ( $row['slug'] === $slug || ( $base_slug !== $slug && $row['slug'] === $base_slug ) ) {
+                        $entry = $row;
+                        break;
+                    }
+                }
+            }
+            if ( $entry ) {
+                $content_root = trailingslashit( WP_CONTENT_DIR );
+                $schema_rel = ( strpos( $schema_abs, $content_root ) === 0 )
+                    ? substr( $schema_abs, strlen( $content_root ) )
+                    : null;
+                $out['schema_entry'] = array(
+                    'template'        => $template,
+                    'kind'            => $kind,
+                    'slug'            => $slug,
+                    'entry'           => $entry,
+                    'schema_rel_path' => $schema_rel,
+                );
+            } else {
+                $out['warnings'][] = "Schema entry for slug '{$slug}' not found in {$template}-schema.json.";
+            }
+        } else {
+            $out['warnings'][] = 'Schema JSON parse failed: ' . $schema_abs;
+        }
+    } else {
+        $out['warnings'][] = 'Schema file missing on sender: ' . $schema_abs;
+    }
+
+    return $out;
+}
+
+/**
+ * Apply the associated_files manifest to the local filesystem (receiver side).
+ *
+ * Writes snippet HTML to its declared rel_path and merges the schema_entry into
+ * the local schema JSON for that slug. Always sender-wins for the targeted slug;
+ * other slugs in the schema are untouched.
+ *
+ * Returns:
+ *   array( 'files_written' => string[], 'warnings' => string[] )
+ */
+function firefly_projects_apply_associated_files( $associated, $post ) {
+    $result = array( 'files_written' => array(), 'warnings' => array() );
+    if ( ! is_array( $associated ) ) return $result;
+
+    $content_root = realpath( WP_CONTENT_DIR );
+    if ( ! $content_root ) {
+        $result['warnings'][] = 'realpath(WP_CONTENT_DIR) failed; refusing to write.';
+        return $result;
+    }
+    $content_root = rtrim( $content_root, DIRECTORY_SEPARATOR );
+
+    // ---- Snippet ----
+    if ( ! empty( $associated['snippet']['rel_path'] ) && isset( $associated['snippet']['content'] ) ) {
+        $rel = ltrim( (string) $associated['snippet']['rel_path'], '/\\' );
+        $candidate = $content_root . DIRECTORY_SEPARATOR . str_replace( '/', DIRECTORY_SEPARATOR, $rel );
+        // Resolve parent dir realpath for containment; create it if missing.
+        $parent_dir = dirname( $candidate );
+        if ( ! is_dir( $parent_dir ) ) {
+            wp_mkdir_p( $parent_dir );
+        }
+        $parent_real = realpath( $parent_dir );
+        if ( $parent_real && strpos( $parent_real, $content_root ) === 0 ) {
+            $final_path = $parent_real . DIRECTORY_SEPARATOR . basename( $candidate );
+            if ( @file_put_contents( $final_path, (string) $associated['snippet']['content'] ) !== false ) {
+                $result['files_written'][] = $rel;
+            } else {
+                $result['warnings'][] = 'Snippet write failed: ' . $rel;
+            }
+        } else {
+            $result['warnings'][] = 'Snippet path escapes wp-content; refused: ' . $rel;
+        }
+    }
+
+    // ---- Schema entry ----
+    if ( ! empty( $associated['schema_entry']['template'] ) && ! empty( $associated['schema_entry']['slug'] ) && isset( $associated['schema_entry']['entry'] ) ) {
+        $template = (string) $associated['schema_entry']['template'];
+        $kind     = ( ( $associated['schema_entry']['kind'] ?? '' ) === 'posts' ) ? 'posts' : 'pages';
+        $slug     = (string) $associated['schema_entry']['slug'];
+        $entry    = $associated['schema_entry']['entry'];
+
+        // Resolve the receiver's schema path the same way the theme does, not
+        // by trusting the sender's path — they may differ if the theme moves.
+        $schema_abs = get_template_directory() . '/data/schemas/' . $template . '-schema.json';
+        $parent_real = realpath( dirname( $schema_abs ) );
+        if ( $parent_real && strpos( $parent_real, $content_root ) === 0 && file_exists( $schema_abs ) ) {
+            $raw = file_get_contents( $schema_abs );
+            $schema = json_decode( $raw, true );
+            if ( is_array( $schema ) ) {
+                if ( ! isset( $schema[ $kind ] ) || ! is_array( $schema[ $kind ] ) ) {
+                    $schema[ $kind ] = array();
+                }
+                $found = false;
+                $base_slug = preg_replace( '/-\d+$/', '', $slug );
+                foreach ( $schema[ $kind ] as $i => $row ) {
+                    if ( ! isset( $row['slug'] ) ) continue;
+                    if ( $row['slug'] === $slug || ( $base_slug !== $slug && $row['slug'] === $base_slug ) ) {
+                        $schema[ $kind ][ $i ] = $entry;
+                        $found = true;
+                        break;
+                    }
+                }
+                if ( ! $found ) {
+                    $schema[ $kind ][] = $entry;
+                }
+                // Atomic write: tmp + rename so a crash mid-write doesn't leave a half-file.
+                $tmp = $schema_abs . '.tmp';
+                $encoded = json_encode( $schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+                if ( $encoded !== false && @file_put_contents( $tmp, $encoded ) !== false && @rename( $tmp, $schema_abs ) ) {
+                    $result['files_written'][] = ltrim( str_replace( $content_root . DIRECTORY_SEPARATOR, '', $schema_abs ), '/\\' );
+                } else {
+                    @unlink( $tmp );
+                    $result['warnings'][] = 'Schema write failed: ' . $schema_abs;
+                }
+            } else {
+                $result['warnings'][] = 'Local schema JSON parse failed; refused to overwrite.';
+            }
+        } else {
+            $result['warnings'][] = 'Schema path inaccessible or escapes wp-content: ' . $schema_abs;
+        }
+    }
+
+    // Forward warnings from the sender's collection step (e.g. "file missing on sender").
+    if ( ! empty( $associated['warnings'] ) && is_array( $associated['warnings'] ) ) {
+        foreach ( $associated['warnings'] as $w ) {
+            $result['warnings'][] = '[sender] ' . $w;
+        }
+    }
+
+    return $result;
 }
 
 /**
@@ -269,7 +467,15 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $meta = get_post_meta($post->ID);
     $meta_data = array();
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
+    $allowed_underscore_keys = array(
+        '_thumbnail_id', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint',
+        // GEO meta
+        '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq',
+        // SEO meta (per-page overrides — see seo-post.php for the registration)
+        '_seo_title', '_seo_description', '_seo_canonical',
+        '_seo_robots_noindex', '_seo_robots_nofollow',
+        '_seo_og_image_id', '_seo_og_title', '_seo_og_description',
+    );
     foreach ($meta as $key => $values) {
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
@@ -328,9 +534,39 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         }
     }
 
+    // Get mobile featured image data if exists. Stored on the post as
+    // _firefly_mobile_thumbnail_id, the same attachment-id shape as the
+    // standard featured image. The receiver re-creates the attachment and
+    // wires it back up on the synced post.
+    $mobile_featured_image = null;
+    $mobile_featured_image_path = null;
+    $mobile_thumbnail_id = (int) get_post_meta( $post->ID, '_firefly_mobile_thumbnail_id', true );
+    if ( $mobile_thumbnail_id ) {
+        $mobile_path = get_attached_file( $mobile_thumbnail_id );
+        if ( $mobile_path && file_exists( $mobile_path ) ) {
+            $mobile_featured_image = array(
+                'filename'  => basename( $mobile_path ),
+                'mime_type' => get_post_mime_type( $mobile_thumbnail_id ),
+                'alt_text'  => get_post_meta( $mobile_thumbnail_id, '_wp_attachment_image_alt', true ),
+                'title'     => get_the_title( $mobile_thumbnail_id ),
+            );
+            $mobile_featured_image_path = $mobile_path;
+        }
+    }
+
+    // Collect theme-side files associated with this post (snippet + schema entry).
+    // Warnings are forwarded to the response so the caller can surface them.
+    $associated_files = firefly_projects_collect_associated_files( $post );
+
+    // Get tracked links for this post (moved up so the zip manifest can include them)
+    $tracked_links = array();
+    if (function_exists('firefly_link_tracking_get_post_links_for_sync')) {
+        $tracked_links = firefly_link_tracking_get_post_links_for_sync($post->ID);
+    }
+
     // Create temporary zip file with assets or featured image
     $zip_path = null;
-    if (!empty($assets_to_sync) || $featured_image_path) {
+    if (!empty($assets_to_sync) || $featured_image_path || $mobile_featured_image_path) {
         $upload_dir = wp_upload_dir();
         $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
 
@@ -362,15 +598,22 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             $zip->addFile($featured_image_path, 'featured/' . basename($featured_image_path));
         }
 
+        // Add mobile featured image to zip if exists
+        if ($mobile_featured_image_path && file_exists($mobile_featured_image_path)) {
+            $zip->addFile($mobile_featured_image_path, 'mobile_featured/' . basename($mobile_featured_image_path));
+        }
+
         // Add manifest with relative paths for proper extraction
         $manifest = array(
-            'post_data'      => $post_data,
-            'meta_data'      => $meta_data,
-            'target_env'     => $target_env,
-            'asset_map'      => $asset_map,
-            'featured_image' => $featured_image,
-            'page_role'      => $page_role,
-            'tracked_links'  => $tracked_links,
+            'post_data'             => $post_data,
+            'meta_data'             => $meta_data,
+            'target_env'            => $target_env,
+            'asset_map'             => $asset_map,
+            'featured_image'        => $featured_image,
+            'mobile_featured_image' => $mobile_featured_image,
+            'page_role'             => $page_role,
+            'tracked_links'         => $tracked_links,
+            'associated_files'      => $associated_files,
             'assets'         => array_map(function($a) {
                 return array(
                     'url'           => isset($a['url']) ? $a['url'] : '',
@@ -384,22 +627,25 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         $zip->close();
     }
 
-    // Get tracked links for this post
-    $tracked_links = array();
-    if (function_exists('firefly_link_tracking_get_post_links_for_sync')) {
-        $tracked_links = firefly_link_tracking_get_post_links_for_sync($post->ID);
-    }
-
-    // Prepare request body
+    // Prepare request body — $tracked_links and $associated_files were collected
+    // before the zip block so the zip manifest could include them.
+    //
+    // The receiver decodes the multipart `manifest` form field from THIS body
+    // (not the manifest.json inside the zip), so every field the receiver
+    // reads has to be present here too. Forgetting to mirror a field here
+    // was the cause of mobile_featured_image silently never landing on the
+    // remote even though the zip's manifest.json had it correctly.
     $body = array(
-        'post_data'      => $post_data,
-        'meta_data'      => $meta_data,
-        'target_env'     => $target_env,
-        'asset_map'      => $asset_map,
-        'featured_image' => $featured_image,
-        'has_assets'     => !empty($assets_to_sync) || $featured_image_path,
-        'page_role'      => $page_role,
-        'tracked_links'  => $tracked_links
+        'post_data'             => $post_data,
+        'meta_data'             => $meta_data,
+        'target_env'            => $target_env,
+        'asset_map'             => $asset_map,
+        'featured_image'        => $featured_image,
+        'mobile_featured_image' => $mobile_featured_image,
+        'has_assets'            => !empty($assets_to_sync) || $featured_image_path || $mobile_featured_image_path,
+        'page_role'             => $page_role,
+        'tracked_links'         => $tracked_links,
+        'associated_files'      => $associated_files,
     );
 
     // Send request
@@ -465,27 +711,85 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $result = json_decode($response, true);
 
     if ($http_code === 200 && isset($result['success']) && $result['success']) {
-        // Save last sync timestamp per environment
+        // Save last sync timestamp + attribution per environment.
         $sync_time = time();
+        $user_id   = get_current_user_id();
         if ($target_env === 'prod') {
             update_post_meta($post->ID, '_firefly_last_sync_prod', $sync_time);
+            if ( $user_id ) update_post_meta($post->ID, '_firefly_last_sync_prod_by', $user_id);
         } else {
             update_post_meta($post->ID, '_firefly_last_sync_dev', $sync_time);
+            if ( $user_id ) update_post_meta($post->ID, '_firefly_last_sync_dev_by', $user_id);
+        }
+
+        // Files reported by the receiver (snippet + schema) plus media assets we shipped.
+        $associated_written = isset($result['associated_files_written']) && is_array($result['associated_files_written'])
+            ? $result['associated_files_written']
+            : array();
+        $associated_warnings = isset($result['associated_files_warnings']) && is_array($result['associated_files_warnings'])
+            ? $result['associated_files_warnings']
+            : array();
+        $files_count = count($assets_to_sync) + count($associated_written);
+
+        // Activity log row — push, success.
+        if ( function_exists( 'firefly_projects_log_sync' ) ) {
+            $revisions = wp_get_post_revisions( $post->ID, array( 'numberposts' => 1, 'orderby' => 'date', 'order' => 'DESC' ) );
+            $revision_id = $revisions ? (int) array_key_first( $revisions ) : null;
+            firefly_projects_log_sync(array(
+                'post_id'     => (int) $post->ID,
+                'post_type'   => $post->post_type,
+                'direction'   => 'push',
+                'env'         => $target_env,
+                'user_id'     => $user_id ?: null,
+                'status'      => 'success',
+                'revision_id' => $revision_id,
+                'files_count' => $files_count,
+                'summary'     => array(
+                    'target_host'        => parse_url($page_endpoint, PHP_URL_HOST),
+                    'media_files'        => array_map(function($a) {
+                        return isset($a['filename']) ? $a['filename'] : basename( isset($a['path']) ? $a['path'] : '' );
+                    }, $assets_to_sync),
+                    'associated_files'   => $associated_written,
+                    'warnings'           => $associated_warnings,
+                ),
+            ));
         }
 
         return array(
             'success' => true,
             'message' => 'Page synced successfully to ' . $env_label . '.',
             'details' => array(
-                'page_title'   => $post->post_title,
-                'page_slug'    => $post->post_name,
-                'files_synced' => count($assets_to_sync),
-                'synced_at'    => time(),
-                'target_env'   => $target_env
+                'page_title'        => $post->post_title,
+                'page_slug'         => $post->post_name,
+                'files_synced'      => $files_count,
+                'associated_files'  => $associated_written,
+                'warnings'          => $associated_warnings,
+                'synced_at'         => $sync_time,
+                'target_env'        => $target_env
             )
         );
     } else {
         $error_message = isset($result['message']) ? $result['message'] : 'Unknown error occurred.';
+
+        // Activity log row — push, failure.
+        if ( function_exists( 'firefly_projects_log_sync' ) ) {
+            firefly_projects_log_sync(array(
+                'post_id'     => (int) $post->ID,
+                'post_type'   => $post->post_type,
+                'direction'   => 'push',
+                'env'         => $target_env,
+                'user_id'     => get_current_user_id() ?: null,
+                'status'      => 'failure',
+                'revision_id' => null,
+                'files_count' => 0,
+                'summary'     => array(
+                    'target_host'    => parse_url($page_endpoint, PHP_URL_HOST),
+                    'error_message'  => $error_message,
+                    'http_code'      => isset($http_code) ? (int) $http_code : null,
+                ),
+            ));
+        }
+
         return array(
             'success' => false,
             'message' => 'Sync to ' . $env_label . ' failed: ' . $error_message
@@ -500,6 +804,14 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
  * @return array Result array with success status and message
  */
 function firefly_projects_handle_incoming_page($request) {
+    // Suppress the save_post → firefly_save_snippet hook for the duration of
+    // this request — we're going to write the snippet explicitly from the
+    // sender's manifest, and we don't want the hook to clobber it from
+    // post_content immediately after wp_insert_post fires.
+    if ( ! defined( 'FIREFLY_PROJECTS_SYNCING_INBOUND' ) ) {
+        define( 'FIREFLY_PROJECTS_SYNCING_INBOUND', true );
+    }
+
     // Get content type to determine how data was sent
     $content_type = $request->get_content_type();
 
@@ -512,8 +824,10 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($manifest['target_env']) ? $manifest['target_env'] : 'dev';
         $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
         $featured_image = isset($manifest['featured_image']) ? $manifest['featured_image'] : null;
+        $mobile_featured_image = isset($manifest['mobile_featured_image']) ? $manifest['mobile_featured_image'] : null;
         $page_role = isset($manifest['page_role']) ? $manifest['page_role'] : null;
         $tracked_links = isset($manifest['tracked_links']) ? $manifest['tracked_links'] : array();
+        $associated_files = isset($manifest['associated_files']) ? $manifest['associated_files'] : array();
 
         // Handle uploaded zip file
         $files = $request->get_file_params();
@@ -527,8 +841,10 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($body['target_env']) ? $body['target_env'] : 'dev';
         $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
         $featured_image = isset($body['featured_image']) ? $body['featured_image'] : null;
+        $mobile_featured_image = isset($body['mobile_featured_image']) ? $body['mobile_featured_image'] : null;
         $page_role = isset($body['page_role']) ? $body['page_role'] : null;
         $tracked_links = isset($body['tracked_links']) ? $body['tracked_links'] : array();
+        $associated_files = isset($body['associated_files']) ? $body['associated_files'] : array();
         $zip_file = null;
     }
 
@@ -627,6 +943,16 @@ function firefly_projects_handle_incoming_page($request) {
         update_post_meta($post_id, '_firefly_asset_map', $asset_map);
     }
 
+    // Apply theme-side files (snippet + schema entry) AFTER meta has been written,
+    // so the writer has access to the right _firefly_template if it needs to fall
+    // back. The snippet auto-export hook is suppressed via FIREFLY_PROJECTS_SYNCING_INBOUND
+    // (defined at the top of this function).
+    $applied_post = get_post( $post_id );
+    $associated_report = array( 'files_written' => array(), 'warnings' => array() );
+    if ( $applied_post && ! empty( $associated_files ) ) {
+        $associated_report = firefly_projects_apply_associated_files( $associated_files, $applied_post );
+    }
+
     // Sync tracked links if provided
     if (!empty($tracked_links) && function_exists('firefly_link_tracking_sync_incoming_links')) {
         firefly_link_tracking_sync_incoming_links($post_id, $tracked_links);
@@ -686,12 +1012,19 @@ function firefly_projects_handle_incoming_page($request) {
                 }
             }
 
-            // Extract and process featured image if included
+            // Extract and process featured image if included.
+            // Local is the source of truth: any prior featured attachment on
+            // the remote is force-replaced by what arrived in the zip. We
+            // delete the previous attachment record + file before inserting
+            // the new one, so re-syncs don't accumulate orphan attachments
+            // and stale image URLs (which a CDN can keep caching for hours).
             if ($featured_image && !empty($featured_image['filename'])) {
                 $featured_filename = $featured_image['filename'];
                 $featured_content = $zip->getFromName('featured/' . $featured_filename);
 
                 if ($featured_content !== false) {
+                    $previous_thumb_id = (int) get_post_thumbnail_id( $post_id );
+
                     $featured_path = $page_assets_dir . '/' . $featured_filename;
                     file_put_contents($featured_path, $featured_content);
 
@@ -719,6 +1052,65 @@ function firefly_projects_handle_incoming_page($request) {
 
                         // Set as featured image
                         set_post_thumbnail($post_id, $attach_id);
+
+                        // Purge the previous featured attachment (record + file +
+                        // generated thumbnail sizes) so nothing on the host is
+                        // still pointing at an out-of-date image URL.
+                        if ( $previous_thumb_id && $previous_thumb_id !== (int) $attach_id ) {
+                            wp_delete_attachment( $previous_thumb_id, true );
+                        }
+                    }
+                }
+            }
+
+            // Extract and process mobile featured image if included
+            if ($mobile_featured_image && !empty($mobile_featured_image['filename'])) {
+                $mobile_filename = $mobile_featured_image['filename'];
+                $mobile_content = $zip->getFromName('mobile_featured/' . $mobile_filename);
+
+                if ($mobile_content !== false) {
+                    // Avoid clobbering a file in page_assets_dir if it shares the
+                    // name with the desktop featured image — prefix with "mobile-".
+                    $mobile_destination_name = $mobile_filename;
+                    if ($featured_image && isset($featured_image['filename']) && $featured_image['filename'] === $mobile_filename) {
+                        $mobile_destination_name = 'mobile-' . $mobile_filename;
+                    }
+                    $mobile_path = $page_assets_dir . '/' . $mobile_destination_name;
+                    file_put_contents($mobile_path, $mobile_content);
+
+                    // Capture any prior mobile thumbnail attachment so we can
+                    // purge it after the new one is wired up — same force-
+                    // replace semantics as the desktop featured image above.
+                    $previous_mobile_id = (int) get_post_meta( $post_id, '_firefly_mobile_thumbnail_id', true );
+
+                    $mobile_attachment = array(
+                        'post_mime_type' => $mobile_featured_image['mime_type'],
+                        'post_title'     => ! empty($mobile_featured_image['title'])
+                            ? $mobile_featured_image['title']
+                            : pathinfo($mobile_filename, PATHINFO_FILENAME),
+                        'post_content'   => '',
+                        'post_status'    => 'inherit'
+                    );
+
+                    $mobile_attach_id = wp_insert_attachment($mobile_attachment, $mobile_path, $post_id);
+
+                    if (! is_wp_error($mobile_attach_id)) {
+                        require_once(ABSPATH . 'wp-admin/includes/image.php');
+                        $mobile_attach_data = wp_generate_attachment_metadata($mobile_attach_id, $mobile_path);
+                        wp_update_attachment_metadata($mobile_attach_id, $mobile_attach_data);
+
+                        if (! empty($mobile_featured_image['alt_text'])) {
+                            update_post_meta($mobile_attach_id, '_wp_attachment_image_alt', $mobile_featured_image['alt_text']);
+                        }
+
+                        // Wire it up to the post's mobile thumbnail meta.
+                        update_post_meta($post_id, '_firefly_mobile_thumbnail_id', (int) $mobile_attach_id);
+
+                        // Purge the previous mobile attachment so old URLs
+                        // (and CDN caches keyed on them) stop resolving.
+                        if ( $previous_mobile_id && $previous_mobile_id !== (int) $mobile_attach_id ) {
+                            wp_delete_attachment( $previous_mobile_id, true );
+                        }
                     }
                 }
             }
@@ -745,6 +1137,8 @@ function firefly_projects_handle_incoming_page($request) {
     return array(
         'success' => true,
         'message' => ($existing_post ? $type_label . ' updated' : $type_label . ' created') . ' successfully on ' . $env_label . '.',
-        'page_role' => $page_role
+        'page_role' => $page_role,
+        'associated_files_written'  => $associated_report['files_written'],
+        'associated_files_warnings' => $associated_report['warnings'],
     );
 }

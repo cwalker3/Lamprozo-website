@@ -54,16 +54,20 @@ function firefly_projects_git_mode_is_enabled_for_user( $user_id = null ) {
 
 /**
  * Classify a porcelain two-char status code into a simpler category the UI
- * can color: "staged" (ready to commit), "modified" (unstaged working-tree
- * change), or "untracked" (new file).
+ * can color: "deleted", "staged" (ready to commit), "modified" (unstaged
+ * working-tree change), or "untracked" (new file).
  *
  * If a file is both staged AND modified (e.g. "MM"), we return "modified"
  * since that's the actionable state — there's work that hasn't been staged.
+ * A 'D' in either column wins over everything else — the file is going
+ * to be removed from the remote, regardless of which gen of the change
+ * the user has staged.
  */
 function firefly_projects_git_classify_status( $xy ) {
     if ( $xy === '??' ) return 'untracked';
     $x = isset( $xy[0] ) ? $xy[0] : ' ';
     $y = isset( $xy[1] ) ? $xy[1] : ' ';
+    if ( $x === 'D' || $y === 'D' ) return 'deleted';
     if ( $y !== ' ' && $y !== '?' ) return 'modified';   // unstaged change present
     if ( $x !== ' ' && $x !== '?' ) return 'staged';     // staged only
     return 'modified';
@@ -84,6 +88,14 @@ function firefly_projects_git_changed_files() {
     if ( ! firefly_projects_git_is_available() ) return array();
 
     $wp_content = firefly_projects_git_wp_content_dir();
+
+    // Force git to re-stat all files before reading status. Without this,
+    // git's lazy stat cache can hold onto outdated mtime/size info after
+    // bulk operations (rebase, checkout, bind-mount filesystem sync delays
+    // on WSL2/Docker), causing `git status --porcelain` to report files as
+    // modified even when their content matches HEAD.
+    @shell_exec( 'cd ' . escapeshellarg( $wp_content ) . ' && git update-index --refresh 2>/dev/null' );
+
     $cmd = 'cd ' . escapeshellarg( $wp_content ) . ' && git status --porcelain 2>&1';
     $output = shell_exec( $cmd );
     if ( ! is_string( $output ) || $output === '' ) return array();
@@ -191,7 +203,7 @@ function firefly_projects_git_status_endpoint( WP_REST_Request $request ) {
         'all_changed_files' => array(),
         'in_scope_files'    => array(),
         'status_map'        => new stdClass(),  // "/wp-content/x" => "staged"|"modified"|"untracked"
-        'status_counts'     => array( 'staged' => 0, 'modified' => 0, 'untracked' => 0 ),
+        'status_counts'     => array( 'staged' => 0, 'modified' => 0, 'untracked' => 0, 'deleted' => 0 ),
         'changed_count'     => 0,
     );
 
@@ -215,7 +227,7 @@ function firefly_projects_git_status_endpoint( WP_REST_Request $request ) {
     $result['changed_count']  = count( $scoped['paths'] );
 
     // Counts per status for the UI label
-    $counts = array( 'staged' => 0, 'modified' => 0, 'untracked' => 0 );
+    $counts = array( 'staged' => 0, 'modified' => 0, 'untracked' => 0, 'deleted' => 0 );
     foreach ( $scoped['status_map'] as $status ) {
         if ( isset( $counts[ $status ] ) ) $counts[ $status ]++;
     }

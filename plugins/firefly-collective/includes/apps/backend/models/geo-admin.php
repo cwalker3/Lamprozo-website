@@ -17,8 +17,8 @@ if (!defined('ABSPATH')) {
  */
 function firefly_collective_add_geo_link() {
     add_menu_page(
-        'GEO Settings',
-        'GEO',
+        'SEO/GEO Settings',
+        'SEO/GEO',
         'manage_options',
         'firefly-geo',
         'firefly_collective_geo_dashboard',

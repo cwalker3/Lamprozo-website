@@ -9,4 +9,4 @@
 <div id="app-root"></div>
 
 <div id="website-app"></div>
-<img src="<?=$template_path?>/images/loading.gif" id="loader">
+<div id="loader" class="ff-app-loader" aria-hidden="true"><span class="ff-app-loader-ring"></span></div>

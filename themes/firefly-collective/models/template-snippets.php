@@ -40,6 +40,55 @@ function firefly_relativize_urls($content) {
     // Matches /wp-content/, /wp-includes/, and /wp-admin/ asset paths.
     $content = preg_replace('#https?://[^/\s"\']+(/wp-(?:content|includes|admin)/)#', '$1', $content);
 
+    // Post-pass: restore absolute URLs in social-crawler meta tags.
+    //
+    // The relativization above is needed for content portability (snippets
+    // sync clean across environments). But social platforms (Twitter/X,
+    // LinkedIn, Slack, Discord, Pinterest) silently SKIP images and links
+    // when given a relative URL — they don't auto-resolve. Even Facebook
+    // only resolves og:image, not twitter:image. Google's canonical also
+    // requires absolute for correct indexing.
+    //
+    // We selectively re-absolute these specific tags after relativization
+    // so the rest of the document (links, images, scripts) stays relative.
+    $content = firefly_reabsolute_crawler_tags( $content );
+
+    return $content;
+}
+
+/**
+ * Restore absolute URLs in the specific <meta> / <link> tags that social
+ * crawlers and search engines require absolute. Runs as a post-pass after
+ * firefly_relativize_urls. Tag matching is intentionally tight — driven by
+ * the emit shape used in seo-meta.php / seo-schema.php — to avoid
+ * accidentally re-absoluting content elsewhere in the page.
+ */
+function firefly_reabsolute_crawler_tags( $content ) {
+    if ( ! is_string( $content ) || $content === '' ) {
+        return $content;
+    }
+    $home = untrailingslashit( home_url() );
+    if ( $home === '' ) {
+        return $content;
+    }
+
+    // og:image / og:url / og:image:secure_url / og:video / og:audio
+    // twitter:image / twitter:image:src
+    // <link rel="canonical" href="...">
+    // Matches root-relative paths only (content="/..." or href="/..."),
+    // case-insensitive on attribute keys, single- or double-quoted.
+    $patterns = array(
+        '#(<meta\s+property=(?:"|\')(?:og:image|og:image:secure_url|og:url|og:video|og:audio)(?:"|\')\s+content=(?:"|\'))(/[^"\']*)#i',
+        '#(<meta\s+name=(?:"|\')(?:twitter:image|twitter:image:src|twitter:url)(?:"|\')\s+content=(?:"|\'))(/[^"\']*)#i',
+        '#(<link\s+rel=(?:"|\')canonical(?:"|\')\s+href=(?:"|\'))(/[^"\']*)#i',
+    );
+
+    foreach ( $patterns as $pattern ) {
+        $content = preg_replace_callback( $pattern, function ( $m ) use ( $home ) {
+            return $m[1] . $home . $m[2];
+        }, $content );
+    }
+
     return $content;
 }
 
@@ -149,6 +198,15 @@ function firefly_get_snippet_path($post_id, $post_type = 'page') {
  * Save post content to snippet file
  */
 function firefly_save_snippet($post_id) {
+    // Suppress when an inbound page-sync is currently applying the snippet
+    // explicitly from the sender's manifest. Without this guard the receiver
+    // would immediately re-derive the snippet from post_content via
+    // firefly_relativize_urls() and clobber the file we just wrote, defeating
+    // the point of shipping snippet HTML byte-for-byte.
+    if (defined('FIREFLY_PROJECTS_SYNCING_INBOUND') && FIREFLY_PROJECTS_SYNCING_INBOUND) {
+        return;
+    }
+
     // Skip autosaves
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
         return;

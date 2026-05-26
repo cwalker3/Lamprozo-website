@@ -2,9 +2,37 @@
 
     // theme/models/app.php
 
-    /**
-     * Get available assets from template directory with blacklist support
-     */
+	/**
+	 * Get available assets from template directory with blacklist support
+	 */
+	function get_template_core_assets($template_name, $theme_path) {
+		$template_dir      = get_template_directory() . '/templates/' . $template_name . '/assets';
+		$template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
+
+		$assets = array(
+			'css' => array(),
+			'js'  => array(),
+		);
+
+		$css_dir = $template_dir . '/css';
+		if (is_dir($css_dir)) {
+			$css_files = glob($css_dir . '/_core_*.css');
+			foreach ($css_files as $file) {
+				$assets['css'][] = $template_web_path . '/css/' . basename($file);
+			}
+		}
+
+		$js_dir = $template_dir . '/js';
+		if (is_dir($js_dir)) {
+			$js_files = glob($js_dir . '/_core_*.js');
+			foreach ($js_files as $file) {
+				$assets['js'][] = $template_web_path . '/js/' . basename($file);
+			}
+		}
+
+		return $assets;
+	}
+
     function get_template_assets($template_name, $theme_path) {
         $template_dir      = get_template_directory() . '/templates/' . $template_name . '/assets';
         $template_web_path = $theme_path . '/templates/' . $template_name . '/assets';
@@ -104,6 +132,7 @@
 
         // Get template assets dynamically
         $template_assets = get_template_assets($active_template, $theme_path);
+        $template_core_assets = get_template_core_assets($active_template, $theme_path);
 
         // Get third party login status
         $third_party = get_user_meta( $user_id, 'third_party', true ) ?: null;
@@ -127,7 +156,12 @@
             'auth_id'           => $_COOKIE['auth_id'],
             'http_host'         => $http_host,
             'active_template'   => $active_template,
-            'template_assets'   => $template_assets,
+            'template_assets'   => array(
+                'core_css' => $template_core_assets['css'],
+                'core_js'  => $template_core_assets['js'],
+                'css'      => $template_assets['css'],
+                'js'       => $template_assets['js'],
+            ),
             'third_party'       => $third_party,
             'dynamic_css'       => $dynamic_css
         ]);
@@ -257,21 +291,23 @@
             break;
 
             case 'order-history':
-                global $currentUserIdAdmin;
+                global $currentUserIdAdmin, $backend_plugin_path;
                 $currentUserIdAdmin = current_user_can('manage_options');
+                $backend_plugin_path = $plugin_path;
 
                 // Get the order-history page from WordPress for banner
                 $orders_page = get_page_by_path('order-history');
-                
+
                 if ($orders_page) {
                     $postContent = apply_filters('the_content', $orders_page->post_content);
                 } else {
                     $postContent = '';
                 }
 
-                // Get orders view
+                // Render through the theme wrapper so the snippet hero
+                // (orders-hero) is echoed alongside the orders table.
                 ob_start();
-                include $plugin_path . '/views/orders.php';
+                include $template_path . '/views/order-history.php';
                 $response_html = ob_get_clean();
 
                 $obj = new stdClass();

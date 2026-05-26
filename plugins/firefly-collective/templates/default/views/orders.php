@@ -9,11 +9,15 @@
 
 ?>
 
-<?php if (is_admin()): ?>
-<h1>Order History</h1>
-<?php else: ?>
-<?php echo apply_filters('the_content', $postContent ?? ''); ?>
-<?php endif; ?>
+<?php
+    /* Page content (snippet hero) is rendered by the theme view that
+       includes us — see views/order-history.php. Don't echo it again
+       here. The admin path keeps its plain <h1> for when this view
+       is loaded standalone in wp-admin without a theme wrapper. */
+    if ( is_admin() ) {
+        echo '<h1>Order History</h1>';
+    }
+?>
 
 <div class="wrap" id="ffc-orders-app" v-cloak>
 
@@ -25,25 +29,25 @@
 
     <!-- Online Payments Toggle Section (Admin Only) -->
     <?php if ($currentUserIdAdmin): ?>
-    <div class="ffc-online-payments-toggle-container" style="background: #fff; padding: 15px 20px; margin: 20px 0; border: 1px solid #ddd; border-radius: 4px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <h3 style="margin: 0 0 5px 0; font-size: 16px;">Online Payments</h3>
-                <p style="margin: 0; color: #666; font-size: 13px;">
+    <div class="ffc-online-payments-toggle-container">
+        <div class="ffc-toggle-row">
+            <div class="ffc-toggle-copy">
+                <h3>Online Payments</h3>
+                <p>
                     {{ onlinePaymentsEnabled ? 'Customers will be required to pay online via Stripe when placing orders' : 'Customers can place orders without online payment (orders only mode)' }}
                 </p>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="ffc-toggle-control">
                 <label class="ffc-toggle-switch">
                     <input type="checkbox" v-model="onlinePaymentsEnabled" @change="toggleOnlinePayments">
                     <span class="ffc-toggle-slider"></span>
                 </label>
-                <span style="font-weight: bold; color: {{ onlinePaymentsEnabled ? '#28a745' : '#dc3545' }}">
+                <span class="ffc-toggle-state" :class="onlinePaymentsEnabled ? 'is-on' : 'is-off'">
                     {{ onlinePaymentsEnabled ? 'ENABLED' : 'DISABLED' }}
                 </span>
             </div>
         </div>
-        <div v-if="toggleMessage" :class="'ffc-toggle-message ffc-toggle-' + toggleMessageType" style="margin-top: 10px; padding: 8px 12px; border-radius: 3px; font-size: 13px;">
+        <div v-if="toggleMessage" :class="'ffc-toggle-message ffc-toggle-' + toggleMessageType">
             {{ toggleMessage }}
         </div>
     </div>
@@ -284,7 +288,7 @@
     </div>
     
     <!-- Order Detail Modal -->
-    <div class="ffc-modal" v-if="showDetailModal" v-cloak>
+    <div class="ffc-modal" v-if="showDetailModal" v-cloak @click.self="showDetailModal = false">
         <div class="ffc-modal-content">
             <div class="ffc-modal-header">
                 <h2>Order Details</h2>
@@ -381,7 +385,7 @@
     </div>
     
     <!-- Status Update Modal -->
-    <div class="ffc-modal" v-if="showStatusModal" v-cloak>
+    <div class="ffc-modal" v-if="showStatusModal" v-cloak @click.self="showStatusModal = false">
         <div class="ffc-modal-content ffc-small-modal">
             <div class="ffc-modal-header">
                 <h2>Update Order Status</h2>
@@ -405,7 +409,7 @@
     </div>
     
     <!-- Delete Confirmation Modal -->
-    <div class="ffc-modal" v-if="showDeleteModal" v-cloak>
+    <div class="ffc-modal" v-if="showDeleteModal" v-cloak @click.self="showDeleteModal = false">
         <div class="ffc-modal-content ffc-small-modal">
             <div class="ffc-modal-header">
                 <h2>Confirm Deletion</h2>
@@ -422,7 +426,7 @@
     </div>
 
     <!-- Refund Confirmation Modal -->
-    <div class="ffc-modal" v-if="showRefundModal" v-cloak>
+    <div class="ffc-modal" v-if="showRefundModal" v-cloak @click.self="showRefundModal = false">
         <div class="ffc-modal-content ffc-small-modal">
             <div class="ffc-modal-header">
                 <h2>Confirm Refund</h2>
@@ -439,7 +443,7 @@
     </div>
 
     <!-- Individual Item Refund Confirmation Modal -->
-    <div class="ffc-modal" v-if="showItemRefundModal" v-cloak>
+    <div class="ffc-modal" v-if="showItemRefundModal" v-cloak @click.self="showItemRefundModal = false">
         <div class="ffc-modal-content ffc-small-modal">
             <div class="ffc-modal-header">
                 <h2>Confirm Item Refund</h2>

@@ -62,9 +62,15 @@
         // Get dispatch for updating post meta
         const { editPost } = useDispatch('core/editor');
 
-        // Save environment preference to localStorage when it changes
+        // Save environment preference to localStorage when it changes.
+        // Also broadcast a window event so the sibling "Recent syncs" panel
+        // can re-fetch with the new env without waiting for the next save.
         useEffect(() => {
-            localStorage.setItem('firefly_page_sync_env', targetEnvProd ? 'prod' : 'dev');
+            const env = targetEnvProd ? 'prod' : 'dev';
+            localStorage.setItem('firefly_page_sync_env', env);
+            try {
+                window.dispatchEvent(new CustomEvent('firefly:env-changed', { detail: { env: env } }));
+            } catch (e) { /* CustomEvent unavailable in ancient browsers */ }
         }, [targetEnvProd]);
 
         // Format date for display (accepts Date object or timestamp)
@@ -940,5 +946,160 @@
             icon: 'download'
         });
     }
+
+    /* =========================================================================
+     * Recent syncs — DUAL-SOURCE activity feed for the open post.
+     *
+     * Mirrors the pages-list chevron panel:
+     *   - Fetches local /sync-log AND /remote-activity?env=<current> in parallel
+     *   - Merges + sorts entries; tags each with origin (Local / remote-env)
+     *   - Per-entry Restore (local revision) and Roll back (remote push) buttons
+     *   - Listens for the window 'firefly:env-changed' event so flipping the
+     *     env toggle in the sister panel above re-fetches without a save
+     * ======================================================================== */
+    const SyncLogPanel = () => {
+        const [entries, setEntries] = useState([]);
+        const [warning, setWarning] = useState(null);
+        const [loading, setLoading] = useState(false);
+        const [error, setError]     = useState(null);
+        const [acting, setActing]   = useState(false);
+        const [env, setEnv] = useState(() => localStorage.getItem('firefly_page_sync_env') === 'prod' ? 'prod' : 'dev');
+
+        const { postId, isSaving } = useSelect((select) => {
+            const editor = select('core/editor');
+            return {
+                postId:   editor.getCurrentPostId(),
+                isSaving: editor.isSavingPost() && !editor.isAutosavingPost(),
+            };
+        });
+
+        const restUrl = (window.fireflyPageSync && window.fireflyPageSync.restUrl) || '';
+        const nonce   = (window.fireflyPageSync && window.fireflyPageSync.nonce)   || '';
+
+        const fetchCombined = () => {
+            if (!postId || !restUrl) return;
+            setLoading(true);
+            setError(null);
+            setWarning(null);
+            const headers = { 'X-WP-Nonce': nonce };
+            Promise.all([
+                fetch(restUrl + 'sync-log?post_id=' + postId + '&limit=10',  { headers, credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ entries: [] })),
+                fetch(restUrl + 'remote-activity?post_id=' + postId + '&env=' + env + '&limit=10', { headers, credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ sync_log: [], revisions: [] })),
+            ]).then(([local, remote]) => {
+                const localEntries = (local && local.entries) ? local.entries.map(e => Object.assign({}, e, { origin: 'local', sort_ts: e.created_at_iso })) : [];
+                const remoteSync   = (remote && remote.sync_log)  ? remote.sync_log.map(e => Object.assign({}, e, { origin: 'remote', kind: 'sync',     sort_ts: e.created_at_iso })) : [];
+                const remoteRev    = (remote && remote.revisions) ? remote.revisions.map(e => Object.assign({}, e, { origin: 'remote', kind: 'revision', sort_ts: e.created_at_iso })) : [];
+                const merged = localEntries.concat(remoteSync, remoteRev);
+                merged.sort((a, b) => (Date.parse(b.sort_ts || 0) - Date.parse(a.sort_ts || 0)));
+                setEntries(merged.slice(0, 8)); // sidebar is space-constrained
+                if (remote && remote.warning) setWarning(remote.warning);
+            }).catch((e) => {
+                setError(e.message || 'Failed to load activity.');
+            }).finally(() => setLoading(false));
+        };
+
+        // Initial load + on env change + after each post save.
+        useEffect(fetchCombined, [postId, env]);
+        useEffect(() => {
+            if (!isSaving) {
+                const t = setTimeout(fetchCombined, 600);
+                return () => clearTimeout(t);
+            }
+        }, [isSaving]);
+
+        // Listen for the env toggle in the sister panel.
+        useEffect(() => {
+            const onEnvChange = (e) => {
+                const next = (e && e.detail && e.detail.env) || (localStorage.getItem('firefly_page_sync_env') === 'prod' ? 'prod' : 'dev');
+                setEnv(next);
+            };
+            window.addEventListener('firefly:env-changed', onEnvChange);
+            return () => window.removeEventListener('firefly:env-changed', onEnvChange);
+        }, []);
+
+        const envLabel = (e) => e === 'prod' ? 'Production' : 'Live Dev';
+        const dirArrow = (entry) => {
+            if (entry.kind === 'revision') return '✎';
+            if (entry.direction === 'restore' || entry.direction === 'rollback' || entry.direction === 'rollback_applied') return '⟲';
+            return entry.direction === 'pull' ? '↓' : '↑';
+        };
+
+        const doRestore = (entry) => {
+            if (acting || !entry.revision_id) return;
+            if (!window.confirm('Restore this page to revision #' + entry.revision_id + '? Local content will be overwritten.')) return;
+            setActing(true);
+            fetch(restUrl + 'restore-local-revision', {
+                method: 'POST',
+                headers: { 'X-WP-Nonce': nonce, 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ post_id: postId, revision_id: entry.revision_id })
+            }).then(r => r.ok ? r.json() : r.json().then(j => { throw new Error(j.message || 'HTTP ' + r.status); }))
+                .then(() => { fetchCombined(); })
+                .catch((e) => { window.alert(e.message || 'Restore failed.'); })
+                .finally(() => setActing(false));
+        };
+
+        const doRollback = (entry) => {
+            if (acting) return;
+            if (!window.confirm('Roll back this push on ' + envLabel(entry.env) + '? The remote will be restored to its pre-push state.')) return;
+            setActing(true);
+            fetch(restUrl + 'rollback-push', {
+                method: 'POST',
+                headers: { 'X-WP-Nonce': nonce, 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ log_id: entry.id })
+            }).then(r => r.ok ? r.json() : r.json().then(j => { throw new Error(j.message || 'HTTP ' + r.status); }))
+                .then(() => { fetchCombined(); })
+                .catch((e) => { window.alert(e.message || 'Rollback failed.'); })
+                .finally(() => setActing(false));
+        };
+
+        let body;
+        if (loading && entries.length === 0) {
+            body = el('div', { className: 'firefly-sync-log-loading' }, el(Spinner), ' Loading…');
+        } else if (error) {
+            body = el(Notice, { status: 'error', isDismissible: false }, error);
+        } else if (entries.length === 0) {
+            body = el('p', { className: 'firefly-sync-log-empty' }, __('No sync activity yet.', 'firefly-projects'));
+        } else {
+            const items = entries.map((entry) => {
+                const origin = entry.origin === 'local' ? 'Local' : envLabel(env);
+                const canRestore  = entry.origin === 'local' && entry.revision_id;
+                const canRollback = entry.origin === 'local' && entry.direction === 'push' && entry.status === 'success'
+                                    && entry.summary && entry.summary.pre_push_revision_id;
+                return el('li', {
+                    key: String(entry.id),
+                    className: 'firefly-sync-log-mini-entry is-origin-' + (entry.origin || 'local')
+                                + (entry.status === 'failure' ? ' is-failure' : ' is-success')
+                                + (entry.kind === 'revision' ? ' is-kind-revision' : ' is-kind-sync')
+                },
+                    el('span', { className: 'firefly-sync-log-dot' }),
+                    el('span', { className: 'firefly-sync-log-mini-origin' }, origin),
+                    el('span', { className: 'firefly-sync-log-mini-dir' }, dirArrow(entry) + ' ' + (entry.env ? envLabel(entry.env) : '')),
+                    el('span', { className: 'firefly-sync-log-mini-user' }, entry.user || 'System'),
+                    entry.revision_url ? el('a', { className: 'firefly-sync-log-mini-rev', href: entry.revision_url, target: '_blank' }, __('View', 'firefly-projects')) : null,
+                    canRestore  ? el('button', { className: 'firefly-sync-log-mini-action', disabled: acting, onClick: () => doRestore(entry)  }, __('Restore', 'firefly-projects')) : null,
+                    canRollback ? el('button', { className: 'firefly-sync-log-mini-action is-danger', disabled: acting, onClick: () => doRollback(entry) }, __('Roll back', 'firefly-projects')) : null,
+                    el('span', { className: 'firefly-sync-log-mini-time', title: entry.created_at_iso || '' }, entry.created_at_human || '')
+                );
+            });
+            body = el('ul', { className: 'firefly-sync-log-mini' }, items);
+        }
+
+        const warningEl = warning
+            ? el(Notice, { status: 'warning', isDismissible: false, className: 'firefly-sync-log-mini-warning' }, warning)
+            : null;
+
+        return el(PluginDocumentSettingPanel, {
+            name: 'firefly-sync-log',
+            title: __('Recent syncs (', 'firefly-projects') + envLabel(env) + ')',
+            className: 'firefly-sync-log-panel'
+        }, warningEl, body);
+    };
+
+    registerPlugin('firefly-sync-log', {
+        render: SyncLogPanel,
+        icon: 'clock'
+    });
 
 })(window.wp);
