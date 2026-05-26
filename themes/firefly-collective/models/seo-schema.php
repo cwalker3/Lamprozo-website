@@ -235,13 +235,15 @@ add_action( 'wp_head', 'firefly_output_post_schema', 5 );
 /**
  * Output meta description tag. Hooked to wp_head priority 1.
  * Routes through firefly_get_meta_description() so _seo_description wins
- * over the GEO/excerpt fallback chain.
+ * over the GEO/excerpt fallback chain. Also fires on /blog (the posts page),
+ * not just singular, by routing through firefly_get_seo_post_id().
  */
 function firefly_output_meta_description() {
-    if ( ! is_singular() ) {
+    $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
+    if ( ! $post_id ) {
         return;
     }
-    $description = firefly_get_meta_description( get_queried_object_id() );
+    $description = firefly_get_meta_description( $post_id );
     if ( $description ) {
         echo '<meta name="description" content="' . esc_attr( $description ) . '" />' . "\n";
     }
@@ -253,10 +255,10 @@ add_action( 'wp_head', 'firefly_output_meta_description', 1 );
  * _seo_canonical postmeta overrides the self-canonical when present.
  */
 function firefly_output_canonical_url() {
-    if ( ! is_singular() ) {
+    $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
+    if ( ! $post_id ) {
         return;
     }
-    $post_id   = get_queried_object_id();
     $override  = get_post_meta( $post_id, '_seo_canonical', true );
     $canonical = ! empty( $override ) ? $override : get_permalink( $post_id );
     echo '<link rel="canonical" href="' . esc_url( $canonical ) . '" />' . "\n";
@@ -264,36 +266,47 @@ function firefly_output_canonical_url() {
 add_action( 'wp_head', 'firefly_output_canonical_url', 1 );
 
 /**
- * Output robots meta tag. Hooked to wp_head priority 1.
+ * Robots directives — composed via WP core's wp_robots filter (5.7+) so
+ * exactly ONE <meta name="robots"> tag is emitted regardless of how many
+ * subsystems contribute. Three sources funnel through this filter:
  *
- * Dev environments and dev.* / localhost domains always emit noindex,nofollow
- * to keep them out of search indexes. On production sites, per-page
- * _seo_robots_noindex / _seo_robots_nofollow toggles compose into the value.
+ *   1. Dev / localhost domains → force noindex,nofollow (this function)
+ *   2. Per-page _seo_robots_noindex / _seo_robots_nofollow (this function)
+ *   3. Production indexability hints (firefly-collective plugin geo-schema)
+ *
+ * WP serializes the final array into one tag at the standard priority — no
+ * direct echo to wp_head, no duplicate tags.
  */
-function firefly_output_robots_meta() {
+function firefly_apply_robots_filters( $robots ) {
     $is_dev        = defined( 'FIREFLY_DEV' ) || defined( 'FIREFLY_LIVE_DEV' );
     $host          = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
     $is_dev_domain = ( strpos( $host, 'dev.' ) === 0 || strpos( $host, 'localhost' ) !== false );
 
     if ( $is_dev || $is_dev_domain ) {
-        echo '<meta name="robots" content="noindex, nofollow" />' . "\n";
-        return;
+        // Force noindex,nofollow on dev — overrides any other contributor.
+        $robots['noindex']  = true;
+        $robots['nofollow'] = true;
+        unset( $robots['index'], $robots['follow'] );
+        // Strip indexing hints that don't make sense once noindex is set.
+        unset( $robots['max-snippet'], $robots['max-image-preview'], $robots['max-video-preview'] );
+        return $robots;
     }
 
-    if ( is_singular() ) {
-        $post_id  = get_queried_object_id();
-        $noindex  = (bool) get_post_meta( $post_id, '_seo_robots_noindex', true );
-        $nofollow = (bool) get_post_meta( $post_id, '_seo_robots_nofollow', true );
-
-        if ( $noindex || $nofollow ) {
-            $parts = array();
-            $parts[] = $noindex ? 'noindex' : 'index';
-            $parts[] = $nofollow ? 'nofollow' : 'follow';
-            echo '<meta name="robots" content="' . esc_attr( implode( ', ', $parts ) ) . '" />' . "\n";
+    $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
+    if ( $post_id ) {
+        if ( get_post_meta( $post_id, '_seo_robots_noindex', true ) ) {
+            $robots['noindex']  = true;
+            unset( $robots['index'] );
+        }
+        if ( get_post_meta( $post_id, '_seo_robots_nofollow', true ) ) {
+            $robots['nofollow'] = true;
+            unset( $robots['follow'] );
         }
     }
+
+    return $robots;
 }
-add_action( 'wp_head', 'firefly_output_robots_meta', 1 );
+add_filter( 'wp_robots', 'firefly_apply_robots_filters', 20 );
 
 /* ----------------------------------------------------------------------------
  * GEO helpers — kept here for backward compatibility with any caller that

@@ -17,17 +17,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Return the post ID whose _seo_* postmeta drives the current request, or 0
+ * if SEO meta doesn't apply (search results, generic archives, 404).
+ *
+ * Singular requests use the queried post. The blog landing (`is_home()` with
+ * a static "posts page") falls back to that page's post id so per-page SEO
+ * still applies to /blog even though `is_singular()` returns false there.
+ * Front page is handled by is_singular() since `show_on_front=page`.
+ */
+function firefly_get_seo_post_id() {
+    if ( is_singular() ) {
+        return (int) get_queried_object_id();
+    }
+    if ( is_home() && ! is_front_page() ) {
+        $posts_page = (int) get_option( 'page_for_posts' );
+        if ( $posts_page ) {
+            return $posts_page;
+        }
+    }
+    return 0;
+}
+
+/**
  * Resolve the <title> tag content for the current request.
  *
- * Override chain (singular only):
+ * Override chain (when a SEO post id resolves):
  *   _seo_title postmeta  →  "{site name} - {page title}"
  *
- * Non-singular pages (archives, search, 404) skip the override and use the
+ * Pages that don't resolve a SEO post id (search, archives, 404) use the
  * site-name + page-title pattern the templates already pass in.
  */
 function firefly_get_document_title( $page_title = '' ) {
-    if ( is_singular() ) {
-        $override = get_post_meta( get_queried_object_id(), '_seo_title', true );
+    $post_id = firefly_get_seo_post_id();
+    if ( $post_id ) {
+        $override = get_post_meta( $post_id, '_seo_title', true );
         if ( ! empty( $override ) ) {
             return $override;
         }
@@ -42,13 +65,13 @@ function firefly_get_document_title( $page_title = '' ) {
 /**
  * Resolve the OG / Twitter title for the current request.
  *
- * Override chain (singular):
+ * Override chain:
  *   _seo_og_title  →  _seo_title  →  post_title  →  site name
  */
 function firefly_get_og_title() {
-    if ( is_singular() ) {
-        $post_id = get_queried_object_id();
-        $og      = get_post_meta( $post_id, '_seo_og_title', true );
+    $post_id = firefly_get_seo_post_id();
+    if ( $post_id ) {
+        $og = get_post_meta( $post_id, '_seo_og_title', true );
         if ( ! empty( $og ) ) return $og;
 
         $seo = get_post_meta( $post_id, '_seo_title', true );
@@ -62,13 +85,12 @@ function firefly_get_og_title() {
 /**
  * Resolve the OG / Twitter description for the current request.
  *
- * Override chain (singular):
+ * Override chain:
  *   _seo_og_description  →  _seo_description  →  _geo_summary  →  excerpt  →  site tagline
  */
 function firefly_get_og_description() {
-    if ( is_singular() ) {
-        $post_id = get_queried_object_id();
-
+    $post_id = firefly_get_seo_post_id();
+    if ( $post_id ) {
         $og = get_post_meta( $post_id, '_seo_og_description', true );
         if ( ! empty( $og ) ) return $og;
 
@@ -87,15 +109,14 @@ function firefly_get_og_description() {
 /**
  * Resolve the OG / Twitter image URL for the current request.
  *
- * Override chain (singular):
+ * Override chain:
  *   _seo_og_image_id postmeta  →  featured image  →  default-og.webp from active template
  */
 function firefly_get_og_image_url() {
     global $template_path_web;
 
-    if ( is_singular() ) {
-        $post_id = get_queried_object_id();
-
+    $post_id = firefly_get_seo_post_id();
+    if ( $post_id ) {
         $override_id = (int) get_post_meta( $post_id, '_seo_og_image_id', true );
         if ( $override_id > 0 ) {
             $url = wp_get_attachment_image_url( $override_id, 'full' );
@@ -121,7 +142,8 @@ function set_open_graph_meta_data() {
     $title       = firefly_get_og_title();
     $description = firefly_get_og_description();
     $image       = firefly_get_og_image_url();
-    $url         = is_singular() ? get_permalink() : home_url();
+    $seo_post_id = firefly_get_seo_post_id();
+    $url         = $seo_post_id ? get_permalink( $seo_post_id ) : home_url();
     $type        = is_singular() ? 'article' : 'website';
 
     echo '<!-- Open Graph meta tags -->' . "\n";

@@ -768,10 +768,28 @@ function firefly_geo_meta_tags() {
     echo '<meta name="geo.region" content="US-' . esc_attr($loc['stateCode']) . '">' . "\n";
     echo '<meta name="geo.placename" content="' . esc_attr($loc['city']) . '">' . "\n";
 
-    // Robots meta - respect WordPress "Discourage search engines" setting
-    if (get_option('blog_public') != '0') {
-        echo '<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">' . "\n";
+    // Robots directives now compose into a SINGLE <meta name="robots"> tag
+    // via the wp_robots filter (see firefly_geo_indexability_hints below).
+    // Direct echo here would duplicate that tag.
+}
+
+/**
+ * Contribute indexability hints to the wp_robots filter chain.
+ * Adds max-snippet / max-image-preview / max-video-preview directives
+ * for sites that allow indexing (blog_public != 0). Dev environments
+ * still get noindex,nofollow forced via the theme's seo-schema.php at
+ * priority 20, which clears these hints out before serialization.
+ */
+add_filter( 'wp_robots', 'firefly_geo_indexability_hints', 10 );
+
+function firefly_geo_indexability_hints( $robots ) {
+    if ( get_option( 'blog_public' ) == '0' ) {
+        return $robots;
     }
+    $robots['max-snippet']       = -1;
+    $robots['max-image-preview'] = 'large';
+    $robots['max-video-preview'] = -1;
+    return $robots;
 }
 
 /**
