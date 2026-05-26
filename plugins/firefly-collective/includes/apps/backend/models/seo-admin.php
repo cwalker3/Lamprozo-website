@@ -271,6 +271,21 @@ add_action( 'rest_api_init', function () {
         'callback'            => 'firefly_collective_rest_seo_receive',
         'permission_callback' => '__return_true',
     ) );
+
+    // Bulk per-page SEO sync: gather every page/post's _seo_* postmeta in
+    // the active template and push the bundle to the remote in one shot.
+    // Cheaper than running the full page-sync per post.
+    register_rest_route( 'firefly-collective/v1', '/seo/sync-pages', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_collective_rest_seo_sync_pages',
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+    ) );
+
+    register_rest_route( 'firefly-collective/v1', '/seo/receive-pages', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_collective_rest_seo_receive_pages',
+        'permission_callback' => '__return_true',
+    ) );
 } );
 
 function firefly_collective_rest_get_seo_config( WP_REST_Request $request ) {
@@ -419,4 +434,220 @@ function firefly_collective_rest_seo_receive( WP_REST_Request $request ) {
         return new WP_REST_Response( array( 'success' => true, 'message' => 'SEO config received and saved successfully.' ), 200 );
     }
     return new WP_REST_Response( array( 'success' => false, 'message' => 'Failed to save configuration.' ), 500 );
+}
+
+/* ---------------------------------------------------------------------------
+ * Bulk per-page SEO sync — pushes every post's _seo_* meta in one payload.
+ * Lighter than running full page-sync per post: no Gutenberg block content,
+ * no media attachments, just the meta keys identified by _firefly_page_id.
+ *
+ * The SEO meta keys list mirrors what seo-post.php registers + what
+ * page-sync.php whitelists. _seo_og_image_id is shipped as an integer; it
+ * references local attachment ids and won't auto-translate cross-env (same
+ * known limitation as full page-sync).
+ * ------------------------------------------------------------------------ */
+
+/**
+ * The exact set of postmeta keys that constitute "per-page SEO".
+ * Single source of truth used by both the gather (sync-pages) and
+ * apply (receive-pages) sides.
+ */
+function firefly_collective_seo_meta_keys() {
+    return array(
+        '_seo_title',
+        '_seo_description',
+        '_seo_canonical',
+        '_seo_robots_noindex',
+        '_seo_robots_nofollow',
+        '_seo_og_image_id',
+        '_seo_og_title',
+        '_seo_og_description',
+    );
+}
+
+/**
+ * REST: POST /seo/sync-pages — local-side bulk gather + push.
+ *
+ * Iterates pages + posts in the active template's scope and collects each
+ * one's _seo_* meta into a single payload keyed by _firefly_page_id, then
+ * POSTs to the remote's /seo/receive-pages with shared-secret auth.
+ */
+function firefly_collective_rest_seo_sync_pages( WP_REST_Request $request ) {
+    $params     = $request->get_json_params();
+    $target_env = isset( $params['target_env'] ) ? $params['target_env'] : 'dev';
+
+    if ( $target_env === 'prod' ) {
+        if ( ! defined( 'PROD_ENDPOINT' ) || empty( PROD_ENDPOINT ) ) {
+            return new WP_REST_Response( array( 'success' => false, 'message' => 'Production endpoint not configured. Set PROD_ENDPOINT in wp-config.php.' ), 400 );
+        }
+        $project_endpoint = PROD_ENDPOINT;
+    } else {
+        if ( ! defined( 'LIVE_DEV_ENDPOINT' ) || empty( LIVE_DEV_ENDPOINT ) ) {
+            return new WP_REST_Response( array( 'success' => false, 'message' => 'Live Dev endpoint not configured. Set LIVE_DEV_ENDPOINT in wp-config.php.' ), 400 );
+        }
+        $project_endpoint = LIVE_DEV_ENDPOINT;
+    }
+    if ( ! defined( 'FIREFLY_SHARED_SECRET' ) || empty( FIREFLY_SHARED_SECRET ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Shared secret not configured. Set FIREFLY_SHARED_SECRET in wp-config.php.' ), 400 );
+    }
+
+    // Resolve active template — the same one the rest of the sync pipeline uses.
+    $template = function_exists( 'firefly_get_scoping_template' ) ? firefly_get_scoping_template() : 'default';
+
+    $posts = get_posts( array(
+        'post_type'            => array( 'page', 'post' ),
+        'post_status'          => 'publish',
+        'numberposts'          => -1,
+        'meta_key'             => '_firefly_template',
+        'meta_value'           => $template,
+        'firefly_skip_scoping' => true,
+    ) );
+
+    $meta_keys = firefly_collective_seo_meta_keys();
+    $pages     = array();
+    $skipped   = array();
+
+    foreach ( $posts as $p ) {
+        $fpid = get_post_meta( $p->ID, '_firefly_page_id', true );
+        if ( ! $fpid ) {
+            $skipped[] = $p->post_name . ' (no _firefly_page_id)';
+            continue;
+        }
+        $meta = array();
+        foreach ( $meta_keys as $key ) {
+            $meta[ $key ] = get_post_meta( $p->ID, $key, true );
+        }
+        $pages[] = array(
+            'firefly_page_id' => (string) $fpid,
+            'post_type'       => $p->post_type,
+            'slug'            => $p->post_name,
+            'meta'            => $meta,
+        );
+    }
+
+    if ( empty( $pages ) ) {
+        return new WP_REST_Response( array(
+            'success'   => false,
+            'message'   => 'No pages with _firefly_page_id found in template "' . $template . '". Sync from the Pages list once so each page gets a stable cross-env id.',
+            'skipped'   => $skipped,
+        ), 400 );
+    }
+
+    if ( preg_match( '/(https?:\/\/[^\/]+)/', $project_endpoint, $matches ) ) {
+        $base_url = $matches[1];
+        $endpoint = $base_url . '/wp-json/firefly-collective/v1/seo/receive-pages';
+    } else {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Invalid endpoint URL format.' ), 400 );
+    }
+
+    $response = wp_remote_post( $endpoint, array(
+        'timeout' => 60, // bulk payload — give it room
+        'headers' => array( 'Content-Type' => 'application/json' ),
+        'body'    => wp_json_encode( array(
+            'secret' => FIREFLY_SHARED_SECRET,
+            'pages'  => $pages,
+        ) ),
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Failed to connect: ' . $response->get_error_message() ), 500 );
+    }
+    $code = wp_remote_retrieve_response_code( $response );
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( $code !== 200 || empty( $body['success'] ) ) {
+        return new WP_REST_Response( array(
+            'success' => false,
+            'message' => isset( $body['message'] ) ? $body['message'] : ( 'Remote returned HTTP ' . $code ),
+        ), $code === 200 ? 500 : $code );
+    }
+
+    $env_name = ( $target_env === 'prod' ) ? 'Production' : 'Live Dev';
+    return new WP_REST_Response( array(
+        'success'        => true,
+        'message'        => sprintf( 'Synced SEO meta for %d page(s) to %s.', count( $pages ), $env_name ),
+        'pages_sent'     => count( $pages ),
+        'pages_applied'  => isset( $body['applied'] ) ? (int) $body['applied'] : null,
+        'skipped'        => $skipped,
+        'remote_message' => isset( $body['message'] ) ? $body['message'] : null,
+    ), 200 );
+}
+
+/**
+ * REST: POST /seo/receive-pages — remote-side bulk apply.
+ *
+ * For every entry in `pages[]`, look up the local post via _firefly_page_id
+ * and write each _seo_* meta key. Returns applied + skipped counts.
+ */
+function firefly_collective_rest_seo_receive_pages( WP_REST_Request $request ) {
+    $params = $request->get_json_params();
+
+    if ( ! defined( 'FIREFLY_SHARED_SECRET' ) || empty( FIREFLY_SHARED_SECRET ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Shared secret not configured on receiving server.' ), 500 );
+    }
+    $received_secret = isset( $params['secret'] ) ? $params['secret'] : '';
+    if ( $received_secret !== FIREFLY_SHARED_SECRET ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'Invalid shared secret.' ), 403 );
+    }
+
+    $pages = isset( $params['pages'] ) && is_array( $params['pages'] ) ? $params['pages'] : array();
+    if ( empty( $pages ) ) {
+        return new WP_REST_Response( array( 'success' => false, 'message' => 'No pages in payload.' ), 400 );
+    }
+
+    $meta_keys = firefly_collective_seo_meta_keys();
+    $applied   = 0;
+    $not_found = array();
+
+    foreach ( $pages as $entry ) {
+        $fpid = isset( $entry['firefly_page_id'] ) ? (string) $entry['firefly_page_id'] : '';
+        if ( $fpid === '' || ! isset( $entry['meta'] ) || ! is_array( $entry['meta'] ) ) {
+            continue;
+        }
+
+        // Resolve by stable cross-env id.
+        $found = get_posts( array(
+            'post_type'            => array( 'page', 'post' ),
+            'post_status'          => 'any',
+            'numberposts'          => 1,
+            'meta_key'             => '_firefly_page_id',
+            'meta_value'           => $fpid,
+            'firefly_skip_scoping' => true,
+        ) );
+        if ( empty( $found ) ) {
+            $not_found[] = $fpid;
+            continue;
+        }
+        $post_id = (int) $found[0]->ID;
+
+        // Apply each known SEO meta key. Per-key sanitization mirrors
+        // seo-post.php's register_post_meta sanitize_callback choices.
+        foreach ( $meta_keys as $key ) {
+            if ( ! array_key_exists( $key, $entry['meta'] ) ) continue;
+            $val = $entry['meta'][ $key ];
+            switch ( $key ) {
+                case '_seo_canonical':
+                    $val = esc_url_raw( (string) $val );
+                    break;
+                case '_seo_robots_noindex':
+                case '_seo_robots_nofollow':
+                    $val = (bool) $val;
+                    break;
+                case '_seo_og_image_id':
+                    $val = (int) $val;
+                    break;
+                default:
+                    $val = sanitize_text_field( (string) $val );
+            }
+            update_post_meta( $post_id, $key, $val );
+        }
+        $applied++;
+    }
+
+    return new WP_REST_Response( array(
+        'success'   => true,
+        'message'   => sprintf( 'Applied SEO meta to %d page(s); %d not found on this site.', $applied, count( $not_found ) ),
+        'applied'   => $applied,
+        'not_found' => $not_found,
+    ), 200 );
 }

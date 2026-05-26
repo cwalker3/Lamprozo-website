@@ -15,6 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 syncing: false,
                 syncingSeo: false,
                 activeTab: 'organization',
+
+                // SEO sync confirmation modal. Opens when the user clicks
+                // "Sync SEO to ..." so they can decide what to include
+                // (site-wide settings, per-page meta, or both) before sending.
+                showSeoSyncModal: false,
+                seoSyncIncludeAdmin: true,
+                seoSyncIncludePages: true,
+                seoSyncStatus: null, // { type: 'admin'|'pages'|'done', text: string }
                 showPreview: false,
                 previewLoading: false,
                 previewJson: '',
@@ -398,40 +406,96 @@ document.addEventListener('DOMContentLoaded', function() {
             },
 
             /**
-             * Sync SEO configuration to remote environment.
-             * Parallel to syncConfig but hits the /seo/sync endpoint which
-             * pushes the wp_ffc_seo_config rows (default OG, Twitter handles,
-             * verification codes, title separator). Same shared-secret flow.
+             * Open the SEO sync confirmation modal. The actual sync runs
+             * after the user picks their scope (admin / pages / both) and
+             * clicks Sync in the modal. See executeSeoSync().
              */
-            async syncSeoConfig() {
+            syncSeoConfig() {
+                // Reset modal state to "include both" by default — the most
+                // common intent for a fresh sync.
+                this.seoSyncIncludeAdmin = true;
+                this.seoSyncIncludePages = true;
+                this.seoSyncStatus = null;
+                this.showSeoSyncModal = true;
+            },
+
+            /**
+             * Run the SEO sync subsets the user selected in the modal.
+             *
+             * - Admin: POST /seo/sync — pushes wp_ffc_seo_config rows
+             *   (default OG, Twitter handles, verification codes, separator)
+             * - Pages: POST /seo/sync-pages — gathers every page/post's
+             *   _seo_* meta in the active template and pushes the bundle.
+             *
+             * Subsets fire sequentially so the status line can show progress
+             * step-by-step. Either side's failure surfaces in the notification
+             * but doesn't abort the other.
+             */
+            async executeSeoSync() {
+                if (!this.seoSyncIncludeAdmin && !this.seoSyncIncludePages) return;
                 this.syncingSeo = true;
+                this.seoSyncStatus = null;
                 const envName = this.syncEnv === 'prod' ? 'Production' : 'Live Dev';
+                const results = [];
 
-                try {
-                    const response = await fetch(geoData.apiUrl + 'seo/sync', {
-                        method: 'POST',
-                        headers: {
-                            'X-WP-Nonce': geoData.nonce,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            target_env: this.syncEnv
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        this.showNotification('success', data.message || `SEO config synced to ${envName}`);
-                    } else {
-                        this.showNotification('error', data.message || `Failed to sync SEO to ${envName}`);
+                if (this.seoSyncIncludeAdmin) {
+                    this.seoSyncStatus = { type: 'admin', text: `Pushing site-wide SEO settings to ${envName}…` };
+                    try {
+                        const r = await fetch(geoData.apiUrl + 'seo/sync', {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': geoData.nonce, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target_env: this.syncEnv })
+                        });
+                        const d = await r.json();
+                        results.push({ label: 'Site-wide settings', success: !!d.success, message: d.message || (d.success ? 'OK' : `HTTP ${r.status}`) });
+                    } catch (e) {
+                        results.push({ label: 'Site-wide settings', success: false, message: e.message || 'Network error' });
                     }
-                } catch (error) {
-                    console.error('Error syncing SEO config:', error);
-                    this.showNotification('error', `Failed to sync SEO to ${envName}`);
-                } finally {
-                    this.syncingSeo = false;
                 }
+
+                if (this.seoSyncIncludePages) {
+                    this.seoSyncStatus = { type: 'pages', text: `Pushing per-page SEO meta to ${envName}…` };
+                    try {
+                        const r = await fetch(geoData.apiUrl + 'seo/sync-pages', {
+                            method: 'POST',
+                            headers: { 'X-WP-Nonce': geoData.nonce, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target_env: this.syncEnv })
+                        });
+                        const d = await r.json();
+                        results.push({
+                            label: 'Per-page meta',
+                            success: !!d.success,
+                            message: d.message || (d.success ? 'OK' : `HTTP ${r.status}`),
+                            sent: d.pages_sent,
+                            applied: d.pages_applied,
+                        });
+                    } catch (e) {
+                        results.push({ label: 'Per-page meta', success: false, message: e.message || 'Network error' });
+                    }
+                }
+
+                const allOk = results.every((r) => r.success);
+                this.seoSyncStatus = {
+                    type: 'done',
+                    text: allOk
+                        ? `Synced to ${envName}: ` + results.map((r) => r.label + ' ✓').join(' · ')
+                        : 'Sync completed with errors — see details below.',
+                    results,
+                };
+
+                if (allOk) {
+                    this.showNotification('success', this.seoSyncStatus.text);
+                    // Close the modal after a short delay so the user sees the
+                    // success summary before it disappears.
+                    setTimeout(() => {
+                        if (this.seoSyncStatus && this.seoSyncStatus.type === 'done') {
+                            this.showSeoSyncModal = false;
+                        }
+                    }, 1800);
+                } else {
+                    this.showNotification('error', 'One or more SEO sync steps failed — see the modal for details.');
+                }
+                this.syncingSeo = false;
             },
 
             /**

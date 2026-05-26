@@ -512,4 +512,83 @@ if (!current_user_can('manage_options')) {
             </div>
         </div>
     </div>
+
+    <!-- SEO sync confirmation modal — explains what "SEO sync" covers and lets
+         the user choose which subset(s) to push. Two checkboxes default to
+         checked; either can be unchecked to skip that subset. Sync button is
+         disabled when both are unchecked. -->
+    <div v-if="showSeoSyncModal" class="geo-modal-overlay" @click.self="!syncingSeo && (showSeoSyncModal = false)">
+        <div class="geo-modal geo-modal-wide geo-modal-sync">
+            <h3>
+                <span class="dashicons dashicons-upload"></span>
+                Sync SEO to {{ syncEnv === 'prod' ? 'Production' : 'Live Dev' }}
+            </h3>
+            <p class="geo-modal-lead">
+                An SEO sync pushes <strong>two kinds of data</strong> to the remote environment.
+                Choose what to include:
+            </p>
+
+            <div class="geo-sync-choices">
+                <label class="geo-sync-choice" :class="{ 'is-checked': seoSyncIncludeAdmin, 'is-disabled': syncingSeo }">
+                    <input type="checkbox" v-model="seoSyncIncludeAdmin" :disabled="syncingSeo">
+                    <span class="geo-sync-choice-body">
+                        <span class="geo-sync-choice-title">
+                            <span class="dashicons dashicons-admin-settings"></span>
+                            Site-wide SEO settings
+                        </span>
+                        <span class="geo-sync-choice-desc">
+                            Default OG image, Twitter handles, search-engine verification codes,
+                            title separator, and default robots policy — everything from the SEO
+                            tab of this admin page.
+                        </span>
+                        <span class="geo-sync-choice-endpoint">→ <code>/seo/receive</code></span>
+                    </span>
+                </label>
+
+                <label class="geo-sync-choice" :class="{ 'is-checked': seoSyncIncludePages, 'is-disabled': syncingSeo }">
+                    <input type="checkbox" v-model="seoSyncIncludePages" :disabled="syncingSeo">
+                    <span class="geo-sync-choice-body">
+                        <span class="geo-sync-choice-title">
+                            <span class="dashicons dashicons-admin-page"></span>
+                            Per-page SEO overrides
+                        </span>
+                        <span class="geo-sync-choice-desc">
+                            Every page and post in the active template — their SEO title,
+                            meta description, canonical, robots toggles, and Open Graph
+                            overrides set in each post's Gutenberg sidebar.
+                        </span>
+                        <span class="geo-sync-choice-endpoint">→ <code>/seo/receive-pages</code></span>
+                    </span>
+                </label>
+            </div>
+
+            <!-- Live status / results -->
+            <div v-if="seoSyncStatus" class="geo-sync-status" :class="'is-' + seoSyncStatus.type">
+                <span v-if="seoSyncStatus.type !== 'done'" class="spinner is-active" style="float:none; margin:0 8px 0 0;"></span>
+                <span>{{ seoSyncStatus.text }}</span>
+                <ul v-if="seoSyncStatus.results" class="geo-sync-results">
+                    <li v-for="(r, idx) in seoSyncStatus.results" :key="idx" :class="r.success ? 'is-success' : 'is-failure'">
+                        <span class="dashicons" :class="r.success ? 'dashicons-yes-alt' : 'dashicons-warning'"></span>
+                        <strong>{{ r.label }}:</strong>
+                        <span>{{ r.message }}</span>
+                        <small v-if="r.sent != null"> ({{ r.applied != null ? (r.applied + '/' + r.sent + ' pages applied') : (r.sent + ' pages sent') }})</small>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="geo-modal-actions">
+                <button type="button" class="button" @click="showSeoSyncModal = false" :disabled="syncingSeo">
+                    {{ seoSyncStatus && seoSyncStatus.type === 'done' ? 'Close' : 'Cancel' }}
+                </button>
+                <button type="button"
+                        class="button button-primary"
+                        @click="executeSeoSync"
+                        :disabled="syncingSeo || (!seoSyncIncludeAdmin && !seoSyncIncludePages)">
+                    <span v-if="syncingSeo" class="spinner is-active" style="float:none; margin:0 5px 0 0;"></span>
+                    <span v-else class="dashicons dashicons-upload"></span>
+                    {{ syncingSeo ? 'Syncing…' : ('Sync to ' + (syncEnv === 'prod' ? 'Production' : 'Live Dev')) }}
+                </button>
+            </div>
+        </div>
+    </div>
 </div>

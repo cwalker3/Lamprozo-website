@@ -811,3 +811,143 @@
         margin: 0;
     }
 }
+
+/* ============================================================================
+   SEO Sync confirmation modal — explains scope, lets user pick subsets.
+   ============================================================================ */
+.geo-modal-wide {
+    max-width: 580px;
+    width: 92%;
+}
+.geo-modal-sync h3 .dashicons {
+    color: #2271b1;
+}
+.geo-modal-lead {
+    margin: 0 0 16px;
+    color: #50575e;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.geo-modal-lead strong {
+    color: #1d2327;
+}
+
+/* Checkbox-card list. Each card is the full clickable label so users
+   can toggle either by clicking the checkbox or the card body. */
+.geo-sync-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.geo-sync-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.geo-sync-choice:hover {
+    border-color: #2271b1;
+    background: #fff;
+}
+.geo-sync-choice.is-checked {
+    border-color: #2271b1;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px #2271b1;
+}
+.geo-sync-choice.is-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.geo-sync-choice > input[type="checkbox"] {
+    margin: 4px 0 0 0;
+    flex: 0 0 auto;
+    transform: scale(1.15);
+}
+.geo-sync-choice-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.geo-sync-choice-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #1d2327;
+    font-size: 14px;
+}
+.geo-sync-choice-title .dashicons {
+    color: #2271b1;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+.geo-sync-choice-desc {
+    color: #50575e;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.geo-sync-choice-endpoint {
+    color: #8c8f94;
+    font-size: 11px;
+    font-family: Consolas, Monaco, monospace;
+    margin-top: 2px;
+}
+.geo-sync-choice-endpoint code {
+    background: transparent;
+    padding: 0;
+    color: #2271b1;
+    font-size: 11px;
+}
+
+/* Live status while syncing + final results summary */
+.geo-sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    background: #f0f6fc;
+    border: 1px solid #c5d9ed;
+    color: #1d2327;
+}
+.geo-sync-status.is-done {
+    background: #f0f9f0;
+    border-color: #c4d9c4;
+}
+.geo-sync-results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.geo-sync-results li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+.geo-sync-results li .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
+.geo-sync-results li.is-success .dashicons { color: #2e7d32; }
+.geo-sync-results li.is-failure .dashicons { color: #b32d2e; }
+.geo-sync-results li strong { color: #1d2327; }
+.geo-sync-results li small { color: #646970; }
