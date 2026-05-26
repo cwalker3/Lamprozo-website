@@ -19,8 +19,17 @@
 
     // localStorage keys are namespaced per-origin (per WP host) so multiple
     // Firefly sites on the same browser don't collide.
-    const LS_SESSIONS_KEY = 'firefly-notes/sessions/v1';
-    const LS_ACTIVE_KEY   = 'firefly-notes/active-session/v1';
+    //
+    // LS_LEGACY_KEY held the entire session list back when sessions lived in
+    // the browser. We now keep it ONLY long enough to run the one-shot
+    // migration to the server on page load, then delete it. New code never
+    // writes here.
+    //
+    // LS_ACTIVE_KEY is the "remember which session I was last in" fallback
+    // for when the URL has no ?session= param. With the server now owning
+    // the session list, this stores a server post id (as a string).
+    const LS_LEGACY_KEY = 'firefly-notes/sessions/v1';
+    const LS_ACTIVE_KEY = 'firefly-notes/active-session/v1';
 
     // ---------- DOM ----------
     const $ = (id) => document.getElementById(id);
@@ -214,9 +223,15 @@
         muted: false,
         editMode: false,
 
-        // Dictation sessions (browser-local, mirrors Ragsmith conversations).
-        // sessions: [{ id, label, ragsmithSessionId, createdAt }]
-        // activeSessionId: id of the currently-active session row in `sessions`
+        // Dictation sessions — server-backed since the post_parent refactor.
+        // Each entry is the wire shape of a firefly_note_session post:
+        //   { id, label, rs_session_id, note_count, created, modified }
+        // id is a WordPress post id (integer). The server is the source of
+        // truth — we never write to this array except via REST round-trips.
+        //
+        // activeSessionId is the integer id of the currently-selected session.
+        // Resolved on load by URL param first, then LS_ACTIVE_KEY, then the
+        // most-recently-modified session, with auto-create as the last resort.
         sessions: [],
         activeSessionId: null,
         // Tracks the text content that was last successfully saved to Ragsmith
@@ -347,7 +362,12 @@
 
     // ---------- Notes CRUD ----------
     async function loadList(autoLoadFirst = false) {
-        const data = await api('/notes');
+        // Scope notes to the active session via the server's ?session= filter.
+        // Without an active session (rare — only between init and the first
+        // resolveInitialActiveSession()), we ask for the unfiltered list as
+        // a defensive fallback so the sidebar isn't empty.
+        const qs = state.activeSessionId ? ('?session=' + encodeURIComponent(state.activeSessionId)) : '';
+        const data = await api('/notes' + qs);
         state.notes = data.notes || [];
         renderList();
         if (autoLoadFirst) {
@@ -381,11 +401,19 @@
 
     async function createNote() {
         await flushPendingSave();
-        // Tag the new note with the active session_id so the bulk-delete on
-        // session removal can find it. The server stores this in post_meta.
+        // The active session is required — the server rejects a create with
+        // no session_id. resolveInitialActiveSession() guarantees one exists
+        // by load time, so this should always be populated when the New Note
+        // button is clickable.
         const sess = getActiveSession();
-        const body = sess ? { session_id: sess.id } : {};
-        const note = await api('/notes', { method: 'POST', body });
+        if (!sess) {
+            await modal.alert({
+                title: 'No session selected',
+                message: 'Pick or create a session in the header dropdown before adding a note.',
+            });
+            return;
+        }
+        const note = await api('/notes', { method: 'POST', body: { session_id: sess.id } });
         state.notes.unshift({ id: note.id, title: note.title, modified: note.modified });
         state.currentId = note.id;
         // Fresh note → no Ragsmith ref yet, so the Save-to-AI button is
@@ -461,84 +489,184 @@
     }
 
     // ---------- Sessions ----------
-    // A "session" here is a browser-local handle to a Ragsmith conversation.
-    // We store an array in localStorage; each entry binds a friendly label
-    // to a Ragsmith session_id (null until the first dictation creates one
-    // server-side). The user can switch between sessions, rename, or delete.
+    // Sessions are now first-class server posts (firefly_note_session CPT).
+    // The browser holds no authoritative session data; we fetch the list
+    // from /sessions on load and after every mutating call. The URL
+    // (?session=N) is the canonical active-session selector with
+    // localStorage as a fallback for "remember where I was last."
+    //
+    // Public functions in this block:
+    //   migrateLegacyLocalStorageIfPresent() — one-shot import on init.
+    //   loadSessionsFromServer()             — fill state.sessions, ensure at
+    //                                          least one exists.
+    //   resolveInitialActiveSession()        — URL → LS → first.
+    //   setActiveSession(id)                 — switch, push URL, re-render.
+    //   createSession()                      — POST /sessions, switch to it.
+    //   renameSession(id)                    — PATCH /sessions/{id}.
+    //   deleteSession(id)                    — DELETE /sessions/{id}
+    //                                          (server cascades notes + rs).
+    //   getActiveSession()                   — local lookup of state record.
 
-    function uuid() {
-        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
-        // RFC4122-ish fallback for older browsers.
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-    }
+    /**
+     * If the previous-generation client wrote a session list to
+     * localStorage, ship it to the server's /sessions/migrate endpoint
+     * before doing anything else. The endpoint is idempotent — safe to
+     * re-run if a prior attempt didn't reach the localStorage clear step.
+     */
+    async function migrateLegacyLocalStorageIfPresent() {
+        let raw;
+        try { raw = localStorage.getItem(LS_LEGACY_KEY); }
+        catch (e) { return; }
+        if (!raw) return;
 
-    function loadSessionsFromStorage() {
+        let parsed;
+        try { parsed = JSON.parse(raw); }
+        catch (e) { localStorage.removeItem(LS_LEGACY_KEY); return; }
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+            localStorage.removeItem(LS_LEGACY_KEY);
+            return;
+        }
+
+        // Send only the fields the migration endpoint cares about — the
+        // legacy createdAt is recreated server-side from post_date so it's
+        // not worth shipping.
+        const payload = parsed
+            .filter((s) => s && typeof s.id === 'string' && s.id !== '')
+            .map((s) => ({
+                id: s.id,
+                label: typeof s.label === 'string' ? s.label : '',
+                ragsmithSessionId: typeof s.ragsmithSessionId === 'string' ? s.ragsmithSessionId : '',
+            }));
+        if (payload.length === 0) {
+            localStorage.removeItem(LS_LEGACY_KEY);
+            return;
+        }
+
         try {
-            const raw = localStorage.getItem(LS_SESSIONS_KEY);
-            const list = raw ? JSON.parse(raw) : null;
-            state.sessions = Array.isArray(list) ? list : [];
-            state.activeSessionId = localStorage.getItem(LS_ACTIVE_KEY) || null;
+            const res = await api('/sessions/migrate', {
+                method: 'POST',
+                body: { sessions: payload },
+            });
+            console.info('[FireflyNotes] migrated legacy sessions:', res && res.migrated);
+            // Map the old active uuid (if any) onto the newly-created server
+            // post id so the user doesn't lose their place on the first load
+            // after upgrade.
+            try {
+                const legacyActive = localStorage.getItem(LS_ACTIVE_KEY);
+                if (legacyActive && res && Array.isArray(res.migrated)) {
+                    const match = res.migrated.find((m) => m.browser_id === legacyActive);
+                    if (match) localStorage.setItem(LS_ACTIVE_KEY, String(match.session_id));
+                    else localStorage.removeItem(LS_ACTIVE_KEY);
+                }
+            } catch (e) { /* ignore */ }
         } catch (e) {
-            state.sessions = [];
-            state.activeSessionId = null;
+            // Surface but don't block the page — the user can still operate
+            // on server sessions, just without their legacy ones imported.
+            console.error('[FireflyNotes] session migration failed:', e);
+            return;
         }
-        // Ensure at least one session exists so the user always has somewhere to dictate.
+
+        // Clear the legacy key. Re-run is safe (idempotent) but pointless.
+        try { localStorage.removeItem(LS_LEGACY_KEY); } catch (e) { /* ignore */ }
+    }
+
+    /**
+     * Fetch /sessions and place it on state.sessions. If the user has no
+     * sessions yet, create one and re-fetch so the picker is never empty.
+     */
+    async function loadSessionsFromServer() {
+        const res = await api('/sessions');
+        state.sessions = (res && Array.isArray(res.sessions)) ? res.sessions : [];
+
         if (state.sessions.length === 0) {
-            const first = makeSession('Default');
-            state.sessions = [first];
-            state.activeSessionId = first.id;
-            persistSessions();
-        } else if (!state.sessions.some((s) => s.id === state.activeSessionId)) {
-            // Saved active id doesn't exist anymore (e.g. cleared elsewhere) — fall back to first.
-            state.activeSessionId = state.sessions[0].id;
-            localStorage.setItem(LS_ACTIVE_KEY, state.activeSessionId);
+            // Auto-create the first session so the dictation flow has somewhere
+            // to land. The user can rename it any time.
+            const created = await api('/sessions', { method: 'POST', body: { label: 'Default' } });
+            state.sessions = [created];
         }
     }
 
-    function persistSessions() {
-        try {
-            localStorage.setItem(LS_SESSIONS_KEY, JSON.stringify(state.sessions));
-            if (state.activeSessionId) {
-                localStorage.setItem(LS_ACTIVE_KEY, state.activeSessionId);
-            }
-        } catch (e) { /* quota or disabled — ignore */ }
+    /**
+     * Decide which session is "active" right now, in priority order:
+     *   1. URL ?session=N (must be a session the user owns)
+     *   2. localStorage LS_ACTIVE_KEY (same constraint)
+     *   3. The most-recently-modified session (top of the list — the server
+     *      sorts DESC by modified)
+     *
+     * Side effects: writes LS_ACTIVE_KEY + history.replaceState so the URL
+     * always reflects the resolved choice afterwards.
+     */
+    function resolveInitialActiveSession() {
+        const ids = new Set(state.sessions.map((s) => Number(s.id)));
+
+        const fromUrl = Number(new URLSearchParams(window.location.search).get('session') || 0);
+        let chosen = ids.has(fromUrl) ? fromUrl : 0;
+
+        if (!chosen) {
+            const fromLs = Number(localStorage.getItem(LS_ACTIVE_KEY) || 0);
+            if (ids.has(fromLs)) chosen = fromLs;
+        }
+        if (!chosen && state.sessions.length > 0) {
+            chosen = Number(state.sessions[0].id);
+        }
+
+        state.activeSessionId = chosen || null;
+        if (chosen) {
+            try { localStorage.setItem(LS_ACTIVE_KEY, String(chosen)); } catch (e) {}
+            writeActiveSessionToUrl(chosen);
+        }
     }
 
-    function makeSession(label) {
-        return {
-            id: uuid(),
-            label: label || ('Session ' + (state.sessions.length + 1)),
-            ragsmithSessionId: null,
-            createdAt: new Date().toISOString(),
-        };
+    /**
+     * Update the URL's ?session= param without triggering navigation. Uses
+     * replaceState so back-button stays useful (we'd push, but pushState
+     * here causes each picker click to add a history entry, which is
+     * annoying — replaceState gives bookmarkability without the spam).
+     */
+    function writeActiveSessionToUrl(id) {
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('session', String(id));
+            window.history.replaceState(null, '', url.toString());
+        } catch (e) { /* same-origin policy / older browser — ignore */ }
     }
 
     function getActiveSession() {
-        return state.sessions.find((s) => s.id === state.activeSessionId) || null;
+        return state.sessions.find((s) => Number(s.id) === Number(state.activeSessionId)) || null;
     }
 
-    function setActiveSession(id) {
-        if (!state.sessions.some((s) => s.id === id)) return;
-        state.activeSessionId = id;
-        persistSessions();
+    /**
+     * Switch the active session. Updates state, the URL, localStorage, and
+     * re-renders the picker + reloads the notes sidebar for the new session.
+     */
+    async function setActiveSession(id) {
+        const numId = Number(id);
+        if (!state.sessions.some((s) => Number(s.id) === numId)) return;
+        state.activeSessionId = numId;
+        try { localStorage.setItem(LS_ACTIVE_KEY, String(numId)); } catch (e) {}
+        writeActiveSessionToUrl(numId);
         renderActiveSession();
         renderSessionList();
+        // Reload the notes sidebar scoped to the new session.
+        await loadList(true).catch((e) => console.error('[FireflyNotes] loadList after switch failed:', e));
     }
 
-    function createSession() {
-        const sess = makeSession('Session ' + (state.sessions.length + 1));
-        state.sessions.unshift(sess);
-        state.activeSessionId = sess.id;
-        persistSessions();
-        renderActiveSession();
-        renderSessionList();
+    /**
+     * Create a new session via the server, refresh the local list, switch
+     * to it. The server auto-numbers the label as "Session N+1" so we
+     * don't need to compute it client-side.
+     */
+    async function createSession() {
+        const created = await api('/sessions', { method: 'POST', body: {} });
+        await loadSessionsFromServer();
+        await setActiveSession(created.id);
     }
 
+    /**
+     * Prompt for a new label, PATCH the server, refresh the local list.
+     */
     async function renameSession(id) {
-        const sess = state.sessions.find((s) => s.id === id);
+        const sess = state.sessions.find((s) => Number(s.id) === Number(id));
         if (!sess) return;
         const next = await modal.prompt({
             title: 'Rename session',
@@ -549,70 +677,58 @@
         if (next == null) return;
         const trimmed = next.trim();
         if (!trimmed) return;
-        sess.label = trimmed;
-        persistSessions();
-        renderActiveSession();
-        renderSessionList();
+        try {
+            await api('/sessions/' + Number(id), { method: 'PATCH', body: { label: trimmed } });
+            await loadSessionsFromServer();
+            renderActiveSession();
+            renderSessionList();
+        } catch (e) {
+            console.error('[FireflyNotes] rename failed:', e);
+            await modal.alert({ title: 'Rename failed', message: e && e.message ? e.message : String(e) });
+        }
     }
 
+    /**
+     * Confirm + cascade-delete a session. The server tears down everything
+     * (ragsmith conversation + child notes + the session post itself); the
+     * client just refreshes its state after.
+     */
     async function deleteSession(id) {
-        const sess = state.sessions.find((s) => s.id === id);
+        const sess = state.sessions.find((s) => Number(s.id) === Number(id));
         if (!sess) return;
 
-        // Show how many WP notes will be removed so the user knows the blast
-        // radius before confirming. Count is based on the session_id meta
-        // we stamp at note creation time.
-        const noteCount = await countNotesForSession(id);
+        const noteCount = sess.note_count || 0;
         const ok = await modal.confirm({
             title: 'Delete this session?',
             message: noteCount > 0
                 ? 'This will delete ' + noteCount + ' note' + (noteCount === 1 ? '' : 's') +
-                  ' tagged with this session, plus the Ragsmith conversation. This cannot be undone.'
+                  ' in this session, plus the Ragsmith conversation. This cannot be undone.'
                 : 'The Ragsmith conversation will be removed. This cannot be undone.',
             confirmLabel: 'Delete',
             danger: true,
         });
         if (!ok) return;
 
-        // The full delete is multi-step (Ragsmith conversation + WP notes +
-        // local state). Block the UI for the whole sequence so the user
-        // doesn't try to switch sessions mid-tear-down.
         await busy.wrap('Deleting session…', async () => {
-            // 1. Drop the Ragsmith conversation (cascades to all its messages).
-            if (sess.ragsmithSessionId && window.FireflyRagsmith && typeof FireflyRagsmith.deleteSession === 'function') {
-                try { await FireflyRagsmith.deleteSession(sess.ragsmithSessionId); }
-                catch (e) { /* best-effort: still drop local state */ }
+            try {
+                await api('/sessions/' + Number(id), { method: 'DELETE' });
+            } catch (e) {
+                console.error('[FireflyNotes] delete session failed:', e);
+                throw e;
             }
-            // 2. Bulk-trash WP notes tagged with this local session_id.
-            try { await api('/sessions/' + encodeURIComponent(id) + '/notes', { method: 'DELETE' }); }
-            catch (e) { console.error('[FireflyNotes] bulk-trash failed:', e); }
         });
 
-        // 3. Drop the local session entry.
-        state.sessions = state.sessions.filter((s) => s.id !== id);
-        if (state.activeSessionId === id) {
-            state.activeSessionId = state.sessions.length ? state.sessions[0].id : null;
-        }
-        if (state.sessions.length === 0) {
-            const first = makeSession('Default');
-            state.sessions = [first];
-            state.activeSessionId = first.id;
-        }
-        persistSessions();
-        renderActiveSession();
-        renderSessionList();
-        // Refresh the notes sidebar — anything tagged to that session is gone.
-        await loadList(true).catch(() => {});
-    }
-
-    // Asks the server how many notes carry this session's local id as their
-    // _firefly_note_session_id meta. Used purely to message the confirm dialog.
-    async function countNotesForSession(localSessionId) {
-        try {
-            const res = await api('/sessions/' + encodeURIComponent(localSessionId) + '/notes/count');
-            return (res && typeof res.count === 'number') ? res.count : 0;
-        } catch (e) {
-            return 0;
+        // Reload the session list from server (will auto-create a Default
+        // session if we just deleted the last one), then switch active to
+        // the most-recent remaining session.
+        await loadSessionsFromServer();
+        const nextId = state.sessions.length ? state.sessions[0].id : null;
+        if (nextId) await setActiveSession(nextId);
+        else {
+            state.activeSessionId = null;
+            renderActiveSession();
+            renderSessionList();
+            await loadList(true).catch(() => {});
         }
     }
 
@@ -783,18 +899,33 @@
                     { reextract_facts: true }
                 );
             } else {
-                // First save: POST /dictation. Ragsmith creates or upserts the
-                // conversation, inserts a new user message, and schedules
-                // extraction. We record the returned id so subsequent saves
-                // take the edit path.
+                // First save for this note: POST /dictation. The session
+                // post owns the Ragsmith conversation id, so we reuse it if
+                // already bound (subsequent dictations land in the same
+                // Ragsmith conversation as everything else in this session).
+                // If unbound, Ragsmith mints a fresh conversation id and we
+                // bind it to the session post via /sessions/{id}/ragsmith
+                // so the next save here — or in any of this session's other
+                // notes — reuses it.
                 res = await FireflyRagsmith.saveDictation(content, {
-                    session_id: sess.ragsmithSessionId || undefined,
+                    session_id: sess.rs_session_id || undefined,
                     source: SOURCE,
                     extract_facts: true,
                 });
-                if (res && res.session_id && !sess.ragsmithSessionId) {
-                    sess.ragsmithSessionId = res.session_id;
-                    persistSessions();
+                if (res && res.session_id && !sess.rs_session_id) {
+                    sess.rs_session_id = res.session_id;
+                    // Persist on the session post so other notes in this
+                    // session pick it up. Best-effort: a failure here just
+                    // means the next save makes a new Ragsmith conversation
+                    // instead of reusing this one.
+                    try {
+                        await api('/sessions/' + sess.id + '/ragsmith', {
+                            method: 'POST',
+                            body: { rs_session_id: res.session_id },
+                        });
+                    } catch (e) {
+                        console.error('[FireflyNotes] bind rs_session_id failed:', e);
+                    }
                 }
                 if (res && res.message_id && res.session_id) {
                     // Best-effort record on the WP side so single-note delete
@@ -1075,14 +1206,36 @@
         });
     }
 
-    function init() {
+    async function init() {
         bindRefs();
         if (!els.list) return;
-        loadSessionsFromStorage();
-        renderActiveSession();
         bindEvents();
-        loadList(true).catch((e) => {
-            els.list.innerHTML = '<li class="firefly-notes-empty">Failed to load: ' + e.message + '</li>';
+
+        // While async work is in flight, give the user something to look at.
+        els.list.innerHTML = '<li class="firefly-notes-empty">Loading&hellip;</li>';
+
+        try {
+            // One-shot localStorage → server import on first load after upgrade.
+            await migrateLegacyLocalStorageIfPresent();
+            await loadSessionsFromServer();
+            resolveInitialActiveSession();
+            renderActiveSession();
+            renderSessionList();
+            await loadList(true);
+        } catch (e) {
+            console.error('[FireflyNotes] init failed:', e);
+            els.list.innerHTML = '<li class="firefly-notes-empty">Failed to load: ' + (e && e.message ? e.message : e) + '</li>';
+        }
+
+        // Browser back/forward through different ?session= values — keep the
+        // app in sync. Falls through harmlessly if the URL param points at a
+        // session we don't own anymore.
+        window.addEventListener('popstate', () => {
+            const fromUrl = Number(new URLSearchParams(window.location.search).get('session') || 0);
+            if (fromUrl && fromUrl !== state.activeSessionId &&
+                state.sessions.some((s) => Number(s.id) === fromUrl)) {
+                setActiveSession(fromUrl).catch(() => {});
+            }
         });
     }
 
