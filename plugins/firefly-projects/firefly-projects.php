@@ -545,11 +545,17 @@ function firefly_projects_add_page_sync_row_action($actions, $post) {
     );
 
     // Chevron toggle that opens a per-row activity-log panel below the row.
-    // Inline SVG matches the icon convention used elsewhere; no dashicons dep.
+    // Data attributes feed the JS drift indicator: it compares
+    // post_modified_gmt (a unix timestamp here) to _firefly_last_sync_<env>
+    // and lights an amber dot when local has changed since the last push.
+    $post_modified_unix = (int) get_post_time( 'U', true, $post->ID );
     $chevron_svg = '<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true" class="firefly-sync-log-chevron"><polyline points="5 8 10 13 15 8"/></svg>';
     $actions['firefly_sync_log'] = sprintf(
-        '<a href="#" class="firefly-sync-log-link" data-post-id="%d" aria-expanded="false">%s<span class="firefly-sync-log-label">%s</span></a>',
+        '<a href="#" class="firefly-sync-log-link" data-post-id="%d" data-post-modified="%d" data-last-sync-dev="%s" data-last-sync-prod="%s" aria-expanded="false">%s<span class="firefly-sync-log-label">%s</span><span class="firefly-sync-log-drift-dot" aria-hidden="true"></span></a>',
         $post->ID,
+        $post_modified_unix,
+        esc_attr( $last_sync_dev ),
+        esc_attr( $last_sync_prod ),
         $chevron_svg,
         __( 'Sync activity', 'firefly-projects' )
     );

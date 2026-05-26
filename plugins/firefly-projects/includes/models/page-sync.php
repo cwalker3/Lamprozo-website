@@ -148,7 +148,7 @@ function firefly_projects_package_page($post, $include_assets = true) {
     // Get post meta (excluding internal WordPress meta)
     $meta = get_post_meta($post->ID);
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint');
     foreach ($meta as $key => $values) {
         // Skip internal meta keys (except whitelisted ones)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -459,7 +459,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
     $meta = get_post_meta($post->ID);
     $meta_data = array();
     // Whitelist underscore-prefixed keys that should sync
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id', '_firefly_mobile_thumbnail_breakpoint');
     foreach ($meta as $key => $values) {
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
@@ -518,6 +518,26 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         }
     }
 
+    // Get mobile featured image data if exists. Stored on the post as
+    // _firefly_mobile_thumbnail_id, the same attachment-id shape as the
+    // standard featured image. The receiver re-creates the attachment and
+    // wires it back up on the synced post.
+    $mobile_featured_image = null;
+    $mobile_featured_image_path = null;
+    $mobile_thumbnail_id = (int) get_post_meta( $post->ID, '_firefly_mobile_thumbnail_id', true );
+    if ( $mobile_thumbnail_id ) {
+        $mobile_path = get_attached_file( $mobile_thumbnail_id );
+        if ( $mobile_path && file_exists( $mobile_path ) ) {
+            $mobile_featured_image = array(
+                'filename'  => basename( $mobile_path ),
+                'mime_type' => get_post_mime_type( $mobile_thumbnail_id ),
+                'alt_text'  => get_post_meta( $mobile_thumbnail_id, '_wp_attachment_image_alt', true ),
+                'title'     => get_the_title( $mobile_thumbnail_id ),
+            );
+            $mobile_featured_image_path = $mobile_path;
+        }
+    }
+
     // Collect theme-side files associated with this post (snippet + schema entry).
     // Warnings are forwarded to the response so the caller can surface them.
     $associated_files = firefly_projects_collect_associated_files( $post );
@@ -530,7 +550,7 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
 
     // Create temporary zip file with assets or featured image
     $zip_path = null;
-    if (!empty($assets_to_sync) || $featured_image_path) {
+    if (!empty($assets_to_sync) || $featured_image_path || $mobile_featured_image_path) {
         $upload_dir = wp_upload_dir();
         $temp_dir = trailingslashit($upload_dir['basedir']) . 'firefly_collective_temp';
 
@@ -562,16 +582,22 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
             $zip->addFile($featured_image_path, 'featured/' . basename($featured_image_path));
         }
 
+        // Add mobile featured image to zip if exists
+        if ($mobile_featured_image_path && file_exists($mobile_featured_image_path)) {
+            $zip->addFile($mobile_featured_image_path, 'mobile_featured/' . basename($mobile_featured_image_path));
+        }
+
         // Add manifest with relative paths for proper extraction
         $manifest = array(
-            'post_data'        => $post_data,
-            'meta_data'        => $meta_data,
-            'target_env'       => $target_env,
-            'asset_map'        => $asset_map,
-            'featured_image'   => $featured_image,
-            'page_role'        => $page_role,
-            'tracked_links'    => $tracked_links,
-            'associated_files' => $associated_files,
+            'post_data'             => $post_data,
+            'meta_data'             => $meta_data,
+            'target_env'            => $target_env,
+            'asset_map'             => $asset_map,
+            'featured_image'        => $featured_image,
+            'mobile_featured_image' => $mobile_featured_image,
+            'page_role'             => $page_role,
+            'tracked_links'         => $tracked_links,
+            'associated_files'      => $associated_files,
             'assets'         => array_map(function($a) {
                 return array(
                     'url'           => isset($a['url']) ? $a['url'] : '',
@@ -587,16 +613,23 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
 
     // Prepare request body — $tracked_links and $associated_files were collected
     // before the zip block so the zip manifest could include them.
+    //
+    // The receiver decodes the multipart `manifest` form field from THIS body
+    // (not the manifest.json inside the zip), so every field the receiver
+    // reads has to be present here too. Forgetting to mirror a field here
+    // was the cause of mobile_featured_image silently never landing on the
+    // remote even though the zip's manifest.json had it correctly.
     $body = array(
-        'post_data'        => $post_data,
-        'meta_data'        => $meta_data,
-        'target_env'       => $target_env,
-        'asset_map'        => $asset_map,
-        'featured_image'   => $featured_image,
-        'has_assets'       => !empty($assets_to_sync) || $featured_image_path,
-        'page_role'        => $page_role,
-        'tracked_links'    => $tracked_links,
-        'associated_files' => $associated_files,
+        'post_data'             => $post_data,
+        'meta_data'             => $meta_data,
+        'target_env'            => $target_env,
+        'asset_map'             => $asset_map,
+        'featured_image'        => $featured_image,
+        'mobile_featured_image' => $mobile_featured_image,
+        'has_assets'            => !empty($assets_to_sync) || $featured_image_path || $mobile_featured_image_path,
+        'page_role'             => $page_role,
+        'tracked_links'         => $tracked_links,
+        'associated_files'      => $associated_files,
     );
 
     // Send request
@@ -775,6 +808,7 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($manifest['target_env']) ? $manifest['target_env'] : 'dev';
         $asset_map = isset($manifest['asset_map']) ? $manifest['asset_map'] : array();
         $featured_image = isset($manifest['featured_image']) ? $manifest['featured_image'] : null;
+        $mobile_featured_image = isset($manifest['mobile_featured_image']) ? $manifest['mobile_featured_image'] : null;
         $page_role = isset($manifest['page_role']) ? $manifest['page_role'] : null;
         $tracked_links = isset($manifest['tracked_links']) ? $manifest['tracked_links'] : array();
         $associated_files = isset($manifest['associated_files']) ? $manifest['associated_files'] : array();
@@ -791,6 +825,7 @@ function firefly_projects_handle_incoming_page($request) {
         $target_env = isset($body['target_env']) ? $body['target_env'] : 'dev';
         $asset_map = isset($body['asset_map']) ? $body['asset_map'] : array();
         $featured_image = isset($body['featured_image']) ? $body['featured_image'] : null;
+        $mobile_featured_image = isset($body['mobile_featured_image']) ? $body['mobile_featured_image'] : null;
         $page_role = isset($body['page_role']) ? $body['page_role'] : null;
         $tracked_links = isset($body['tracked_links']) ? $body['tracked_links'] : array();
         $associated_files = isset($body['associated_files']) ? $body['associated_files'] : array();
@@ -961,12 +996,19 @@ function firefly_projects_handle_incoming_page($request) {
                 }
             }
 
-            // Extract and process featured image if included
+            // Extract and process featured image if included.
+            // Local is the source of truth: any prior featured attachment on
+            // the remote is force-replaced by what arrived in the zip. We
+            // delete the previous attachment record + file before inserting
+            // the new one, so re-syncs don't accumulate orphan attachments
+            // and stale image URLs (which a CDN can keep caching for hours).
             if ($featured_image && !empty($featured_image['filename'])) {
                 $featured_filename = $featured_image['filename'];
                 $featured_content = $zip->getFromName('featured/' . $featured_filename);
 
                 if ($featured_content !== false) {
+                    $previous_thumb_id = (int) get_post_thumbnail_id( $post_id );
+
                     $featured_path = $page_assets_dir . '/' . $featured_filename;
                     file_put_contents($featured_path, $featured_content);
 
@@ -994,6 +1036,65 @@ function firefly_projects_handle_incoming_page($request) {
 
                         // Set as featured image
                         set_post_thumbnail($post_id, $attach_id);
+
+                        // Purge the previous featured attachment (record + file +
+                        // generated thumbnail sizes) so nothing on the host is
+                        // still pointing at an out-of-date image URL.
+                        if ( $previous_thumb_id && $previous_thumb_id !== (int) $attach_id ) {
+                            wp_delete_attachment( $previous_thumb_id, true );
+                        }
+                    }
+                }
+            }
+
+            // Extract and process mobile featured image if included
+            if ($mobile_featured_image && !empty($mobile_featured_image['filename'])) {
+                $mobile_filename = $mobile_featured_image['filename'];
+                $mobile_content = $zip->getFromName('mobile_featured/' . $mobile_filename);
+
+                if ($mobile_content !== false) {
+                    // Avoid clobbering a file in page_assets_dir if it shares the
+                    // name with the desktop featured image — prefix with "mobile-".
+                    $mobile_destination_name = $mobile_filename;
+                    if ($featured_image && isset($featured_image['filename']) && $featured_image['filename'] === $mobile_filename) {
+                        $mobile_destination_name = 'mobile-' . $mobile_filename;
+                    }
+                    $mobile_path = $page_assets_dir . '/' . $mobile_destination_name;
+                    file_put_contents($mobile_path, $mobile_content);
+
+                    // Capture any prior mobile thumbnail attachment so we can
+                    // purge it after the new one is wired up — same force-
+                    // replace semantics as the desktop featured image above.
+                    $previous_mobile_id = (int) get_post_meta( $post_id, '_firefly_mobile_thumbnail_id', true );
+
+                    $mobile_attachment = array(
+                        'post_mime_type' => $mobile_featured_image['mime_type'],
+                        'post_title'     => ! empty($mobile_featured_image['title'])
+                            ? $mobile_featured_image['title']
+                            : pathinfo($mobile_filename, PATHINFO_FILENAME),
+                        'post_content'   => '',
+                        'post_status'    => 'inherit'
+                    );
+
+                    $mobile_attach_id = wp_insert_attachment($mobile_attachment, $mobile_path, $post_id);
+
+                    if (! is_wp_error($mobile_attach_id)) {
+                        require_once(ABSPATH . 'wp-admin/includes/image.php');
+                        $mobile_attach_data = wp_generate_attachment_metadata($mobile_attach_id, $mobile_path);
+                        wp_update_attachment_metadata($mobile_attach_id, $mobile_attach_data);
+
+                        if (! empty($mobile_featured_image['alt_text'])) {
+                            update_post_meta($mobile_attach_id, '_wp_attachment_image_alt', $mobile_featured_image['alt_text']);
+                        }
+
+                        // Wire it up to the post's mobile thumbnail meta.
+                        update_post_meta($post_id, '_firefly_mobile_thumbnail_id', (int) $mobile_attach_id);
+
+                        // Purge the previous mobile attachment so old URLs
+                        // (and CDN caches keyed on them) stop resolving.
+                        if ( $previous_mobile_id && $previous_mobile_id !== (int) $mobile_attach_id ) {
+                            wp_delete_attachment( $previous_mobile_id, true );
+                        }
                     }
                 }
             }

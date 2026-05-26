@@ -210,3 +210,49 @@ function firefly_projects_get_sync_log( $post_id, $limit = 20 ) {
 
     return $entries;
 }
+
+/**
+ * Read the most recent WP revisions for a post, shaped for the activity
+ * timeline. Pairs with sync_log entries when the cross-env activity feed
+ * merges both sources into one chronological view.
+ *
+ * Returns array of entries with the same surface as get_sync_log() where
+ * sensible (id, user, created_at_iso, created_at_human, revision_id,
+ * revision_url) plus origin='revision' to distinguish from sync entries.
+ */
+function firefly_projects_get_post_revisions_shaped( $post_id, $limit = 20 ) {
+    $limit = max( 1, min( 100, (int) $limit ) );
+    $revisions = wp_get_post_revisions( (int) $post_id, array(
+        'numberposts' => $limit,
+        'orderby'     => 'date',
+        'order'       => 'DESC',
+    ) );
+
+    if ( empty( $revisions ) ) {
+        return array();
+    }
+
+    $entries = array();
+    foreach ( $revisions as $rev_id => $rev ) {
+        $author_id   = (int) $rev->post_author;
+        $author_obj  = $author_id ? get_userdata( $author_id ) : null;
+        $author_name = $author_obj ? $author_obj->display_name : ( $author_id ? 'User #' . $author_id : 'System' );
+
+        $ts_gmt = strtotime( $rev->post_modified_gmt . ' UTC' );
+        $iso    = $ts_gmt ? gmdate( 'c', $ts_gmt ) : null;
+        $human  = $ts_gmt ? human_time_diff( $ts_gmt, time() ) . ' ago' : '';
+
+        $entries[] = array(
+            'id'               => 'rev-' . (int) $rev_id,  // string id so JS won't collide with sync_log integer ids
+            'kind'             => 'revision',
+            'post_id'          => (int) $post_id,
+            'user_id'          => $author_id ?: null,
+            'user'             => $author_name,
+            'revision_id'      => (int) $rev_id,
+            'revision_url'     => admin_url( 'revision.php?revision=' . (int) $rev_id ),
+            'created_at_iso'   => $iso,
+            'created_at_human' => $human,
+        );
+    }
+    return $entries;
+}

@@ -1101,6 +1101,11 @@
             state.targetEnvProd = !state.targetEnvProd;
             localStorage.setItem('firefly_pages_sync_env', state.targetEnvProd ? 'prod' : 'dev');
             updateToolbarToggle();
+            // Notify other modules (notably the activity log) so open panels
+            // re-fetch their remote half for the new env.
+            $(document).trigger('firefly:env-changed', [{
+                env: state.targetEnvProd ? 'prod' : 'dev'
+            }]);
         });
 
         // Individual page sync link
@@ -1134,13 +1139,22 @@
 })(jQuery);
 
 /* =============================================================================
- * Sync activity log — per-row expandable panel.
+ * Sync activity log — per-row expandable panel (DUAL-SOURCE).
  *
- * The chevron row action ('.firefly-sync-log-link') toggles a sub-<tr> directly
- * after the post's row. First open fetches `/sync-log?post_id=X`, renders the
- * timeline, and caches the markup in a data-attribute so toggling open again
- * is instant. Re-fetch is triggered after a sync from the per-row "Sync to
- * Remote" link (so the new entry shows up without a page reload).
+ * Local is the command center; the env toggle in the toolbar (Live Dev /
+ * Production) decides which remote's activity is merged into the same panel.
+ *
+ * On chevron click, fetches BOTH:
+ *   - GET /sync-log?post_id=X        (this local's sync_log entries)
+ *   - GET /remote-activity?...&env=Y (the remote's sync_log + WP revisions)
+ *
+ * Entries are tagged with origin = 'local' | 'remote' and rendered as one
+ * chronological timeline. Per-entry actions appear contextually:
+ *   - "Restore" on any local-side entry with a revision_id
+ *   - "Roll back" on any local push entry with summary.pre_push_revision_id
+ *
+ * When both sides have post-sync edits, a warning strip at the top of the
+ * panel offers Push (existing flow) or Restore-to-last-sync.
  * ============================================================================= */
 (function ($) {
     'use strict';
@@ -1155,28 +1169,21 @@
         };
     }
 
+    /** Read current env from the toolbar toggle's persisted state. */
+    function getCurrentEnv() {
+        return (localStorage.getItem('firefly_pages_sync_env') === 'prod') ? 'prod' : 'dev';
+    }
+
+    function envLabel(env) { return env === 'prod' ? 'Production' : 'Live Dev'; }
+
     // Inline SVGs reused in the entries.
     var ICONS = {
         push:     '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 9 8 4 13 9"/><line x1="8" y1="4" x2="8" y2="13"/></svg>',
         pull:     '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 8 12 13 7"/><line x1="8" y1="3" x2="8" y2="12"/></svg>',
+        restore:  '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a5 5 0 1 0 1.5-3.5"/><polyline points="2 3 2 6 5 6"/></svg>',
+        edit:     '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3l8-8z"/></svg>',
         spinner:  '<span class="firefly-sync-log-spinner" aria-hidden="true"></span>'
     };
-
-    function fetchEntries(postId, cb) {
-        var r = getRest();
-        $.ajax({
-            url: r.url + 'sync-log',
-            method: 'GET',
-            data: { post_id: postId, limit: 20 },
-            headers: { 'X-WP-Nonce': r.nonce }
-        }).done(function (data) {
-            cb(null, (data && data.entries) ? data.entries : []);
-        }).fail(function (xhr) {
-            var msg = 'Failed to load activity (' + (xhr && xhr.status ? xhr.status : 'network') + ').';
-            try { var j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-            cb(new Error(msg), null);
-        });
-    }
 
     function escapeHtml(s) {
         return String(s == null ? '' : s)
@@ -1184,11 +1191,66 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    function envLabel(env) { return env === 'prod' ? 'Production' : 'Live Dev'; }
-    function dirLabel(direction, env) {
-        var arrow = direction === 'push' ? '→' : '←';
-        var verb  = direction === 'push' ? 'Push'   : 'Pull';
-        return verb + ' ' + arrow + ' ' + envLabel(env);
+    /** Fetch local sync log entries. */
+    function fetchLocal(postId) {
+        var r = getRest();
+        return $.ajax({
+            url: r.url + 'sync-log',
+            method: 'GET',
+            data: { post_id: postId, limit: 20 },
+            headers: { 'X-WP-Nonce': r.nonce }
+        }).then(function (data) {
+            return (data && data.entries) ? data.entries : [];
+        });
+    }
+
+    /** Fetch remote activity for the toggled env (graceful on failure). */
+    function fetchRemote(postId, env) {
+        var r = getRest();
+        return $.ajax({
+            url: r.url + 'remote-activity',
+            method: 'GET',
+            data: { post_id: postId, env: env, limit: 20 },
+            headers: { 'X-WP-Nonce': r.nonce }
+        }).then(function (data) {
+            // Endpoint always returns success:true even when the remote is
+            // unreachable; warning + empty entries surface as a banner.
+            return data || {};
+        }, function () {
+            return { warning: 'Could not load remote activity.', sync_log: [], revisions: [] };
+        });
+    }
+
+    /** Combined fetch + normalization. Returns { entries, warning, env } */
+    function fetchCombined(postId, env) {
+        return $.when(fetchLocal(postId), fetchRemote(postId, env)).then(function (local, remote) {
+            var localEntries  = Array.isArray(local) ? local : [];
+            var remoteSync    = (remote && Array.isArray(remote.sync_log))  ? remote.sync_log  : [];
+            var remoteRev     = (remote && Array.isArray(remote.revisions)) ? remote.revisions : [];
+            var warning       = (remote && remote.warning) ? remote.warning : null;
+            var current       = (remote && remote.current) ? remote.current : null;
+
+            // Tag origin + a sortable timestamp on each entry.
+            var tagged = [];
+            localEntries.forEach(function (e) {
+                tagged.push(Object.assign({}, e, { origin: 'local', sort_ts: e.created_at_iso }));
+            });
+            remoteSync.forEach(function (e) {
+                tagged.push(Object.assign({}, e, { origin: 'remote', kind: 'sync', sort_ts: e.created_at_iso }));
+            });
+            remoteRev.forEach(function (e) {
+                // Remote revisions become "edit" entries — distinguish from syncs visually.
+                tagged.push(Object.assign({}, e, { origin: 'remote', kind: 'revision', sort_ts: e.created_at_iso }));
+            });
+
+            tagged.sort(function (a, b) {
+                var ta = a.sort_ts ? Date.parse(a.sort_ts) : 0;
+                var tb = b.sort_ts ? Date.parse(b.sort_ts) : 0;
+                return tb - ta;
+            });
+
+            return { entries: tagged, warning: warning, env: env, current: current };
+        });
     }
 
     function summaryFiles(summary) {
@@ -1199,36 +1261,161 @@
         return out;
     }
 
-    function renderEntries(entries) {
-        if (!entries || entries.length === 0) {
-            return '<div class="firefly-sync-log-empty">No sync activity yet for this page.</div>';
+    function dirIcon(entry) {
+        if (entry.kind === 'revision') return ICONS.edit;
+        if (entry.direction === 'restore' || entry.direction === 'rollback' || entry.direction === 'rollback_applied') return ICONS.restore;
+        if (entry.direction === 'pull')    return ICONS.pull;
+        return ICONS.push;
+    }
+
+    function dirLabel(entry, env) {
+        if (entry.kind === 'revision') return 'Edit on ' + envLabel(env);
+        switch (entry.direction) {
+            case 'pull':              return 'Pull ← ' + envLabel(entry.env || env);
+            case 'restore':           return 'Restore local';
+            case 'rollback':          return 'Roll back ' + envLabel(entry.env || env);
+            case 'rollback_applied':  return 'Rolled back (applied)';
+            case 'push':
+            default:                  return 'Push → ' + envLabel(entry.env || env);
         }
-        var html = '<ol class="firefly-sync-log-timeline">';
-        entries.forEach(function (e) {
-            var isFail   = e.status === 'failure';
-            var dirHtml  = (e.direction === 'pull' ? ICONS.pull : ICONS.push) + escapeHtml(dirLabel(e.direction, e.env));
-            var files    = summaryFiles(e.summary);
-            var filesTip = files.length ? files.join('\n') : '';
-            var filesPart = files.length
-                ? '<span class="firefly-sync-log-files" title="' + escapeHtml(filesTip) + '">' + e.files_count + ' file' + (e.files_count === 1 ? '' : 's') + '</span>'
-                : (e.direction === 'push' ? '<span class="firefly-sync-log-files is-muted">no files</span>' : '');
-            var revPart = e.revision_url
-                ? '<a class="firefly-sync-log-revision" href="' + escapeHtml(e.revision_url) + '">View version</a>'
-                : '';
-            var errPart = '';
-            if (isFail && e.summary && e.summary.error_message) {
-                errPart = '<div class="firefly-sync-log-error">' + escapeHtml(e.summary.error_message) + '</div>';
+    }
+
+    /** Decide which per-entry action buttons are available. */
+    function entryActions(entry) {
+        var actions = [];
+        // Restore local: any local-origin entry with a revision_id that points
+        // at a LOCAL revision (sync_log rows store local revision_ids).
+        if (entry.origin === 'local' && entry.revision_id) {
+            actions.push({
+                cls:   'firefly-sync-log-action firefly-sync-log-restore',
+                label: 'Restore',
+                attrs: 'data-action="restore-local" data-revision-id="' + entry.revision_id + '"'
+            });
+        }
+        // Roll back: a local push success with a recorded pre_push_revision_id.
+        if (entry.origin === 'local' && entry.direction === 'push' && entry.status === 'success'
+            && entry.summary && entry.summary.pre_push_revision_id) {
+            actions.push({
+                cls:   'firefly-sync-log-action firefly-sync-log-rollback',
+                label: 'Roll back',
+                attrs: 'data-action="rollback-push" data-log-id="' + entry.id + '"'
+            });
+        }
+        return actions;
+    }
+
+    function renderEntry(entry, env) {
+        var isFail   = entry.status === 'failure';
+        var iconHtml = dirIcon(entry);
+        var dirHtml  = iconHtml + escapeHtml(dirLabel(entry, env));
+        var files    = summaryFiles(entry.summary);
+        var filesPart = files.length
+            ? '<span class="firefly-sync-log-files" title="' + escapeHtml(files.join('\n')) + '">' + entry.files_count + ' file' + (entry.files_count === 1 ? '' : 's') + '</span>'
+            : (entry.direction === 'push' ? '<span class="firefly-sync-log-files is-muted">no files</span>' : '');
+        var revPart = entry.revision_url
+            ? '<a class="firefly-sync-log-revision" href="' + escapeHtml(entry.revision_url) + '">View version</a>'
+            : '';
+        var actions = entryActions(entry);
+        var actionsHtml = actions.map(function (a) {
+            return '<button type="button" class="' + a.cls + '" ' + a.attrs + '>' + escapeHtml(a.label) + '</button>';
+        }).join('');
+        var errPart = (isFail && entry.summary && entry.summary.error_message)
+            ? '<div class="firefly-sync-log-error">' + escapeHtml(entry.summary.error_message) + '</div>'
+            : '';
+
+        var classes = 'firefly-sync-log-entry'
+            + ' is-origin-' + (entry.origin || 'local')
+            + ' ' + (isFail ? 'is-failure' : 'is-success')
+            + (entry.kind === 'revision' ? ' is-kind-revision' : ' is-kind-sync');
+
+        // Origin chip prefixes every entry so users see at a glance whose
+        // event it was (Local vs Live Dev/Prod).
+        var originChip = '<span class="firefly-sync-log-origin">'
+            + (entry.origin === 'local' ? 'Local' : escapeHtml(envLabel(env)))
+            + '</span>';
+
+        return '<li class="' + classes + '" data-entry-id="' + escapeHtml(entry.id) + '">'
+            +   '<span class="firefly-sync-log-dot" aria-hidden="true"></span>'
+            +   originChip
+            +   '<span class="firefly-sync-log-direction">' + dirHtml + '</span>'
+            +   '<span class="firefly-sync-log-user">' + escapeHtml(entry.user || 'System') + '</span>'
+            +   filesPart
+            +   revPart
+            +   '<span class="firefly-sync-log-actions">' + actionsHtml + '</span>'
+            +   '<time class="firefly-sync-log-time" datetime="' + escapeHtml(entry.created_at_iso || '') + '" title="' + escapeHtml(entry.created_at_iso || '') + '">' + escapeHtml(entry.created_at_human || '') + '</time>'
+            +   errPart
+            + '</li>';
+    }
+
+    /**
+     * Detect a both-sides-edited conflict for the conflict strip.
+     * "Both sides have edits since the last successful push" means: there's at
+     * least one remote entry (sync OR revision) newer than the most recent
+     * local push success, AND there's at least one local revision newer than
+     * that same push (we approximate with: any local sync_log row newer that
+     * isn't itself a push, OR the user has unpushed local edits — but we
+     * don't track local revisions in the panel directly, so we settle for
+     * "remote moved since our last successful push" as the trigger).
+     */
+    function findConflict(entries, env) {
+        // Most recent local push-success entry.
+        var lastPush = null;
+        for (var i = 0; i < entries.length; i++) {
+            var e = entries[i];
+            if (e.origin === 'local' && e.direction === 'push' && e.status === 'success') {
+                lastPush = e;
+                break;
             }
-            html += '<li class="firefly-sync-log-entry ' + (isFail ? 'is-failure' : 'is-success') + '">'
-                  +   '<span class="firefly-sync-log-dot" aria-hidden="true"></span>'
-                  +   '<span class="firefly-sync-log-direction">' + dirHtml + '</span>'
-                  +   '<span class="firefly-sync-log-user">' + escapeHtml(e.user || 'System') + '</span>'
-                  +   filesPart
-                  +   revPart
-                  +   '<time class="firefly-sync-log-time" datetime="' + escapeHtml(e.created_at_iso || '') + '" title="' + escapeHtml(e.created_at_iso || '') + '">' + escapeHtml(e.created_at_human || '') + '</time>'
-                  +   errPart
-                  + '</li>';
+        }
+        if (!lastPush || !lastPush.sort_ts) return null;
+        var pushTs = Date.parse(lastPush.sort_ts);
+
+        // Any remote entry newer than the last push?
+        var remoteAhead = entries.some(function (e) {
+            return e.origin === 'remote' && e.sort_ts && Date.parse(e.sort_ts) > pushTs;
         });
+        if (!remoteAhead) return null;
+
+        return {
+            last_push:  lastPush,
+            env_label:  envLabel(env),
+        };
+    }
+
+    function renderConflictStrip(conflict) {
+        if (!conflict) return '';
+        var pushDateAttr = conflict.last_push.created_at_iso || '';
+        var pushDateLabel = conflict.last_push.created_at_human || 'last push';
+        var restoreAttrs = 'data-action="restore-local" data-revision-id="' + (conflict.last_push.revision_id || '') + '"';
+        return '<div class="firefly-sync-log-conflict">'
+            +   '<span class="firefly-sync-log-conflict-icon">⚠</span>'
+            +   '<span class="firefly-sync-log-conflict-text">'
+            +     escapeHtml(conflict.env_label) + ' has changed since your last sync ('
+            +     '<time datetime="' + escapeHtml(pushDateAttr) + '">' + escapeHtml(pushDateLabel) + '</time>).'
+            +   '</span>'
+            +   '<button type="button" class="button button-primary firefly-sync-log-conflict-push" data-action="push-now">Push your local now</button>'
+            +   (conflict.last_push.revision_id
+                ? '<button type="button" class="button firefly-sync-log-action" ' + restoreAttrs + '>Restore local to last sync</button>'
+                : '')
+            + '</div>';
+    }
+
+    function renderBody(combined) {
+        var html = '';
+        var warning = combined.warning;
+        if (warning) {
+            html += '<div class="firefly-sync-log-warning">' + escapeHtml(warning) + '</div>';
+        }
+        var conflict = findConflict(combined.entries, combined.env);
+        if (conflict) html += renderConflictStrip(conflict);
+
+        if (!combined.entries || combined.entries.length === 0) {
+            html += '<div class="firefly-sync-log-empty">No sync activity yet for this page.</div>';
+            return html;
+        }
+
+        html += '<ol class="firefly-sync-log-timeline">';
+        combined.entries.forEach(function (e) { html += renderEntry(e, combined.env); });
         html += '</ol>';
         return html;
     }
@@ -1253,18 +1440,16 @@
         return $panel;
     }
 
-    function loadInto($panel, postId, opts) {
-        opts = opts || {};
+    function loadInto($panel, postId) {
         var $body = $panel.find('.firefly-sync-log-body');
-        $body.html('<div class="firefly-sync-log-loading">' + ICONS.spinner + ' Loading activity…</div>');
-        fetchEntries(postId, function (err, entries) {
-            if (err) {
-                $body.html('<div class="firefly-sync-log-error">' + escapeHtml(err.message) + '</div>');
-                return;
-            }
-            $body.html(renderEntries(entries));
+        var env   = getCurrentEnv();
+        $body.html('<div class="firefly-sync-log-loading">' + ICONS.spinner + ' Loading activity from Local + ' + escapeHtml(envLabel(env)) + '…</div>');
+        fetchCombined(postId, env).done(function (combined) {
+            $body.html(renderBody(combined));
             $panel.data('loaded', true);
-            if (opts.onLoad) opts.onLoad(entries);
+            $panel.data('env', env);
+        }).fail(function () {
+            $body.html('<div class="firefly-sync-log-error">Failed to load activity. Try again.</div>');
         });
     }
 
@@ -1279,9 +1464,7 @@
         $link.attr('aria-expanded', willOpen ? 'true' : 'false');
         $link.toggleClass('is-open', willOpen);
 
-        if (willOpen && !$panel.data('loaded')) {
-            loadInto($panel, postId);
-        }
+        if (willOpen) loadInto($panel, postId); // always re-fetch so env-toggle changes are reflected
     }
 
     /**
@@ -1294,16 +1477,123 @@
         loadInto($panel, postId);
     };
 
+    /** Per-entry action: restore local to a revision. */
+    function doRestoreLocal($btn) {
+        var $panel    = $btn.closest('.firefly-sync-log-row');
+        var postId    = parseInt($panel.attr('data-post-id'), 10);
+        var revId     = parseInt($btn.attr('data-revision-id'), 10);
+        if (!postId || !revId) return;
+        if (!confirm('Restore this page to revision #' + revId + '? Local content will be overwritten.')) return;
+
+        var r = getRest();
+        $btn.prop('disabled', true).addClass('is-working');
+        $.ajax({
+            url:     r.url + 'restore-local-revision',
+            method:  'POST',
+            data:    JSON.stringify({ post_id: postId, revision_id: revId }),
+            contentType: 'application/json',
+            headers: { 'X-WP-Nonce': r.nonce }
+        }).done(function () {
+            SyncLog.refresh(postId);
+        }).fail(function (xhr) {
+            var msg = 'Restore failed.';
+            try { var j = JSON.parse(xhr.responseText); if (j.message) msg = j.message; } catch (e) {}
+            alert(msg);
+            $btn.prop('disabled', false).removeClass('is-working');
+        });
+    }
+
+    /** Per-entry action: roll back a push on the remote. */
+    function doRollbackPush($btn) {
+        var $panel = $btn.closest('.firefly-sync-log-row');
+        var postId = parseInt($panel.attr('data-post-id'), 10);
+        var logId  = parseInt($btn.attr('data-log-id'), 10);
+        if (!postId || !logId) return;
+        if (!confirm('Roll back this push on the remote? The remote will be restored to its pre-push state.')) return;
+
+        var r = getRest();
+        $btn.prop('disabled', true).addClass('is-working');
+        $.ajax({
+            url:     r.url + 'rollback-push',
+            method:  'POST',
+            data:    JSON.stringify({ log_id: logId }),
+            contentType: 'application/json',
+            headers: { 'X-WP-Nonce': r.nonce }
+        }).done(function () {
+            SyncLog.refresh(postId);
+        }).fail(function (xhr) {
+            var msg = 'Rollback failed.';
+            try { var j = JSON.parse(xhr.responseText); if (j.message) msg = j.message; } catch (e) {}
+            alert(msg);
+            $btn.prop('disabled', false).removeClass('is-working');
+        });
+    }
+
+    /** Conflict strip's "Push your local now" — delegates to the existing per-row link. */
+    function doPushFromConflict($btn) {
+        var $panel = $btn.closest('.firefly-sync-log-row');
+        var postId = parseInt($panel.attr('data-post-id'), 10);
+        if (!postId) return;
+        // Trigger a click on the per-row Sync to Remote link so the existing
+        // confirmation modal handles the flow (don't duplicate that logic).
+        var $row = $panel.prev('tr');
+        $row.find('.firefly-sync-page-link').first().trigger('click');
+    }
+
+    /**
+     * Drift indicator — lights an amber dot on the chevron when local has
+     * been modified since its last sync to the currently-selected env.
+     * Remote-ahead detection is a planned follow-up (needs a batched
+     * /post-activity sweep on page load).
+     */
+    function updateDriftIndicators() {
+        var env = getCurrentEnv();
+        $('.firefly-sync-log-link').each(function () {
+            var $link = $(this);
+            var modified  = parseInt($link.attr('data-post-modified'), 10) || 0;
+            var lastSync  = parseInt($link.attr(env === 'prod' ? 'data-last-sync-prod' : 'data-last-sync-dev'), 10) || 0;
+            var localAhead = modified > 0 && (lastSync === 0 || modified > lastSync + 5); // 5s slack for clock skew
+            $link.toggleClass('is-drift-local', localAhead);
+        });
+    }
+
     $(document).ready(function () {
         $(document).on('click', '.firefly-sync-log-link', function (e) {
             e.preventDefault();
             togglePanel($(this));
         });
 
+        // Compute drift dots on initial render + whenever the env toggle flips.
+        updateDriftIndicators();
+        $(document).on('firefly:env-changed', updateDriftIndicators);
+
+        // Per-entry action buttons (delegated, since rows are rendered dynamically).
+        $(document).on('click', '.firefly-sync-log-restore, .firefly-sync-log-conflict .firefly-sync-log-action', function (e) {
+            e.preventDefault();
+            doRestoreLocal($(this));
+        });
+        $(document).on('click', '.firefly-sync-log-rollback', function (e) {
+            e.preventDefault();
+            doRollbackPush($(this));
+        });
+        $(document).on('click', '.firefly-sync-log-conflict-push', function (e) {
+            e.preventDefault();
+            doPushFromConflict($(this));
+        });
+
         // Whenever the existing per-row "Sync to Remote" flow finishes,
         // refresh the matching activity panel so the new entry shows up.
         $(document).on('firefly:sync-page:done', function (e, data) {
             if (data && data.postId) SyncLog.refresh(data.postId);
+        });
+
+        // Env toggle changed in the toolbar — re-fetch any open panels so
+        // the remote half matches the new viewing perspective.
+        $(document).on('firefly:env-changed', function () {
+            $('.firefly-sync-log-row:not([hidden])').each(function () {
+                var postId = parseInt($(this).attr('data-post-id'), 10);
+                if (postId) loadInto($(this), postId);
+            });
         });
     });
 })(jQuery);

@@ -852,3 +852,158 @@ ol.firefly-sync-log-timeline {
         padding: 10px 12px 14px;
     }
 }
+
+/* =============================================================================
+   Sync activity log v2 — dual-source UI: origin chip, conflict strip,
+   per-entry action buttons, warning banner, revision entries.
+   ========================================================================== */
+
+/* Origin chip — small uppercase tag at the start of each entry */
+.firefly-sync-log-origin {
+    display: inline-flex;
+    align-items: center;
+    background: #f0f0f1;
+    color: #50575e;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-entry.is-origin-local .firefly-sync-log-origin {
+    background: #fef6e0;
+    color: #8a6500;
+}
+.firefly-sync-log-entry.is-origin-remote .firefly-sync-log-origin {
+    background: #eef0f4;
+    color: #50575e;
+}
+
+/* Remote-side entries: slightly muted body so the eye prioritizes local. */
+.firefly-sync-log-entry.is-origin-remote {
+    opacity: 0.85;
+}
+
+/* Revision entries (out-of-band edits) — distinct pencil-icon row, dim dot. */
+.firefly-sync-log-entry.is-kind-revision .firefly-sync-log-dot {
+    background: #8c8f94;
+}
+.firefly-sync-log-entry.is-kind-revision {
+    color: #50575e;
+}
+
+/* Per-entry action buttons (Restore, Roll back). Compact, ghost-style. */
+.firefly-sync-log-actions {
+    display: inline-flex;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-action {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    color: #2271b1;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    line-height: 1.4;
+}
+.firefly-sync-log-action:hover {
+    background: #f0f6fc;
+    border-color: #2271b1;
+}
+.firefly-sync-log-action.firefly-sync-log-rollback {
+    color: #b32d2e;
+}
+.firefly-sync-log-action.firefly-sync-log-rollback:hover {
+    background: #fcf0f1;
+    border-color: #b32d2e;
+}
+.firefly-sync-log-action.is-working {
+    opacity: 0.6;
+    cursor: progress;
+}
+.firefly-sync-log-action[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Warning banner — shown when the remote was unreachable or post isn't yet
+   registered for cross-env sync. Soft, informational, not alarming. */
+.firefly-sync-log-warning {
+    background: #fef8e7;
+    border: 1px solid #f0d479;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #8a6500;
+}
+
+/* Conflict strip — full-width banner at the top of the panel when both
+   sides have diverged. Action buttons inline on the right. */
+.firefly-sync-log-conflict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    background: #fef0f0;
+    border: 1px solid #e8b0b0;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+.firefly-sync-log-conflict-icon {
+    font-size: 16px;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-conflict-text {
+    flex: 1 1 280px;
+    color: #1d2327;
+    font-size: 13px;
+}
+.firefly-sync-log-conflict-text time {
+    font-weight: 500;
+    color: #2c3338;
+}
+.firefly-sync-log-conflict .button {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 782px) {
+    .firefly-sync-log-origin {
+        font-size: 9px;
+        padding: 1px 5px;
+    }
+    .firefly-sync-log-conflict {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .firefly-sync-log-conflict .button {
+        width: 100%;
+    }
+}
+
+/* Drift dot — appears on the chevron when local is ahead of the selected env. */
+.firefly-sync-log-drift-dot {
+    display: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f0b849;
+    box-shadow: 0 0 0 2px #fff;
+    margin-left: 4px;
+    flex: 0 0 auto;
+}
+.firefly-sync-log-link.is-drift-local .firefly-sync-log-drift-dot {
+    display: inline-block;
+}
+.firefly-sync-log-link.is-drift-local {
+    font-weight: 500;
+}
+.firefly-sync-log-link {
+    display: inline-flex;
+    align-items: center;
+}
