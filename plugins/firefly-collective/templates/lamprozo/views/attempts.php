@@ -31,12 +31,14 @@
 .attempt-field { flex:1; min-width:160px; }
 .attempt-field input, .attempt-field select, .attempt-field textarea { width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; }
 .attempt-field textarea { resize:vertical; min-height:60px; }
-.vod-list { display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+.vod-list { display:flex; flex-direction:column; gap:14px; margin-bottom:6px; }
+.vod-item { display:flex; flex-direction:column; gap:4px; padding:6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
 .vod-row { display:flex; gap:6px; align-items:center; }
 .vod-row input { padding:4px 7px; border:1px solid #ccc; border-radius:4px; }
 .vod-label-input { width:100px; }
 .vod-url-input { flex:1; }
 .vod-dur-input { width:90px; }
+.vod-summary-input { width:100%; padding:5px 7px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:0.9em; resize:vertical; min-height:50px; }
 </style>
 
 <script>
@@ -70,18 +72,22 @@
         const vods   = attempt.vods || [];
 
         const vodRows = vods.map((v, vi) => `
-            <div class="vod-row">
-                <input class="vod-url-input" type="text" placeholder="https://youtu.be/..." value="${esc(v.url||'')}"
-                    onchange="updateVod(${i},${vi},'url',this.value)"
-                    onblur="fetchYtMeta(${i},${vi},this.value)">
-                <input class="vod-label-input" type="text" placeholder="Title (auto-filled from YouTube)" value="${esc(v.label||'')}"
-                    id="vod-label-${i}-${vi}"
-                    onchange="updateVod(${i},${vi},'label',this.value)">
-                <input class="vod-dur-input" type="text" placeholder="Duration (e.g. 1:23:45)"
-                    id="vod-dur-${i}-${vi}"
-                    value="${esc(v.duration||'')}"
-                    onchange="updateVod(${i},${vi},'duration',this.value)">
-                <button class="button button-small" onclick="removeVod(${i},${vi})">✕</button>
+            <div class="vod-item">
+                <div class="vod-row">
+                    <input class="vod-url-input" type="text" placeholder="https://youtu.be/..." value="${esc(v.url||'')}"
+                        onchange="updateVod(${i},${vi},'url',this.value)"
+                        onblur="fetchYtMeta(${i},${vi},this.value)">
+                    <input class="vod-label-input" type="text" placeholder="Title (auto-filled from YouTube)" value="${esc(v.label||'')}"
+                        id="vod-label-${i}-${vi}"
+                        onchange="updateVod(${i},${vi},'label',this.value)">
+                    <input class="vod-dur-input" type="text" placeholder="Duration (e.g. 1:23:45)"
+                        id="vod-dur-${i}-${vi}"
+                        value="${esc(v.duration||'')}"
+                        onchange="updateVod(${i},${vi},'duration',this.value)">
+                    <button class="button button-small" onclick="removeVod(${i},${vi})">✕</button>
+                </div>
+                <textarea class="vod-summary-input" placeholder="What happened in this VOD?"
+                    onchange="updateVod(${i},${vi},'summary',this.value)">${esc(v.summary||'')}</textarea>
             </div>`).join('');
 
         return `<div class="attempt-card">
@@ -177,7 +183,7 @@
     window.toggleCard    = (i) => { openCards.has(i) ? openCards.delete(i) : openCards.add(i); render(); };
     window.updateField   = (i, key, val) => { attempts[i][key] = val; };
     window.updateVod     = (i, vi, key, val) => { attempts[i].vods[vi][key] = val; };
-    window.addVod        = (i) => { attempts[i].vods = attempts[i].vods || []; attempts[i].vods.push({label:'VOD',url:''}); render(); };
+    window.addVod        = (i) => { attempts[i].vods = attempts[i].vods || []; attempts[i].vods.push({label:'VOD',url:'',summary:''}); render(); };
     window.removeVod     = (i, vi) => { attempts[i].vods.splice(vi, 1); render(); };
     window.deleteAttempt = (i) => { if (confirm('Delete attempt #' + attempts[i].number + '?')) { attempts.splice(i, 1); render(); } };
 

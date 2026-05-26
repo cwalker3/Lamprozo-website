@@ -50,13 +50,35 @@ $fragsheet_alive = [];
 $fragsheet_dead  = [];
 $fragsheet = $attempt['fragsheet'] ?? null;
 if (!empty($fragsheet)) {
+    // HZLA leaves behind two kinds of "shadow" entries when a mon evolves:
+    //   (a) Mirrored: Croconaw co-exists with Feraligatr with prevoFragCount
+    //       and fragCount swapped. The prevo has prevoFragCount > fragCount.
+    //   (b) Stub: zero-stat prevo placeholders left behind without a
+    //       boxImportBatchId (e.g. Onix, Gligar, Duskull, Togetic). HZLA's
+    //       real box entries always include a boxImportBatchId; placeholders
+    //       generated for evolved prevos don't.
+    // Hide both kinds; merge their count into the evolved form via the
+    // fragCount + prevoFragCount sum below.
+    $shadow_prevos = [];
+    foreach ($fragsheet as $species => $mon) {
+        $frag    = (int) ($mon['fragCount']      ?? 0);
+        $prevo   = (int) ($mon['prevoFragCount'] ?? 0);
+        $batchId = $mon['setData']['My Box']['boxImportBatchId'] ?? '';
+        if ($prevo > 0 && $prevo > $frag) {
+            $shadow_prevos[$species] = true;
+        } elseif ($frag === 0 && $prevo === 0 && $batchId === '') {
+            $shadow_prevos[$species] = true;
+        }
+    }
+
     foreach ($fragsheet as $species => $mon) {
         if ($mon['hide'] ?? false) continue;
+        if (isset($shadow_prevos[$species])) continue;
         $ivs = $mon['setData']['My Box']['ivs'] ?? [];
         $entry = [
             'species'   => $species,
             'nickname'  => $mon['nn'] ?? null,
-            'fragCount' => $mon['fragCount'] ?? 0,
+            'fragCount' => (int) ($mon['fragCount'] ?? 0) + (int) ($mon['prevoFragCount'] ?? 0),
             'frags'     => $mon['frags'] ?? [],
             'met'       => $mon['setData']['My Box']['met'] ?? '',
             'nature'    => $mon['setData']['My Box']['nature'] ?? '',
@@ -108,9 +130,10 @@ if (!empty($fragsheet)) {
                     ? $custom_label
                     : (lamprozo_yt_title($vod['url']) ?? $custom_label ?: 'VOD');
                 $duration = $vod_durations[$vi] ?? null;
+                $summary  = trim($vod['summary'] ?? '');
             ?>
             <?php if ($yt_id): ?>
-            <button class="vod-thumb" onclick="lamprozoOpenVod('<?php echo esc_js($yt_id); ?>', <?php echo esc_attr(json_encode($label)); ?>)">
+            <button class="vod-thumb" onclick="lamprozoOpenVod('<?php echo esc_js($yt_id); ?>', <?php echo esc_attr(json_encode($label)); ?>, <?php echo esc_attr(json_encode($summary)); ?>)">
             <?php else: ?>
             <a class="vod-thumb" href="<?php echo esc_url($vod['url']); ?>" target="_blank">
             <?php endif; ?>
@@ -132,6 +155,9 @@ if (!empty($fragsheet)) {
                 </div>
                 <?php endif; ?>
                 <span class="vod-thumb__label"><?php echo esc_html($label); ?></span>
+                <?php if ($summary): ?>
+                <span class="vod-thumb__summary"><?php echo esc_html($summary); ?></span>
+                <?php endif; ?>
             <?php if ($yt_id): ?></button><?php else: ?></a><?php endif; ?>
             <?php endforeach; ?>
         </div>
@@ -238,12 +264,16 @@ function lamprozoHideMonTooltip() {
         <div class="vod-modal__embed">
             <iframe id="vod-modal-iframe" src="" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
         </div>
+        <div id="vod-modal-summary" class="vod-modal__summary"></div>
     </div>
 </div>
 <script>
-function lamprozoOpenVod(ytId, title) {
+function lamprozoOpenVod(ytId, title, summary) {
     document.getElementById('vod-modal-title').textContent = title;
     document.getElementById('vod-modal-iframe').src = 'https://www.youtube.com/embed/' + ytId + '?autoplay=1';
+    var summaryEl = document.getElementById('vod-modal-summary');
+    summaryEl.textContent = summary || '';
+    summaryEl.style.display = summary ? 'block' : 'none';
     document.getElementById('vod-modal').classList.add('vod-modal--open');
     document.body.style.overflow = 'hidden';
 }

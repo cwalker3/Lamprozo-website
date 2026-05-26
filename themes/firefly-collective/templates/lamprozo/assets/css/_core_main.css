@@ -761,6 +761,19 @@ footer p {
     text-overflow: ellipsis;
 }
 
+.vod-thumb__summary {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.35;
+    margin-top: 2px;
+    white-space: normal;
+    opacity: 0.85;
+}
+
 /* VOD thumbnail as button */
 button.vod-thumb {
     background: none;
@@ -949,6 +962,17 @@ button.vod-thumb {
     width: 100%;
     height: 100%;
     display: block;
+}
+
+.vod-modal__summary {
+    padding: 1rem 1.25rem;
+    color: var(--color-text);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    border-top: 1px solid var(--color-border);
+    max-height: 30vh;
+    overflow-y: auto;
 }
 
 .vod-thumb__duration {
