@@ -733,13 +733,12 @@ function lamprozo_rest_new_attempt($request) {
     // A fresh run starts at 0 badges, the starting level cap, and 0 deaths
     // (empty box -> box-derived deaths = 0).
     $challenge_data = lamprozo_get_challenges_data()[$challenge] ?? [];
-    $badge_total    = lamprozo_challenge_badge_count($challenge_data);
 
     array_unshift($attempts, [
         'number' => $next,
         'status' => 'ongoing',
         'cap'    => lamprozo_cap_for_badges($challenge_data, 0),
-        'badges' => '0/' . $badge_total,
+        'badges' => '0',
         'vods'   => [],
         'box'    => [],
     ]);

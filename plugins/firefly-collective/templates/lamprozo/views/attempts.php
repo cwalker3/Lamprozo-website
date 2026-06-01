@@ -85,11 +85,11 @@ $embed     = isset($embed) ? (bool) $embed : false;
 
     function renderCard(attempt, i) {
         const isOpen = openCards.has(i) || attempt.status === 'ongoing';
-        const split  = attempt.split || '';
         const notes  = attempt.notes || '';
         const vods   = attempt.vods || [];
         const cap    = attempt.cap || '';
         const badges = attempt.badges || '';
+        const badgeNum = parseInt((String(badges).match(/\d+/) || ['0'])[0], 10);
         const deaths = attempt.deaths ?? '';
         const box    = attempt.box || [];
         const deadCount = box.filter(m => m.alive === false).length;
@@ -132,7 +132,7 @@ $embed     = isset($embed) ? (bool) $embed : false;
             <div class="attempt-card__header" onclick="toggleCard(${i})">
                 <span class="attempt-card__number">Attempt #${attempt.number}</span>
                 <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:0.78em;font-weight:700;background:${statusColor(attempt.status)}20;color:${statusColor(attempt.status)}">${statusLabel(attempt.status)}</span>
-                <span class="attempt-card__summary">${badges ? '🎖 ' + esc(badges) : ''}${cap ? '&nbsp;&nbsp;⬆ ' + esc(cap) : ''}&nbsp;&nbsp;💀 ${esc(String(deathsShown))}${split ? '&nbsp;&nbsp;📍 ' + esc(split) : ''}</span>
+                <span class="attempt-card__summary">🎖 ${badgeNum}&nbsp;&nbsp;💀 ${esc(String(deathsShown))}</span>
                 ${notes ? `<span class="attempt-card__notes-preview" title="${esc(notes)}">${esc(notesPreview)}</span>` : '<span style="flex:1"></span>'}
                 <span class="attempt-card__toggle">${isOpen ? '▲ collapse' : '▼ expand'}</span>
             </div>
@@ -151,20 +151,19 @@ $embed     = isset($embed) ? (bool) $embed : false;
                         <input type="text" id="cap-input-${i}" placeholder="e.g. 16" value="${esc(cap)}"
                             onchange="saveMeta(${i},'cap',this.value)">
                     </div>
-                    <div class="attempt-field" style="min-width:100px;max-width:130px">
+                    <div class="attempt-field" style="min-width:130px;max-width:150px">
                         <label>Badges</label>
-                        <input type="text" placeholder="e.g. 3/8" value="${esc(badges)}"
-                            onchange="saveMeta(${i},'badges',this.value)">
+                        <div style="display:flex;gap:4px;align-items:center">
+                            <button type="button" class="button button-small" onclick="bumpBadges(${i},-1)">&minus;</button>
+                            <input type="number" min="0" id="badges-input-${i}" value="${badgeNum}" style="width:52px;text-align:center"
+                                onchange="saveMeta(${i},'badges',this.value)">
+                            <button type="button" class="button button-small" onclick="bumpBadges(${i},1)">+</button>
+                        </div>
                     </div>
                     <div class="attempt-field" style="min-width:90px;max-width:120px">
                         <label>Deaths</label>
                         <input type="text" placeholder="auto: ${deadCount}" value="${esc(deaths)}"
                             onchange="saveMeta(${i},'deaths',this.value)">
-                    </div>
-                    <div class="attempt-field">
-                        <label>Split reached</label>
-                        <input type="text" placeholder="e.g. Gym 3, Elite Four..." value="${esc(split)}"
-                            onchange="updateField(${i},'split',this.value)">
                     </div>
                 </div>
                 <div class="attempt-card__row">
@@ -342,6 +341,14 @@ $embed     = isset($embed) ? (bool) $embed : false;
     window.updateField   = (i, key, val) => { attempts[i][key] = val; };
     // Persist a single meta field (cap/badges/deaths) immediately, without
     // touching the box — so it survives the party sync and needs no Save click.
+    window.bumpBadges = (i, delta) => {
+        const cur = parseInt((String(attempts[i].badges || '').match(/\d+/) || ['0'])[0], 10);
+        const next = Math.max(0, cur + delta);
+        const el = document.getElementById('badges-input-' + i);
+        if (el) el.value = next;
+        saveMeta(i, 'badges', String(next));
+    };
+
     window.saveMeta = (i, key, val) => {
         attempts[i][key] = val;
         fetch(apiBase + challenge + '/meta', {
