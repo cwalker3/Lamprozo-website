@@ -461,7 +461,7 @@ function lamprozo_render_layout_page() {
       box-shadow: 0 0.8vh 2vh var(--shadow); backdrop-filter: blur(8px);
       padding: 0.9vh 1vw;
     }
-    .status__top { display: flex; align-items: stretch; gap: 1vw; flex: 1.4; min-height: 0; }
+    .status__top { display: flex; align-items: stretch; gap: 1vw; flex: 1.3; min-height: 0; }
     .status__card {
       display: flex; flex-direction: column; justify-content: center;
       padding: 0 1.2vw; min-width: 16%;
@@ -480,16 +480,16 @@ function lamprozo_render_layout_page() {
     .stat--deaths  .stat__value { color: var(--danger); }
     /* Badge row */
     .status__badges {
-      flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1vw;
+      flex: 1.2; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1vw;
       background: var(--panel-bg); border: 0.18vh solid var(--border); border-radius: 0.9vh;
-      padding: 0 1.2vw; overflow: hidden;
+      padding: 0.5vh 1.2vw; overflow: hidden;
     }
     .status__badges .stat__label { flex-shrink: 0; }
-    .status__badges #badges { display: flex; align-items: center; height: 100%; }
-    .badge-pips { display: flex; gap: 0.8vw; align-items: center; justify-content: center; flex-wrap: nowrap; height: 100%; }
-    .badge-pip  { width: 3vh; height: 3vh; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.2vh solid rgba(255,255,255,0.22); }
+    .status__badges #badges { display: flex; align-items: center; height: 100%; min-width: 0; }
+    .badge-pips { display: flex; gap: 0.8vw; align-items: center; justify-content: center; flex-wrap: nowrap; height: 100%; max-height: 100%; }
+    .badge-pip  { width: 3vh; height: 3vh; max-height: 100%; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.2vh solid rgba(255,255,255,0.22); }
     .badge-pip--on { box-shadow: 0 0 0.6vh rgba(0,0,0,0.45); }
-    .badge-img  { height: 5.6vh; width: auto; max-width: 7vh; object-fit: contain; }
+    .badge-img  { height: 5vh; max-height: 100%; width: auto; max-width: 7vh; object-fit: contain; }
     .badge-img--off { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
     .badge-img--on  { filter: drop-shadow(0 0 0.5vh rgba(0,0,0,0.55)); }
   </style>
