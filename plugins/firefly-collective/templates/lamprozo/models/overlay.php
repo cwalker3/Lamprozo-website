@@ -452,15 +452,16 @@ function lamprozo_render_layout_page() {
     .chat__msg  { color: var(--text); }
     .chat__line--action .chat__msg { font-style: italic; }
 
-    /* Status bar, directly under the GBA screen */
+    /* Status bar under the GBA screen: top row (game + stats), then a badge row */
     .status {
-      position: absolute; left: 3.45%; top: 84%; width: 62.6%; height: 8%;
-      display: flex; align-items: stretch; gap: 1vw;
+      position: absolute; left: 3.45%; top: 84%; width: 62.6%; height: 14%;
+      display: flex; flex-direction: column; gap: 0.7vh;
       background: rgba(12, 16, 28, 0.88);
       border: 0.22vh solid var(--border); border-radius: 1.2vh;
       box-shadow: 0 0.8vh 2vh var(--shadow); backdrop-filter: blur(8px);
       padding: 0.9vh 1vw;
     }
+    .status__top { display: flex; align-items: stretch; gap: 1vw; flex: 1.4; min-height: 0; }
     .status__card {
       display: flex; flex-direction: column; justify-content: center;
       padding: 0 1.2vw; min-width: 16%;
@@ -477,13 +478,20 @@ function lamprozo_render_layout_page() {
     .stat__value { margin-top: 0.5vh; font-size: 3.2vh; font-weight: 900; line-height: 1; letter-spacing: -0.03em; }
     .stat--attempt .stat__value { color: var(--accent); }
     .stat--deaths  .stat__value { color: var(--danger); }
-    .stat--badges  .stat__value { color: var(--gold); }
-    .badge-pips { display: flex; gap: 0.45vw; align-items: center; justify-content: center; flex-wrap: wrap; }
-    .badge-pip  { width: 1.8vh; height: 1.8vh; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.18vh solid rgba(255,255,255,0.22); }
-    .badge-pip--on { box-shadow: 0 0 0.5vh rgba(0,0,0,0.4); }
-    .badge-img  { width: 2.4vh; height: 2.4vh; object-fit: contain; }
+    /* Badge row */
+    .status__badges {
+      flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1vw;
+      background: var(--panel-bg); border: 0.18vh solid var(--border); border-radius: 0.9vh;
+      padding: 0 1.2vw; overflow: hidden;
+    }
+    .status__badges .stat__label { flex-shrink: 0; }
+    .status__badges #badges { display: flex; align-items: center; height: 100%; }
+    .badge-pips { display: flex; gap: 0.8vw; align-items: center; justify-content: center; flex-wrap: nowrap; height: 100%; }
+    .badge-pip  { width: 3vh; height: 3vh; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.2vh solid rgba(255,255,255,0.22); }
+    .badge-pip--on { box-shadow: 0 0 0.6vh rgba(0,0,0,0.45); }
+    .badge-img  { height: 5.6vh; width: auto; max-width: 7vh; object-fit: contain; }
     .badge-img--off { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
-    .badge-img--on  { filter: drop-shadow(0 0 0.4vh rgba(0,0,0,0.55)); }
+    .badge-img--on  { filter: drop-shadow(0 0 0.5vh rgba(0,0,0,0.55)); }
   </style>
 </head>
 <body>
@@ -498,15 +506,20 @@ function lamprozo_render_layout_page() {
     </div>
 
     <div class="status">
-      <div class="status__card">
-        <div class="status__game" id="game"><?php echo esc_html($overlay['game']); ?></div>
-        <div class="status__ruleset" id="ruleset"><?php echo esc_html($overlay['ruleset']); ?></div>
+      <div class="status__top">
+        <div class="status__card">
+          <div class="status__game" id="game"><?php echo esc_html($overlay['game']); ?></div>
+          <div class="status__ruleset" id="ruleset"><?php echo esc_html($overlay['ruleset']); ?></div>
+        </div>
+        <div class="status__stats">
+          <div class="stat stat--attempt"><span class="stat__label">Attempt</span><span class="stat__value" id="attempt"><?php echo esc_html($overlay['attempt']); ?></span></div>
+          <div class="stat"><span class="stat__label">Level Cap</span><span class="stat__value" id="cap"><?php echo esc_html($overlay['cap']); ?></span></div>
+          <div class="stat stat--deaths"><span class="stat__label">Deaths</span><span class="stat__value" id="deaths"><?php echo esc_html($overlay['deaths']); ?></span></div>
+        </div>
       </div>
-      <div class="status__stats">
-        <div class="stat stat--attempt"><span class="stat__label">Attempt</span><span class="stat__value" id="attempt"><?php echo esc_html($overlay['attempt']); ?></span></div>
-        <div class="stat"><span class="stat__label">Level Cap</span><span class="stat__value" id="cap"><?php echo esc_html($overlay['cap']); ?></span></div>
-        <div class="stat stat--deaths"><span class="stat__label">Deaths</span><span class="stat__value" id="deaths"><?php echo esc_html($overlay['deaths']); ?></span></div>
-        <div class="stat stat--badges"><span class="stat__label">Badges</span><span class="stat__value" id="badges"><?php echo esc_html($overlay['badges']); ?></span></div>
+      <div class="status__badges">
+        <span class="stat__label">Badges</span>
+        <span id="badges"><?php echo esc_html($overlay['badges']); ?></span>
       </div>
     </div>
   </div>
