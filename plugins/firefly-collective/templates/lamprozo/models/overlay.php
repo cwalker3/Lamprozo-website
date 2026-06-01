@@ -200,7 +200,7 @@ function lamprozo_render_overlay_page() {
     }
 
     function poll() {
-      fetch(REST_URL, { cache: "no-store" })
+      fetch(REST_URL + (REST_URL.indexOf("?") < 0 ? "?" : "&") + "_=" + Date.now(), { cache: "no-store" })
         .then(function(r) { return r.json(); })
         .then(applyOverlay)
         .catch(function() { /* keep last good values */ });
@@ -302,9 +302,9 @@ function lamprozo_render_layout_page() {
     /* GBA screen is 3:2 (240x160). On a 16:9 canvas, width% = 0.84375 * height%,
        so 62.6% x 74.2% holds a true 3:2 box with no stretching. Centered in the
        left column; the status bar below matches its width. */
-    .region--gba    { left: 5.45%; top: 7.8%; width: 62.6%;  height: 74.2%; }
-    .region--cam    { left: 74.1%; top: 7.8%; width: 23.75%; height: 29.9%; }
-    .region--chat   { left: 74.1%; top: 46.5%; width: 23.75%; height: 45.5%; overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
+    .region--gba    { left: 3.45%; top: 7.8%; width: 62.6%; height: 74.2%; }
+    .region--cam    { left: 70%;   top: 7.8%; width: 28%;   height: 29.9%; }
+    .region--chat   { left: 70%; top: 46.5%; width: 28%; height: 45.5%; overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
 
     .chat {
       width: 100%; height: 100%; padding: 0.9vh 0.7vw;
@@ -312,7 +312,7 @@ function lamprozo_render_layout_page() {
       overflow: hidden;
     }
     .chat__line {
-      font-size: 1.55vh; line-height: 1.32; word-wrap: break-word; overflow-wrap: anywhere;
+      font-size: 1.95vh; line-height: 1.34; word-wrap: break-word; overflow-wrap: anywhere;
       text-shadow: 0 1px 3px rgba(0,0,0,0.7);
     }
     .chat__user { font-weight: 800; margin-right: 0.35em; }
@@ -321,7 +321,7 @@ function lamprozo_render_layout_page() {
 
     /* Status bar, directly under the GBA screen */
     .status {
-      position: absolute; left: 5.45%; top: 84%; width: 62.6%; height: 8%;
+      position: absolute; left: 3.45%; top: 84%; width: 62.6%; height: 8%;
       display: flex; align-items: stretch; gap: 1vw;
       background: rgba(12, 16, 28, 0.88);
       border: 0.22vh solid var(--border); border-radius: 1.2vh;
@@ -388,8 +388,8 @@ function lamprozo_render_layout_page() {
     bgResize(); window.addEventListener('resize', bgResize);
 
     var HOLES = [
-      { x: 5.45, y: 7.8, w: 62.6,  h: 74.2 },   // GBA screen
-      { x: 74.1, y: 7.8, w: 23.75, h: 29.9 }    // webcam
+      { x: 3.45, y: 7.8, w: 62.6, h: 74.2 },   // GBA screen
+      { x: 70,   y: 7.8, w: 28,   h: 29.9 }    // webcam
     ];
     var ORBS = [
       { ox: 0.15, oy: 0.35, r: 0.30, hueOff:  0,  phase: 0.00 },
@@ -498,7 +498,7 @@ function lamprozo_render_layout_page() {
       }
     }
     function poll() {
-      fetch(REST_URL, { cache: "no-store" })
+      fetch(REST_URL + (REST_URL.indexOf("?") < 0 ? "?" : "&") + "_=" + Date.now(), { cache: "no-store" })
         .then(function(r) { return r.json(); })
         .then(applyOverlay)
         .catch(function() {});
