@@ -131,18 +131,32 @@ function firefly_get_og_description() {
  * Resolve the OG / Twitter image URL for the current request.
  *
  * Override chain:
- *   _seo_og_image_id postmeta  →  featured image  →  default-og.webp from active template
+ *   _seo_og_image_id postmeta  →  mobile featured image  →  featured image
+ *   →  site-wide SEO default  →  default-og.webp from active template
+ *
+ * Optional $post_id / $size let template-side OG emitters request the image
+ * for a specific post; with no args we resolve against the current request.
  */
-function firefly_get_og_image_url() {
-    $post_id = firefly_get_seo_post_id();
+function firefly_get_og_image_url( $post_id = null, $size = 'full' ) {
+    if ( $post_id === null ) {
+        $post_id = firefly_get_seo_post_id();
+    }
     if ( $post_id ) {
         $override_id = (int) get_post_meta( $post_id, '_seo_og_image_id', true );
         if ( $override_id > 0 ) {
-            $url = wp_get_attachment_image_url( $override_id, 'full' );
+            $url = wp_get_attachment_image_url( $override_id, $size );
             if ( $url ) return firefly_absolute_url( $url );
         }
 
-        $featured = get_the_post_thumbnail_url( $post_id, 'full' );
+        // Prefer the mobile featured image when set — OG previews render at
+        // mobile-like sizes in social feeds, so the mobile crop is the more
+        // appropriate source when the editor has provided one.
+        if ( function_exists( 'firefly_get_mobile_thumbnail_url' ) ) {
+            $mobile = firefly_get_mobile_thumbnail_url( $post_id, $size );
+            if ( $mobile ) return firefly_absolute_url( $mobile );
+        }
+
+        $featured = get_the_post_thumbnail_url( $post_id, $size );
         if ( $featured ) return firefly_absolute_url( $featured );
     }
 
