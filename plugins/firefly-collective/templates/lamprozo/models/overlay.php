@@ -215,6 +215,8 @@ function lamprozo_render_overlay_page() {
     .badges .value { color: var(--gold); }
     .badge-pips { display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 130px; }
     .badge-pip  { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.22); }
+    .badge-img  { width: 20px; height: 20px; object-fit: contain; }
+    .badge-img--off { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
     .overlay.vertical { flex-direction: column; align-items: stretch; width: 260px; }
     .overlay.vertical .stat-row { display: grid; grid-template-columns: 1fr 1fr; }
     .overlay.vertical .game-card,
@@ -254,23 +256,37 @@ function lamprozo_render_overlay_page() {
     // WP Admin appear on stream within a few seconds, no OBS refresh needed.
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
-    var BADGE_SETS = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
+    function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
       var set = BADGE_SETS[data.badgeset];
-      if (set && set.length) {
-        var n = earnedBadges(data.badges);
-        el.innerHTML = '<span class="badge-pips">' + set.map(function(b, i) {
-          var on = i < n;
-          var style = on ? ' style="background:' + b.color + ';border-color:' + b.color + '"' : '';
-          return '<span class="badge-pip' + (on ? ' badge-pip--on' : '') + '"' + style + ' title="' + b.name + '"></span>';
-        }).join('') + '</span>';
-      } else {
-        el.textContent = (data.badges == null ? "" : data.badges);
-      }
+      if (!(set && set.length)) { el.textContent = (data.badges == null ? "" : data.badges); return; }
+      var n = earnedBadges(data.badges);
+      el.textContent = "";
+      var wrap = document.createElement("span");
+      wrap.className = "badge-pips";
+      set.forEach(function(b, i) {
+        var on = i < n;
+        // Prefer an uploaded badge image; fall back to a colored pip if absent.
+        var img = document.createElement("img");
+        img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png";
+        img.alt = b.name; img.title = b.name;
+        img.onerror = function() {
+          var pip = document.createElement("span");
+          pip.className = "badge-pip" + (on ? " badge-pip--on" : "");
+          if (on) { pip.style.background = b.color; pip.style.borderColor = b.color; }
+          pip.title = b.name;
+          img.replaceWith(pip);
+        };
+        wrap.appendChild(img);
+      });
+      el.appendChild(wrap);
     }
 
     function applyOverlay(data) {
@@ -358,6 +374,7 @@ function lamprozo_render_layout_page() {
     $overlay  = lamprozo_overlay_resolve();
     $rest_url = esc_url_raw(rest_url('lamprozo/v1/overlay'));
     $sse_url  = esc_url_raw(home_url('/?lamprozo_overlay_sse=1'));
+    $uploads_url = esc_url_raw(wp_upload_dir()['baseurl']);
     $interval = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 5000;
 
     // Chat is rendered in-page via an anonymous, read-only Twitch IRC-over-
@@ -463,6 +480,9 @@ function lamprozo_render_layout_page() {
     .badge-pips { display: flex; gap: 0.45vw; align-items: center; justify-content: center; flex-wrap: wrap; }
     .badge-pip  { width: 1.8vh; height: 1.8vh; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.18vh solid rgba(255,255,255,0.22); }
     .badge-pip--on { box-shadow: 0 0 0.5vh rgba(0,0,0,0.4); }
+    .badge-img  { width: 2.4vh; height: 2.4vh; object-fit: contain; }
+    .badge-img--off { filter: grayscale(1) brightness(0.5); opacity: 0.5; }
+    .badge-img--on  { filter: drop-shadow(0 0 0.4vh rgba(0,0,0,0.55)); }
   </style>
 </head>
 <body>
@@ -601,23 +621,37 @@ function lamprozo_render_layout_page() {
     // ── Live-updating status — polls the public REST endpoint ──────────────────
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
-    var BADGE_SETS = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
+    function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
       var set = BADGE_SETS[data.badgeset];
-      if (set && set.length) {
-        var n = earnedBadges(data.badges);
-        el.innerHTML = '<span class="badge-pips">' + set.map(function(b, i) {
-          var on = i < n;
-          var style = on ? ' style="background:' + b.color + ';border-color:' + b.color + '"' : '';
-          return '<span class="badge-pip' + (on ? ' badge-pip--on' : '') + '"' + style + ' title="' + b.name + '"></span>';
-        }).join('') + '</span>';
-      } else {
-        el.textContent = (data.badges == null ? "" : data.badges);
-      }
+      if (!(set && set.length)) { el.textContent = (data.badges == null ? "" : data.badges); return; }
+      var n = earnedBadges(data.badges);
+      el.textContent = "";
+      var wrap = document.createElement("span");
+      wrap.className = "badge-pips";
+      set.forEach(function(b, i) {
+        var on = i < n;
+        // Prefer an uploaded badge image; fall back to a colored pip if absent.
+        var img = document.createElement("img");
+        img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png";
+        img.alt = b.name; img.title = b.name;
+        img.onerror = function() {
+          var pip = document.createElement("span");
+          pip.className = "badge-pip" + (on ? " badge-pip--on" : "");
+          if (on) { pip.style.background = b.color; pip.style.borderColor = b.color; }
+          pip.title = b.name;
+          img.replaceWith(pip);
+        };
+        wrap.appendChild(img);
+      });
+      el.appendChild(wrap);
     }
 
     function applyOverlay(data) {
