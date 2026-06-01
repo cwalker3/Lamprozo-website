@@ -258,6 +258,7 @@ function lamprozo_render_overlay_page() {
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
     var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
     var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
+    var BADGE_CB = Date.now(); // per-load cache-bust so a stale 404 can't stick
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
     function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
@@ -275,7 +276,7 @@ function lamprozo_render_overlay_page() {
         // Prefer an uploaded badge image; fall back to a colored pip if absent.
         var img = document.createElement("img");
         img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
-        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png";
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
         img.alt = b.name; img.title = b.name;
         img.onerror = function() {
           var pip = document.createElement("span");
@@ -623,6 +624,7 @@ function lamprozo_render_layout_page() {
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
     var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
     var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
+    var BADGE_CB = Date.now(); // per-load cache-bust so a stale 404 can't stick
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
     function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
@@ -640,7 +642,7 @@ function lamprozo_render_layout_page() {
         // Prefer an uploaded badge image; fall back to a colored pip if absent.
         var img = document.createElement("img");
         img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
-        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png";
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
         img.alt = b.name; img.title = b.name;
         img.onerror = function() {
           var pip = document.createElement("span");
