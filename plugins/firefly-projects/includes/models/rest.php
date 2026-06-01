@@ -512,10 +512,20 @@ function firefly_plugin_register_rest_endpoints() {
             'permission_callback' => '__return_true', // Uses shared secret authentication
             'args'                => array(
                 'post_slug' => array(
-                    'required'          => true,
+                    'required'          => false,
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_title',
-                    'description'       => 'The page slug to export'
+                    'description'       => 'The page slug to export (optional if firefly_page_id given)'
+                ),
+                'firefly_page_id' => array(
+                    'required'    => false,
+                    'type'        => 'string',
+                    'description' => 'Stable cross-env id "{template}:{slug}" (preferred)'
+                ),
+                'template' => array(
+                    'required'    => false,
+                    'type'        => 'string',
+                    'description' => 'Template to scope the slug lookup to'
                 )
             )
         )
@@ -769,6 +779,46 @@ function firefly_projects_find_post_by_firefly_page_id( $firefly_page_id ) {
         'meta_value'           => $firefly_page_id,
         'firefly_skip_scoping' => true,
     ) );
+    return $found ? $found[0] : null;
+}
+
+/**
+ * Parse a stable firefly_page_id ("{template}:{slug}") into its parts.
+ *
+ * @return array{template:string, slug:string}
+ */
+function firefly_projects_parse_page_id( $firefly_page_id ) {
+    if ( $firefly_page_id && strpos( $firefly_page_id, ':' ) !== false ) {
+        list( $template, $slug ) = explode( ':', $firefly_page_id, 2 );
+        return array( 'template' => $template, 'slug' => $slug );
+    }
+    return array( 'template' => '', 'slug' => '' );
+}
+
+/**
+ * Find a page/post by slug scoped to a template, so the same slug can exist
+ * across templates (the way scoped content is meant to work). When the
+ * _firefly_page_id meta isn't stored yet, this resolves by slug + template
+ * meta. Falls back to a plain slug lookup when no template is given.
+ *
+ * @return WP_Post|null
+ */
+function firefly_projects_find_scoped_page( $slug, $template = '', $post_types = array( 'page', 'post' ) ) {
+    if ( empty( $slug ) ) return null;
+    $args = array(
+        'name'                 => $slug,
+        'post_type'            => $post_types,
+        'post_status'          => 'any',
+        'numberposts'          => 1,
+        'firefly_skip_scoping' => true,
+    );
+    if ( ! empty( $template ) ) {
+        $args['meta_query'] = array( array(
+            'key'   => '_firefly_template',
+            'value' => $template,
+        ) );
+    }
+    $found = get_posts( $args );
     return $found ? $found[0] : null;
 }
 
@@ -1558,6 +1608,8 @@ function firefly_projects_delete_pages($request) {
 function firefly_projects_pull_page($request) {
     $post_slug = $request->get_param('post_slug');
     $source_env = $request->get_param('source_env');
+    $firefly_page_id = $request->get_param('firefly_page_id');
+    $template = $request->get_param('template');
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -1578,10 +1630,15 @@ function firefly_projects_pull_page($request) {
         $endpoint = LIVE_DEV_ENDPOINT;
     }
 
-    // Build export URL
+    // Build export URL. Prefer the stable firefly_page_id so the remote can
+    // resolve the right page when a slug is shared across templates.
     if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
         $base_url = $matches[1];
-        $export_url = $base_url . '/wp-json/firefly-plugin/v1/export-page?post_slug=' . urlencode($post_slug);
+        $query = array();
+        if (!empty($firefly_page_id)) { $query['firefly_page_id'] = $firefly_page_id; }
+        if (!empty($post_slug))       { $query['post_slug']       = $post_slug; }
+        if (!empty($template))        { $query['template']        = $template; }
+        $export_url = $base_url . '/wp-json/firefly-plugin/v1/export-page?' . http_build_query($query);
     } else {
         return new WP_REST_Response(array(
             'success' => false,
@@ -1690,15 +1747,36 @@ function firefly_projects_export_page($request) {
     $auth_failure = firefly_projects_verify_shared_secret($request);
     if ($auth_failure !== null) return $auth_failure;
 
-    $post_slug = $request->get_param('post_slug');
+    $post_slug       = $request->get_param('post_slug');
+    $firefly_page_id = $request->get_param('firefly_page_id');
+    $template        = $request->get_param('template');
 
-    // Find the page by slug
-    $post = get_page_by_path($post_slug, OBJECT, array('page', 'post'));
+    // Resolve the page in a template-aware way so the same slug can exist
+    // across templates. Prefer the stable firefly_page_id ("{template}:{slug}").
+    $post = null;
+    if ($firefly_page_id) {
+        $post = firefly_projects_find_post_by_firefly_page_id($firefly_page_id);
+        if (!$post) {
+            $parsed = firefly_projects_parse_page_id($firefly_page_id);
+            if ($parsed['slug']) {
+                if (empty($template))  { $template  = $parsed['template']; }
+                if (empty($post_slug)) { $post_slug = $parsed['slug']; }
+                $post = firefly_projects_find_scoped_page($parsed['slug'], $parsed['template']);
+            }
+        }
+    }
+    if (!$post && $post_slug) {
+        $post = firefly_projects_find_scoped_page($post_slug, $template);
+    }
+    if (!$post && $post_slug) {
+        // Legacy last-resort: unscoped slug lookup.
+        $post = get_page_by_path($post_slug, OBJECT, array('page', 'post'));
+    }
 
     if (!$post) {
         return new WP_REST_Response(array(
             'success' => false,
-            'message' => 'Page not found: ' . $post_slug
+            'message' => 'Page not found: ' . ($firefly_page_id ? $firefly_page_id : $post_slug)
         ), 404);
     }
 
@@ -1726,13 +1804,22 @@ function firefly_projects_export_page($request) {
     // Get post meta
     $meta = get_post_meta($post->ID);
     $meta_data = array();
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template');
+    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
     foreach ($meta as $key => $values) {
         // Skip internal meta (except whitelisted keys)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
             continue;
         }
         $meta_data[$key] = $values[0];
+    }
+
+    // Ensure a stable cross-environment id travels with the page so the
+    // importer can match it template-scoped even when the meta wasn't stored.
+    if (empty($meta_data['_firefly_page_id'])) {
+        $tmpl = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
+        if ($tmpl) {
+            $meta_data['_firefly_page_id'] = $tmpl . ':' . $post->post_name;
+        }
     }
 
     // Get existing asset map if any
@@ -1805,8 +1892,36 @@ function firefly_projects_import_pulled_page($data, $source_env) {
 
     $page_slug = $post_data['post_name'];
 
-    // Find or create local post
-    $existing_post = get_page_by_path($page_slug, OBJECT, $post_data['post_type']);
+    // Match the local target template-scoped, so a slug shared across templates
+    // lands on the right page (or creates a new scoped one) instead of
+    // clobbering whichever template happens to own that slug.
+    $incoming_template = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
+    $firefly_page_id   = isset($meta_data['_firefly_page_id']) ? $meta_data['_firefly_page_id'] : '';
+
+    // Ensure a stable id exists so future syncs match deterministically.
+    if (empty($firefly_page_id) && $incoming_template) {
+        $firefly_page_id = $incoming_template . ':' . $page_slug;
+        $meta_data['_firefly_page_id'] = $firefly_page_id;
+    }
+
+    $existing_post = null;
+    if ($firefly_page_id) {
+        $existing_post = firefly_projects_find_post_by_firefly_page_id($firefly_page_id);
+        if (!$existing_post && $incoming_template) {
+            $existing_post = firefly_projects_find_scoped_page($page_slug, $incoming_template, array($post_data['post_type']));
+        }
+    }
+    if (!$existing_post) {
+        // Slug fallback only when the template matches (or the local page has no
+        // template). A different template's same-slug page must NOT be reused.
+        $fallback = get_page_by_path($page_slug, OBJECT, $post_data['post_type']);
+        if ($fallback) {
+            $fallback_template = get_post_meta($fallback->ID, '_firefly_template', true);
+            if (empty($fallback_template) || $fallback_template === $incoming_template) {
+                $existing_post = $fallback;
+            }
+        }
+    }
 
     // Initially save content as-is (we'll rewrite after processing assets)
     $wp_post_data = array(
@@ -1850,6 +1965,17 @@ function firefly_projects_import_pulled_page($data, $source_env) {
             ? firefly_collective_get_active_template()
             : get_option('firefly_collective_active_template', 'default');
         update_post_meta($post_id, '_firefly_template', $active_template);
+    }
+
+    // Preserve the intended slug across templates. wp_insert_post may have
+    // deduplicated it (e.g. "template" -> "template-2") because another template
+    // already owns that slug — the theme's wp_unique_post_slug filter can't see
+    // _firefly_template on a brand-new insert (post ID is 0 during slug
+    // generation). Now that the template meta is set, re-apply the desired slug;
+    // the filter sees the template and keeps it scoped per template.
+    $desired_slug = isset($post_data['post_name']) ? $post_data['post_name'] : '';
+    if ($desired_slug && get_post_field('post_name', $post_id) !== $desired_slug) {
+        wp_update_post(array('ID' => $post_id, 'post_name' => $desired_slug));
     }
 
     // Process assets - save to uploads/pages and create mappings
@@ -1954,16 +2080,35 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         }
     }
 
-    // Set page role if specified (front page or posts page)
+    // Set page role if specified (front page or posts page). The theme resolves
+    // these PER TEMPLATE via firefly_front_page_{template}/firefly_posts_page_{template}
+    // (used for front-end front-page detection and the Customizer preview), so we
+    // must set those too — not just the global core options. The global option is
+    // only touched for the active template, so pulling another template's front
+    // page can't hijack the live site's front page.
     $page_role = isset($data['page_role']) ? $data['page_role'] : null;
     if ($page_role && $post_data['post_type'] === 'page') {
-        // Ensure WordPress is set to use a static front page
-        update_option('show_on_front', 'page');
+        $role_template = get_post_meta($post_id, '_firefly_template', true);
+        $active_template = function_exists('firefly_collective_get_active_template')
+            ? firefly_collective_get_active_template()
+            : get_option('firefly_collective_active_template', 'default');
+        $is_active = (!$role_template || $role_template === $active_template);
 
         if ($page_role === 'front_page') {
-            update_option('page_on_front', $post_id);
+            if ($role_template) {
+                update_option("firefly_front_page_{$role_template}", $post_id);
+            }
+            if ($is_active) {
+                update_option('show_on_front', 'page');
+                update_option('page_on_front', $post_id);
+            }
         } elseif ($page_role === 'posts_page') {
-            update_option('page_for_posts', $post_id);
+            if ($role_template) {
+                update_option("firefly_posts_page_{$role_template}", $post_id);
+            }
+            if ($is_active) {
+                update_option('page_for_posts', $post_id);
+            }
         }
     }
 

@@ -179,6 +179,13 @@ function firefly_resolve_scoped_page_slug($query) {
             $query->set('page_id', $page->ID);
             $query->is_page = true;
             $query->is_singular = true;
+            // Force the queried object to the scoped page. WordPress resolves a
+            // shared slug to the lowest-ID page (which may be another template's)
+            // and caches it as the queried object; without this, is_front_page()
+            // and is_page(page_on_front) compare against the wrong page, so the
+            // front page isn't recognized when accessed via its slug URL.
+            $query->queried_object    = $page;
+            $query->queried_object_id = $page->ID;
         }
     }
 }

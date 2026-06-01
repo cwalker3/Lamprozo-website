@@ -938,6 +938,17 @@ function firefly_projects_handle_incoming_page($request) {
         update_post_meta($post_id, $key, $value);
     }
 
+    // Preserve the intended slug across templates. wp_insert_post may have
+    // deduplicated it (e.g. "home" -> "home-2") because another template owns
+    // the slug — the theme's wp_unique_post_slug filter can't see
+    // _firefly_template on a brand-new insert. Now that the template meta is
+    // written, re-apply the desired slug; the filter keeps it scoped.
+    $desired_slug = isset($post_data['post_name']) ? $post_data['post_name'] : '';
+    if ($desired_slug && get_post_field('post_name', $post_id) !== $desired_slug) {
+        wp_update_post(array('ID' => $post_id, 'post_name' => $desired_slug));
+        $sync_log("  SLUG RESTORED -> {$desired_slug}");
+    }
+
     // Save asset map if provided
     if (!empty($asset_map)) {
         update_post_meta($post_id, '_firefly_asset_map', $asset_map);

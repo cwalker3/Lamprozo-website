@@ -75,6 +75,9 @@ function firefly_find_template_menu_id($template, $base_name = '') {
         foreach ($menus as $menu) {
             if ($menu->name === $base_name
                 && get_term_meta($menu->term_id, FIREFLY_TEMPLATE_META_KEY, true) === $template) {
+                // Heal the canonical pointer: it was stale or missing (e.g. a
+                // pull/import replaced the menu term without updating it).
+                update_option("firefly_menu_{$template}", (int) $menu->term_id);
                 return (int) $menu->term_id;
             }
         }
@@ -84,6 +87,7 @@ function firefly_find_template_menu_id($template, $base_name = '') {
     if ('' !== $base_name) {
         $legacy = get_term_by('name', "{$base_name} ({$template})", 'nav_menu');
         if ($legacy && !is_wp_error($legacy)) {
+            update_option("firefly_menu_{$template}", (int) $legacy->term_id);
             return (int) $legacy->term_id;
         }
     }
@@ -267,7 +271,19 @@ function firefly_override_menu_in_customizer($locations) {
     }
 
     $temp_template = get_option(FIREFLY_COLLECTIVE_TEMPLATE_TEMP_OPTION, FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE);
-    $menu_id = get_option("firefly_menu_{$temp_template}", 0);
+
+    // Resolve robustly rather than trusting the raw option: a pull/import can
+    // replace the menu term (new ID) without updating firefly_menu_{template},
+    // leaving the option pointing at a deleted term and the overlay empty.
+    $base_name = 'Main Menu';
+    if (function_exists('firefly_get_template_schema')) {
+        $schema = firefly_get_template_schema($temp_template);
+        if (!empty($schema['menu']['name'])) {
+            $base_name = $schema['menu']['name'];
+        }
+    }
+
+    $menu_id = firefly_find_template_menu_id($temp_template, $base_name);
 
     if ($menu_id) {
         $locations['website-menu'] = $menu_id;

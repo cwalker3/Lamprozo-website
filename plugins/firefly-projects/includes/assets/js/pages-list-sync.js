@@ -739,11 +739,11 @@
 
         // Page checkbox
         $modal.on('change', '.firefly-pull-page-checkbox', function() {
-            var slug = $(this).data('slug');
+            var key = $(this).data('fpid') || $(this).data('slug');
             if ($(this).is(':checked')) {
-                state.selectedPages[slug] = true;
+                state.selectedPages[key] = true;
             } else {
-                delete state.selectedPages[slug];
+                delete state.selectedPages[key];
             }
             updateSelectionCount();
         });
@@ -861,14 +861,15 @@
 
         var html = '';
         filteredPages.forEach(function(page) {
-            var isChecked = state.selectedPages[page.slug] ? ' checked' : '';
+            var pageKey = page.firefly_page_id || page.slug;
+            var isChecked = state.selectedPages[pageKey] ? ' checked' : '';
             var statusClass = page.status === 'publish' ? 'publish' : 'draft';
             var statusLabel = page.status === 'publish' ? 'Published' : 'Draft';
             var modifiedDate = page.modified ? formatDate(Math.floor(new Date(page.modified).getTime() / 1000)) : '';
 
             html += '<div class="firefly-pull-page-item">' +
                 '<label class="firefly-pull-page-label">' +
-                    '<input type="checkbox" class="firefly-pull-page-checkbox" data-slug="' + escapeHtml(page.slug) + '"' + isChecked + '>' +
+                    '<input type="checkbox" class="firefly-pull-page-checkbox" data-slug="' + escapeHtml(page.slug) + '" data-fpid="' + escapeHtml(pageKey) + '"' + isChecked + '>' +
                     '<div class="firefly-pull-page-info">' +
                         '<div class="firefly-pull-page-header">' +
                             '<span class="firefly-pull-page-title">' + escapeHtml(page.title || '(No title)') + '</span>' +
@@ -898,18 +899,19 @@
                 (page.slug && page.slug.toLowerCase().indexOf(searchTerm) !== -1);
 
             if (matches) {
+                var pageKey = page.firefly_page_id || page.slug;
                 if (select) {
-                    state.selectedPages[page.slug] = true;
+                    state.selectedPages[pageKey] = true;
                 } else {
-                    delete state.selectedPages[page.slug];
+                    delete state.selectedPages[pageKey];
                 }
             }
         });
 
         // Update checkboxes
         $('#firefly-pull-page-list .firefly-pull-page-checkbox').each(function() {
-            var slug = $(this).data('slug');
-            $(this).prop('checked', !!state.selectedPages[slug]);
+            var key = $(this).data('fpid') || $(this).data('slug');
+            $(this).prop('checked', !!state.selectedPages[key]);
         });
 
         updateSelectionCount();
@@ -928,8 +930,8 @@
      * Perform bulk pull of selected pages
      */
     function performBulkPull() {
-        var selectedSlugs = Object.keys(state.selectedPages);
-        if (selectedSlugs.length === 0) return;
+        var selectedKeys = Object.keys(state.selectedPages);
+        if (selectedKeys.length === 0) return;
 
         state.isPulling = true;
 
@@ -942,7 +944,7 @@
         // Show progress UI
         $content.html(
             '<div class="firefly-sync-progress">' +
-                '<h4>Pulling ' + selectedSlugs.length + ' page(s) from ' + envLabel + '...</h4>' +
+                '<h4>Pulling ' + selectedKeys.length + ' page(s) from ' + envLabel + '...</h4>' +
                 '<div class="firefly-progress-bar">' +
                     '<div class="firefly-progress-fill' + (state.pullEnvProd ? ' is-prod' : '') + '" id="firefly-pull-progress" style="width: 0%"></div>' +
                 '</div>' +
@@ -953,7 +955,7 @@
 
         // Pull pages one by one
         var results = {
-            total: selectedSlugs.length,
+            total: selectedKeys.length,
             success: 0,
             failed: 0,
             errors: []
@@ -961,27 +963,31 @@
         var currentIndex = 0;
 
         function pullNextPage() {
-            if (currentIndex >= selectedSlugs.length) {
+            if (currentIndex >= selectedKeys.length) {
                 // All done
                 showPullResults(results);
                 return;
             }
 
-            var slug = selectedSlugs[currentIndex];
-            var page = state.remotePages.find(function(p) { return p.slug === slug; });
-            var pageTitle = page ? page.title : slug;
+            var pageKey = selectedKeys[currentIndex];
+            var page = state.remotePages.find(function(p) { return (p.firefly_page_id || p.slug) === pageKey; });
+            var pageTitle = page ? page.title : pageKey;
+            var pageSlug = page ? page.slug : pageKey;
 
             // Update progress
-            var progress = Math.round(((currentIndex + 1) / selectedSlugs.length) * 100);
+            var progress = Math.round(((currentIndex + 1) / selectedKeys.length) * 100);
             $('#firefly-pull-progress').css('width', progress + '%');
-            $('#firefly-pull-progress-text').text('Pulling: ' + pageTitle + ' (' + (currentIndex + 1) + '/' + selectedSlugs.length + ')');
+            $('#firefly-pull-progress-text').text('Pulling: ' + pageTitle + ' (' + (currentIndex + 1) + '/' + selectedKeys.length + ')');
 
             $.ajax({
                 url: config.restUrl + 'pull-page',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
-                    post_slug: slug,
+                    firefly_page_id: page ? (page.firefly_page_id || '') : '',
+                    post_slug: pageSlug,
+                    template: page && page.firefly_page_id && page.firefly_page_id.indexOf(':') !== -1
+                        ? page.firefly_page_id.split(':')[0] : '',
                     source_env: sourceEnv
                 }),
                 headers: { 'X-WP-Nonce': config.nonce },
@@ -992,7 +998,7 @@
                         results.failed++;
                         results.errors.push({
                             title: pageTitle,
-                            slug: slug,
+                            slug: pageSlug,
                             error: response.message || 'Unknown error'
                         });
                     }
@@ -1006,7 +1012,7 @@
                     } catch (e) {}
                     results.errors.push({
                         title: pageTitle,
-                        slug: slug,
+                        slug: pageSlug,
                         error: message
                     });
                 },

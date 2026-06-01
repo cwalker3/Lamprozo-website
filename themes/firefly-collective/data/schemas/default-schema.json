@@ -26,18 +26,14 @@
         {
             "slug": "template",
             "title": "Template",
-            "snippet": "template.html"
+            "snippet": "template.html",
+            "menu_order": 0,
+            "in_menu": false
         },
         {
             "slug": "app",
             "title": "App",
             "snippet": "app.html"
-        },
-        {
-            "slug": "blog",
-            "title": "Blog",
-            "snippet": "blog.html",
-            "set_as": "posts_page"
         },
         {
             "slug": "signup",
@@ -50,6 +46,14 @@
             "snippet": "home.html",
             "set_as": "front_page",
             "menu_order": 1,
+            "in_menu": false
+        },
+        {
+            "slug": "blog",
+            "title": "Blog",
+            "snippet": "blog.html",
+            "set_as": "posts_page",
+            "menu_order": 3,
             "in_menu": false
         },
         {
