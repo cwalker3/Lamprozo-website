@@ -512,7 +512,42 @@ add_action('rest_api_init', function() {
         'callback'            => 'lamprozo_rest_new_attempt',
         'permission_callback' => fn() => current_user_can('manage_options'),
     ]);
+    // Set only cap/badges/deaths on one attempt (fresh read + targeted write) so
+    // these manual fields persist instantly and never clobber / get clobbered by
+    // the party box-sync, which writes the same attempts option.
+    register_rest_route('lamprozo/v1', '/attempts/(?P<challenge>[a-z0-9-]+)/meta', [
+        'methods'             => 'POST',
+        'callback'            => 'lamprozo_rest_set_attempt_meta',
+        'permission_callback' => fn() => current_user_can('manage_options'),
+    ]);
 });
+
+function lamprozo_rest_set_attempt_meta($request) {
+    $challenge = $request['challenge'];
+    $body      = $request->get_json_params();
+    $number    = isset($body['number']) ? (int) $body['number'] : null;
+
+    $attempts = lamprozo_get_attempts($challenge);
+    $found    = false;
+    foreach ($attempts as $i => $a) {
+        $match = ($number !== null)
+            ? ((int) ($a['number'] ?? -1) === $number)
+            : (($a['status'] ?? '') === 'ongoing');
+        if ($match) {
+            foreach (['cap', 'badges', 'deaths'] as $f) {
+                if (array_key_exists($f, $body)) {
+                    $attempts[$i][$f] = sanitize_text_field((string) $body[$f]);
+                }
+            }
+            $found = true;
+            break;
+        }
+    }
+    if ($found) {
+        lamprozo_save_attempts($challenge, $attempts);
+    }
+    return rest_ensure_response(['success' => $found]);
+}
 
 function lamprozo_rest_get_attempts($request) {
     $challenge = $request['challenge'];

@@ -139,17 +139,17 @@
                     <div class="attempt-field" style="min-width:100px;max-width:130px">
                         <label>Level cap</label>
                         <input type="text" placeholder="e.g. 16" value="${esc(cap)}"
-                            onchange="updateField(${i},'cap',this.value)">
+                            onchange="saveMeta(${i},'cap',this.value)">
                     </div>
                     <div class="attempt-field" style="min-width:100px;max-width:130px">
                         <label>Badges</label>
                         <input type="text" placeholder="e.g. 3/8" value="${esc(badges)}"
-                            onchange="updateField(${i},'badges',this.value)">
+                            onchange="saveMeta(${i},'badges',this.value)">
                     </div>
                     <div class="attempt-field" style="min-width:90px;max-width:120px">
                         <label>Deaths</label>
                         <input type="text" placeholder="auto: ${deadCount}" value="${esc(deaths)}"
-                            onchange="updateField(${i},'deaths',this.value)">
+                            onchange="saveMeta(${i},'deaths',this.value)">
                     </div>
                     <div class="attempt-field">
                         <label>Split reached</label>
@@ -330,6 +330,15 @@
 
     window.toggleCard    = (i) => { openCards.has(i) ? openCards.delete(i) : openCards.add(i); render(); };
     window.updateField   = (i, key, val) => { attempts[i][key] = val; };
+    // Persist a single meta field (cap/badges/deaths) immediately, without
+    // touching the box — so it survives the party sync and needs no Save click.
+    window.saveMeta = (i, key, val) => {
+        attempts[i][key] = val;
+        fetch(apiBase + challenge + '/meta', {
+            method: 'POST', headers: headers(),
+            body: JSON.stringify({ number: attempts[i].number, [key]: val })
+        }).catch(() => {});
+    };
     window.updateVod     = (i, vi, key, val) => { attempts[i].vods[vi][key] = val; };
     window.addVod        = (i) => { attempts[i].vods = attempts[i].vods || []; attempts[i].vods.push({label:'VOD',url:'',summary:''}); render(); };
     window.removeVod     = (i, vi) => { attempts[i].vods.splice(vi, 1); render(); };
