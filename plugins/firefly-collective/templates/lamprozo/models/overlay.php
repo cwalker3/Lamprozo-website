@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) { exit; }
  * Returns blanks when there's no active challenge.
  */
 function lamprozo_overlay_resolve() {
-    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'badgeset' => 'none', 'theme' => 'emerald'];
+    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'badgeset' => 'none', 'theme' => 'emerald', 'party' => array_slice((array) get_option('lamprozo_party', []), 0, 6)];
 
     if (!function_exists('lamprozo_get_challenges_data')) {
         return $blank;
@@ -62,6 +62,7 @@ function lamprozo_overlay_resolve() {
         'badges'  => $ongoing['badges'] ?? '',
         'badgeset'=> $active['badgeset'] ?? 'none',
         'theme'   => $active['theme']   ?? 'emerald',
+        'party'   => array_slice((array) get_option('lamprozo_party', []), 0, 6),
     ];
 }
 
@@ -79,7 +80,72 @@ add_action('rest_api_init', function() {
         },
         'permission_callback' => '__return_true',
     ]);
+
+    // Party push from the local game-sync bridge (POST Showdown text). Authed by a
+    // shared key so it can be called from outside WP (the bridge isn't logged in).
+    register_rest_route('lamprozo/v1', '/party', [
+        'methods'             => 'POST',
+        'callback'            => 'lamprozo_rest_set_party',
+        'permission_callback' => function($request) {
+            $expected = defined('LAMPROZO_PARTY_KEY') ? LAMPROZO_PARTY_KEY : 'firefly-cli-dev-key';
+            $given    = (string) $request->get_header('x-lamprozo-key');
+            return (is_string($given) && hash_equals($expected, $given)) || current_user_can('manage_options');
+        },
+    ]);
 });
+
+/**
+ * Store the live party (for the overlay) and merge any new mons into the active
+ * challenge's ongoing attempt box (you set alive/dead in the admin afterwards).
+ * Accepts a raw Showdown-export body, or JSON {"showdown": "..."}.
+ */
+function lamprozo_rest_set_party($request) {
+    if (!function_exists('lamprozo_parse_showdown')) {
+        return new WP_Error('unavailable', 'Parser unavailable', ['status' => 500]);
+    }
+    $body = $request->get_body();
+    $text = $body;
+    $json = json_decode($body, true);
+    if (is_array($json) && isset($json['showdown'])) {
+        $text = $json['showdown'];
+    }
+
+    $mons = lamprozo_parse_showdown($text);
+    update_option('lamprozo_party', $mons, false);
+
+    // Merge into the active challenge's ongoing attempt box (add-only).
+    $merged_into = null;
+    $added = 0;
+    if (function_exists('lamprozo_get_challenges_data')) {
+        foreach (lamprozo_get_challenges_data() as $slug => $c) {
+            if (($c['status'] ?? '') !== 'active') {
+                continue;
+            }
+            $attempts = lamprozo_get_attempts($slug);
+            foreach ($attempts as $i => $a) {
+                if (($a['status'] ?? '') === 'ongoing') {
+                    $before = $a['box'] ?? [];
+                    $after  = lamprozo_merge_into_box($before, $mons);
+                    if (count($after) !== count($before)) {
+                        $attempts[$i]['box'] = $after;
+                        lamprozo_save_attempts($slug, $attempts);
+                        $merged_into = $slug;
+                        $added = count($after) - count($before);
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    return rest_ensure_response([
+        'success'     => true,
+        'party'       => count($mons),
+        'box_added'   => $added,
+        'merged_into' => $merged_into,
+    ]);
+}
 
 // ── Instant updates via Server-Sent Events ──────────────────────────────────────
 
@@ -92,7 +158,7 @@ function lamprozo_overlay_bump_rev() {
     update_option('lamprozo_overlay_rev', (string) microtime(true), false);
 }
 function lamprozo_overlay_maybe_bump_rev($option) {
-    if ($option === 'lamprozo_challenges' || strpos($option, 'lamprozo_attempts_') === 0) {
+    if ($option === 'lamprozo_challenges' || $option === 'lamprozo_party' || strpos($option, 'lamprozo_attempts_') === 0) {
         lamprozo_overlay_bump_rev();
     }
 }
@@ -368,6 +434,44 @@ function lamprozo_badge_sets() {
 add_action('template_redirect', function() {
     if (!isset($_GET['lamprozo_layout'])) { return; }
     lamprozo_render_layout_page();
+    exit;
+});
+
+// ── Party probe (diagnostic) ────────────────────────────────────────────────────
+// Open /?lamprozo_party_probe=1 in a browser ON THE STREAMING PC to dump whatever
+// the local sync server returns, so the party JSON shape can be mapped. Override
+// the source with &src=. Temporary helper; safe to remove once the party panel works.
+add_action('template_redirect', function() {
+    if (!isset($_GET['lamprozo_party_probe'])) { return; }
+    $src = isset($_GET['src']) ? esc_url_raw($_GET['src']) : 'http://localhost:31124/update';
+    header('Content-Type: text/html; charset=utf-8');
+    nocache_headers();
+    ?>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Party probe</title>
+<style>body{font-family:Consolas,monospace;background:#0e0e10;color:#efeff1;padding:1.2rem;line-height:1.4}
+h3{margin:0 0 .6rem;font-weight:600}.src{color:#7dd3fc}pre{white-space:pre-wrap;word-break:break-word;background:#18181b;border:1px solid #2a2a2e;border-radius:8px;padding:1rem}.err{color:#fb7185}</style>
+</head><body>
+<h3>GET <span class="src" id="u"></span></h3>
+<pre id="out">loading…</pre>
+<script>
+var SRC = <?php echo wp_json_encode($src); ?>;
+document.getElementById('u').textContent = SRC;
+fetch(SRC, { cache: 'no-store' })
+  .then(function(r){ return r.text().then(function(t){ return { status: r.status, body: t }; }); })
+  .then(function(res){
+    var out = document.getElementById('out');
+    var pretty;
+    try { pretty = JSON.stringify(JSON.parse(res.body), null, 2); } catch (e) { pretty = res.body; }
+    out.textContent = 'HTTP ' + res.status + '\n\n' + pretty;
+  })
+  .catch(function(e){
+    var o = document.getElementById('out'); o.className = 'err';
+    o.textContent = 'FETCH FAILED: ' + e + '\n\nOpen F12 → Console for the exact reason (CORS / mixed-content / connection refused).';
+  });
+</script>
+</body></html>
+    <?php
     exit;
 });
 

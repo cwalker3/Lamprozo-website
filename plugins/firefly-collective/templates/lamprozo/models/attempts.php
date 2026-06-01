@@ -237,6 +237,68 @@ function lamprozo_attempt_deaths($attempt) {
     return $dead;
 }
 
+/**
+ * Parse a Pokémon Showdown export (the format the in-game sync server returns)
+ * into a list of mons. PHP mirror of the admin Box editor's JS parser.
+ */
+function lamprozo_parse_showdown($text) {
+    $mons = [];
+    foreach (preg_split('/\n\s*\n/', (string) $text) as $block) {
+        $lines = array_values(array_filter(array_map('trim', explode("\n", $block)), 'strlen'));
+        if (empty($lines)) {
+            continue;
+        }
+        $first = $lines[0];
+        $head  = trim(explode(' @ ', $first)[0]);                 // drop held item
+        $head  = trim(preg_replace('/\s*\((?:M|F)\)\s*$/i', '', $head)); // drop gender
+        $species = $head;
+        $nickname = '';
+        if (preg_match('/^(.*?)\s*\((.+)\)\s*$/', $head, $m)) {
+            $nickname = trim($m[1]);
+            $species  = trim($m[2]);
+        }
+        if ($species === '') {
+            continue;
+        }
+        $mon = ['species' => $species, 'nickname' => $nickname];
+        foreach (array_slice($lines, 1) as $l) {
+            if (preg_match('/^Level:\s*(\d+)/i', $l, $mm))      { $mon['level']   = (int) $mm[1]; }
+            elseif (preg_match('/^Ability:\s*(.+)$/i', $l, $mm)) { $mon['ability'] = trim($mm[1]); }
+            elseif (preg_match('/^(.+?)\s+Nature$/i', $l, $mm))  { $mon['nature']  = trim($mm[1]); }
+        }
+        $mons[] = $mon;
+    }
+    return $mons;
+}
+
+/**
+ * Merge parsed mons into an existing box (add-only, preserving alive/dead/kills
+ * on entries already present). Match is by species + nickname, case-insensitive.
+ */
+function lamprozo_merge_into_box($box, $mons) {
+    if (!is_array($box)) {
+        $box = [];
+    }
+    foreach ($mons as $p) {
+        $sp = strtolower($p['species'] ?? '');
+        $nk = strtolower($p['nickname'] ?? '');
+        if ($sp === '') {
+            continue;
+        }
+        $exists = false;
+        foreach ($box as $e) {
+            if (strtolower($e['species'] ?? '') === $sp && strtolower($e['nickname'] ?? '') === $nk) {
+                $exists = true;
+                break;
+            }
+        }
+        if (!$exists) {
+            $box[] = ['species' => $p['species'], 'nickname' => $p['nickname'] ?? '', 'alive' => true, 'kills' => 0];
+        }
+    }
+    return $box;
+}
+
 function lamprozo_default_challenges() {
     return [
         'sterling-silver' => [
