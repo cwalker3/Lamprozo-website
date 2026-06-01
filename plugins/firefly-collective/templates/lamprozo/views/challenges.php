@@ -2,6 +2,10 @@
 if (!defined('ABSPATH')) exit;
 $theme_keys = function_exists('lamprozo_layout_themes') ? array_keys(lamprozo_layout_themes()) : ['emerald'];
 $badge_keys = array_merge(['none'], function_exists('lamprozo_badge_sets') ? array_keys(lamprozo_badge_sets()) : []);
+$badge_counts = [];
+if (function_exists('lamprozo_badge_sets')) {
+    foreach (lamprozo_badge_sets() as $k => $v) { $badge_counts[$k] = count($v); }
+}
 ?>
 <div class="wrap">
 <h1>Challenges</h1>
@@ -35,6 +39,12 @@ $badge_keys = array_merge(['none'], function_exists('lamprozo_badge_sets') ? arr
 .cd-fields { display:flex; gap:16px; flex-wrap:wrap; margin:12px 0; }
 .cd-fields label { font-size:0.78em; font-weight:600; color:#555; text-transform:uppercase; letter-spacing:0.04em; display:flex; flex-direction:column; gap:4px; }
 .cd-fields input, .cd-fields select { padding:5px 8px; border:1px solid #ccc; border-radius:4px; min-width:170px; font-weight:400; text-transform:none; }
+.cd-caps { margin:12px 0; }
+.cd-caps__label { font-size:0.78em; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px; }
+.cd-caps__label span { font-weight:400; text-transform:none; color:#888; letter-spacing:0; }
+.cd-caps__row { display:flex; gap:6px; flex-wrap:wrap; }
+.cap-cell { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:0.7em; color:#888; font-weight:700; }
+.cap-cell input { width:46px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:13px; color:#1d2327; }
 .cd-subhead { margin:18px 0 8px; padding-top:14px; border-top:1px solid #eee; font-size:0.78em; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; }
 #cd-attempts iframe { width:100%; border:0; display:block; background:#f6f7f7; border-radius:4px; }
 </style>
@@ -84,6 +94,7 @@ const nonce   = '<?php echo esc_js(wp_create_nonce('wp_rest')); ?>';
 const headers = { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce };
 const themeOptions = <?php echo wp_json_encode($theme_keys); ?>;
 const badgeOptions = <?php echo wp_json_encode($badge_keys); ?>;
+const badgeCounts  = <?php echo wp_json_encode($badge_counts); ?>;
 const PROTECTED = ['sterling-silver','renegade-platinum','platinum-kaizo'];
 
 let challengesData = [];
@@ -134,6 +145,12 @@ function renderInfo() {
     const el = document.getElementById('cd-info');
     if (!c || !el) return;
     const isComplete = c.status==='completed', isOnHold = c.status==='on_hold';
+    const n = badgeCounts[c.badgeset] || 8;
+    const caps = c.caps || [];
+    let capCells = '';
+    for (let i = 0; i <= n; i++) {
+        capCells += `<label class="cap-cell"><span>${i}</span><input type="text" value="${esc(caps[i]||'')}" onchange="updateCaps('${esc(c.slug)}',${i},this.value)"></label>`;
+    }
     el.innerHTML = `
         <div class="cd-head">
             <h2>${esc(c.title)} ${statusBadge(c.status)}</h2>
@@ -150,6 +167,10 @@ function renderInfo() {
             <label>Ruleset<input type="text" value="${esc(c.ruleset||'')}" placeholder="Hardcore Nuzlocke" onchange="updateField('${esc(c.slug)}','ruleset',this.value)"></label>
             <label>Background theme${themeSelect(c.slug, c.theme)}</label>
             <label>Badge set${badgeSelect(c.slug, c.badgeset)}</label>
+        </div>
+        <div class="cd-caps">
+            <div class="cd-caps__label">Level cap by badges <span>(badges &rarr; cap; auto-applies to the ongoing attempt)</span></div>
+            <div class="cd-caps__row">${capCells}</div>
         </div>`;
 }
 
@@ -192,6 +213,15 @@ async function updateField(slug, field, value) {
     const res = await fetch(apiBase + '/challenges/' + slug, { method:'PUT', headers, body: JSON.stringify({ [field]: value }) });
     const data = await res.json();
     if (!data.success) alert(data.message || ('Error saving ' + field + '.'));
+}
+
+// Save the per-badge level caps array for a challenge.
+function updateCaps(slug, idx, val) {
+    const c = challengesData.find(x => x.slug === slug); if (!c) return;
+    c.caps = c.caps || [];
+    c.caps[idx] = val;
+    fetch(apiBase + '/challenges/' + slug, { method:'PUT', headers, body: JSON.stringify({ caps: c.caps }) })
+        .then(r => r.json()).then(d => { if (!d.success) alert(d.message || 'Error saving caps.'); });
 }
 
 async function toggleStatus(slug, newStatus) {

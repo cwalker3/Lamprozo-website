@@ -253,6 +253,29 @@ function lamprozo_box_from_fragsheet($fragsheet) {
  * Count of dead box members in an attempt. Falls back to deriving the box from a
  * legacy fragsheet if `box` hasn't been materialized yet.
  */
+/** Number of gym badges for a challenge (from its badge set, default 8). */
+function lamprozo_challenge_badge_count($challenge) {
+    $set = $challenge['badgeset'] ?? 'none';
+    if (function_exists('lamprozo_badge_sets')) {
+        $sets = lamprozo_badge_sets();
+        if (isset($sets[$set])) {
+            return count($sets[$set]);
+        }
+    }
+    return 8;
+}
+
+/** Leading integer of a badges string ("3/8" -> 3, "3" -> 3, "" -> 0). */
+function lamprozo_badge_count_from_string($badges) {
+    return preg_match('/\d+/', (string) $badges, $m) ? (int) $m[0] : 0;
+}
+
+/** The level cap for a given badge count, from a challenge's caps array. '' if unset. */
+function lamprozo_cap_for_badges($challenge, $badge_count) {
+    $caps = $challenge['caps'] ?? [];
+    return (is_array($caps) && isset($caps[$badge_count]) && $caps[$badge_count] !== '') ? $caps[$badge_count] : '';
+}
+
 function lamprozo_attempt_deaths($attempt) {
     // Manual override wins (for games where the box isn't tracked).
     if (isset($attempt['deaths']) && $attempt['deaths'] !== '' && $attempt['deaths'] !== null) {
@@ -496,6 +519,10 @@ function lamprozo_get_challenges_data() {
             $challenge['badgeset'] = $defaults[$slug]['badgeset'] ?? 'none';
             $updated = true;
         }
+        if (!isset($challenge['caps'])) {
+            $challenge['caps'] = $defaults[$slug]['caps'] ?? [];
+            $updated = true;
+        }
     }
     unset($challenge);
     if ($updated) update_option('lamprozo_challenges', $stored);
@@ -573,14 +600,30 @@ function lamprozo_rest_set_attempt_meta($request) {
                     $attempts[$i][$f] = sanitize_text_field((string) $body[$f]);
                 }
             }
+            // When badges change, auto-set the level cap from the challenge's
+            // per-badge caps (if defined), unless cap was explicitly sent too.
+            if (array_key_exists('badges', $body) && !array_key_exists('cap', $body)) {
+                $cd  = lamprozo_get_challenges_data()[$challenge] ?? [];
+                $bc  = lamprozo_badge_count_from_string($attempts[$i]['badges']);
+                $cap = lamprozo_cap_for_badges($cd, $bc);
+                if ($cap !== '') {
+                    $attempts[$i]['cap'] = $cap;
+                }
+            }
             $found = true;
             break;
         }
     }
     if ($found) {
         lamprozo_save_attempts($challenge, $attempts);
+        return rest_ensure_response([
+            'success' => true,
+            'cap'     => $attempts[$i]['cap']    ?? '',
+            'badges'  => $attempts[$i]['badges'] ?? '',
+            'deaths'  => $attempts[$i]['deaths'] ?? '',
+        ]);
     }
-    return rest_ensure_response(['success' => $found]);
+    return rest_ensure_response(['success' => false]);
 }
 
 function lamprozo_rest_get_attempts($request) {
@@ -619,6 +662,7 @@ function lamprozo_rest_create_challenge($request) {
         'ruleset'     => sanitize_text_field($body['ruleset'] ?? ''),
         'theme'       => sanitize_key($body['theme'] ?? 'emerald'),
         'badgeset'    => sanitize_key($body['badgeset'] ?? 'none'),
+        'caps'        => (isset($body['caps']) && is_array($body['caps'])) ? array_map(fn($v) => sanitize_text_field((string) $v), $body['caps']) : [],
     ];
     update_option('lamprozo_challenges', $challenges);
 
@@ -645,6 +689,9 @@ function lamprozo_rest_update_challenge($request) {
         if (isset($body[$field])) {
             $challenges[$slug][$field] = sanitize_text_field($body[$field]);
         }
+    }
+    if (isset($body['caps']) && is_array($body['caps'])) {
+        $challenges[$slug]['caps'] = array_map(fn($v) => sanitize_text_field((string) $v), $body['caps']);
     }
     update_option('lamprozo_challenges', $challenges);
     return rest_ensure_response(['success' => true]);
@@ -683,14 +730,16 @@ function lamprozo_rest_new_attempt($request) {
     // Get next number
     $next = empty($attempts) ? 1 : (max(array_column($attempts, 'number')) + 1);
 
-    // Carry level cap / badges forward from the most recent attempt for convenience.
-    $prev = $attempts[0] ?? [];
+    // A fresh run starts at 0 badges, the starting level cap, and 0 deaths
+    // (empty box -> box-derived deaths = 0).
+    $challenge_data = lamprozo_get_challenges_data()[$challenge] ?? [];
+    $badge_total    = lamprozo_challenge_badge_count($challenge_data);
 
     array_unshift($attempts, [
         'number' => $next,
         'status' => 'ongoing',
-        'cap'    => $prev['cap'] ?? '',
-        'badges' => $prev['badges'] ?? '',
+        'cap'    => lamprozo_cap_for_badges($challenge_data, 0),
+        'badges' => '0/' . $badge_total,
         'vods'   => [],
         'box'    => [],
     ]);

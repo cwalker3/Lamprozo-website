@@ -143,7 +143,7 @@ $embed     = isset($embed) ? (bool) $embed : false;
                     </div>
                     <div class="attempt-field" style="min-width:100px;max-width:130px">
                         <label>Level cap</label>
-                        <input type="text" placeholder="e.g. 16" value="${esc(cap)}"
+                        <input type="text" id="cap-input-${i}" placeholder="e.g. 16" value="${esc(cap)}"
                             onchange="saveMeta(${i},'cap',this.value)">
                     </div>
                     <div class="attempt-field" style="min-width:100px;max-width:130px">
@@ -342,6 +342,13 @@ $embed     = isset($embed) ? (bool) $embed : false;
         fetch(apiBase + challenge + '/meta', {
             method: 'POST', headers: headers(),
             body: JSON.stringify({ number: attempts[i].number, [key]: val })
+        }).then(r => r.json()).then(d => {
+            // Badge count may auto-derive a new level cap server-side; reflect it.
+            if (key === 'badges' && d && d.cap !== undefined && d.cap !== attempts[i].cap) {
+                attempts[i].cap = d.cap;
+                const capEl = document.getElementById('cap-input-' + i);
+                if (capEl) capEl.value = d.cap;
+            }
         }).catch(() => {});
     };
     window.updateVod     = (i, vi, key, val) => { attempts[i].vods[vi][key] = val; };
@@ -367,18 +374,26 @@ $embed     = isset($embed) ? (bool) $embed : false;
             .catch(() => notice('Save failed.', 'error'));
     });
 
-    document.getElementById('btn-new-attempt').addEventListener('click', () => {
-        const hasOngoing = attempts.some(a => a.status === 'ongoing');
-        let previous_status = 'failed';
-        if (hasOngoing) {
-            const choice = confirm('Did you complete the current attempt?\n\nOK = Completed\nCancel = Wiped');
-            if (choice === null) return;
-            previous_status = choice ? 'completed' : 'failed';
-        }
+    window.doNewAttempt = (previous_status) => {
         fetch(apiBase + challenge + '/new', { method: 'POST', headers: headers(), body: JSON.stringify({ previous_status }) })
             .then(r => r.json())
             .then(data => { notice('Started attempt #' + data.number + '!'); openCards.clear(); load(); })
             .catch(() => notice('Failed to create attempt.', 'error'));
+    };
+    window.cancelNewAttempt = () => { const el = document.getElementById('attempts-notice'); el.style.display = 'none'; el.innerHTML = ''; };
+
+    document.getElementById('btn-new-attempt').addEventListener('click', () => {
+        // No ongoing attempt -> just start one.
+        if (!attempts.some(a => a.status === 'ongoing')) { window.doNewAttempt('failed'); return; }
+        // Otherwise ask how the current run ended, with clear inline choices.
+        const el = document.getElementById('attempts-notice');
+        el.style.display = 'block';
+        el.innerHTML = `<div class="notice notice-warning inline" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0">
+            <strong>Start a new attempt — how did the current run end?</strong>
+            <button class="button button-small" onclick="doNewAttempt('failed')">💀 Wiped</button>
+            <button class="button button-small" onclick="doNewAttempt('completed')">✓ Completed</button>
+            <button class="button button-small" onclick="cancelNewAttempt()">Cancel</button>
+        </div>`;
     });
 
     function load() {
