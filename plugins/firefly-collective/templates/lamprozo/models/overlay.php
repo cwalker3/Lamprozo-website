@@ -225,11 +225,10 @@ function lamprozo_render_layout_page() {
     $rest_url = esc_url_raw(rest_url('lamprozo/v1/overlay'));
     $interval = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 5000;
 
-    // Twitch chat embed: channel overridable via ?channel=, parent must be the
-    // host this page is served from (handles localhost / tunnel / production).
+    // Chat is rendered in-page via an anonymous, read-only Twitch IRC-over-
+    // WebSocket connection (see the chat client script) — no login, no parent-
+    // domain restriction. Channel overridable via ?channel=.
     $channel = isset($_GET['channel']) ? sanitize_key($_GET['channel']) : 'lamprozo';
-    $host    = wp_parse_url(home_url(), PHP_URL_HOST) ?: 'localhost';
-    $chat_src = 'https://www.twitch.tv/embed/' . rawurlencode($channel) . '/chat?darkpopout&parent=' . rawurlencode($host);
 
     header('Content-Type: text/html; charset=utf-8');
     nocache_headers();
@@ -276,9 +275,20 @@ function lamprozo_render_layout_page() {
 
     .region--gba    { left: 2%;    top: 7.8%; width: 69.5%;  height: 74.2%; }
     .region--cam    { left: 74.1%; top: 7.8%; width: 23.75%; height: 29.9%; }
-    .region--chat   { left: 74.1%; top: 46.5%; width: 23.75%; height: 45.5%; overflow: hidden; }
+    .region--chat   { left: 74.1%; top: 46.5%; width: 23.75%; height: 45.5%; overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
 
-    .region--chat iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .chat {
+      width: 100%; height: 100%; padding: 0.9vh 0.7vw;
+      display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5vh;
+      overflow: hidden;
+    }
+    .chat__line {
+      font-size: 1.55vh; line-height: 1.32; word-wrap: break-word; overflow-wrap: anywhere;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    .chat__user { font-weight: 800; margin-right: 0.35em; }
+    .chat__msg  { color: var(--text); }
+    .chat__line--action .chat__msg { font-style: italic; }
 
     /* Status bar, directly under the GBA screen */
     .status {
@@ -315,7 +325,7 @@ function lamprozo_render_layout_page() {
     <div class="region region--cam"></div>
 
     <div class="region region--chat">
-      <iframe src="<?php echo esc_url($chat_src); ?>" title="Twitch chat"></iframe>
+      <div class="chat" id="chat"></div>
     </div>
 
     <div class="status">
@@ -353,6 +363,62 @@ function lamprozo_render_layout_page() {
         .catch(function() {});
     }
     setInterval(poll, <?php echo (int) $interval; ?>);
+
+    // ── Twitch chat: anonymous, read-only IRC over WebSocket ───────────────────
+    var CHANNEL   = <?php echo wp_json_encode($channel); ?>;
+    var chatEl    = document.getElementById("chat");
+    var MAX_LINES = 60;
+    var FALLBACK_COLORS = ["#FF4F4F","#7DD3FC","#FACC15","#34D399","#F472B6","#A78BFA","#FB923C","#22D3EE"];
+
+    function chatEscape(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+    function fallbackColor(name) {
+      var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      return FALLBACK_COLORS[h % FALLBACK_COLORS.length];
+    }
+    function parseTags(raw) {
+      var t = {};
+      raw.split(";").forEach(function(p) { var i = p.indexOf("="); if (i > 0) t[p.slice(0, i)] = p.slice(i + 1); });
+      return t;
+    }
+    function addLine(name, color, msg, isAction) {
+      var c = color || fallbackColor(name);
+      var line = document.createElement("div");
+      line.className = "chat__line" + (isAction ? " chat__line--action" : "");
+      var u = document.createElement("span");
+      u.className = "chat__user"; u.style.color = c; u.textContent = name + ":";
+      var m = document.createElement("span");
+      m.className = "chat__msg"; if (isAction) m.style.color = c;
+      m.innerHTML = " " + chatEscape(msg);
+      line.appendChild(u); line.appendChild(m);
+      chatEl.appendChild(line);
+      while (chatEl.children.length > MAX_LINES) chatEl.removeChild(chatEl.firstChild);
+    }
+    function connectChat() {
+      var ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
+      ws.onopen = function() {
+        ws.send("PASS SCHMOOPIIE");
+        ws.send("NICK justinfan" + Math.floor(Math.random() * 99999));
+        ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+        ws.send("JOIN #" + CHANNEL);
+      };
+      ws.onmessage = function(e) {
+        e.data.split("\r\n").forEach(function(line) {
+          if (!line) return;
+          if (line.indexOf("PING") === 0) { ws.send("PONG :tmi.twitch.tv"); return; }
+          var m = line.match(/^(?:@(\S+) )?:(\w+)!\S+ PRIVMSG #\S+ :([\s\S]*)$/);
+          if (!m) return;
+          var tags = m[1] ? parseTags(m[1]) : {};
+          var name = tags["display-name"] || m[2];
+          var text = m[3], isAction = false;
+          var am = text.match(/^\x01ACTION ([\s\S]*)\x01$/);
+          if (am) { isAction = true; text = am[1]; }
+          addLine(name, tags["color"] || "", text, isAction);
+        });
+      };
+      ws.onclose = function() { setTimeout(connectChat, 3000); };
+      ws.onerror = function() { try { ws.close(); } catch (_) {} };
+    }
+    if (CHANNEL) connectChat();
   </script>
 </body>
 </html>
