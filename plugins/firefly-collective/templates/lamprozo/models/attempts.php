@@ -123,6 +123,40 @@ function ffc_attempts_dashboard() {
     if (file_exists($view_path)) include $view_path;
 }
 
+// Chrome-less attempts editor for embedding inside a challenge card's expander.
+// /?lamprozo_attempts_embed=1&challenge=SLUG  (admin-only; same-origin iframe).
+add_action('template_redirect', function () {
+    if (!isset($_GET['lamprozo_attempts_embed'])) {
+        return;
+    }
+    if (!current_user_can('manage_options')) {
+        status_header(403);
+        echo 'Forbidden';
+        exit;
+    }
+    $preselect = isset($_GET['challenge']) ? sanitize_title($_GET['challenge']) : '';
+    $embed     = true;
+    header('Content-Type: text/html; charset=utf-8');
+    nocache_headers();
+    ?>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { margin: 0; padding: 12px; background: #f6f7f7; color: #1d2327; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
+  .button { display: inline-block; padding: 3px 10px; border: 1px solid #2271b1; border-radius: 3px; background: #f6f7f7; color: #2271b1; cursor: pointer; font-size: 13px; line-height: 2; text-decoration: none; vertical-align: top; box-sizing: border-box; }
+  .button-primary { background: #2271b1; border-color: #2271b1; color: #fff; }
+  .button-small { font-size: 11px; line-height: 1.8; padding: 0 8px; }
+  .button-link-delete { color: #b32d2e; border-color: #b32d2e; background: #fff; }
+  .notice { padding: 6px 10px; border-left: 4px solid #72aee6; background: #fff; margin: 0 0 10px; }
+  .notice-success { border-color: #00a32a; } .notice-error { border-color: #d63638; } .notice-warning { border-color: #dba617; }
+  #attempts-app { max-width: none !important; }
+</style></head><body>
+<?php include dirname(__FILE__, 2) . '/views/attempts.php'; ?>
+</body></html>
+    <?php
+    exit;
+});
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function lamprozo_get_attempts($challenge) {

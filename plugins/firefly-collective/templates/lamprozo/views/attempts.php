@@ -1,10 +1,15 @@
-<div id="attempts-app" style="max-width:1000px;padding:1.5rem 0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-        <h1 style="margin:0">Attempts</h1>
-        <div style="display:flex;gap:0.75rem;align-items:center">
-            <select id="challenge-select" style="padding:0.4rem 0.75rem;border-radius:4px;border:1px solid #ccc">
+<?php
+// $preselect / $embed may be injected by the embed endpoint; otherwise derive.
+$preselect = isset($preselect) ? $preselect : (isset($_GET['challenge']) ? sanitize_title($_GET['challenge']) : '');
+$embed     = isset($embed) ? (bool) $embed : false;
+?>
+<div id="attempts-app" style="max-width:1000px;padding:<?php echo $embed ? '0' : '1.5rem 0'; ?>">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:0.75rem">
+        <?php if (!$embed): ?><h1 style="margin:0">Attempts</h1><?php endif; ?>
+        <div style="display:flex;gap:0.75rem;align-items:center;<?php echo $embed ? 'margin-left:auto' : ''; ?>">
+            <select id="challenge-select" style="<?php echo $embed ? 'display:none' : 'padding:0.4rem 0.75rem;border-radius:4px;border:1px solid #ccc'; ?>">
                 <?php foreach (lamprozo_get_challenges() as $slug => $name): ?>
-                <option value="<?php echo esc_attr($slug); ?>"><?php echo esc_html($name); ?></option>
+                <option value="<?php echo esc_attr($slug); ?>"<?php selected($preselect, $slug); ?>><?php echo esc_html($name); ?></option>
                 <?php endforeach; ?>
             </select>
             <button id="btn-new-attempt" class="button button-primary">+ New Attempt</button>
@@ -385,3 +390,24 @@
     load();
 })();
 </script>
+<?php if ($embed): ?>
+<script>
+// Report content height to the parent (Challenges page) so the iframe auto-sizes.
+(function () {
+    function reportHeight() {
+        try {
+            parent.postMessage({
+                type: 'lamprozo-attempts-height',
+                challenge: <?php echo wp_json_encode($preselect); ?>,
+                height: document.body.scrollHeight + 24
+            }, '*');
+        } catch (e) {}
+    }
+    window.addEventListener('load', reportHeight);
+    if (window.MutationObserver) {
+        new MutationObserver(reportHeight).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    }
+    setInterval(reportHeight, 800);
+})();
+</script>
+<?php endif; ?>

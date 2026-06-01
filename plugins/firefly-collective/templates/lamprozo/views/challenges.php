@@ -21,6 +21,8 @@ $badge_keys = array_merge(['none'], function_exists('lamprozo_badge_sets') ? arr
 .form-row input, .form-full input, .form-full textarea { width:100%; box-sizing:border-box; }
 .form-full { margin-bottom:12px; }
 .form-full textarea { height:70px; }
+.attempts-embed { display:none; margin-top:12px; border-top:1px solid #e0e0e0; padding-top:10px; }
+.attempts-embed iframe { width:100%; border:0; display:block; background:#f6f7f7; border-radius:4px; }
 </style>
 
 <div id="challenge-list" class="challenge-grid"></div>
@@ -142,13 +144,14 @@ function renderChallenges(challenges) {
             </p>
             <div class="actions">
                 <a href="/${esc(c.slug)}" target="_blank" class="button button-small">View Page</a>
-                <a href="/wp-admin/admin.php?page=lamprozo-attempts&challenge=${esc(c.slug)}" class="button button-small">Attempts</a>
+                <button class="button button-small" onclick="toggleAttempts('${esc(c.slug)}', this)">▸ Attempts</button>
                 ${!isComplete ? `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','${isOnHold ? 'active' : 'on_hold'}')">${isOnHold ? 'Set Active' : 'Put On Hold'}</button>` : ''}
                 ${!isComplete ? `<button class="button button-small" style="background:#6a0dad;color:#fff;border-color:#6a0dad" onclick="toggleStatus('${esc(c.slug)}','completed')">Mark Completed</button>` : `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','active')">Reopen</button>`}
                 ${!['sterling-silver','renegade-platinum','platinum-kaizo'].includes(c.slug)
                     ? `<button class="button button-small button-link-delete" onclick="deleteChallenge('${esc(c.slug)}','${esc(c.title)}')">Delete</button>`
                     : ''}
             </div>
+            <div class="attempts-embed" id="att-${esc(c.slug)}"></div>
         </div>`;
     }).join('');
 }
@@ -220,6 +223,40 @@ async function updateBadgeset(slug, badgeset) {
     const data = await res.json();
     if (!data.success) alert(data.message || 'Error saving badge set.');
 }
+
+// Expand a challenge card to show its attempts editor inline (embedded iframe).
+function toggleAttempts(slug, btn) {
+    const card = btn.closest('.challenge-card');
+    const box  = document.getElementById('att-' + slug);
+    if (!box) return;
+    if (box.dataset.open === '1') {
+        box.dataset.open = '0';
+        box.style.display = 'none';
+        box.innerHTML = '';
+        if (card) card.style.gridColumn = '';
+        btn.textContent = '▸ Attempts';
+        return;
+    }
+    box.dataset.open = '1';
+    box.style.display = 'block';
+    if (card) card.style.gridColumn = '1 / -1';   // span full width so the editor has room
+    btn.textContent = '▾ Attempts';
+    const f = document.createElement('iframe');
+    f.src = '/?lamprozo_attempts_embed=1&challenge=' + encodeURIComponent(slug);
+    f.setAttribute('data-challenge', slug);
+    f.style.height = '320px';
+    box.appendChild(f);
+}
+
+// Auto-size each embedded attempts iframe to its content.
+window.addEventListener('message', function (e) {
+    if (!e.data || e.data.type !== 'lamprozo-attempts-height') return;
+    document.querySelectorAll('.attempts-embed iframe').forEach(function (f) {
+        if (f.getAttribute('data-challenge') === e.data.challenge) {
+            f.style.height = Math.max(200, e.data.height) + 'px';
+        }
+    });
+});
 
 async function toggleStatus(slug, newStatus) {
     const res = await fetch(apiBase + '/challenges/' + slug, {
