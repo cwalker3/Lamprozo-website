@@ -331,6 +331,36 @@ function lamprozo_dex_number($species) {
     return $id;
 }
 
+/**
+ * Ensure a party sprite exists locally at uploads/lamprozo/party/{dex}.png by
+ * downloading the menu icon once on first sighting. Never overwrites a file you
+ * uploaded yourself. Best-effort — failures are ignored (renderParty falls back).
+ */
+function lamprozo_cache_party_sprite($dex) {
+    $dex = (int) $dex;
+    if ($dex <= 0) {
+        return;
+    }
+    $up   = wp_upload_dir();
+    $dir  = trailingslashit($up['basedir']) . 'lamprozo/party';
+    $file = $dir . '/' . $dex . '.png';
+    if (file_exists($file)) {
+        return; // your upload or an earlier cache — leave it alone
+    }
+    if (!wp_mkdir_p($dir)) {
+        return;
+    }
+    $url  = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/' . $dex . '.png';
+    $resp = wp_remote_get($url, ['timeout' => 5]);
+    if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) {
+        return;
+    }
+    $body = wp_remote_retrieve_body($resp);
+    if ($body !== '') {
+        file_put_contents($file, $body);
+    }
+}
+
 function lamprozo_default_challenges() {
     return [
         'sterling-silver' => [

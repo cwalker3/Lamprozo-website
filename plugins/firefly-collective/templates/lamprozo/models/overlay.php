@@ -113,6 +113,9 @@ function lamprozo_rest_set_party($request) {
     $mons = lamprozo_parse_showdown($text);
     foreach ($mons as &$mon) {
         $mon['dex'] = function_exists('lamprozo_dex_number') ? lamprozo_dex_number($mon['species']) : null;
+        if ($mon['dex'] && function_exists('lamprozo_cache_party_sprite')) {
+            lamprozo_cache_party_sprite($mon['dex']);
+        }
     }
     unset($mon);
     update_option('lamprozo_party', $mons, false);
@@ -335,6 +338,9 @@ function lamprozo_render_overlay_page() {
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
+      var bsig = (data.badgeset || "none") + "|" + (data.badges == null ? "" : data.badges);
+      if (renderBadges.sig === bsig) return;   // unchanged -> skip rebuild (no flash)
+      renderBadges.sig = bsig;
       var set = BADGE_SETS[data.badgeset];
       if (!(set && set.length)) { el.textContent = (data.badges == null ? "" : data.badges); return; }
       var n = earnedBadges(data.badges);
@@ -365,6 +371,9 @@ function lamprozo_render_overlay_page() {
       var el = document.getElementById("party");
       if (!el) return;                       // only the full layout has a party panel
       var party = data.party || [];
+      var psig = JSON.stringify(party.map(function(p){ return [p.dex || 0, p.species, p.nickname, p.level]; }));
+      if (renderParty.sig === psig) return;    // unchanged -> skip rebuild (no flash)
+      renderParty.sig = psig;
       el.textContent = "";
       party.forEach(function(p) {
         var slug = partySlug(p.species);
@@ -787,6 +796,9 @@ function lamprozo_render_layout_page() {
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
+      var bsig = (data.badgeset || "none") + "|" + (data.badges == null ? "" : data.badges);
+      if (renderBadges.sig === bsig) return;   // unchanged -> skip rebuild (no flash)
+      renderBadges.sig = bsig;
       var set = BADGE_SETS[data.badgeset];
       if (!(set && set.length)) { el.textContent = (data.badges == null ? "" : data.badges); return; }
       var n = earnedBadges(data.badges);
@@ -817,6 +829,9 @@ function lamprozo_render_layout_page() {
       var el = document.getElementById("party");
       if (!el) return;                       // only the full layout has a party panel
       var party = data.party || [];
+      var psig = JSON.stringify(party.map(function(p){ return [p.dex || 0, p.species, p.nickname, p.level]; }));
+      if (renderParty.sig === psig) return;    // unchanged -> skip rebuild (no flash)
+      renderParty.sig = psig;
       el.textContent = "";
       party.forEach(function(p) {
         var slug = partySlug(p.species);
