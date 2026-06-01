@@ -356,6 +356,28 @@ function lamprozo_render_overlay_page() {
       el.appendChild(wrap);
     }
 
+    function partySlug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
+    function renderParty(data) {
+      var el = document.getElementById("party");
+      if (!el) return;                       // only the full layout has a party panel
+      var party = data.party || [];
+      el.textContent = "";
+      party.forEach(function(p) {
+        var slug = partySlug(p.species);
+        var img = document.createElement("img");
+        img.className = "party-mon";
+        img.src = UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB;
+        img.alt = p.nickname || p.species || "";
+        img.title = (p.nickname || p.species || "") + (p.level ? "  L" + p.level : "");
+        img.onerror = function() {           // uploaded sprite missing -> pokemondb sprite
+          if (img.dataset.fb) { img.style.visibility = "hidden"; return; }
+          img.dataset.fb = "1";
+          img.src = "https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png";
+        };
+        el.appendChild(img);
+      });
+    }
+
     function applyOverlay(data) {
       FIELDS.forEach(function(key) {
         var el = document.getElementById(key);
@@ -364,6 +386,7 @@ function lamprozo_render_overlay_page() {
         }
       });
       renderBadges(data);
+      renderParty(data);
     }
 
     function poll() {
@@ -584,12 +607,15 @@ function lamprozo_render_layout_page() {
     .stat--deaths  .stat__value { color: var(--danger); }
     /* Badge row */
     .status__badges {
-      flex: 1.2; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1vw;
+      flex: 1.2; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1.6vw;
       background: var(--panel-bg); border: 0.18vh solid var(--border); border-radius: 0.9vh;
       padding: 0.5vh 1.2vw; overflow: hidden;
     }
-    .status__badges .stat__label { flex-shrink: 0; }
-    .status__badges #badges { display: flex; align-items: center; height: 100%; min-width: 0; }
+    .status__badges #badges,
+    .status__badges #party { display: flex; align-items: center; height: 100%; min-width: 0; }
+    .status__badges #party { gap: 0.6vw; }
+    .status__divider { width: 2px; align-self: stretch; margin: 0.6vh 0; background: rgba(255,255,255,0.16); flex-shrink: 0; }
+    .party-mon { height: 5.5vh; max-height: 100%; width: auto; object-fit: contain; image-rendering: pixelated; }
     .badge-pips { display: flex; gap: 0.8vw; align-items: center; justify-content: center; flex-wrap: nowrap; height: 100%; max-height: 100%; }
     .badge-pip  { width: 3vh; height: 3vh; max-height: 100%; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.2vh solid rgba(255,255,255,0.22); }
     .badge-pip--on { box-shadow: 0 0 0.6vh rgba(0,0,0,0.45); }
@@ -622,8 +648,9 @@ function lamprozo_render_layout_page() {
         </div>
       </div>
       <div class="status__badges">
-        <span class="stat__label">Badges</span>
-        <span id="badges"><?php echo esc_html($overlay['badges']); ?></span>
+        <span id="badges"></span>
+        <span class="status__divider"></span>
+        <span id="party"></span>
       </div>
     </div>
   </div>
@@ -773,6 +800,28 @@ function lamprozo_render_layout_page() {
       el.appendChild(wrap);
     }
 
+    function partySlug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
+    function renderParty(data) {
+      var el = document.getElementById("party");
+      if (!el) return;                       // only the full layout has a party panel
+      var party = data.party || [];
+      el.textContent = "";
+      party.forEach(function(p) {
+        var slug = partySlug(p.species);
+        var img = document.createElement("img");
+        img.className = "party-mon";
+        img.src = UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB;
+        img.alt = p.nickname || p.species || "";
+        img.title = (p.nickname || p.species || "") + (p.level ? "  L" + p.level : "");
+        img.onerror = function() {           // uploaded sprite missing -> pokemondb sprite
+          if (img.dataset.fb) { img.style.visibility = "hidden"; return; }
+          img.dataset.fb = "1";
+          img.src = "https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png";
+        };
+        el.appendChild(img);
+      });
+    }
+
     function applyOverlay(data) {
       FIELDS.forEach(function(key) {
         var el = document.getElementById(key);
@@ -781,6 +830,7 @@ function lamprozo_render_layout_page() {
         }
       });
       renderBadges(data);
+      renderParty(data);
       // Re-theme the background live when the active game changes (unless ?bg= locked it).
       if (!THEME_LOCKED && data.theme && THEMES[data.theme] && data.theme !== themeName) {
         themeName = data.theme;
