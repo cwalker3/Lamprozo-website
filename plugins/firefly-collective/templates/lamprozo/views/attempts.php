@@ -28,7 +28,9 @@ $embed     = isset($embed) ? (bool) $embed : false;
 .attempt-card__header:hover { background:#f0f0f0; }
 .attempt-card__number { font-weight:700; min-width:110px; }
 .attempt-card__split { color:#555; font-size:0.9em; flex:1; }
-.attempt-card__toggle { margin-left:auto; color:#888; font-size:0.85em; }
+.attempt-card__summary { color:#555; font-size:0.85em; white-space:nowrap; }
+.attempt-card__notes-preview { color:#888; font-size:0.85em; font-style:italic; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attempt-card__toggle { margin-left:auto; color:#888; font-size:0.85em; flex-shrink:0; }
 .attempt-card__body { padding:14px; display:none; }
 .attempt-card__body.open { display:block; }
 .attempt-card__row { display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
@@ -91,6 +93,8 @@ $embed     = isset($embed) ? (bool) $embed : false;
         const deaths = attempt.deaths ?? '';
         const box    = attempt.box || [];
         const deadCount = box.filter(m => m.alive === false).length;
+        const deathsShown  = (deaths !== '' && deaths != null) ? deaths : deadCount;
+        const notesPreview = notes.length > 80 ? notes.slice(0, 80) + '…' : notes;
 
         const boxRows = box.map((m, bi) => `
             <div class="box-mon box-mon--${m.alive === false ? 'dead' : 'alive'}">
@@ -128,7 +132,8 @@ $embed     = isset($embed) ? (bool) $embed : false;
             <div class="attempt-card__header" onclick="toggleCard(${i})">
                 <span class="attempt-card__number">Attempt #${attempt.number}</span>
                 <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:0.78em;font-weight:700;background:${statusColor(attempt.status)}20;color:${statusColor(attempt.status)}">${statusLabel(attempt.status)}</span>
-                <span class="attempt-card__split">${split ? '📍 ' + esc(split) : ''}</span>
+                <span class="attempt-card__summary">${badges ? '🎖 ' + esc(badges) : ''}${cap ? '&nbsp;&nbsp;⬆ ' + esc(cap) : ''}&nbsp;&nbsp;💀 ${esc(String(deathsShown))}${split ? '&nbsp;&nbsp;📍 ' + esc(split) : ''}</span>
+                ${notes ? `<span class="attempt-card__notes-preview" title="${esc(notes)}">${esc(notesPreview)}</span>` : '<span style="flex:1"></span>'}
                 <span class="attempt-card__toggle">${isOpen ? '▲ collapse' : '▼ expand'}</span>
             </div>
             <div class="attempt-card__body ${isOpen ? 'open' : ''}">
