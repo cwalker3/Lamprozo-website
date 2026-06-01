@@ -11,6 +11,87 @@
 // =============================================================================
 
 /**
+ * Create a nav_menu scoped to a template, allowing the same display name to be
+ * reused across templates.
+ *
+ * WordPress treats nav_menu names as globally unique, but wp_insert_term permits
+ * a duplicate name as long as a unique slug is supplied. We give each template's
+ * menu a per-template slug ("{name}-{template}") so two templates can both have,
+ * e.g., a menu named "Main Menu" -- the same way scoped pages share a slug. The
+ * new menu is tagged with the template via term meta.
+ *
+ * @param string $name     Menu display name.
+ * @param string $template Template slug to scope the menu to.
+ * @return int|WP_Error    New menu term ID, or WP_Error on failure.
+ */
+function firefly_create_scoped_menu($name, $template) {
+    $name = trim($name);
+    if ('' === $name) {
+        return new WP_Error('menu_name_empty', __('Please enter a valid menu name.', 'firefly-collective'));
+    }
+
+    // Per-template unique slug keeps the display name free to repeat.
+    $slug = wp_unique_term_slug(
+        sanitize_title($name . '-' . $template),
+        (object) array('taxonomy' => 'nav_menu', 'parent' => 0)
+    );
+
+    $result = wp_insert_term($name, 'nav_menu', array('slug' => $slug));
+    if (is_wp_error($result)) {
+        return $result;
+    }
+
+    update_term_meta($result['term_id'], FIREFLY_TEMPLATE_META_KEY, $template);
+
+    return (int) $result['term_id'];
+}
+
+/**
+ * Resolve the existing menu term ID for a template, if any.
+ *
+ * Looks up (in order): the stored firefly_menu_{template} option, a nav_menu
+ * tagged with this template whose name matches the base name, and finally a
+ * legacy "{base_name} ({template})" name match (for menus created before names
+ * were shared across templates).
+ *
+ * @param string $template  Template slug.
+ * @param string $base_name Expected menu name (no template suffix).
+ * @return int Menu term ID, or 0 if none found.
+ */
+function firefly_find_template_menu_id($template, $base_name = '') {
+    // 1. Canonical stored pointer.
+    $menu_id = (int) get_option("firefly_menu_{$template}");
+    if ($menu_id && term_exists($menu_id, 'nav_menu')) {
+        return $menu_id;
+    }
+
+    $menus = get_terms(array('taxonomy' => 'nav_menu', 'hide_empty' => false));
+    if (!is_array($menus)) {
+        $menus = array();
+    }
+
+    // 2. nav_menu tagged with this template whose name matches the base name.
+    if ('' !== $base_name) {
+        foreach ($menus as $menu) {
+            if ($menu->name === $base_name
+                && get_term_meta($menu->term_id, FIREFLY_TEMPLATE_META_KEY, true) === $template) {
+                return (int) $menu->term_id;
+            }
+        }
+    }
+
+    // 3. Legacy suffixed name ("Main Menu (template)").
+    if ('' !== $base_name) {
+        $legacy = get_term_by('name', "{$base_name} ({$template})", 'nav_menu');
+        if ($legacy && !is_wp_error($legacy)) {
+            return (int) $legacy->term_id;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * Create navigation menu for a template from its schema.
  */
 function firefly_create_template_navigation($template) {
@@ -18,13 +99,11 @@ function firefly_create_template_navigation($template) {
     $menu_config = isset($schema['menu']) ? $schema['menu'] : array('name' => 'Main Menu');
     $menu_base_name = isset($menu_config['name']) ? $menu_config['name'] : 'Main Menu';
 
-    // Create unique menu name per template
-    $menu_name = "{$menu_base_name} ({$template})";
-    $menu_obj = wp_get_nav_menu_object($menu_name);
+    // Resolve this template's existing menu so the display name can be shared
+    // across templates (e.g. every template's "Main Menu") instead of suffixed.
+    $menu_id = firefly_find_template_menu_id($template, $menu_base_name);
 
-    if ($menu_obj) {
-        $menu_id = $menu_obj->term_id;
-
+    if ($menu_id) {
         // Clear existing menu items so we can rebuild from schema
         $existing_items = wp_get_nav_menu_items($menu_id);
         if ($existing_items) {
@@ -32,15 +111,25 @@ function firefly_create_template_navigation($template) {
                 wp_delete_post($item->ID, true);
             }
         }
+
+        // Normalize a legacy suffixed name to the shared base name, keeping the
+        // existing (unique) slug. wp_update_term only enforces slug uniqueness.
+        $term = get_term($menu_id, 'nav_menu');
+        if ($term && !is_wp_error($term) && $term->name !== $menu_base_name) {
+            wp_update_term($menu_id, 'nav_menu', array(
+                'name' => $menu_base_name,
+                'slug' => $term->slug,
+            ));
+        }
     } else {
-        $menu_id = wp_create_nav_menu($menu_name);
+        $menu_id = firefly_create_scoped_menu($menu_base_name, $template);
 
         if (is_wp_error($menu_id)) {
             return 0;
         }
     }
 
-    // Set template meta on menu term
+    // Ensure template meta on menu term
     update_term_meta($menu_id, FIREFLY_TEMPLATE_META_KEY, $template);
 
     // Populate menu items from schema
