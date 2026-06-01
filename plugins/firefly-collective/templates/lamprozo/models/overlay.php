@@ -523,7 +523,7 @@ function lamprozo_render_layout_page() {
     $rest_url = esc_url_raw(rest_url('lamprozo/v1/overlay'));
     $sse_url  = esc_url_raw(home_url('/?lamprozo_overlay_sse=1'));
     $uploads_url = esc_url_raw(wp_upload_dir()['baseurl']);
-    $interval = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 5000;
+    $interval = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 1000;
 
     // Chat is rendered in-page via an anonymous, read-only Twitch IRC-over-
     // WebSocket connection (see the chat client script) — no login, no parent-
