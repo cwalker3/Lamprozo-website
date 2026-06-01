@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) { exit; }
  * Returns blanks when there's no active challenge.
  */
 function lamprozo_overlay_resolve() {
-    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'theme' => 'emerald'];
+    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'badgeset' => 'none', 'theme' => 'emerald'];
 
     if (!function_exists('lamprozo_get_challenges_data')) {
         return $blank;
@@ -60,6 +60,7 @@ function lamprozo_overlay_resolve() {
         'cap'     => $ongoing['cap']    ?? '',
         'deaths'  => $ongoing ? (string) lamprozo_attempt_deaths($ongoing) : '0',
         'badges'  => $ongoing['badges'] ?? '',
+        'badgeset'=> $active['badgeset'] ?? 'none',
         'theme'   => $active['theme']   ?? 'emerald',
     ];
 }
@@ -212,6 +213,8 @@ function lamprozo_render_overlay_page() {
     .attempt .value { color: var(--accent); }
     .deaths .value { color: var(--danger); }
     .badges .value { color: var(--gold); }
+    .badge-pips { display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 130px; }
+    .badge-pip  { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.22); }
     .overlay.vertical { flex-direction: column; align-items: stretch; width: 260px; }
     .overlay.vertical .stat-row { display: grid; grid-template-columns: 1fr 1fr; }
     .overlay.vertical .game-card,
@@ -250,7 +253,25 @@ function lamprozo_render_overlay_page() {
     // Live-updating overlay: polls the public REST endpoint so edits made in
     // WP Admin appear on stream within a few seconds, no OBS refresh needed.
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
-    var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths", "badges"];
+    var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
+    var BADGE_SETS = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+
+    function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
+    function renderBadges(data) {
+      var el = document.getElementById("badges");
+      if (!el) return;
+      var set = BADGE_SETS[data.badgeset];
+      if (set && set.length) {
+        var n = earnedBadges(data.badges);
+        el.innerHTML = '<span class="badge-pips">' + set.map(function(b, i) {
+          var on = i < n;
+          var style = on ? ' style="background:' + b.color + ';border-color:' + b.color + '"' : '';
+          return '<span class="badge-pip' + (on ? ' badge-pip--on' : '') + '"' + style + ' title="' + b.name + '"></span>';
+        }).join('') + '</span>';
+      } else {
+        el.textContent = (data.badges == null ? "" : data.badges);
+      }
+    }
 
     function applyOverlay(data) {
       FIELDS.forEach(function(key) {
@@ -259,6 +280,7 @@ function lamprozo_render_overlay_page() {
           el.textContent = data[key];
         }
       });
+      renderBadges(data);
     }
 
     function poll() {
@@ -302,6 +324,27 @@ function lamprozo_layout_themes() {
         'gold'     => ['base' => '#1a1405', 'hue' => 45,  'sat' => 65],
         'ruby'     => ['base' => '#1a060a', 'hue' => 350, 'sat' => 65],
         'sapphire' => ['base' => '#060a1a', 'hue' => 225, 'sat' => 65],
+    ];
+}
+
+/**
+ * Gym-badge sets per game region. Each badge has a name + color; the overlay
+ * lights them up in order according to the attempt's earned badge count. A
+ * challenge's `badgeset` field selects one ('none' falls back to plain text).
+ */
+function lamprozo_badge_sets() {
+    return [
+        // Hoenn (Emerald / Emerald Kaizo), in gym order.
+        'hoenn' => [
+            ['name' => 'Stone',   'color' => '#9aa3ad'],
+            ['name' => 'Knuckle', 'color' => '#d9534f'],
+            ['name' => 'Dynamo',  'color' => '#f1c40f'],
+            ['name' => 'Heat',    'color' => '#e67e22'],
+            ['name' => 'Balance', 'color' => '#c8a24a'],
+            ['name' => 'Feather', 'color' => '#48c9b0'],
+            ['name' => 'Mind',    'color' => '#af7ac5'],
+            ['name' => 'Rain',    'color' => '#2e86de'],
+        ],
     ];
 }
 
@@ -417,6 +460,9 @@ function lamprozo_render_layout_page() {
     .stat--attempt .stat__value { color: var(--accent); }
     .stat--deaths  .stat__value { color: var(--danger); }
     .stat--badges  .stat__value { color: var(--gold); }
+    .badge-pips { display: flex; gap: 0.45vw; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .badge-pip  { width: 1.8vh; height: 1.8vh; border-radius: 50%; background: rgba(255,255,255,0.1); border: 0.18vh solid rgba(255,255,255,0.22); }
+    .badge-pip--on { box-shadow: 0 0 0.5vh rgba(0,0,0,0.4); }
   </style>
 </head>
 <body>
@@ -554,7 +600,25 @@ function lamprozo_render_layout_page() {
 
     // ── Live-updating status — polls the public REST endpoint ──────────────────
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
-    var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths", "badges"];
+    var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
+    var BADGE_SETS = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+
+    function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
+    function renderBadges(data) {
+      var el = document.getElementById("badges");
+      if (!el) return;
+      var set = BADGE_SETS[data.badgeset];
+      if (set && set.length) {
+        var n = earnedBadges(data.badges);
+        el.innerHTML = '<span class="badge-pips">' + set.map(function(b, i) {
+          var on = i < n;
+          var style = on ? ' style="background:' + b.color + ';border-color:' + b.color + '"' : '';
+          return '<span class="badge-pip' + (on ? ' badge-pip--on' : '') + '"' + style + ' title="' + b.name + '"></span>';
+        }).join('') + '</span>';
+      } else {
+        el.textContent = (data.badges == null ? "" : data.badges);
+      }
+    }
 
     function applyOverlay(data) {
       FIELDS.forEach(function(key) {
@@ -563,6 +627,7 @@ function lamprozo_render_layout_page() {
           el.textContent = data[key];
         }
       });
+      renderBadges(data);
       // Re-theme the background live when the active game changes (unless ?bg= locked it).
       if (!THEME_LOCKED && data.theme && THEMES[data.theme] && data.theme !== themeName) {
         themeName = data.theme;

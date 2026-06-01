@@ -83,6 +83,7 @@
         const vods   = attempt.vods || [];
         const cap    = attempt.cap || '';
         const badges = attempt.badges || '';
+        const deaths = attempt.deaths ?? '';
         const box    = attempt.box || [];
         const deadCount = box.filter(m => m.alive === false).length;
 
@@ -144,6 +145,11 @@
                         <label>Badges</label>
                         <input type="text" placeholder="e.g. 3/8" value="${esc(badges)}"
                             onchange="updateField(${i},'badges',this.value)">
+                    </div>
+                    <div class="attempt-field" style="min-width:90px;max-width:120px">
+                        <label>Deaths</label>
+                        <input type="text" placeholder="auto: ${deadCount}" value="${esc(deaths)}"
+                            onchange="updateField(${i},'deaths',this.value)">
                     </div>
                     <div class="attempt-field">
                         <label>Split reached</label>

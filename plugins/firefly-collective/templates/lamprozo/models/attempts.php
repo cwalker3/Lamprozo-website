@@ -220,6 +220,10 @@ function lamprozo_box_from_fragsheet($fragsheet) {
  * legacy fragsheet if `box` hasn't been materialized yet.
  */
 function lamprozo_attempt_deaths($attempt) {
+    // Manual override wins (for games where the box isn't tracked).
+    if (isset($attempt['deaths']) && $attempt['deaths'] !== '' && $attempt['deaths'] !== null) {
+        return (int) $attempt['deaths'];
+    }
     $box = $attempt['box'] ?? [];
     if (empty($box) && !empty($attempt['fragsheet'])) {
         $box = lamprozo_box_from_fragsheet($attempt['fragsheet']);
@@ -292,6 +296,10 @@ function lamprozo_get_challenges_data() {
         }
         if (!isset($challenge['theme'])) {
             $challenge['theme'] = $defaults[$slug]['theme'] ?? 'emerald';
+            $updated = true;
+        }
+        if (!isset($challenge['badgeset'])) {
+            $challenge['badgeset'] = $defaults[$slug]['badgeset'] ?? 'none';
             $updated = true;
         }
     }
@@ -381,6 +389,7 @@ function lamprozo_rest_create_challenge($request) {
         'description' => sanitize_textarea_field($body['description'] ?? ''),
         'ruleset'     => sanitize_text_field($body['ruleset'] ?? ''),
         'theme'       => sanitize_key($body['theme'] ?? 'emerald'),
+        'badgeset'    => sanitize_key($body['badgeset'] ?? 'none'),
     ];
     update_option('lamprozo_challenges', $challenges);
 
@@ -403,7 +412,7 @@ function lamprozo_rest_update_challenge($request) {
     if (!isset($challenges[$slug])) {
         return new WP_Error('not_found', 'Challenge not found', ['status' => 404]);
     }
-    foreach (['title', 'game', 'type', 'gen', 'description', 'status', 'ruleset', 'theme'] as $field) {
+    foreach (['title', 'game', 'type', 'gen', 'description', 'status', 'ruleset', 'theme', 'badgeset'] as $field) {
         if (isset($body[$field])) {
             $challenges[$slug][$field] = sanitize_text_field($body[$field]);
         }
