@@ -80,6 +80,68 @@ add_action('rest_api_init', function() {
     ]);
 });
 
+// ── Instant updates via Server-Sent Events ──────────────────────────────────────
+
+/**
+ * Bump a revision marker whenever overlay-relevant data changes, so an open SSE
+ * stream can detect the change and push immediately. Hooked on option writes so
+ * every path (admin save, new attempt, challenge create/update/delete) is caught.
+ */
+function lamprozo_overlay_bump_rev() {
+    update_option('lamprozo_overlay_rev', (string) microtime(true), false);
+}
+function lamprozo_overlay_maybe_bump_rev($option) {
+    if ($option === 'lamprozo_challenges' || strpos($option, 'lamprozo_attempts_') === 0) {
+        lamprozo_overlay_bump_rev();
+    }
+}
+add_action('updated_option', 'lamprozo_overlay_maybe_bump_rev');
+add_action('added_option',   'lamprozo_overlay_maybe_bump_rev');
+
+add_action('template_redirect', function() {
+    if (!isset($_GET['lamprozo_overlay_sse'])) { return; }
+    lamprozo_stream_overlay_sse();
+    exit;
+});
+
+/**
+ * Server-Sent Events stream of the resolved overlay state. Holds one connection
+ * open, pushing a fresh payload the instant the revision marker changes. Recycles
+ * every ~45s so the browser's EventSource reconnects cleanly.
+ */
+function lamprozo_stream_overlay_sse() {
+    global $wpdb;
+    @set_time_limit(0);
+    ignore_user_abort(true);
+    while (ob_get_level() > 0) { @ob_end_flush(); }
+
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('X-Accel-Buffering: no'); // disable proxy buffering (nginx)
+
+    $read_rev = function() use ($wpdb) {
+        return (string) $wpdb->get_var(
+            $wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", 'lamprozo_overlay_rev')
+        );
+    };
+    $send = function() {
+        wp_cache_delete('alloptions', 'options'); // force fresh autoloaded option reads
+        echo 'data: ' . wp_json_encode(lamprozo_overlay_resolve()) . "\n\n";
+        @ob_flush(); @flush();
+    };
+
+    $last = $read_rev();
+    $send();
+
+    $start = time();
+    while (!connection_aborted() && (time() - $start) < 45) {
+        usleep(800000); // 0.8s
+        $rev = $read_rev();
+        if ($rev !== $last) { $last = $rev; $send(); }
+        else { echo ": ping\n\n"; @ob_flush(); @flush(); } // heartbeat
+    }
+}
+
 // ── Public overlay page (OBS Browser Source) ───────────────────────────────────
 
 add_action('template_redirect', function() {
@@ -206,7 +268,16 @@ function lamprozo_render_overlay_page() {
         .catch(function() { /* keep last good values */ });
     }
 
-    setInterval(poll, <?php echo (int) $interval; ?>);
+    setInterval(poll, <?php echo (int) $interval; ?>); // fallback / safety net
+
+    // Instant updates: Server-Sent Events push the moment data is saved in admin.
+    // (The poll above stays as a fallback if the stream drops.)
+    var SSE_URL = <?php echo wp_json_encode($sse_url); ?>;
+    if (window.EventSource) {
+      var es = new EventSource(SSE_URL);
+      es.onmessage = function(e) { try { applyOverlay(JSON.parse(e.data)); } catch (_) {} };
+      // On error the browser auto-reconnects; the fallback poll covers any gap.
+    }
   </script>
 </body>
 </html>
@@ -243,6 +314,7 @@ add_action('template_redirect', function() {
 function lamprozo_render_layout_page() {
     $overlay  = lamprozo_overlay_resolve();
     $rest_url = esc_url_raw(rest_url('lamprozo/v1/overlay'));
+    $sse_url  = esc_url_raw(home_url('/?lamprozo_overlay_sse=1'));
     $interval = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 5000;
 
     // Chat is rendered in-page via an anonymous, read-only Twitch IRC-over-
@@ -503,7 +575,16 @@ function lamprozo_render_layout_page() {
         .then(applyOverlay)
         .catch(function() {});
     }
-    setInterval(poll, <?php echo (int) $interval; ?>);
+    setInterval(poll, <?php echo (int) $interval; ?>); // fallback / safety net
+
+    // Instant updates: Server-Sent Events push the moment data is saved in admin.
+    // (The poll above stays as a fallback if the stream drops.)
+    var SSE_URL = <?php echo wp_json_encode($sse_url); ?>;
+    if (window.EventSource) {
+      var es = new EventSource(SSE_URL);
+      es.onmessage = function(e) { try { applyOverlay(JSON.parse(e.data)); } catch (_) {} };
+      // On error the browser auto-reconnects; the fallback poll covers any gap.
+    }
 
     // ── Twitch chat: anonymous, read-only IRC over WebSocket ───────────────────
     var CHANNEL   = <?php echo wp_json_encode($channel); ?>;
