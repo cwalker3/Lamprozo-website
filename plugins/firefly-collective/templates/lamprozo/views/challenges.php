@@ -177,7 +177,10 @@ function load() {
         .then(r => r.json())
         .then(data => {
             challengesData = data;
-            if (!challengesData.some(c => c.slug === selected)) selected = challengesData[0]?.slug || null;
+            if (!challengesData.some(c => c.slug === selected)) {
+                const active = challengesData.find(c => c.status === 'active');
+                selected = (active || challengesData[0])?.slug || null;
+            }
             renderList();
             renderDetail();
         });
