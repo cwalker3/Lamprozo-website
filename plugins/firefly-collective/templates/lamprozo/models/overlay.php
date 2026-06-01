@@ -588,7 +588,7 @@ function lamprozo_render_layout_page() {
       box-shadow: 0 0.8vh 2vh var(--shadow); backdrop-filter: blur(8px);
       padding: 0.9vh 1vw;
     }
-    .status__top { display: flex; align-items: stretch; gap: 1vw; flex: 1.3; min-height: 0; }
+    .status__top { display: flex; align-items: stretch; gap: 1vw; flex: 1.45; min-height: 0; }
     .status__card {
       display: flex; flex-direction: column; justify-content: center;
       padding: 0 1.2vw; min-width: 16%;
@@ -600,9 +600,10 @@ function lamprozo_render_layout_page() {
     .stat {
       flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
       background: var(--panel-bg); border: 0.18vh solid var(--border); border-radius: 0.9vh;
+      padding: 0.7vh 0.4vw; overflow: hidden;
     }
     .stat__label { font-size: 1.3vh; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
-    .stat__value { margin-top: 0.5vh; font-size: 3.2vh; font-weight: 900; line-height: 1; letter-spacing: -0.03em; }
+    .stat__value { margin-top: 0.35vh; font-size: 2.8vh; font-weight: 900; line-height: 1.05; letter-spacing: -0.03em; }
     .stat--attempt .stat__value { color: var(--accent); }
     .stat--deaths  .stat__value { color: var(--danger); }
     /* Badge row */
