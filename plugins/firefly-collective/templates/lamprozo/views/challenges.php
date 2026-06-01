@@ -156,8 +156,9 @@ function renderInfo() {
             <h2>${esc(c.title)} ${statusBadge(c.status)}</h2>
             <div class="actions">
                 <a href="/${esc(c.slug)}" target="_blank" class="button button-small">View Page</a>
-                ${!isComplete ? `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','${isOnHold?'active':'on_hold'}')">${isOnHold?'Set Active':'Put On Hold'}</button>` : ''}
-                ${!isComplete ? `<button class="button button-small" style="background:#6a0dad;color:#fff;border-color:#6a0dad" onclick="toggleStatus('${esc(c.slug)}','completed')">Mark Completed</button>` : `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','active')">Reopen</button>`}
+                ${c.status!=='active'    ? `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','active')">Set Active</button>` : ''}
+                ${c.status!=='on_hold'   ? `<button class="button button-small" onclick="toggleStatus('${esc(c.slug)}','on_hold')">Put On Hold</button>` : ''}
+                ${c.status!=='completed' ? `<button class="button button-small" style="background:#6a0dad;color:#fff;border-color:#6a0dad" onclick="toggleStatus('${esc(c.slug)}','completed')">Mark Completed</button>` : ''}
                 ${!PROTECTED.includes(c.slug) ? `<button class="button button-small button-link-delete" onclick="deleteChallenge('${esc(c.slug)}','${esc(c.title)}')">Delete</button>` : ''}
             </div>
         </div>

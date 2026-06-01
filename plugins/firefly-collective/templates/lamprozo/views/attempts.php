@@ -132,7 +132,7 @@ $embed     = isset($embed) ? (bool) $embed : false;
             <div class="attempt-card__header" onclick="toggleCard(${i})">
                 <span class="attempt-card__number">Attempt #${attempt.number}</span>
                 <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:0.78em;font-weight:700;background:${statusColor(attempt.status)}20;color:${statusColor(attempt.status)}">${statusLabel(attempt.status)}</span>
-                <span class="attempt-card__summary">🎖 ${badgeNum}&nbsp;&nbsp;💀 ${esc(String(deathsShown))}</span>
+                <span class="attempt-card__summary">🎖 ${badgeNum}</span>
                 ${notes ? `<span class="attempt-card__notes-preview" title="${esc(notes)}">${esc(notesPreview)}</span>` : '<span style="flex:1"></span>'}
                 <span class="attempt-card__toggle">${isOpen ? '▲ collapse' : '▼ expand'}</span>
             </div>
@@ -151,13 +151,13 @@ $embed     = isset($embed) ? (bool) $embed : false;
                         <input type="text" id="cap-input-${i}" placeholder="e.g. 16" value="${esc(cap)}"
                             onchange="saveMeta(${i},'cap',this.value)">
                     </div>
-                    <div class="attempt-field" style="min-width:130px;max-width:150px">
+                    <div class="attempt-field" style="flex:0 0 auto;min-width:0">
                         <label>Badges</label>
                         <div style="display:flex;gap:4px;align-items:center">
-                            <button type="button" class="button button-small" onclick="bumpBadges(${i},-1)">&minus;</button>
-                            <input type="number" min="0" id="badges-input-${i}" value="${badgeNum}" style="width:52px;text-align:center"
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpBadges(${i},-1)">&minus;</button>
+                            <input type="number" min="0" id="badges-input-${i}" value="${badgeNum}" style="width:46px;flex:0 0 46px;text-align:center"
                                 onchange="saveMeta(${i},'badges',this.value)">
-                            <button type="button" class="button button-small" onclick="bumpBadges(${i},1)">+</button>
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpBadges(${i},1)">+</button>
                         </div>
                     </div>
                     <div class="attempt-field" style="min-width:90px;max-width:120px">

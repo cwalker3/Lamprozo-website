@@ -694,6 +694,19 @@ function lamprozo_rest_update_challenge($request) {
         $challenges[$slug]['caps'] = array_map(fn($v) => sanitize_text_field((string) $v), $body['caps']);
     }
     update_option('lamprozo_challenges', $challenges);
+
+    // Completing a challenge also completes its ongoing attempt.
+    if (($body['status'] ?? '') === 'completed') {
+        $attempts = lamprozo_get_attempts($slug);
+        $changed  = false;
+        foreach ($attempts as &$a) {
+            if (($a['status'] ?? '') === 'ongoing') { $a['status'] = 'completed'; $changed = true; }
+        }
+        unset($a);
+        if ($changed) {
+            lamprozo_save_attempts($slug, $attempts);
+        }
+    }
     return rest_ensure_response(['success' => true]);
 }
 
