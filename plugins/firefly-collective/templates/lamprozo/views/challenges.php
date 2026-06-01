@@ -1,4 +1,7 @@
-<?php if (!defined('ABSPATH')) exit; ?>
+<?php
+if (!defined('ABSPATH')) exit;
+$theme_keys = function_exists('lamprozo_layout_themes') ? array_keys(lamprozo_layout_themes()) : ['emerald'];
+?>
 <div class="wrap">
 <h1>Challenges</h1>
 <style>
@@ -53,6 +56,16 @@
             <input type="text" id="new-ruleset" placeholder="e.g. Hardcore Nuzlocke">
         </div>
     </div>
+    <div class="form-row">
+        <div>
+            <label>Background theme</label>
+            <select id="new-theme">
+                <?php foreach ($theme_keys as $tk): ?>
+                <option value="<?php echo esc_attr($tk); ?>"><?php echo esc_html(ucfirst($tk)); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
     <div class="form-full">
         <label>Description</label>
         <textarea id="new-desc" placeholder="A short description of this challenge..."></textarea>
@@ -66,6 +79,14 @@
 const apiBase = '<?php echo esc_js(rest_url('lamprozo/v1')); ?>';
 const nonce   = '<?php echo esc_js(wp_create_nonce('wp_rest')); ?>';
 const headers = { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce };
+const themeOptions = <?php echo wp_json_encode($theme_keys); ?>;
+
+function themeSelect(slug, current) {
+    const opts = themeOptions.map(t =>
+        `<option value="${t}"${t === (current||'emerald') ? ' selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`
+    ).join('');
+    return `<select onchange="updateTheme('${esc(slug)}', this.value)" style="flex:1;padding:3px 6px;border:1px solid #ccc;border-radius:4px">${opts}</select>`;
+}
 
 function generateSlug() {
     const title = document.getElementById('new-title').value;
@@ -93,6 +114,10 @@ function renderChallenges(challenges) {
                 <input type="text" value="${esc(c.ruleset||'')}" placeholder="e.g. Hardcore Nuzlocke"
                     style="flex:1;padding:3px 6px;border:1px solid #ccc;border-radius:4px"
                     onchange="updateRuleset('${esc(c.slug)}', this.value)">
+            </p>
+            <p class="meta" style="display:flex;align-items:center;gap:6px">
+                <label style="font-weight:600;white-space:nowrap">BG theme:</label>
+                ${themeSelect(c.slug, c.theme)}
             </p>
             <div class="actions">
                 <a href="/${esc(c.slug)}" target="_blank" class="button button-small">View Page</a>
@@ -130,6 +155,7 @@ async function createChallenge() {
             type:        document.getElementById('new-type').value.trim() || 'ROM Hack',
             gen:         document.getElementById('new-gen').value.trim(),
             ruleset:     document.getElementById('new-ruleset').value.trim(),
+            theme:       document.getElementById('new-theme').value,
             description: document.getElementById('new-desc').value.trim(),
         })
     });
@@ -153,6 +179,15 @@ async function updateRuleset(slug, ruleset) {
     });
     const data = await res.json();
     if (!data.success) alert(data.message || 'Error saving ruleset.');
+}
+
+async function updateTheme(slug, theme) {
+    const res = await fetch(apiBase + '/challenges/' + slug, {
+        method: 'PUT', headers,
+        body: JSON.stringify({ theme })
+    });
+    const data = await res.json();
+    if (!data.success) alert(data.message || 'Error saving theme.');
 }
 
 async function toggleStatus(slug, newStatus) {

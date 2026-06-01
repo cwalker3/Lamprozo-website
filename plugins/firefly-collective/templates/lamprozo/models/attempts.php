@@ -243,6 +243,7 @@ function lamprozo_default_challenges() {
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon SoulSilver ROM hack Sterling Silver.',
             'ruleset'     => 'Hardcore Nuzlocke',
+            'theme'       => 'silver',
             'status'      => 'active',
         ],
         'renegade-platinum' => [
@@ -253,6 +254,7 @@ function lamprozo_default_challenges() {
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon Platinum ROM hack Renegade Platinum.',
             'ruleset'     => 'Hardcore Nuzlocke',
+            'theme'       => 'platinum',
             'status'      => 'on_hold',
         ],
         'platinum-kaizo' => [
@@ -263,6 +265,7 @@ function lamprozo_default_challenges() {
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon Platinum ROM hack Platinum Kaizo.',
             'ruleset'     => 'Hardcore Nuzlocke',
+            'theme'       => 'platinum',
             'status'      => 'on_hold',
         ],
     ];
@@ -285,6 +288,10 @@ function lamprozo_get_challenges_data() {
         }
         if (!isset($challenge['ruleset'])) {
             $challenge['ruleset'] = $defaults[$slug]['ruleset'] ?? '';
+            $updated = true;
+        }
+        if (!isset($challenge['theme'])) {
+            $challenge['theme'] = $defaults[$slug]['theme'] ?? 'emerald';
             $updated = true;
         }
     }
@@ -373,6 +380,7 @@ function lamprozo_rest_create_challenge($request) {
         'gen'         => sanitize_text_field($body['gen'] ?? ''),
         'description' => sanitize_textarea_field($body['description'] ?? ''),
         'ruleset'     => sanitize_text_field($body['ruleset'] ?? ''),
+        'theme'       => sanitize_key($body['theme'] ?? 'emerald'),
     ];
     update_option('lamprozo_challenges', $challenges);
 
@@ -395,7 +403,7 @@ function lamprozo_rest_update_challenge($request) {
     if (!isset($challenges[$slug])) {
         return new WP_Error('not_found', 'Challenge not found', ['status' => 404]);
     }
-    foreach (['title', 'game', 'type', 'gen', 'description', 'status', 'ruleset'] as $field) {
+    foreach (['title', 'game', 'type', 'gen', 'description', 'status', 'ruleset', 'theme'] as $field) {
         if (isset($body[$field])) {
             $challenges[$slug][$field] = sanitize_text_field($body[$field]);
         }

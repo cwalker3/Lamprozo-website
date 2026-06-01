@@ -92,11 +92,13 @@ if (function_exists('lamprozo_get_challenges_data')) {
         </div>
         <p class="ov-hint">
             <strong>Full layout</strong> is a single browser source sized to your whole canvas. It
-            draws the framed game + webcam holes, an embedded Twitch chat, and the status bar — so
-            place it on <em>top</em> and put your game capture, webcam, and a background source
-            <em>behind</em> it (they show through the transparent frames). Chat channel defaults to
-            <code>lamprozo</code>; override with <code>&amp;channel=yourname</code>. Open it from the
-            same domain as this site so Twitch chat loads.
+            draws the animated background, the framed game + webcam holes, an embedded Twitch chat,
+            and the status bar — so place it on <em>top</em> and put your game capture and webcam
+            <em>behind</em> it (they show through the transparent frames). The background
+            <strong>auto-themes per game</strong> (set each challenge's <em>BG theme</em> on the
+            Challenges page); override with <code>&amp;bg=emerald</code>. Chat channel defaults to
+            <code>lamprozo</code> (override <code>&amp;channel=</code>); open from the same domain as
+            this site so chat connects.
         </p>
         <p class="ov-hint">
             Add a <strong>Browser Source</strong> in OBS and paste one of these URLs. The

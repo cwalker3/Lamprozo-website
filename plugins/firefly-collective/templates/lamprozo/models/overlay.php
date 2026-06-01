@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) { exit; }
  * Returns blanks when there's no active challenge.
  */
 function lamprozo_overlay_resolve() {
-    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => ''];
+    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'theme' => 'emerald'];
 
     if (!function_exists('lamprozo_get_challenges_data')) {
         return $blank;
@@ -60,6 +60,7 @@ function lamprozo_overlay_resolve() {
         'cap'     => $ongoing['cap']    ?? '',
         'deaths'  => $ongoing ? (string) lamprozo_attempt_deaths($ongoing) : '0',
         'badges'  => $ongoing['badges'] ?? '',
+        'theme'   => $active['theme']   ?? 'emerald',
     ];
 }
 
@@ -214,6 +215,25 @@ function lamprozo_render_overlay_page() {
 
 // ── Full GBA stream layout (OBS Browser Source) ─────────────────────────────────
 
+/**
+ * Animated-background color presets. Each drives the canvas backdrop: `base` is
+ * the solid fill, `hue`/`sat` generate the drifting orbs + sparkle particles.
+ * A challenge's `theme` field picks one of these (see the admin Challenges page).
+ */
+function lamprozo_layout_themes() {
+    return [
+        'emerald'  => ['base' => '#071a0a', 'hue' => 145, 'sat' => 60],
+        'platinum' => ['base' => '#0b0a16', 'hue' => 265, 'sat' => 42],
+        'silver'   => ['base' => '#0e1013', 'hue' => 210, 'sat' => 12],
+        'crystal'  => ['base' => '#06141a', 'hue' => 188, 'sat' => 60],
+        'fire'     => ['base' => '#1a0707', 'hue' => 8,   'sat' => 70],
+        'water'    => ['base' => '#06101f', 'hue' => 215, 'sat' => 65],
+        'gold'     => ['base' => '#1a1405', 'hue' => 45,  'sat' => 65],
+        'ruby'     => ['base' => '#1a060a', 'hue' => 350, 'sat' => 65],
+        'sapphire' => ['base' => '#060a1a', 'hue' => 225, 'sat' => 65],
+    ];
+}
+
 add_action('template_redirect', function() {
     if (!isset($_GET['lamprozo_layout'])) { return; }
     lamprozo_render_layout_page();
@@ -229,6 +249,11 @@ function lamprozo_render_layout_page() {
     // WebSocket connection (see the chat client script) — no login, no parent-
     // domain restriction. Channel overridable via ?channel=.
     $channel = isset($_GET['channel']) ? sanitize_key($_GET['channel']) : 'lamprozo';
+
+    // Background theme: ?bg= override, else the active challenge's theme, else emerald.
+    $themes    = lamprozo_layout_themes();
+    $theme_key = isset($_GET['bg']) ? sanitize_key($_GET['bg']) : ($overlay['theme'] ?? 'emerald');
+    if (!isset($themes[$theme_key])) { $theme_key = 'emerald'; }
 
     header('Content-Type: text/html; charset=utf-8');
     nocache_headers();
@@ -258,7 +283,8 @@ function lamprozo_render_layout_page() {
       background: transparent; overflow: hidden;
       font-family: "Inter", "Segoe UI", Arial, sans-serif; color: var(--text);
     }
-    .stage { position: absolute; inset: 0; }
+    #bg { position: absolute; inset: 0; z-index: 0; }
+    .stage { position: absolute; inset: 0; z-index: 1; }
 
     /* Framed, transparent regions — OBS sources sit BEHIND the browser source. */
     .region {
@@ -273,7 +299,10 @@ function lamprozo_render_layout_page() {
       color: var(--muted); text-shadow: 0 1px 3px rgba(0,0,0,0.6);
     }
 
-    .region--gba    { left: 2%;    top: 7.8%; width: 69.5%;  height: 74.2%; }
+    /* GBA screen is 3:2 (240x160). On a 16:9 canvas, width% = 0.84375 * height%,
+       so 62.6% x 74.2% holds a true 3:2 box with no stretching. Centered in the
+       left column; the status bar below matches its width. */
+    .region--gba    { left: 5.45%; top: 7.8%; width: 62.6%;  height: 74.2%; }
     .region--cam    { left: 74.1%; top: 7.8%; width: 23.75%; height: 29.9%; }
     .region--chat   { left: 74.1%; top: 46.5%; width: 23.75%; height: 45.5%; overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
 
@@ -292,7 +321,7 @@ function lamprozo_render_layout_page() {
 
     /* Status bar, directly under the GBA screen */
     .status {
-      position: absolute; left: 2%; top: 84%; width: 69.5%; height: 8%;
+      position: absolute; left: 5.45%; top: 84%; width: 62.6%; height: 8%;
       display: flex; align-items: stretch; gap: 1vw;
       background: rgba(12, 16, 28, 0.88);
       border: 0.22vh solid var(--border); border-radius: 1.2vh;
@@ -319,6 +348,7 @@ function lamprozo_render_layout_page() {
   </style>
 </head>
 <body>
+  <canvas id="bg"></canvas>
   <div class="stage">
     <div class="region region--gba"></div>
 
@@ -343,8 +373,114 @@ function lamprozo_render_layout_page() {
   </div>
 
   <script>
-    // Live-updating status — polls the public REST endpoint so edits in WP Admin
-    // appear on stream within a few seconds (no OBS refresh needed).
+    // ── Background theme (per active game) ─────────────────────────────────────
+    var THEMES       = <?php echo wp_json_encode($themes); ?>;
+    var THEME_LOCKED = <?php echo isset($_GET['bg']) ? 'true' : 'false'; ?>;
+    var themeName    = <?php echo wp_json_encode($theme_key); ?>;
+    var THEME        = THEMES[themeName] || THEMES.emerald;
+
+    // ── Animated canvas background (drifting orbs + sparkles, scanlines, vignette).
+    // Transparent holes are punched for the game + webcam so OBS captures placed
+    // BEHIND this browser source show through.
+    var bgCanvas = document.getElementById('bg');
+    var bgCtx    = bgCanvas.getContext('2d');
+    function bgResize() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
+    bgResize(); window.addEventListener('resize', bgResize);
+
+    var HOLES = [
+      { x: 5.45, y: 7.8, w: 62.6,  h: 74.2 },   // GBA screen
+      { x: 74.1, y: 7.8, w: 23.75, h: 29.9 }    // webcam
+    ];
+    var ORBS = [
+      { ox: 0.15, oy: 0.35, r: 0.30, hueOff:  0,  phase: 0.00 },
+      { ox: 0.80, oy: 0.65, r: 0.26, hueOff: 10,  phase: 1.80 },
+      { ox: 0.50, oy: 0.15, r: 0.20, hueOff: -10, phase: 3.50 },
+      { ox: 0.30, oy: 0.80, r: 0.23, hueOff: 15,  phase: 2.20 }
+    ];
+    var PARTICLES = Array.from({ length: 90 }, function() {
+      return {
+        x: Math.random(), y: Math.random(),
+        size: Math.random() * 2.5 + 0.4,
+        speed: Math.random() * 0.00012 + 0.00003,
+        drift: (Math.random() - 0.5) * 0.00008,
+        opacity: Math.random() * 0.55 + 0.1,
+        pulseRate: Math.random() * 0.0015 + 0.0005,
+        pulsePhase: Math.random() * Math.PI * 2,
+        hueOff: Math.random() * 50 - 15,
+        lightness: 55 + Math.random() * 30
+      };
+    });
+    function roundRectPath(c, x, y, w, h, r) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y,     x + w, y + h, r);
+      c.arcTo(x + w, y + h, x,     y + h, r);
+      c.arcTo(x,     y + h, x,     y,     r);
+      c.arcTo(x,     y,     x + w, y,     r);
+      c.closePath();
+    }
+    function bgDraw(ts) {
+      var W = bgCanvas.width, H = bgCanvas.height, t = ts * 0.001;
+      var hue = THEME.hue, sat = THEME.sat;
+
+      bgCtx.globalCompositeOperation = 'source-over';
+      bgCtx.fillStyle = THEME.base;
+      bgCtx.fillRect(0, 0, W, H);
+
+      for (var i = 0; i < ORBS.length; i++) {
+        var o = ORBS[i];
+        var x = (o.ox + Math.sin(t * 0.07 + o.phase) * 0.08) * W;
+        var y = (o.oy + Math.cos(t * 0.05 + o.phase) * 0.06) * H;
+        var r = o.r * Math.max(W, H);
+        var a = 0.26 + Math.sin(t * 0.09 + o.phase) * 0.05;
+        var g = bgCtx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0,   'hsla(' + (hue + o.hueOff) + ',' + sat + '%,30%,' + a + ')');
+        g.addColorStop(0.5, 'hsla(' + (hue + o.hueOff) + ',' + Math.max(sat - 10, 8) + '%,20%,' + (a * 0.5) + ')');
+        g.addColorStop(1,   'transparent');
+        bgCtx.fillStyle = g; bgCtx.fillRect(0, 0, W, H);
+      }
+
+      for (var j = 0; j < PARTICLES.length; j++) {
+        var p = PARTICLES[j];
+        var pulse = 0.65 + Math.sin(t * p.pulseRate * 1000 + p.pulsePhase) * 0.35;
+        var alpha = p.opacity * pulse;
+        var px = p.x * W, py = p.y * H, glowR = p.size * 5;
+        var ph = hue + p.hueOff, psat = Math.min(sat + 20, 90);
+        var pg = bgCtx.createRadialGradient(px, py, 0, px, py, glowR);
+        pg.addColorStop(0,   'hsla(' + ph + ',' + psat + '%,' + p.lightness + '%,' + alpha + ')');
+        pg.addColorStop(0.4, 'hsla(' + ph + ',' + (psat - 10) + '%,' + (p.lightness - 10) + '%,' + (alpha * 0.4) + ')');
+        pg.addColorStop(1,   'transparent');
+        bgCtx.beginPath(); bgCtx.arc(px, py, glowR, 0, Math.PI * 2); bgCtx.fillStyle = pg; bgCtx.fill();
+        bgCtx.beginPath(); bgCtx.arc(px, py, p.size * 0.5, 0, Math.PI * 2);
+        bgCtx.fillStyle = 'hsla(' + ph + ',90%,75%,' + (alpha * 0.6) + ')'; bgCtx.fill();
+        p.y -= p.speed; p.x += p.drift;
+        if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
+        if (p.x < -0.02) p.x = 1.02;
+        if (p.x > 1.02) p.x = -0.02;
+      }
+
+      bgCtx.fillStyle = 'rgba(0,0,0,0.04)';
+      for (var sy = 0; sy < H; sy += 4) bgCtx.fillRect(0, sy, W, 1);
+
+      var vg = bgCtx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+      vg.addColorStop(0, 'transparent'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+      bgCtx.fillStyle = vg; bgCtx.fillRect(0, 0, W, H);
+
+      bgCtx.globalCompositeOperation = 'destination-out';
+      bgCtx.fillStyle = '#000';
+      var rr = 0.01 * H;
+      for (var k = 0; k < HOLES.length; k++) {
+        var hl = HOLES[k];
+        roundRectPath(bgCtx, hl.x / 100 * W, hl.y / 100 * H, hl.w / 100 * W, hl.h / 100 * H, rr);
+        bgCtx.fill();
+      }
+      bgCtx.globalCompositeOperation = 'source-over';
+
+      requestAnimationFrame(bgDraw);
+    }
+    requestAnimationFrame(bgDraw);
+
+    // ── Live-updating status — polls the public REST endpoint ──────────────────
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths", "badges"];
 
@@ -355,6 +491,11 @@ function lamprozo_render_layout_page() {
           el.textContent = data[key];
         }
       });
+      // Re-theme the background live when the active game changes (unless ?bg= locked it).
+      if (!THEME_LOCKED && data.theme && THEMES[data.theme] && data.theme !== themeName) {
+        themeName = data.theme;
+        THEME = THEMES[themeName];
+      }
     }
     function poll() {
       fetch(REST_URL, { cache: "no-store" })
