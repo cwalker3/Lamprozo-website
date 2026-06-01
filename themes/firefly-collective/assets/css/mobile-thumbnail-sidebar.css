@@ -1,0 +1,106 @@
+/**
+ * Firefly Mobile Featured Image — sidebar styles.
+ * Lives inside the native "Featured image" panel as a section
+ * below the desktop featured image picker.
+ */
+
+.firefly-mobile-thumbnail-section {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid #e0e0e0;
+}
+
+.firefly-mobile-thumbnail__label {
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1.4;
+	text-transform: uppercase;
+	color: #1e1e1e;
+	margin: 0 0 4px;
+}
+
+.firefly-mobile-thumbnail__help {
+	font-size: 12px;
+	color: #757575;
+	margin: 0 0 12px;
+	line-height: 1.4;
+}
+
+/* Empty-state CTA */
+.firefly-mobile-thumbnail__set {
+	width: 100%;
+	justify-content: center;
+}
+
+/* Selected state — thumbnail with hover overlay */
+.firefly-mobile-thumbnail__display {
+	position: relative;
+	display: block;
+	margin: 0;
+	border-radius: 2px;
+	overflow: hidden;
+	background: #f0f0f0;
+	cursor: pointer;
+	line-height: 0;
+}
+
+.firefly-mobile-thumbnail__display:focus-within,
+.firefly-mobile-thumbnail__display:hover {
+	box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #007cba);
+}
+
+.firefly-mobile-thumbnail__image {
+	display: block;
+	width: 100%;
+	height: auto;
+	object-fit: cover;
+	max-height: 320px;
+}
+
+/* Replace/Remove hover overlay */
+.firefly-mobile-thumbnail__hover {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	background: rgba(0, 0, 0, 0.55);
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	padding: 12px;
+	box-sizing: border-box;
+}
+
+.firefly-mobile-thumbnail__display:hover .firefly-mobile-thumbnail__hover,
+.firefly-mobile-thumbnail__display:focus-within .firefly-mobile-thumbnail__hover {
+	opacity: 1;
+}
+
+.firefly-mobile-thumbnail__btn {
+	min-width: 110px;
+	justify-content: center;
+}
+
+.firefly-mobile-thumbnail__hover .components-button {
+	background: #fff;
+}
+
+.firefly-mobile-thumbnail__hover .components-button.is-destructive {
+	background: #fff;
+	color: #b32d2e;
+}
+
+/* Breakpoint input */
+.firefly-mobile-thumbnail__breakpoint {
+	margin-top: 12px;
+}
+
+.firefly-mobile-thumbnail__breakpoint .components-base-control__field {
+	margin-bottom: 4px;
+}
+
+.firefly-mobile-thumbnail__breakpoint input[type='number'] {
+	width: 100%;
+}
