@@ -48,6 +48,10 @@
             <label>Generation</label>
             <input type="text" id="new-gen" placeholder="e.g. II">
         </div>
+        <div>
+            <label>Ruleset</label>
+            <input type="text" id="new-ruleset" placeholder="e.g. Hardcore Nuzlocke">
+        </div>
     </div>
     <div class="form-full">
         <label>Description</label>
@@ -84,6 +88,12 @@ function renderChallenges(challenges) {
             <h3>${esc(c.title)} ${badge}</h3>
             <p class="meta">${esc(c.type)} &middot; Gen ${esc(c.gen)} &middot; <code>${esc(c.slug)}</code></p>
             <p class="desc">${esc(c.description)}</p>
+            <p class="meta" style="display:flex;align-items:center;gap:6px">
+                <label style="font-weight:600;white-space:nowrap">Ruleset:</label>
+                <input type="text" value="${esc(c.ruleset||'')}" placeholder="e.g. Hardcore Nuzlocke"
+                    style="flex:1;padding:3px 6px;border:1px solid #ccc;border-radius:4px"
+                    onchange="updateRuleset('${esc(c.slug)}', this.value)">
+            </p>
             <div class="actions">
                 <a href="/${esc(c.slug)}" target="_blank" class="button button-small">View Page</a>
                 <a href="/wp-admin/admin.php?page=lamprozo-attempts&challenge=${esc(c.slug)}" class="button button-small">Attempts</a>
@@ -119,13 +129,14 @@ async function createChallenge() {
             game:        document.getElementById('new-game').value.trim() || title,
             type:        document.getElementById('new-type').value.trim() || 'ROM Hack',
             gen:         document.getElementById('new-gen').value.trim(),
+            ruleset:     document.getElementById('new-ruleset').value.trim(),
             description: document.getElementById('new-desc').value.trim(),
         })
     });
     const data = await res.json();
     if (data.success) {
         status.textContent = `Created! Visit /${slug}`;
-        ['new-title','new-slug','new-game','new-type','new-gen','new-desc'].forEach(id => {
+        ['new-title','new-slug','new-game','new-type','new-gen','new-ruleset','new-desc'].forEach(id => {
             const el = document.getElementById(id);
             el.value = id === 'new-type' ? 'ROM Hack' : '';
         });
@@ -133,6 +144,15 @@ async function createChallenge() {
     } else {
         status.textContent = data.message || 'Error creating challenge.';
     }
+}
+
+async function updateRuleset(slug, ruleset) {
+    const res = await fetch(apiBase + '/challenges/' + slug, {
+        method: 'PUT', headers,
+        body: JSON.stringify({ ruleset })
+    });
+    const data = await res.json();
+    if (!data.success) alert(data.message || 'Error saving ruleset.');
 }
 
 async function toggleStatus(slug, newStatus) {

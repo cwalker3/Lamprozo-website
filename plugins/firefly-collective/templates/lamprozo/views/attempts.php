@@ -39,6 +39,17 @@
 .vod-url-input { flex:1; }
 .vod-dur-input { width:90px; }
 .vod-summary-input { width:100%; padding:5px 7px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:0.9em; resize:vertical; min-height:50px; }
+.box-grid { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+.box-mon { display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
+.box-mon--dead { opacity:0.65; background:#f7eaea; }
+.box-mon__sprite { width:40px; height:40px; image-rendering:pixelated; object-fit:contain; flex-shrink:0; }
+.box-mon__species { width:130px; }
+.box-mon__nick { width:120px; }
+.box-mon__kills { width:64px; }
+.box-mon input { padding:4px 7px; border:1px solid #ccc; border-radius:4px; }
+.box-import { margin-top:8px; }
+.box-import summary { cursor:pointer; font-size:0.85em; color:#2271b1; }
+.box-import__text { width:100%; min-height:90px; margin:6px 0; font-family:monospace; font-size:0.82em; padding:6px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
 </style>
 
 <script>
@@ -70,6 +81,23 @@
         const split  = attempt.split || '';
         const notes  = attempt.notes || '';
         const vods   = attempt.vods || [];
+        const cap    = attempt.cap || '';
+        const badges = attempt.badges || '';
+        const box    = attempt.box || [];
+        const deadCount = box.filter(m => m.alive === false).length;
+
+        const boxRows = box.map((m, bi) => `
+            <div class="box-mon box-mon--${m.alive === false ? 'dead' : 'alive'}">
+                <img class="box-mon__sprite" src="${spriteUrl(m.species)}" alt="" onerror="this.style.visibility='hidden'">
+                <input class="box-mon__species" type="text" placeholder="Species" value="${esc(m.species||'')}"
+                    onchange="updateBoxMon(${i},${bi},'species',this.value)">
+                <input class="box-mon__nick" type="text" placeholder="Nickname" value="${esc(m.nickname||'')}"
+                    onchange="updateBoxMon(${i},${bi},'nickname',this.value)">
+                <input class="box-mon__kills" type="number" min="0" title="Kills" value="${m.kills||0}"
+                    onchange="updateBoxMon(${i},${bi},'kills',this.value)">
+                <button class="button button-small" onclick="toggleBoxAlive(${i},${bi})">${m.alive === false ? '💀 Dead' : 'Alive'}</button>
+                <button class="button button-small button-link-delete" onclick="removeBoxMon(${i},${bi})">✕</button>
+            </div>`).join('');
 
         const vodRows = vods.map((v, vi) => `
             <div class="vod-item">
@@ -99,13 +127,23 @@
             </div>
             <div class="attempt-card__body ${isOpen ? 'open' : ''}">
                 <div class="attempt-card__row">
-                    <div class="attempt-field" style="min-width:140px;max-width:180px">
+                    <div class="attempt-field" style="min-width:130px;max-width:160px">
                         <label>Status</label>
                         <select onchange="updateField(${i},'status',this.value)">
                             <option value="ongoing"   ${attempt.status==='ongoing'   ? 'selected':''}>Ongoing</option>
                             <option value="failed"    ${attempt.status==='failed'    ? 'selected':''}>Wiped</option>
                             <option value="completed" ${attempt.status==='completed' ? 'selected':''}>Completed</option>
                         </select>
+                    </div>
+                    <div class="attempt-field" style="min-width:100px;max-width:130px">
+                        <label>Level cap</label>
+                        <input type="text" placeholder="e.g. 16" value="${esc(cap)}"
+                            onchange="updateField(${i},'cap',this.value)">
+                    </div>
+                    <div class="attempt-field" style="min-width:100px;max-width:130px">
+                        <label>Badges</label>
+                        <input type="text" placeholder="e.g. 3/8" value="${esc(badges)}"
+                            onchange="updateField(${i},'badges',this.value)">
                     </div>
                     <div class="attempt-field">
                         <label>Split reached</label>
@@ -125,13 +163,21 @@
                     <button class="button button-small" onclick="addVod(${i})">+ Add VOD</button>
                 </div>
                 <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
-                    <label style="font-size:0.85em;font-weight:600;color:#555;display:block;margin-bottom:6px">Fragsheet <span style="font-weight:400;color:#888">(HZLA calc JSON)</span></label>
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <input type="file" accept=".json" onchange="loadFragsheetFile(${i},this)" style="flex:1">
-                        ${attempt.fragsheet
-                            ? `<span style="color:#00a32a;font-size:0.85em">✓ ${Object.keys(attempt.fragsheet).length} Pokémon loaded</span>
-                               <button class="button button-small button-link-delete" onclick="clearFragsheet(${i})">Remove</button>`
-                            : '<span style="color:#888;font-size:0.85em">No fragsheet</span>'}
+                    <label style="font-size:0.85em;font-weight:600;color:#555;display:block;margin-bottom:6px">
+                        Box <span style="font-weight:400;color:#888">(${box.length} Pokémon, ${deadCount} dead)</span>
+                    </label>
+                    <div class="box-grid">${boxRows}</div>
+                    <button class="button button-small" onclick="addBoxMon(${i})">+ Add Pokémon</button>
+                    <div class="box-import">
+                        <details>
+                            <summary>Import…</summary>
+                            <textarea id="showdown-${i}" class="box-import__text" placeholder="Paste a Pokémon Showdown team export here, then click Import. Re-importing merges — it adds new mons and keeps any you've marked dead."></textarea>
+                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                                <button class="button button-small" onclick="importShowdown(${i})">Import Showdown</button>
+                                <span style="color:#ccc">|</span>
+                                <label style="font-size:0.85em;color:#555">HZLA JSON: <input type="file" accept=".json" onchange="loadFragsheetFile(${i},this)"></label>
+                            </div>
+                        </details>
                     </div>
                 </div>
                 <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
@@ -165,14 +211,100 @@
             });
     };
 
-    window.clearFragsheet = (i) => { attempts[i].fragsheet = null; render(); };
+    // ── Box helpers ──────────────────────────────────────────────────────────
+    function spriteSlug(s) { return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+    function spriteUrl(s)  { return 'https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/' + spriteSlug(s) + '.png'; }
+
+    // Parse a Pokémon Showdown team export into [{species, nickname, alive, nature, ability}].
+    function parseShowdown(text) {
+        const mons = [];
+        String(text || '').split(/\n\s*\n/).forEach(block => {
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            if (!lines.length) return;
+            let head = lines[0].split(' @ ')[0].trim();   // drop held item
+            // Strip trailing gender marker "(M)" / "(F)".
+            head = head.replace(/\s*\((?:M|F)\)\s*$/i, '').trim();
+            let species = head, nickname = '';
+            const m = head.match(/^(.*?)\s*\((.+)\)\s*$/);
+            if (m) { nickname = m[1].trim(); species = m[2].trim(); }
+            if (!species) return;
+            const entry = { species, nickname, alive: true };
+            lines.slice(1).forEach(l => {
+                const am = l.match(/^Ability:\s*(.+)$/i);
+                if (am) entry.ability = am[1].trim();
+                const nm = l.match(/^(.+?)\s+Nature$/i);
+                if (nm) entry.nature = nm[1].trim();
+            });
+            mons.push(entry);
+        });
+        return mons;
+    }
+
+    // JS port of lamprozo_box_from_fragsheet(): HZLA fragsheet object -> box array.
+    function boxFromFragsheet(fragsheet) {
+        if (!fragsheet || typeof fragsheet !== 'object') return [];
+        const shadow = {};
+        for (const [species, mon] of Object.entries(fragsheet)) {
+            const frag    = parseInt(mon.fragCount, 10) || 0;
+            const prevo   = parseInt(mon.prevoFragCount, 10) || 0;
+            const batchId = (mon.setData && mon.setData['My Box'] && mon.setData['My Box'].boxImportBatchId) || '';
+            if (prevo > 0 && prevo > frag) shadow[species] = true;
+            else if (frag === 0 && prevo === 0 && batchId === '') shadow[species] = true;
+        }
+        const box = [];
+        for (const [species, mon] of Object.entries(fragsheet)) {
+            if (mon.hide) continue;
+            if (shadow[species]) continue;
+            const myBox = (mon.setData && mon.setData['My Box']) || {};
+            const entry = {
+                species,
+                nickname: mon.nn || '',
+                alive: mon.alive === true,
+                kills: (parseInt(mon.fragCount, 10) || 0) + (parseInt(mon.prevoFragCount, 10) || 0),
+            };
+            if (myBox.met)     entry.met     = myBox.met;
+            if (myBox.nature)  entry.nature  = myBox.nature;
+            if (myBox.ability) entry.ability = myBox.ability;
+            if (myBox.ivs)     entry.ivs     = myBox.ivs;
+            box.push(entry);
+        }
+        box.sort((a, b) => (b.kills || 0) - (a.kills || 0));
+        return box;
+    }
+
+    window.importShowdown = (i) => {
+        const text = document.getElementById('showdown-' + i).value;
+        const parsed = parseShowdown(text);
+        if (!parsed.length) { notice('No Pokémon found in that paste.', 'warning'); return; }
+        attempts[i].box = attempts[i].box || [];
+        let added = 0;
+        parsed.forEach(p => {
+            const dup = attempts[i].box.find(e =>
+                (e.species||'').toLowerCase() === p.species.toLowerCase() &&
+                (e.nickname||'').toLowerCase() === (p.nickname||'').toLowerCase());
+            if (dup) {
+                if (!dup.nature && p.nature)   dup.nature = p.nature;
+                if (!dup.ability && p.ability) dup.ability = p.ability;
+            } else {
+                attempts[i].box.push(p);
+                added++;
+            }
+        });
+        notice(`Imported ${added} new Pokémon (${parsed.length - added} already in box).`);
+        render();
+    };
+
     window.loadFragsheetFile = (i, input) => {
         const file = input.files[0];
         if (!file) return;
+        if ((attempts[i].box || []).length && !confirm('Replace the current box with this HZLA import?')) {
+            input.value = ''; return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                attempts[i].fragsheet = JSON.parse(e.target.result);
+                attempts[i].box = boxFromFragsheet(JSON.parse(e.target.result));
+                delete attempts[i].fragsheet;
                 render();
             } catch(err) {
                 alert('Invalid JSON file: ' + err.message);
@@ -180,6 +312,16 @@
         };
         reader.readAsText(file);
     };
+
+    window.addBoxMon    = (i) => { attempts[i].box = attempts[i].box || []; attempts[i].box.push({species:'',nickname:'',alive:true,kills:0}); render(); };
+    window.removeBoxMon = (i, bi) => { attempts[i].box.splice(bi, 1); render(); };
+    window.toggleBoxAlive = (i, bi) => { attempts[i].box[bi].alive = attempts[i].box[bi].alive === false; render(); };
+    window.updateBoxMon = (i, bi, key, val) => {
+        if (key === 'kills') val = parseInt(val, 10) || 0;
+        attempts[i].box[bi][key] = val;
+        if (key === 'species') render(); // refresh sprite
+    };
+
     window.toggleCard    = (i) => { openCards.has(i) ? openCards.delete(i) : openCards.add(i); render(); };
     window.updateField   = (i, key, val) => { attempts[i][key] = val; };
     window.updateVod     = (i, vi, key, val) => { attempts[i].vods[vi][key] = val; };

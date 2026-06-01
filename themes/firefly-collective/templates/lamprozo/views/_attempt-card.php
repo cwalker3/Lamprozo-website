@@ -45,53 +45,31 @@ if ($total_seconds > 0) {
         : sprintf('%dm %ds', $m, $s);
 }
 
-// Parse fragsheet upfront so both header and body can use it
+// Build alive/dead lists from the universal box. Falls back to deriving from a
+// legacy HZLA fragsheet for any attempt that predates the box migration.
+$box = $attempt['box'] ?? [];
+if (empty($box) && !empty($attempt['fragsheet']) && function_exists('lamprozo_box_from_fragsheet')) {
+    $box = lamprozo_box_from_fragsheet($attempt['fragsheet']);
+}
+
 $fragsheet_alive = [];
 $fragsheet_dead  = [];
-$fragsheet = $attempt['fragsheet'] ?? null;
-if (!empty($fragsheet)) {
-    // HZLA leaves behind two kinds of "shadow" entries when a mon evolves:
-    //   (a) Mirrored: Croconaw co-exists with Feraligatr with prevoFragCount
-    //       and fragCount swapped. The prevo has prevoFragCount > fragCount.
-    //   (b) Stub: zero-stat prevo placeholders left behind without a
-    //       boxImportBatchId (e.g. Onix, Gligar, Duskull, Togetic). HZLA's
-    //       real box entries always include a boxImportBatchId; placeholders
-    //       generated for evolved prevos don't.
-    // Hide both kinds; merge their count into the evolved form via the
-    // fragCount + prevoFragCount sum below.
-    $shadow_prevos = [];
-    foreach ($fragsheet as $species => $mon) {
-        $frag    = (int) ($mon['fragCount']      ?? 0);
-        $prevo   = (int) ($mon['prevoFragCount'] ?? 0);
-        $batchId = $mon['setData']['My Box']['boxImportBatchId'] ?? '';
-        if ($prevo > 0 && $prevo > $frag) {
-            $shadow_prevos[$species] = true;
-        } elseif ($frag === 0 && $prevo === 0 && $batchId === '') {
-            $shadow_prevos[$species] = true;
-        }
-    }
-
-    foreach ($fragsheet as $species => $mon) {
-        if ($mon['hide'] ?? false) continue;
-        if (isset($shadow_prevos[$species])) continue;
-        $ivs = $mon['setData']['My Box']['ivs'] ?? [];
-        $entry = [
-            'species'   => $species,
-            'nickname'  => $mon['nn'] ?? null,
-            'fragCount' => (int) ($mon['fragCount'] ?? 0) + (int) ($mon['prevoFragCount'] ?? 0),
-            'frags'     => $mon['frags'] ?? [],
-            'met'       => $mon['setData']['My Box']['met'] ?? '',
-            'nature'    => $mon['setData']['My Box']['nature'] ?? '',
-            'ability'   => $mon['setData']['My Box']['ability'] ?? '',
-            'alive'     => $mon['alive'] ?? false,
-            'ivs'       => $ivs,
-        ];
-        if ($entry['alive']) $fragsheet_alive[] = $entry;
-        else                 $fragsheet_dead[]  = $entry;
-    }
-    usort($fragsheet_alive, fn($a, $b) => $b['fragCount'] - $a['fragCount']);
-    usort($fragsheet_dead,  fn($a, $b) => $b['fragCount'] - $a['fragCount']);
+foreach ($box as $mon) {
+    $entry = [
+        'species'   => $mon['species']  ?? '',
+        'nickname'  => $mon['nickname'] ?? null,
+        'fragCount' => (int) ($mon['kills'] ?? 0),
+        'met'       => $mon['met']     ?? '',
+        'nature'    => $mon['nature']  ?? '',
+        'ability'   => $mon['ability'] ?? '',
+        'alive'     => (bool) ($mon['alive'] ?? false),
+        'ivs'       => $mon['ivs'] ?? [],
+    ];
+    if ($entry['alive']) $fragsheet_alive[] = $entry;
+    else                 $fragsheet_dead[]  = $entry;
 }
+usort($fragsheet_alive, fn($a, $b) => $b['fragCount'] - $a['fragCount']);
+usort($fragsheet_dead,  fn($a, $b) => $b['fragCount'] - $a['fragCount']);
 ?>
 <div class="attempt-card attempt-card--<?php echo esc_attr($attempt['status']); ?><?php echo $is_ongoing ? ' attempt-card--open' : ''; ?>">
     <button class="attempt-card__header" onclick="this.closest('.attempt-card').classList.toggle('attempt-card--open')" aria-expanded="<?php echo $is_ongoing ? 'true' : 'false'; ?>">
@@ -186,7 +164,7 @@ if (!empty($fragsheet)) {
                          onmouseleave="lamprozoHideMonTooltip()">
                         <img class="frag-mon__sprite" src="https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/<?php echo esc_attr($sprite_slug); ?>.png"
                              alt="<?php echo esc_attr($mon['species']); ?>" onerror="this.style.display='none'">
-                        <span class="frag-mon__name"><?php echo esc_html($mon['nickname'] ?? $mon['species']); ?></span>
+                        <span class="frag-mon__name"><?php echo esc_html(!empty($mon['nickname']) ? $mon['nickname'] : $mon['species']); ?></span>
                         <?php if ($mon['fragCount'] > 0): ?>
                         <span class="frag-mon__kills">💀 <?php echo $mon['fragCount']; ?></span>
                         <?php endif; ?>

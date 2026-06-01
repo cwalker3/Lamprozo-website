@@ -126,22 +126,111 @@ function ffc_attempts_dashboard() {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function lamprozo_get_attempts($challenge) {
-    $data = get_option('lamprozo_attempts_' . sanitize_key($challenge), null);
+    $key  = 'lamprozo_attempts_' . sanitize_key($challenge);
+    $data = get_option($key, null);
+
+    $seeded = false;
     if ($data === null) {
         // Seed from PHP data file on first load
         $data_file = get_template_directory() . '/templates/lamprozo/data/' . sanitize_key($challenge) . '.php';
         if (file_exists($data_file)) {
-            require $data_file;
-            update_option('lamprozo_attempts_' . sanitize_key($challenge), $attempts);
-            return $attempts;
+            require $data_file;   // provides $attempts
+            $data   = $attempts;
+            $seeded = true;
+        } else {
+            return [];
         }
-        return [];
     }
+
+    // Migrate legacy HZLA `fragsheet` data into the universal `box` model.
+    $dirty = false;
+    foreach ($data as &$attempt) {
+        if (!isset($attempt['box']) && !empty($attempt['fragsheet'])) {
+            $attempt['box'] = lamprozo_box_from_fragsheet($attempt['fragsheet']);
+            $dirty = true;
+        }
+    }
+    unset($attempt);
+
+    if ($seeded || $dirty) {
+        update_option($key, $data);
+    }
+
     return $data;
 }
 
 function lamprozo_save_attempts($challenge, $attempts) {
     update_option('lamprozo_attempts_' . sanitize_key($challenge), $attempts);
+}
+
+/**
+ * Convert a legacy HZLA fragsheet (species-keyed object) into a flat box array.
+ * Filters HZLA "shadow prevo" artifacts (mirrored + zero-stat stub placeholders
+ * left behind on evolution) and merges their kill counts into the evolved form.
+ * Ported from the public _attempt-card.php renderer so the box is clean at rest.
+ */
+function lamprozo_box_from_fragsheet($fragsheet) {
+    if (!is_array($fragsheet) || empty($fragsheet)) {
+        return [];
+    }
+
+    $shadow_prevos = [];
+    foreach ($fragsheet as $species => $mon) {
+        $frag    = (int) ($mon['fragCount']      ?? 0);
+        $prevo   = (int) ($mon['prevoFragCount'] ?? 0);
+        $batchId = $mon['setData']['My Box']['boxImportBatchId'] ?? '';
+        if ($prevo > 0 && $prevo > $frag) {
+            $shadow_prevos[$species] = true;
+        } elseif ($frag === 0 && $prevo === 0 && $batchId === '') {
+            $shadow_prevos[$species] = true;
+        }
+    }
+
+    $box = [];
+    foreach ($fragsheet as $species => $mon) {
+        if ($mon['hide'] ?? false) {
+            continue;
+        }
+        if (isset($shadow_prevos[$species])) {
+            continue;
+        }
+        $entry = [
+            'species'  => $species,
+            'nickname' => $mon['nn'] ?? '',
+            'alive'    => (bool) ($mon['alive'] ?? false),
+            'kills'    => (int) ($mon['fragCount'] ?? 0) + (int) ($mon['prevoFragCount'] ?? 0),
+        ];
+        $met     = $mon['setData']['My Box']['met']     ?? '';
+        $nature  = $mon['setData']['My Box']['nature']  ?? '';
+        $ability = $mon['setData']['My Box']['ability'] ?? '';
+        $ivs     = $mon['setData']['My Box']['ivs']     ?? [];
+        if ($met)          { $entry['met']     = $met; }
+        if ($nature)       { $entry['nature']  = $nature; }
+        if ($ability)      { $entry['ability'] = $ability; }
+        if (!empty($ivs))  { $entry['ivs']     = $ivs; }
+        $box[] = $entry;
+    }
+
+    usort($box, fn($a, $b) => ($b['kills'] ?? 0) - ($a['kills'] ?? 0));
+    return $box;
+}
+
+/**
+ * Count of dead box members in an attempt. Falls back to deriving the box from a
+ * legacy fragsheet if `box` hasn't been materialized yet.
+ */
+function lamprozo_attempt_deaths($attempt) {
+    $box = $attempt['box'] ?? [];
+    if (empty($box) && !empty($attempt['fragsheet'])) {
+        $box = lamprozo_box_from_fragsheet($attempt['fragsheet']);
+    }
+    $dead = 0;
+    foreach ($box as $mon) {
+        if (($mon['alive'] ?? true) === false) {
+            $dead++;
+        }
+    }
+    return $dead;
 }
 
 function lamprozo_default_challenges() {
@@ -153,6 +242,7 @@ function lamprozo_default_challenges() {
             'type'        => 'ROM Hack',
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon SoulSilver ROM hack Sterling Silver.',
+            'ruleset'     => 'Hardcore Nuzlocke',
             'status'      => 'active',
         ],
         'renegade-platinum' => [
@@ -162,6 +252,7 @@ function lamprozo_default_challenges() {
             'type'        => 'ROM Hack',
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon Platinum ROM hack Renegade Platinum.',
+            'ruleset'     => 'Hardcore Nuzlocke',
             'status'      => 'on_hold',
         ],
         'platinum-kaizo' => [
@@ -171,6 +262,7 @@ function lamprozo_default_challenges() {
             'type'        => 'ROM Hack',
             'gen'         => 'IV',
             'description' => 'A hardcore Nuzlocke of the Pokémon Platinum ROM hack Platinum Kaizo.',
+            'ruleset'     => 'Hardcore Nuzlocke',
             'status'      => 'on_hold',
         ],
     ];
@@ -183,12 +275,16 @@ function lamprozo_get_challenges_data() {
         update_option('lamprozo_challenges', $stored);
         return $stored;
     }
-    // Migrate: add status field if missing
+    // Migrate: add status / ruleset fields if missing
     $defaults = lamprozo_default_challenges();
     $updated  = false;
     foreach ($stored as $slug => &$challenge) {
         if (!isset($challenge['status'])) {
             $challenge['status'] = $defaults[$slug]['status'] ?? 'on_hold';
+            $updated = true;
+        }
+        if (!isset($challenge['ruleset'])) {
+            $challenge['ruleset'] = $defaults[$slug]['ruleset'] ?? '';
             $updated = true;
         }
     }
@@ -276,6 +372,7 @@ function lamprozo_rest_create_challenge($request) {
         'type'        => sanitize_text_field($body['type'] ?? 'ROM Hack'),
         'gen'         => sanitize_text_field($body['gen'] ?? ''),
         'description' => sanitize_textarea_field($body['description'] ?? ''),
+        'ruleset'     => sanitize_text_field($body['ruleset'] ?? ''),
     ];
     update_option('lamprozo_challenges', $challenges);
 
@@ -298,7 +395,7 @@ function lamprozo_rest_update_challenge($request) {
     if (!isset($challenges[$slug])) {
         return new WP_Error('not_found', 'Challenge not found', ['status' => 404]);
     }
-    foreach (['title', 'game', 'type', 'gen', 'description', 'status'] as $field) {
+    foreach (['title', 'game', 'type', 'gen', 'description', 'status', 'ruleset'] as $field) {
         if (isset($body[$field])) {
             $challenges[$slug][$field] = sanitize_text_field($body[$field]);
         }
@@ -340,10 +437,16 @@ function lamprozo_rest_new_attempt($request) {
     // Get next number
     $next = empty($attempts) ? 1 : (max(array_column($attempts, 'number')) + 1);
 
+    // Carry level cap / badges forward from the most recent attempt for convenience.
+    $prev = $attempts[0] ?? [];
+
     array_unshift($attempts, [
         'number' => $next,
         'status' => 'ongoing',
+        'cap'    => $prev['cap'] ?? '',
+        'badges' => $prev['badges'] ?? '',
         'vods'   => [],
+        'box'    => [],
     ]);
 
     lamprozo_save_attempts($challenge, $attempts);
