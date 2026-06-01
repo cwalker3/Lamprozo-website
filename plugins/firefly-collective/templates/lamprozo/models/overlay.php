@@ -209,7 +209,7 @@ function lamprozo_stream_overlay_sse() {
 
     $start = time();
     while (!connection_aborted() && (time() - $start) < 45) {
-        usleep(800000); // 0.8s
+        usleep(400000); // 0.4s
         $rev = $read_rev();
         if ($rev !== $last) { $last = $rev; $send(); }
         else { echo ": ping\n\n"; @ob_flush(); @flush(); } // heartbeat
