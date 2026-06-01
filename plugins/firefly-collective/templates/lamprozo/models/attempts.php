@@ -299,6 +299,38 @@ function lamprozo_merge_into_box($box, $mons) {
     return $box;
 }
 
+/**
+ * Resolve a species name to its National Dex number via PokéAPI, cached forever
+ * per species (so it's fetched at most once each). Returns null if unknown, so
+ * sprite rendering can fall back to a name-based source.
+ */
+function lamprozo_dex_number($species) {
+    $name = strtolower(trim((string) $species));
+    $name = str_replace(['♀', '♂'], ['-f', '-m'], $name);
+    $name = str_replace([' ', '.', "'", ':'], ['-', '', '', ''], $name);
+    $name = preg_replace('/[^a-z0-9-]/', '', $name);
+    $name = trim(preg_replace('/-+/', '-', $name), '-');
+    if ($name === '') {
+        return null;
+    }
+
+    $key    = 'lamprozo_dex_' . $name;
+    $cached = get_transient($key);
+    if ($cached !== false) {
+        return $cached === 'none' ? null : (int) $cached;
+    }
+
+    $resp = wp_remote_get('https://pokeapi.co/api/v2/pokemon/' . rawurlencode($name), ['timeout' => 3]);
+    if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) {
+        set_transient($key, 'none', HOUR_IN_SECONDS); // unknown for now; retry in an hour
+        return null;
+    }
+    $data = json_decode(wp_remote_retrieve_body($resp), true);
+    $id   = isset($data['id']) ? (int) $data['id'] : null;
+    set_transient($key, $id === null ? 'none' : $id, $id === null ? HOUR_IN_SECONDS : YEAR_IN_SECONDS);
+    return $id;
+}
+
 function lamprozo_default_challenges() {
     return [
         'sterling-silver' => [

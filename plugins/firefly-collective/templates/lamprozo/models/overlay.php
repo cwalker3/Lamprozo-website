@@ -111,6 +111,10 @@ function lamprozo_rest_set_party($request) {
     }
 
     $mons = lamprozo_parse_showdown($text);
+    foreach ($mons as &$mon) {
+        $mon['dex'] = function_exists('lamprozo_dex_number') ? lamprozo_dex_number($mon['species']) : null;
+    }
+    unset($mon);
     update_option('lamprozo_party', $mons, false);
 
     // Merge into the active challenge's ongoing attempt box (add-only).
@@ -364,16 +368,23 @@ function lamprozo_render_overlay_page() {
       el.textContent = "";
       party.forEach(function(p) {
         var slug = partySlug(p.species);
+        var dex  = p.dex || 0;
+        var srcs = [];
+        if (dex) {
+          srcs.push(UPLOADS_URL + "/lamprozo/party/" + dex + ".png?v=" + BADGE_CB);                          // e.g. 278.png
+          srcs.push(UPLOADS_URL + "/lamprozo/party/" + String(dex).padStart(3, "0") + ".png?v=" + BADGE_CB);  // e.g. 025.png
+          srcs.push("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/" + dex + ".png");
+        }
+        srcs.push(UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB);                            // name-based upload
+        srcs.push("https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png");          // last resort
         var img = document.createElement("img");
         img.className = "party-mon";
-        img.src = UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB;
         img.alt = p.nickname || p.species || "";
         img.title = (p.nickname || p.species || "") + (p.level ? "  L" + p.level : "");
-        img.onerror = function() {           // uploaded sprite missing -> pokemondb sprite
-          if (img.dataset.fb) { img.style.visibility = "hidden"; return; }
-          img.dataset.fb = "1";
-          img.src = "https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png";
-        };
+        var i = 0;
+        function nextSrc() { if (i < srcs.length) { img.src = srcs[i++]; } else { img.style.visibility = "hidden"; } }
+        img.onerror = nextSrc;
+        nextSrc();
         el.appendChild(img);
       });
     }
@@ -809,16 +820,23 @@ function lamprozo_render_layout_page() {
       el.textContent = "";
       party.forEach(function(p) {
         var slug = partySlug(p.species);
+        var dex  = p.dex || 0;
+        var srcs = [];
+        if (dex) {
+          srcs.push(UPLOADS_URL + "/lamprozo/party/" + dex + ".png?v=" + BADGE_CB);                          // e.g. 278.png
+          srcs.push(UPLOADS_URL + "/lamprozo/party/" + String(dex).padStart(3, "0") + ".png?v=" + BADGE_CB);  // e.g. 025.png
+          srcs.push("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/" + dex + ".png");
+        }
+        srcs.push(UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB);                            // name-based upload
+        srcs.push("https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png");          // last resort
         var img = document.createElement("img");
         img.className = "party-mon";
-        img.src = UPLOADS_URL + "/lamprozo/party/" + slug + ".png?v=" + BADGE_CB;
         img.alt = p.nickname || p.species || "";
         img.title = (p.nickname || p.species || "") + (p.level ? "  L" + p.level : "");
-        img.onerror = function() {           // uploaded sprite missing -> pokemondb sprite
-          if (img.dataset.fb) { img.style.visibility = "hidden"; return; }
-          img.dataset.fb = "1";
-          img.src = "https://img.pokemondb.net/sprites/heartgold-soulsilver/normal/" + slug + ".png";
-        };
+        var i = 0;
+        function nextSrc() { if (i < srcs.length) { img.src = srcs[i++]; } else { img.style.visibility = "hidden"; } }
+        img.onerror = nextSrc;
+        nextSrc();
         el.appendChild(img);
       });
     }
