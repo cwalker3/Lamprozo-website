@@ -229,7 +229,7 @@ function lamprozo_render_overlay_page() {
     $rest_url  = esc_url_raw(rest_url('lamprozo/v1/overlay'));
     $vertical  = (isset($_GET['vertical']) && $_GET['vertical'] === 'true');
     // Poll interval (ms); override with &interval=10 for 10s.
-    $interval  = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 5000;
+    $interval  = isset($_GET['interval']) ? max(1, (int) $_GET['interval']) * 1000 : 1000;
 
     header('Content-Type: text/html; charset=utf-8');
     nocache_headers(); // Live overlay — never let a CDN/proxy serve a stale copy.
