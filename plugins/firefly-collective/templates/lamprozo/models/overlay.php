@@ -607,13 +607,13 @@ function lamprozo_render_layout_page() {
     .stat--deaths  .stat__value { color: var(--danger); }
     /* Badge row */
     .status__badges {
-      flex: 1.2; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 1.6vw;
+      flex: 1.2; min-height: 0; display: flex; align-items: stretch; justify-content: center; gap: 0;
       background: var(--panel-bg); border: 0.18vh solid var(--border); border-radius: 0.9vh;
       padding: 0.5vh 1.2vw; overflow: hidden;
     }
+    /* Two even columns: badges | party */
     .status__badges #badges,
-    .status__badges #party { display: flex; align-items: center; height: 100%; min-width: 0; }
-    .status__badges #party { gap: 0.6vw; }
+    .status__badges #party { flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; min-width: 0; gap: 0.6vw; }
     .status__divider { width: 2px; align-self: stretch; margin: 0.6vh 0; background: rgba(255,255,255,0.16); flex-shrink: 0; }
     .party-mon { height: 5.5vh; max-height: 100%; width: auto; object-fit: contain; image-rendering: pixelated; }
     .badge-pips { display: flex; gap: 0.8vw; align-items: center; justify-content: center; flex-wrap: nowrap; height: 100%; max-height: 100%; }
