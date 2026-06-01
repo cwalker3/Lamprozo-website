@@ -133,7 +133,7 @@ function lamprozo_rest_set_party($request) {
                 if (($a['status'] ?? '') === 'ongoing') {
                     $before = $a['box'] ?? [];
                     $after  = lamprozo_merge_into_box($before, $mons);
-                    if (count($after) !== count($before)) {
+                    if (wp_json_encode($after) !== wp_json_encode($before)) {
                         $attempts[$i]['box'] = $after;
                         lamprozo_save_attempts($slug, $attempts);
                         $merged_into = $slug;

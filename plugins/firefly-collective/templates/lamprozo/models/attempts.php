@@ -261,10 +261,18 @@ function lamprozo_parse_showdown($text) {
             continue;
         }
         $mon = ['species' => $species, 'nickname' => $nickname];
+        if (strpos($first, ' @ ') !== false) {
+            $item = trim(explode(' @ ', $first, 2)[1]);
+            if ($item !== '') { $mon['item'] = $item; }
+        }
         foreach (array_slice($lines, 1) as $l) {
-            if (preg_match('/^Level:\s*(\d+)/i', $l, $mm))      { $mon['level']   = (int) $mm[1]; }
-            elseif (preg_match('/^Ability:\s*(.+)$/i', $l, $mm)) { $mon['ability'] = trim($mm[1]); }
-            elseif (preg_match('/^(.+?)\s+Nature$/i', $l, $mm))  { $mon['nature']  = trim($mm[1]); }
+            if (preg_match('/^Level:\s*(\d+)/i', $l, $mm))        { $mon['level']   = (int) $mm[1]; }
+            elseif (preg_match('/^Ability:\s*(.+)$/i', $l, $mm))   { $mon['ability'] = trim($mm[1]); }
+            elseif (preg_match('/^Location:\s*(.+)$/i', $l, $mm))  { $mon['met']     = trim($mm[1]); }
+            elseif (preg_match('/^IVs:\s*(.+)$/i', $l, $mm))       { $mon['ivs']     = lamprozo_parse_ivs($mm[1]); }
+            elseif (preg_match('/^EVs:/i', $l))                    { continue; }
+            elseif (preg_match('/^(.+?)\s+Nature$/i', $l, $mm))    { $mon['nature']  = trim($mm[1]); }
+            elseif (preg_match('/^-\s*(.+)$/', $l, $mm))           { $mon['moves'][] = trim($mm[1]); }
         }
         $mons[] = $mon;
     }
@@ -272,28 +280,56 @@ function lamprozo_parse_showdown($text) {
 }
 
 /**
- * Merge parsed mons into an existing box (add-only, preserving alive/dead/kills
- * on entries already present). Match is by species + nickname, case-insensitive.
+ * Parse a Showdown "IVs:" line into the box's iv keys (hp/at/df/sa/sd/sp).
+ */
+function lamprozo_parse_ivs($s) {
+    $map = ['hp' => 'hp', 'atk' => 'at', 'def' => 'df', 'spa' => 'sa', 'spd' => 'sd', 'spe' => 'sp'];
+    $ivs = [];
+    foreach (explode('/', (string) $s) as $part) {
+        if (preg_match('/(\d+)\s*([A-Za-z]+)/', trim($part), $m)) {
+            $stat = strtolower($m[2]);
+            if (isset($map[$stat])) {
+                $ivs[$map[$stat]] = (int) $m[1];
+            }
+        }
+    }
+    return $ivs;
+}
+
+/**
+ * Merge parsed mons into an existing box. New mons are added (alive); existing
+ * ones (matched by species + nickname) keep their alive/dead/kills but have their
+ * enrichment (ivs, moves, nature, ability, met, item, level) refreshed so the
+ * recorded data stays current.
  */
 function lamprozo_merge_into_box($box, $mons) {
     if (!is_array($box)) {
         $box = [];
     }
+    $enrich = ['ivs', 'moves', 'nature', 'ability', 'met', 'item', 'level'];
     foreach ($mons as $p) {
         $sp = strtolower($p['species'] ?? '');
         $nk = strtolower($p['nickname'] ?? '');
         if ($sp === '') {
             continue;
         }
-        $exists = false;
-        foreach ($box as $e) {
+        $idx = null;
+        foreach ($box as $k => $e) {
             if (strtolower($e['species'] ?? '') === $sp && strtolower($e['nickname'] ?? '') === $nk) {
-                $exists = true;
+                $idx = $k;
                 break;
             }
         }
-        if (!$exists) {
-            $box[] = ['species' => $p['species'], 'nickname' => $p['nickname'] ?? '', 'alive' => true, 'kills' => 0];
+        if ($idx === null) {
+            $entry = ['species' => $p['species'], 'nickname' => $p['nickname'] ?? '', 'alive' => true, 'kills' => 0];
+            foreach ($enrich as $f) {
+                if (!empty($p[$f])) { $entry[$f] = $p[$f]; }
+            }
+            $box[] = $entry;
+        } else {
+            foreach ($enrich as $f) {
+                if (!empty($p[$f])) { $box[$idx][$f] = $p[$f]; }
+            }
         }
     }
     return $box;
