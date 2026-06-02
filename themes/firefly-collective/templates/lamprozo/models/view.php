@@ -18,7 +18,7 @@ function determine_view() {
     if (!empty($segments[0])) {
         $view = sanitize_title($segments[0]);
 
-        $static_views = array('home', 'challenges', 'contact', 'about', 'blog', 'videos', 'clips');
+        $static_views = array('home', 'nuzlockes', 'contact', 'about', 'blog', 'videos', 'clips');
         if (in_array($view, $static_views)) {
             return $view;
         }
@@ -80,3 +80,16 @@ function lamprozo_handle_custom_views() {
     }
 }
 add_action('template_redirect', 'lamprozo_handle_custom_views');
+
+// Permanent redirect from the old /challenges URL to /nuzlockes. Runs before the
+// static page cache serves (init priority 1), so it fires even for cached paths.
+add_action('init', function () {
+    if (is_admin()) {
+        return;
+    }
+    $path = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+    if (rtrim($path, '/') === '/challenges') {
+        wp_safe_redirect(home_url('/nuzlockes/'), 301);
+        exit;
+    }
+}, 0);
