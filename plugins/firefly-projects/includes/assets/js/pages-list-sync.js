@@ -10,6 +10,15 @@
     // Get configuration from PHP
     var config = window.fireflyPagesSync || {};
 
+    // Post type derived labels — this UI is enqueued for both edit-page and
+    // edit-post screens, so every user-facing string + the post_type sent to
+    // remote endpoints must reflect $screen->post_type from the PHP localizer.
+    var POST_TYPE = (config.postType === 'post') ? 'post' : 'page';
+    var TYPE_SINGULAR = (POST_TYPE === 'post') ? 'Post' : 'Page';
+    var TYPE_PLURAL   = (POST_TYPE === 'post') ? 'Posts' : 'Pages';
+    var TYPE_SINGULAR_LC = (POST_TYPE === 'post') ? 'post' : 'page';
+    var TYPE_PLURAL_LC   = (POST_TYPE === 'post') ? 'posts' : 'pages';
+
     // State
     var state = {
         targetEnvProd: localStorage.getItem('firefly_pages_sync_env') === 'prod',
@@ -119,7 +128,7 @@
         var modalHtml = '<div id="firefly-pages-sync-modal" class="firefly-sync-modal-overlay">' +
             '<div class="firefly-sync-modal">' +
                 '<div class="firefly-sync-modal-header">' +
-                    '<h2>Sync Page to Remote</h2>' +
+                    '<h2>Sync ' + TYPE_SINGULAR + ' to Remote</h2>' +
                     '<button type="button" class="firefly-modal-close">&times;</button>' +
                 '</div>' +
                 '<div class="firefly-modal-content">' +
@@ -132,13 +141,13 @@
                     '<div class="firefly-sync-summary">' +
                         '<h4>Sync Details</h4>' +
                         '<table class="firefly-sync-table">' +
-                            '<tr><th>Page</th><td>' + escapeHtml(pageData.postTitle) + '</td></tr>' +
+                            '<tr><th>' + TYPE_SINGULAR + '</th><td>' + escapeHtml(pageData.postTitle) + '</td></tr>' +
                             '<tr><th>Target</th><td><span class="firefly-env-badge firefly-env-' + envClass + '" id="firefly-modal-target-badge">' + envLabel + '</span></td></tr>' +
                             '<tr><th>Last Sync</th><td id="firefly-modal-last-sync">' + (lastSyncFormatted || '<em>Never synced</em>') + '</td></tr>' +
                         '</table>' +
                     '</div>' +
                     '<p class="firefly-sync-description">' +
-                        'The page content and assets will be synced to the remote site.' +
+                        'The ' + TYPE_SINGULAR_LC + ' content and assets will be synced to the remote site.' +
                     '</p>' +
                 '</div>' +
                 '<div class="firefly-modal-footer">' +
@@ -170,7 +179,7 @@
         var modalHtml = '<div id="firefly-pages-sync-modal" class="firefly-sync-modal-overlay">' +
             '<div class="firefly-sync-modal">' +
                 '<div class="firefly-sync-modal-header">' +
-                    '<h2>Sync All Pages</h2>' +
+                    '<h2>Sync All ' + TYPE_PLURAL + '</h2>' +
                     '<button type="button" class="firefly-modal-close">&times;</button>' +
                 '</div>' +
                 '<div class="firefly-modal-content">' +
@@ -184,14 +193,14 @@
                                 '<input type="radio" name="sync_mode" value="safe" checked>' +
                                 '<div>' +
                                     '<strong>Safe Sync</strong>' +
-                                    '<p class="firefly-sync-mode-description">Sync all local pages. Remote-only pages are kept.</p>' +
+                                    '<p class="firefly-sync-mode-description">Sync all local ' + TYPE_PLURAL_LC + '. Remote-only ' + TYPE_PLURAL_LC + ' are kept.</p>' +
                                 '</div>' +
                             '</label>' +
                             '<label class="firefly-sync-mode-option">' +
                                 '<input type="radio" name="sync_mode" value="mirror">' +
                                 '<div>' +
                                     '<strong>Mirror Sync</strong>' +
-                                    '<p class="firefly-sync-mode-description">Make remote an exact copy. Remote-only pages are <strong>deleted</strong>.</p>' +
+                                    '<p class="firefly-sync-mode-description">Make remote an exact copy. Remote-only ' + TYPE_PLURAL_LC + ' are <strong>deleted</strong>.</p>' +
                                 '</div>' +
                             '</label>' +
                         '</div>' +
@@ -199,12 +208,12 @@
                     // Warning for mirror mode (hidden by default)
                     '<div class="firefly-sync-warning firefly-sync-warning-prod firefly-mirror-warning" id="firefly-mirror-warning" style="display: none;">' +
                         '<span class="dashicons dashicons-warning"></span>' +
-                        '<span id="firefly-orphan-warning-text">Checking remote pages...</span>' +
+                        '<span id="firefly-orphan-warning-text">Checking remote ' + TYPE_PLURAL_LC + '...</span>' +
                     '</div>' +
                     // Summary
                     '<div class="firefly-sync-summary">' +
                         '<table class="firefly-sync-table">' +
-                            '<tr><th>Pages</th><td>' + config.pageCount + ' published page(s)</td></tr>' +
+                            '<tr><th>' + TYPE_PLURAL + '</th><td>' + config.pageCount + ' published ' + TYPE_SINGULAR_LC + '(s)</td></tr>' +
                             '<tr><th>Target</th><td><span class="firefly-env-badge firefly-env-' + envClass + '" id="firefly-modal-target-badge">' + envLabel + '</span></td></tr>' +
                         '</table>' +
                     '</div>' +
@@ -387,28 +396,28 @@
     function fetchOrphanCount() {
         var targetEnv = state.targetEnvProd ? 'prod' : 'dev';
 
-        $('#firefly-orphan-warning-text').text('Checking remote pages...');
+        $('#firefly-orphan-warning-text').text('Checking remote ' + TYPE_PLURAL_LC + '...');
 
         $.ajax({
             url: config.restUrl + 'pages-orphan-count',
             method: 'GET',
-            data: { target_env: targetEnv },
+            data: { target_env: targetEnv, post_type: POST_TYPE },
             headers: { 'X-WP-Nonce': config.nonce },
             success: function(response) {
                 state.orphanCount = response.orphan_count || 0;
                 if (state.orphanCount > 0) {
                     $('#firefly-orphan-warning-text').text(
-                        'Mirror mode will DELETE ' + state.orphanCount + ' page(s) on remote that don\'t exist locally.'
+                        'Mirror mode will DELETE ' + state.orphanCount + ' ' + TYPE_SINGULAR_LC + '(s) on remote that don\'t exist locally.'
                     );
                 } else {
                     $('#firefly-orphan-warning-text').text(
-                        'No pages will be deleted (remote has no extra pages).'
+                        'No ' + TYPE_PLURAL_LC + ' will be deleted (remote has no extra ' + TYPE_PLURAL_LC + ').'
                     );
                     $('#firefly-mirror-warning').removeClass('firefly-sync-warning-prod');
                 }
             },
             error: function() {
-                $('#firefly-orphan-warning-text').text('Could not check remote pages.');
+                $('#firefly-orphan-warning-text').text('Could not check remote ' + TYPE_PLURAL_LC + '.');
             }
         });
     }
@@ -473,7 +482,7 @@
         // Show progress UI
         $content.html(
             '<div class="firefly-sync-progress">' +
-                '<h4>Syncing Pages to ' + getEnvLabel() + '...</h4>' +
+                '<h4>Syncing ' + TYPE_PLURAL + ' to ' + getEnvLabel() + '...</h4>' +
                 '<div class="firefly-progress-bar">' +
                     '<div class="firefly-progress-fill' + (state.targetEnvProd ? ' is-prod' : '') + '" style="width: 0%"></div>' +
                 '</div>' +
@@ -488,7 +497,8 @@
             contentType: 'application/json',
             data: JSON.stringify({
                 sync_mode: syncMode,
-                target_env: state.targetEnvProd ? 'prod' : 'dev'
+                target_env: state.targetEnvProd ? 'prod' : 'dev',
+                post_type: POST_TYPE
             }),
             headers: { 'X-WP-Nonce': config.nonce },
             timeout: 300000, // 5 minutes
@@ -567,7 +577,7 @@
         // Show deleted pages if any
         if (details.deleted_pages && details.deleted_pages.length > 0) {
             html += '<div class="firefly-sync-deleted">' +
-                '<h4>Deleted Remote Pages:</h4>' +
+                '<h4>Deleted Remote ' + TYPE_PLURAL + ':</h4>' +
                 '<ul>';
             details.deleted_pages.forEach(function(page) {
                 html += '<li>' + escapeHtml(page.title) + ' <code>' + escapeHtml(page.slug) + '</code></li>';
@@ -631,7 +641,7 @@
         var modalHtml = '<div id="firefly-pages-pull-modal" class="firefly-sync-modal-overlay">' +
             '<div class="firefly-sync-modal firefly-pull-modal-wide">' +
                 '<div class="firefly-sync-modal-header">' +
-                    '<h2>Pull Pages from Remote</h2>' +
+                    '<h2>Pull ' + TYPE_PLURAL + ' from Remote</h2>' +
                     '<button type="button" class="firefly-modal-close">&times;</button>' +
                 '</div>' +
                 '<div class="firefly-modal-content">' +
@@ -643,7 +653,7 @@
                     '</div>' +
                     // Search and selection controls
                     '<div class="firefly-pull-controls">' +
-                        '<input type="text" id="firefly-pull-search" class="regular-text" placeholder="Search pages...">' +
+                        '<input type="text" id="firefly-pull-search" class="regular-text" placeholder="Search ' + TYPE_PLURAL_LC + '...">' +
                         '<div class="firefly-pull-select-controls">' +
                             '<button type="button" class="button button-small" id="firefly-pull-select-all">Select All</button>' +
                             '<button type="button" class="button button-small" id="firefly-pull-deselect-all">Deselect All</button>' +
@@ -654,18 +664,18 @@
                     '<div class="firefly-pull-page-list" id="firefly-pull-page-list">' +
                         '<div class="firefly-pull-loading">' +
                             '<span class="spinner is-active"></span>' +
-                            '<span>Loading pages from ' + envLabel + '...</span>' +
+                            '<span>Loading ' + TYPE_PLURAL_LC + ' from ' + envLabel + '...</span>' +
                         '</div>' +
                     '</div>' +
                     // Description
                     '<p class="firefly-sync-description">' +
-                        'Select pages to pull. Content and assets will be copied to your local environment.' +
+                        'Select ' + TYPE_PLURAL_LC + ' to pull. Content and assets will be copied to your local environment.' +
                     '</p>' +
                 '</div>' +
                 '<div class="firefly-modal-footer">' +
                     '<button type="button" class="button firefly-modal-cancel">Cancel</button>' +
                     '<button type="button" class="button button-primary" id="firefly-confirm-pull" disabled>' +
-                        'Pull Selected Pages' +
+                        'Pull Selected ' + TYPE_PLURAL +
                     '</button>' +
                 '</div>' +
             '</div>' +
@@ -794,7 +804,7 @@
         $list.html(
             '<div class="firefly-pull-loading">' +
                 '<span class="spinner is-active"></span>' +
-                '<span>Loading pages from ' + envLabel + '...</span>' +
+                '<span>Loading ' + TYPE_PLURAL_LC + ' from ' + envLabel + '...</span>' +
             '</div>'
         );
 
@@ -810,7 +820,8 @@
             method: 'GET',
             data: {
                 source_env: sourceEnv,
-                post_type: 'page'
+                post_type: POST_TYPE,
+                template:  config.activeTemplate || ''
             },
             headers: { 'X-WP-Nonce': config.nonce },
             success: function(response) {
@@ -819,7 +830,7 @@
                     renderPageList();
                 } else {
                     $list.html(
-                        '<div class="notice notice-error"><p>' + escapeHtml(response.message || 'Failed to load pages.') + '</p></div>'
+                        '<div class="notice notice-error"><p>' + escapeHtml(response.message || ('Failed to load ' + TYPE_PLURAL_LC + '.')) + '</p></div>'
                     );
                 }
             },
@@ -853,7 +864,7 @@
         if (filteredPages.length === 0) {
             $list.html(
                 '<div class="firefly-pull-no-pages">' +
-                    (searchTerm ? 'No pages match your search.' : 'No pages available on remote.') +
+                    (searchTerm ? ('No ' + TYPE_PLURAL_LC + ' match your search.') : ('No ' + TYPE_PLURAL_LC + ' available on remote.')) +
                 '</div>'
             );
             return;
@@ -944,7 +955,7 @@
         // Show progress UI
         $content.html(
             '<div class="firefly-sync-progress">' +
-                '<h4>Pulling ' + selectedKeys.length + ' page(s) from ' + envLabel + '...</h4>' +
+                '<h4>Pulling ' + selectedKeys.length + ' ' + TYPE_SINGULAR_LC + '(s) from ' + envLabel + '...</h4>' +
                 '<div class="firefly-progress-bar">' +
                     '<div class="firefly-progress-fill' + (state.pullEnvProd ? ' is-prod' : '') + '" id="firefly-pull-progress" style="width: 0%"></div>' +
                 '</div>' +
@@ -1038,7 +1049,7 @@
 
         var success = results.failed === 0;
         var statusClass = success ? 'notice-success' : (results.success > 0 ? 'notice-warning' : 'notice-error');
-        var message = 'Pulled ' + results.success + ' of ' + results.total + ' page(s).';
+        var message = 'Pulled ' + results.success + ' of ' + results.total + ' ' + TYPE_SINGULAR_LC + '(s).';
 
         var html = '<div class="notice ' + statusClass + ' firefly-sync-result">' +
             '<p><strong>' + message + '</strong></p>' +
@@ -1065,7 +1076,7 @@
 
         // Auto-refresh if any pages were pulled successfully
         if (results.success > 0) {
-            html += '<p class="firefly-refresh-notice">Refreshing page list...</p>';
+            html += '<p class="firefly-refresh-notice">Refreshing ' + TYPE_SINGULAR_LC + ' list...</p>';
             $content.html(html);
             $footer.html('<button type="button" class="button firefly-modal-cancel" disabled>Please wait...</button>');
 

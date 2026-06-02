@@ -266,14 +266,26 @@ function firefly_projects_list_pages_handler($request) {
         $post_statuses[] = 'pending';
     }
 
-    $pages = get_posts(array(
+    // Optional template scope. When the caller passes a template, we filter
+    // to posts with matching _firefly_template meta so callers from one
+    // template's admin don't see sibling-template posts with the same slug.
+    $template = $request->get_param('template');
+    $template = is_string($template) ? trim($template) : '';
+
+    $query_args = array(
         'post_type'            => $post_type,
         'post_status'          => $post_statuses,
         'numberposts'          => -1,
         'orderby'              => 'title',
         'order'                => 'ASC',
         'firefly_skip_scoping' => true,
-    ));
+    );
+    if ( $template !== '' ) {
+        $query_args['meta_key']   = '_firefly_template';
+        $query_args['meta_value'] = $template;
+    }
+
+    $pages = get_posts($query_args);
 
     $list = array();
     foreach ($pages as $page) {

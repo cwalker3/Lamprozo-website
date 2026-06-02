@@ -751,6 +751,7 @@ function firefly_projects_enqueue_pages_list_sync_assets($hook) {
         'hasProdEndpoint' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT),
         'pageCount'       => count($posts),
         'postType'        => $screen->post_type,
+        'activeTemplate'  => $active_template,
         'localPosts'      => $local_posts
     ));
 }

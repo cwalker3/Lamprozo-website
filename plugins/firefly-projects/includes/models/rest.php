@@ -460,6 +460,11 @@ function firefly_plugin_register_rest_endpoints() {
                     'type'              => 'string',
                     'default'           => 'false',
                     'description'       => 'Include draft posts'
+                ),
+                'template' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'description'       => 'Filter to posts/pages belonging to this firefly template (matches _firefly_template meta). Empty = unfiltered.'
                 )
             )
         )
@@ -572,6 +577,11 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'page',
                     'enum'              => array('page', 'post'),
                     'description'       => 'Post type to fetch: page or post'
+                ),
+                'template' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'description'       => 'Scope the remote list to this firefly template. Empty = no scoping.'
                 )
             )
         )
@@ -1801,10 +1811,25 @@ function firefly_projects_export_page($request) {
         }
     }
 
-    // Get post meta
+    // Get post meta. Whitelist must stay in sync with the package /
+    // perform_page_sync whitelists above — same set of meta keys travels
+    // in both directions (push and pull).
     $meta = get_post_meta($post->ID);
     $meta_data = array();
-    $allowed_underscore_keys = array('_thumbnail_id', '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq', '_firefly_template', '_firefly_page_id');
+    $allowed_underscore_keys = array(
+        '_thumbnail_id',
+        '_geo_summary', '_geo_key_facts', '_geo_article_type', '_geo_faq',
+        '_firefly_template', '_firefly_page_id',
+        '_firefly_mobile_thumbnail_id', '_firefly_mobile_thumbnail_breakpoint',
+        // SEO meta (per-page overrides — see seo-post.php for the registration)
+        '_seo_title', '_seo_description', '_seo_canonical',
+        '_seo_robots_noindex', '_seo_robots_nofollow',
+        // NOTE: _seo_og_image_id is intentionally NOT in this whitelist.
+        // The id is environment-specific; once pull-side OG file shipping
+        // lands the receiver will re-resolve the id locally (mirrors the
+        // sync direction).
+        '_seo_og_title', '_seo_og_description',
+    );
     foreach ($meta as $key => $values) {
         // Skip internal meta (except whitelisted keys)
         if (strpos($key, '_') === 0 && !in_array($key, $allowed_underscore_keys)) {
@@ -2182,6 +2207,7 @@ function firefly_projects_process_page_assets_callback($request) {
 function firefly_projects_fetch_remote_pages($request) {
     $source_env = $request->get_param('source_env');
     $post_type = $request->get_param('post_type');
+    $template = $request->get_param('template');
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -2202,10 +2228,15 @@ function firefly_projects_fetch_remote_pages($request) {
         $endpoint = LIVE_DEV_ENDPOINT;
     }
 
-    // Build list-pages URL
+    // Build list-pages URL. Pass `template` so the remote scopes its
+    // response to the local site's active template — otherwise same-slug
+    // posts from sibling templates leak into the pull modal.
     if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
         $base_url = $matches[1];
         $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-pages?include_drafts=true&post_type=' . urlencode($post_type);
+        if ( ! empty( $template ) ) {
+            $list_url .= '&template=' . urlencode( $template );
+        }
     } else {
         return new WP_REST_Response(array(
             'success' => false,
