@@ -561,8 +561,9 @@ function lamprozo_render_layout_page() {
     }
     .chat__line {
       font-size: 1.95vh; line-height: 1.34; word-wrap: break-word; overflow-wrap: anywhere;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7); transition: opacity 0.5s ease;
     }
+    .chat__line--out { opacity: 0; }
     .chat__user { font-weight: 800; margin-right: 0.35em; }
     .chat__msg  { color: var(--text); }
     .chat__line--action .chat__msg { font-style: italic; }
@@ -823,6 +824,8 @@ function lamprozo_render_layout_page() {
     var CHANNEL   = <?php echo wp_json_encode($channel); ?>;
     var chatEl    = document.getElementById("chat");
     var MAX_LINES = 60;
+    // Auto-remove each message after this many ms (?ttl=seconds, 0 = never).
+    var MSG_TTL = (function () { var v = new URLSearchParams(location.search).get("ttl"); return (v === null ? 60 : Math.max(0, parseInt(v, 10) || 0)) * 1000; })();
     var FALLBACK_COLORS = ["#FF4F4F","#7DD3FC","#FACC15","#34D399","#F472B6","#A78BFA","#FB923C","#22D3EE"];
 
     // Bot accounts to hide (defaults + anything passed in ?bots=a,b,c).
@@ -900,6 +903,12 @@ function lamprozo_render_layout_page() {
       line.appendChild(u); line.appendChild(m);
       chatEl.appendChild(line);
       while (chatEl.children.length > MAX_LINES) chatEl.removeChild(chatEl.firstChild);
+      if (MSG_TTL > 0) {
+        setTimeout(function () {
+          line.classList.add("chat__line--out");
+          setTimeout(function () { if (line.parentNode) line.remove(); }, 600);
+        }, MSG_TTL);
+      }
     }
     function connectChat() {
       var ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
