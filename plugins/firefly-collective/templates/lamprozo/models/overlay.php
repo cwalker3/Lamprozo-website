@@ -566,6 +566,7 @@ function lamprozo_render_layout_page() {
     .chat__user { font-weight: 800; margin-right: 0.35em; }
     .chat__msg  { color: var(--text); }
     .chat__line--action .chat__msg { font-style: italic; }
+    .chat-emote { height: 1.7em; vertical-align: middle; margin: -0.25em 0; }
 
     /* Status bar under the GBA screen: top row (game + stats), then a badge row */
     .status {
@@ -824,6 +825,29 @@ function lamprozo_render_layout_page() {
     var MAX_LINES = 60;
     var FALLBACK_COLORS = ["#FF4F4F","#7DD3FC","#FACC15","#34D399","#F472B6","#A78BFA","#FB923C","#22D3EE"];
 
+    // Bot accounts to hide (defaults + anything passed in ?bots=a,b,c).
+    var BOTS = {};
+    ["nightbot","streamelements","streamlabs","moobot","fossabot","wizebot","soundalerts",
+     "pretzelrocks","commanderroot","streamlootsbot","sery_bot","tangiabot","kofistreambot",
+     "lattemotte","creatisbot","botrixoficial","own3d","blerp","streamcaptainbot"].forEach(function(b){ BOTS[b] = 1; });
+    (new URLSearchParams(location.search).get("bots") || "").split(",").forEach(function(b){
+      b = b.trim().toLowerCase(); if (b) BOTS[b] = 1;
+    });
+
+    // Third-party emote name -> image URL (7TV channel + global; loaded once).
+    var EMOTES = {}, emotesLoadedFor = null;
+    function add7tv(e) { if (e && e.name && e.id) EMOTES[e.name] = "https://cdn.7tv.app/emote/" + e.id + "/2x.webp"; }
+    function load7TV(roomId) {
+      if (emotesLoadedFor === roomId) return;
+      emotesLoadedFor = roomId;
+      fetch("https://7tv.io/v3/emote-sets/global").then(function(r){ return r.json(); })
+        .then(function(d){ (d.emotes || []).forEach(add7tv); }).catch(function(){});
+      if (roomId) {
+        fetch("https://7tv.io/v3/users/twitch/" + roomId).then(function(r){ return r.json(); })
+          .then(function(d){ var s = d && d.emote_set && d.emote_set.emotes; (s || []).forEach(add7tv); }).catch(function(){});
+      }
+    }
+
     function chatEscape(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
     function fallbackColor(name) {
       var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -834,7 +858,37 @@ function lamprozo_render_layout_page() {
       raw.split(";").forEach(function(p) { var i = p.indexOf("="); if (i > 0) t[p.slice(0, i)] = p.slice(i + 1); });
       return t;
     }
-    function addLine(name, color, msg, isAction) {
+    // Twitch native emotes present in this message -> {name: id} (positions are code points).
+    function twitchEmoteNames(emotesTag, msg) {
+      var map = {};
+      if (!emotesTag) return map;
+      var chars = Array.from(msg);
+      emotesTag.split("/").forEach(function(group) {
+        var c = group.split(":"); if (c.length < 2) return;
+        var range = c[1].split(",")[0].split("-");
+        var s = parseInt(range[0], 10), e = parseInt(range[1], 10);
+        if (isNaN(s) || isNaN(e)) return;
+        var name = chars.slice(s, e + 1).join("");
+        if (name) map[name] = c[0];
+      });
+      return map;
+    }
+    function emoteImg(url, name) {
+      return '<img class="chat-emote" src="' + url + '" alt="' + chatEscape(name) + '" title="' + chatEscape(name) + '">';
+    }
+    // Build message HTML: swap emotes for <img>, escape everything else.
+    function renderMessageHTML(msg, emotesTag) {
+      var tw = twitchEmoteNames(emotesTag, msg);
+      return msg.split(/(\s+)/).map(function(tok) {
+        if (tok === "") return "";
+        if (/^\s+$/.test(tok)) return tok;
+        if (tw[tok])     return emoteImg("https://static-cdn.jtvnw.net/emoticons/v2/" + tw[tok] + "/default/dark/2.0", tok);
+        if (EMOTES[tok]) return emoteImg(EMOTES[tok], tok);
+        return chatEscape(tok);
+      }).join("");
+    }
+
+    function addLine(name, color, html, isAction) {
       var c = color || fallbackColor(name);
       var line = document.createElement("div");
       line.className = "chat__line" + (isAction ? " chat__line--action" : "");
@@ -842,7 +896,7 @@ function lamprozo_render_layout_page() {
       u.className = "chat__user"; u.style.color = c; u.textContent = name + ":";
       var m = document.createElement("span");
       m.className = "chat__msg"; if (isAction) m.style.color = c;
-      m.innerHTML = " " + chatEscape(msg);
+      m.innerHTML = " " + html;
       line.appendChild(u); line.appendChild(m);
       chatEl.appendChild(line);
       while (chatEl.children.length > MAX_LINES) chatEl.removeChild(chatEl.firstChild);
@@ -862,11 +916,13 @@ function lamprozo_render_layout_page() {
           var m = line.match(/^(?:@(\S+) )?:(\w+)!\S+ PRIVMSG #\S+ :([\s\S]*)$/);
           if (!m) return;
           var tags = m[1] ? parseTags(m[1]) : {};
+          if (tags["room-id"]) load7TV(tags["room-id"]);
+          if (BOTS[m[2].toLowerCase()]) return;            // hide bot accounts
           var name = tags["display-name"] || m[2];
           var text = m[3], isAction = false;
           var am = text.match(/^\x01ACTION ([\s\S]*)\x01$/);
           if (am) { isAction = true; text = am[1]; }
-          addLine(name, tags["color"] || "", text, isAction);
+          addLine(name, tags["color"] || "", renderMessageHTML(text, tags["emotes"]), isAction);
         });
       };
       ws.onclose = function() { setTimeout(connectChat, 3000); };
