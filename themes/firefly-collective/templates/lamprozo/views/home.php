@@ -33,7 +33,7 @@ if ($active_challenge):
 ?>
 <section class="active-challenge">
     <div class="active-challenge__inner">
-        <p class="active-challenge__label">Current Challenge</p>
+        <p class="active-challenge__label">Current Nuzlocke</p>
         <h2 class="active-challenge__title"><?php echo esc_html($active_challenge['title']); ?></h2>
         <p class="active-challenge__meta">
             <?php echo esc_html($active_challenge['type']); ?> &middot; Gen <?php echo esc_html($active_challenge['gen']); ?>

@@ -97,19 +97,11 @@ add_action('admin_menu', function() {
     );
     add_submenu_page(
         'lamprozo-challenges',
-        'Challenges',
-        'Challenges',
+        'Nuzlockes',
+        'Nuzlockes',
         'manage_options',
         'lamprozo-challenges',
         'ffc_challenges_dashboard'
-    );
-    add_submenu_page(
-        'lamprozo-challenges',
-        'Attempts',
-        'Attempts',
-        'manage_options',
-        'lamprozo-attempts',
-        'ffc_attempts_dashboard'
     );
 });
 

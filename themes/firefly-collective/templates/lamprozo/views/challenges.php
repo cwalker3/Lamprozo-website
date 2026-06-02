@@ -52,7 +52,7 @@ function render_challenge_card($entry) { ?>
 ?>
 <div class="runs-page">
     <div class="runs-header">
-        <h1 class="runs-title">Challenges</h1>
+        <h1 class="runs-title">Nuzlockes</h1>
         <p class="runs-subtitle">Every attempt. Every loss. Every victory.</p>
     </div>
 

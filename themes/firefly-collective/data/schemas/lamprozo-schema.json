@@ -41,7 +41,7 @@
         },
         {
             "slug": "challenges",
-            "title": "Challenges",
+            "title": "Nuzlockes",
             "snippet": "challenges.html",
             "in_menu": true,
             "menu_order": 2
@@ -101,7 +101,7 @@
                 "menu_order": 1
             },
             {
-                "title": "Challenges",
+                "title": "Nuzlockes",
                 "type": "custom",
                 "url": "/challenges",
                 "menu_order": 2

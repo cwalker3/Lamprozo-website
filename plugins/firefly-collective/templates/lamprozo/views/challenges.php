@@ -8,7 +8,7 @@ if (function_exists('lamprozo_badge_sets')) {
 }
 ?>
 <div class="wrap">
-<h1>Challenges</h1>
+<h1>Nuzlockes</h1>
 <style>
 .badge-active  { background:#e6f4ea; color:#1e7e34; border-radius:20px; padding:2px 10px; font-size:0.72em; font-weight:700; vertical-align:middle; }
 .badge-on-hold { background:#fff3cd; color:#856404; border-radius:20px; padding:2px 10px; font-size:0.72em; font-weight:700; vertical-align:middle; }
@@ -49,10 +49,10 @@ if (function_exists('lamprozo_badge_sets')) {
 #cd-attempts iframe { width:100%; border:0; display:block; background:#f6f7f7; border-radius:4px; }
 </style>
 
-<p><button class="button button-primary" onclick="toggleAddForm()" id="add-toggle">+ New Challenge</button></p>
+<p><button class="button button-primary" onclick="toggleAddForm()" id="add-toggle">+ New Nuzlocke</button></p>
 
 <div class="add-form" id="add-form" style="display:none">
-    <h2>Add New Challenge</h2>
+    <h2>Add New Nuzlocke</h2>
     <div class="form-row">
         <div><label>Title *</label><input type="text" id="new-title" placeholder="e.g. Crystal Legacy" oninput="generateSlug()"></div>
         <div><label>Slug *</label><input type="text" id="new-slug" placeholder="e.g. crystal-legacy"></div>
