@@ -2269,22 +2269,58 @@
             // a long-lived, browser-playable URL that survives Ragsmith
             // cleanup. The base recording-pane <audio> element points at
             // the resulting WP URL.
+            //
+            // Ragsmith's WEBM→MP3 conversion is async; this endpoint can
+            // return 502 (or 504/408/425) for several seconds after the
+            // transcript/summary calls already returned. Retry with mild
+            // exponential backoff so the MP3 actually lands in WP rather
+            // than silently leaving the player disabled.
             let mp3Attach = null;
             let mp3Url    = null;
             if (sourceFilename) {
-                try {
-                    if (modeEls.recProgressText) modeEls.recProgressText.textContent = 'Saving MP3…';
-                    const mp3Res = await fetch(ragsmithRest() + '/audio/save-to-media', {
-                        method: 'POST', credentials: 'same-origin',
-                        headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json', Accept: 'application/json' },
-                        body: JSON.stringify({ filename: sourceFilename, format: 'mp3' }),
-                    });
-                    if (mp3Res.ok) {
-                        const mp3Json = await mp3Res.json();
-                        mp3Attach = mp3Json && mp3Json.attachment_id;
-                        mp3Url    = mp3Json && mp3Json.url;
+                const TRANSIENT_STATUSES = new Set([408, 425, 502, 504]);
+                const DELAYS_MS = [2000, 3000, 5000, 8000]; // 5 attempts total (initial + 4 retries)
+                const MAX_ATTEMPTS = DELAYS_MS.length + 1;
+
+                for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                    if (modeEls.recProgressText) {
+                        modeEls.recProgressText.textContent = attempt === 1
+                            ? 'Saving MP3…'
+                            : 'Saving MP3… (retry ' + attempt + '/' + MAX_ATTEMPTS + ')';
                     }
-                } catch (e) { console.warn('[FireflyCapture] MP3 save failed:', e); }
+                    let mp3Res = null;
+                    let networkError = null;
+                    try {
+                        mp3Res = await fetch(ragsmithRest() + '/audio/save-to-media', {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json', Accept: 'application/json' },
+                            body: JSON.stringify({ filename: sourceFilename, format: 'mp3' }),
+                        });
+                    } catch (e) {
+                        networkError = e;
+                    }
+
+                    if (mp3Res && mp3Res.ok) {
+                        try {
+                            const mp3Json = await mp3Res.json();
+                            mp3Attach = mp3Json && mp3Json.attachment_id;
+                            mp3Url    = mp3Json && mp3Json.url;
+                        } catch (e) { console.warn('[FireflyCapture] MP3 save: ok response but JSON parse failed:', e); }
+                        break; // success
+                    }
+
+                    // Decide whether to retry. Network error → retry.
+                    // HTTP error → retry only on the known-transient statuses.
+                    const status      = mp3Res ? mp3Res.status : 0;
+                    const isTransient = networkError != null || TRANSIENT_STATUSES.has(status);
+                    if (!isTransient || attempt === MAX_ATTEMPTS) {
+                        console.warn('[FireflyCapture] MP3 save failed (attempt ' + attempt + '/' + MAX_ATTEMPTS + '):',
+                                     networkError || ('HTTP ' + status));
+                        break; // give up; downstream patch will omit mp3 fields
+                    }
+                    // Wait, then retry. DELAYS_MS[attempt-1] = delay AFTER this attempt.
+                    await new Promise((r) => setTimeout(r, DELAYS_MS[attempt - 1]));
+                }
             }
 
             // Persist transcript + summary + mp3 refs on the WP record.
