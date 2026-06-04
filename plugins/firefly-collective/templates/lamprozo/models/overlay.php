@@ -439,6 +439,17 @@ function lamprozo_badge_sets() {
             ['name' => 'Mind',    'color' => '#af7ac5'],
             ['name' => 'Rain',    'color' => '#2e86de'],
         ],
+        // Johto (Gen 2), in gym order.
+        'johto' => [
+            ['name' => 'Zephyr',  'color' => '#c7ccd1'],
+            ['name' => 'Hive',    'color' => '#e05a5a'],
+            ['name' => 'Plain',   'color' => '#f1c40f'],
+            ['name' => 'Fog',     'color' => '#9b59b6'],
+            ['name' => 'Storm',   'color' => '#e67e22'],
+            ['name' => 'Mineral', 'color' => '#7f9aa8'],
+            ['name' => 'Glacier', 'color' => '#5dade2'],
+            ['name' => 'Rising',  'color' => '#c0392b'],
+        ],
     ];
 }
 
