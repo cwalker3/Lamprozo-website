@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) { exit; }
  * Returns blanks when there's no active challenge.
  */
 function lamprozo_overlay_resolve() {
-    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'badgeset' => 'none', 'theme' => 'emerald', 'party' => array_slice((array) get_option('lamprozo_party', []), 0, 6)];
+    $blank = ['game' => '', 'ruleset' => '', 'attempt' => '', 'cap' => '', 'deaths' => '', 'badges' => '', 'badgeset' => 'none', 'theme' => 'emerald', 'layout' => 'gba', 'party' => array_slice((array) get_option('lamprozo_party', []), 0, 6)];
 
     if (!function_exists('lamprozo_get_challenges_data')) {
         return $blank;
@@ -62,6 +62,7 @@ function lamprozo_overlay_resolve() {
         'badges'  => $ongoing['badges'] ?? '',
         'badgeset'=> $active['badgeset'] ?? 'none',
         'theme'   => $active['theme']   ?? 'emerald',
+        'layout'  => $active['layout']  ?? 'gba',
         'party'   => array_slice((array) get_option('lamprozo_party', []), 0, 6),
     ];
 }
@@ -514,6 +515,34 @@ function lamprozo_render_layout_page() {
     $theme_key = isset($_GET['bg']) ? sanitize_key($_GET['bg']) : ($overlay['theme'] ?? 'emerald');
     if (!isset($themes[$theme_key])) { $theme_key = 'emerald'; }
 
+    // Layout mode: ?mode= override, else the active challenge's layout, else gba.
+    // Region positions are [left, top, width, height] in % of the 16:9 canvas.
+    // gba screen is 3:2; DS screens are 4:3 (width% = 0.75 * height%).
+    $mode = isset($_GET['mode']) ? sanitize_key($_GET['mode']) : ($overlay['layout'] ?? 'gba');
+    if (!in_array($mode, ['gba', 'ds'], true)) { $mode = 'gba'; }
+    if ($mode === 'ds') {
+        $regions = [
+            'game'   => [2.5, 4.0,  57.0, 76.0],   // top screen (4:3)
+            'cam'    => [69.0, 4.0,  29.0, 29.0],   // webcam (16:9)
+            'chat'   => [69.0, 35.0, 29.0, 20.5],   // chat (middle)
+            'bottom' => [69.0, 57.0, 29.0, 38.7],   // bottom screen (4:3)
+            'status' => [2.5, 81.5, 57.0, 14.5],
+        ];
+    } else {
+        $regions = [
+            'game'   => [3.45, 7.8,  62.6, 74.2],   // GBA screen (3:2)
+            'cam'    => [70.0, 7.8,  28.0, 29.9],
+            'chat'   => [70.0, 46.5, 28.0, 45.5],
+            'status' => [3.45, 84.0, 62.6, 14.0],
+        ];
+    }
+    $pos = function ($r) {
+        return sprintf('left:%s%%;top:%s%%;width:%s%%;height:%s%%;', $r[0], $r[1], $r[2], $r[3]);
+    };
+    // Transparent holes for OBS captures: the game screen(s) + webcam.
+    $holes = [$regions['game'], $regions['cam']];
+    if ($mode === 'ds') { $holes[] = $regions['bottom']; }
+
     header('Content-Type: text/html; charset=utf-8');
     nocache_headers();
     ?>
@@ -558,12 +587,9 @@ function lamprozo_render_layout_page() {
       color: var(--muted); text-shadow: 0 1px 3px rgba(0,0,0,0.6);
     }
 
-    /* GBA screen is 3:2 (240x160). On a 16:9 canvas, width% = 0.84375 * height%,
-       so 62.6% x 74.2% holds a true 3:2 box with no stretching. Centered in the
-       left column; the status bar below matches its width. */
-    .region--gba    { left: 3.45%; top: 7.8%; width: 62.6%; height: 74.2%; }
-    .region--cam    { left: 70%;   top: 7.8%; width: 28%;   height: 29.9%; }
-    .region--chat   { left: 70%; top: 46.5%; width: 28%; height: 45.5%; overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
+    /* Region positions are set inline per layout mode (see $regions in PHP):
+       GBA screen is 3:2, DS screens are 4:3. */
+    .region--chat { overflow: hidden; background: rgba(12,16,28,0.55); backdrop-filter: blur(6px); }
 
     .chat {
       width: 100%; height: 100%; padding: 0.9vh 0.7vw;
@@ -582,7 +608,7 @@ function lamprozo_render_layout_page() {
 
     /* Status bar under the GBA screen: top row (game + stats), then a badge row */
     .status {
-      position: absolute; left: 3.45%; top: 84%; width: 62.6%; height: 14%;
+      position: absolute;
       display: flex; flex-direction: column; gap: 0.7vh;
       background: rgba(12, 16, 28, 0.88);
       border: 0.22vh solid var(--border); border-radius: 1.2vh;
@@ -625,15 +651,19 @@ function lamprozo_render_layout_page() {
 <body>
   <canvas id="bg"></canvas>
   <div class="stage">
-    <div class="region region--gba"></div>
+    <div class="region" style="<?php echo $pos($regions['game']); ?>"></div>
 
-    <div class="region region--cam"></div>
+    <div class="region" style="<?php echo $pos($regions['cam']); ?>"></div>
 
-    <div class="region region--chat">
+    <div class="region region--chat" style="<?php echo $pos($regions['chat']); ?>">
       <div class="chat" id="chat"></div>
     </div>
 
-    <div class="status">
+    <?php if ($mode === 'ds'): ?>
+    <div class="region" style="<?php echo $pos($regions['bottom']); ?>"></div>
+    <?php endif; ?>
+
+    <div class="status" style="<?php echo $pos($regions['status']); ?>">
       <div class="status__top">
         <div class="status__card">
           <div class="status__game" id="game"><?php echo esc_html($overlay['game']); ?></div>
@@ -666,10 +696,7 @@ function lamprozo_render_layout_page() {
     function bgResize() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
     bgResize(); window.addEventListener('resize', bgResize);
 
-    var HOLES = [
-      { x: 3.45, y: 7.8, w: 62.6, h: 74.2 },   // GBA screen
-      { x: 70,   y: 7.8, w: 28,   h: 29.9 }    // webcam
-    ];
+    var HOLES = <?php echo wp_json_encode(array_map(function ($r) { return ['x' => $r[0], 'y' => $r[1], 'w' => $r[2], 'h' => $r[3]]; }, $holes)); ?>;
     var ORBS = [
       { ox: 0.15, oy: 0.35, r: 0.30, hueOff:  0,  phase: 0.00 },
       { ox: 0.80, oy: 0.65, r: 0.26, hueOff: 10,  phase: 1.80 },

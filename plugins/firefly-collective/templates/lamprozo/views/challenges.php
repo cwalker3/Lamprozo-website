@@ -119,6 +119,12 @@ function badgeSelect(slug, current) {
     return `<select onchange="updateField('${esc(slug)}','badgeset',this.value)">${opts}</select>`;
 }
 
+function layoutSelect(slug, current) {
+    const opts = [['gba','GBA (1 screen)'],['ds','DS (2 screens)']]
+        .map(([v,l]) => `<option value="${v}"${v===(current||'gba')?' selected':''}>${l}</option>`).join('');
+    return `<select onchange="updateField('${esc(slug)}','layout',this.value)">${opts}</select>`;
+}
+
 function toggleAddForm() {
     const f = document.getElementById('add-form');
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -166,6 +172,7 @@ function renderInfo() {
         ${c.description ? `<p class="cd-desc">${esc(c.description)}</p>` : ''}
         <div class="cd-fields">
             <label>Ruleset<input type="text" value="${esc(c.ruleset||'')}" placeholder="Hardcore Nuzlocke" onchange="updateField('${esc(c.slug)}','ruleset',this.value)"></label>
+            <label>Layout${layoutSelect(c.slug, c.layout)}</label>
             <label>Background theme${themeSelect(c.slug, c.theme)}</label>
             <label>Badge set${badgeSelect(c.slug, c.badgeset)}</label>
         </div>
