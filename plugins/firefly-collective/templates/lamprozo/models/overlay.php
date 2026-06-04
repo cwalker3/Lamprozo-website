@@ -522,11 +522,11 @@ function lamprozo_render_layout_page() {
     if (!in_array($mode, ['gba', 'ds'], true)) { $mode = 'gba'; }
     if ($mode === 'ds') {
         $regions = [
-            'game'   => [2.5, 4.0,  57.0, 76.0],   // top screen (4:3)
-            'cam'    => [69.0, 4.0,  29.0, 29.0],   // webcam (16:9)
-            'chat'   => [69.0, 35.0, 29.0, 20.5],   // chat (middle)
-            'bottom' => [69.0, 57.0, 29.0, 38.7],   // bottom screen (4:3)
-            'status' => [2.5, 81.5, 57.0, 14.5],
+            'game'   => [2.5,  4.0,  57.0, 76.0],   // top screen (4:3)
+            'cam'    => [63.0, 4.0,  32.0, 32.0],   // webcam (16:9)
+            'chat'   => [63.0, 37.0, 32.0, 15.5],   // chat (middle)
+            'bottom' => [63.0, 53.5, 32.0, 42.5],   // bottom screen (4:3)
+            'status' => [2.5,  81.5, 57.0, 14.5],
         ];
     } else {
         $regions = [
