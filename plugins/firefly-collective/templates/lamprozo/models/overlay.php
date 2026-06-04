@@ -521,12 +521,13 @@ function lamprozo_render_layout_page() {
     $mode = isset($_GET['mode']) ? sanitize_key($_GET['mode']) : ($overlay['layout'] ?? 'gba');
     if (!in_array($mode, ['gba', 'ds'], true)) { $mode = 'gba'; }
     if ($mode === 'ds') {
+        // Even gaps: 3.7% (left) + 57% + 3.7% (center) + 32% + 3.7% (right) = 100%.
         $regions = [
-            'game'   => [2.5,  4.0,  57.0, 76.0],   // top screen (4:3)
-            'cam'    => [63.0, 4.0,  32.0, 32.0],   // webcam (16:9)
-            'chat'   => [63.0, 37.0, 32.0, 15.5],   // chat (middle)
-            'bottom' => [63.0, 53.5, 32.0, 42.5],   // bottom screen (4:3)
-            'status' => [2.5,  81.5, 57.0, 14.5],
+            'game'   => [3.7,  4.0,  57.0, 76.0],   // top screen (4:3)
+            'cam'    => [64.4, 4.0,  32.0, 32.0],   // webcam (16:9)
+            'chat'   => [64.4, 37.0, 32.0, 15.5],   // chat (middle)
+            'bottom' => [64.4, 53.5, 32.0, 42.5],   // bottom screen (4:3)
+            'status' => [3.7,  81.5, 57.0, 14.5],
         ];
     } else {
         $regions = [
