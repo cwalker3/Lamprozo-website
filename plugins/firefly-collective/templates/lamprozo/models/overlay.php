@@ -345,13 +345,16 @@ function lamprozo_render_overlay_page() {
         + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
         + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
         + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
-        + ".fx-wipe{position:absolute;top:50%;left:50%;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;font-size:11vh;letter-spacing:.12em;color:#ff3b3b;-webkit-text-stroke:.5vh #1a0000;text-shadow:0 0 4vh rgba(255,0,0,.6);animation:fxWipe 2.6s cubic-bezier(.2,.8,.2,1) forwards}"
+        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:fxSoulsBg 3.6s ease forwards}"
+        + ".fx-souls__band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:46%;background:radial-gradient(ellipse 60% 100% at center,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 72%)}"
+        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;animation:fxSoulsT 3.6s ease forwards}"
         + ".fx-flash{position:absolute;inset:0;opacity:0}"
         + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
         + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
         + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
         + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
-        + "@keyframes fxWipe{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.18)}16%{transform:translate(-50%,-50%) scale(1)}20%{transform:translate(-53%,-50%) scale(1)}24%{transform:translate(-47%,-50%) scale(1)}28%{transform:translate(-52%,-50%) scale(1)}32%{transform:translate(-48%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-58%) scale(1)}}";
+        + "@keyframes fxSoulsBg{0%{background:rgba(0,0,0,0)}16%{background:rgba(0,0,0,.6)}82%{background:rgba(0,0,0,.6)}100%{background:rgba(0,0,0,0)}}"
+        + "@keyframes fxSoulsT{0%{opacity:0;transform:scale(.85);letter-spacing:.22em}26%{opacity:1}86%{opacity:1}100%{opacity:0;transform:scale(1.07);letter-spacing:.08em}}";
       var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
       var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
     })();
@@ -378,9 +381,11 @@ function lamprozo_render_overlay_page() {
       fxSpawn(b, 1900);
     }
     function fxWipe() {
-      fxFlash("red");
-      var w = document.createElement("div"); w.className = "fx-wipe"; w.textContent = "WIPED";
-      fxSpawn(w, 2600);
+      var o = document.createElement("div"); o.className = "fx-souls";
+      var band = document.createElement("div"); band.className = "fx-souls__band";
+      var t = document.createElement("div"); t.className = "fx-souls__t"; t.textContent = "YOU DIED";
+      o.appendChild(band); o.appendChild(t);
+      fxSpawn(o, 3700);
     }
     // Fire effects when stats increase (resets to 0 on a new run never fire).
     function detectFx(data) {
@@ -863,13 +868,16 @@ function lamprozo_render_layout_page() {
         + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
         + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
         + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
-        + ".fx-wipe{position:absolute;top:50%;left:50%;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;font-size:11vh;letter-spacing:.12em;color:#ff3b3b;-webkit-text-stroke:.5vh #1a0000;text-shadow:0 0 4vh rgba(255,0,0,.6);animation:fxWipe 2.6s cubic-bezier(.2,.8,.2,1) forwards}"
+        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:fxSoulsBg 3.6s ease forwards}"
+        + ".fx-souls__band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:46%;background:radial-gradient(ellipse 60% 100% at center,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 72%)}"
+        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;animation:fxSoulsT 3.6s ease forwards}"
         + ".fx-flash{position:absolute;inset:0;opacity:0}"
         + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
         + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
         + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
         + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
-        + "@keyframes fxWipe{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.18)}16%{transform:translate(-50%,-50%) scale(1)}20%{transform:translate(-53%,-50%) scale(1)}24%{transform:translate(-47%,-50%) scale(1)}28%{transform:translate(-52%,-50%) scale(1)}32%{transform:translate(-48%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-58%) scale(1)}}";
+        + "@keyframes fxSoulsBg{0%{background:rgba(0,0,0,0)}16%{background:rgba(0,0,0,.6)}82%{background:rgba(0,0,0,.6)}100%{background:rgba(0,0,0,0)}}"
+        + "@keyframes fxSoulsT{0%{opacity:0;transform:scale(.85);letter-spacing:.22em}26%{opacity:1}86%{opacity:1}100%{opacity:0;transform:scale(1.07);letter-spacing:.08em}}";
       var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
       var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
     })();
@@ -896,9 +904,11 @@ function lamprozo_render_layout_page() {
       fxSpawn(b, 1900);
     }
     function fxWipe() {
-      fxFlash("red");
-      var w = document.createElement("div"); w.className = "fx-wipe"; w.textContent = "WIPED";
-      fxSpawn(w, 2600);
+      var o = document.createElement("div"); o.className = "fx-souls";
+      var band = document.createElement("div"); band.className = "fx-souls__band";
+      var t = document.createElement("div"); t.className = "fx-souls__t"; t.textContent = "YOU DIED";
+      o.appendChild(band); o.appendChild(t);
+      fxSpawn(o, 3700);
     }
     // Fire effects when stats increase (resets to 0 on a new run never fire).
     function detectFx(data) {
