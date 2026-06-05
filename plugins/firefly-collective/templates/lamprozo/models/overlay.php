@@ -336,6 +336,63 @@ function lamprozo_render_overlay_page() {
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
     function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
+
+    // ── Update effects: badge earned / death / wipe (full layout only) ─────────
+    (function () {
+      if (!document.getElementById("bg")) return;   // only the full layout
+      var css = "#fx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}"
+        + ".fx-banner{position:absolute;top:13%;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5em;padding:.45em 1.1em;border-radius:.6em;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;white-space:nowrap;font-size:5vh;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}"
+        + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
+        + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
+        + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
+        + ".fx-wipe{position:absolute;top:50%;left:50%;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;font-size:11vh;letter-spacing:.12em;color:#ff3b3b;-webkit-text-stroke:.5vh #1a0000;text-shadow:0 0 4vh rgba(255,0,0,.6);animation:fxWipe 2.6s cubic-bezier(.2,.8,.2,1) forwards}"
+        + ".fx-flash{position:absolute;inset:0;opacity:0}"
+        + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
+        + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
+        + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
+        + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
+        + "@keyframes fxWipe{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.18)}16%{transform:translate(-50%,-50%) scale(1)}20%{transform:translate(-53%,-50%) scale(1)}24%{transform:translate(-47%,-50%) scale(1)}28%{transform:translate(-52%,-50%) scale(1)}32%{transform:translate(-48%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-58%) scale(1)}}";
+      var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+      var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
+    })();
+
+    function fxSpawn(node, dur) {
+      var r = document.getElementById("fx"); if (!r) return;
+      r.appendChild(node);
+      setTimeout(function () { if (node.parentNode) node.remove(); }, dur);
+    }
+    function fxFlash(kind) { var f = document.createElement("div"); f.className = "fx-flash fx-flash--" + kind; fxSpawn(f, 1300); }
+    function fxBadge(data, n) {
+      fxFlash("gold");
+      var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
+      if (badge) {
+        label = badge.name + " Badge!";
+        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
+      }
+      var b = document.createElement("div"); b.className = "fx-banner fx-badge"; b.innerHTML = img + "<span>" + label + "</span>";
+      fxSpawn(b, 2400);
+    }
+    function fxDeath() {
+      fxFlash("red");
+      var b = document.createElement("div"); b.className = "fx-banner fx-death"; b.innerHTML = "💀 <span>Death</span>";
+      fxSpawn(b, 1900);
+    }
+    function fxWipe() {
+      fxFlash("red");
+      var w = document.createElement("div"); w.className = "fx-wipe"; w.textContent = "WIPED";
+      fxSpawn(w, 2600);
+    }
+    // Fire effects when stats increase (resets to 0 on a new run never fire).
+    function detectFx(data) {
+      if (!document.getElementById("fx")) return;
+      var b = earnedBadges(data.badges), d = parseInt(data.deaths, 10) || 0, a = parseInt(data.attempt, 10) || 0;
+      if (detectFx.seen) {
+        if (b > detectFx.b) fxBadge(data, b);
+        if (d > detectFx.d) fxDeath();
+        if (a > detectFx.a) fxWipe();
+      }
+      detectFx.b = b; detectFx.d = d; detectFx.a = a; detectFx.seen = true;
+    }
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
@@ -376,6 +433,7 @@ function lamprozo_render_overlay_page() {
         }
       });
       renderBadges(data);
+      detectFx(data);
     }
 
     function poll() {
@@ -796,6 +854,63 @@ function lamprozo_render_layout_page() {
 
     function earnedBadges(v) { var m = String(v == null ? "" : v).match(/\d+/); return m ? parseInt(m[0], 10) : 0; }
     function badgeSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-"); }
+
+    // ── Update effects: badge earned / death / wipe (full layout only) ─────────
+    (function () {
+      if (!document.getElementById("bg")) return;   // only the full layout
+      var css = "#fx{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}"
+        + ".fx-banner{position:absolute;top:13%;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.5em;padding:.45em 1.1em;border-radius:.6em;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;white-space:nowrap;font-size:5vh;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}"
+        + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
+        + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
+        + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
+        + ".fx-wipe{position:absolute;top:50%;left:50%;font-family:Inter,'Segoe UI',Arial,sans-serif;font-weight:900;font-size:11vh;letter-spacing:.12em;color:#ff3b3b;-webkit-text-stroke:.5vh #1a0000;text-shadow:0 0 4vh rgba(255,0,0,.6);animation:fxWipe 2.6s cubic-bezier(.2,.8,.2,1) forwards}"
+        + ".fx-flash{position:absolute;inset:0;opacity:0}"
+        + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
+        + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
+        + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
+        + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
+        + "@keyframes fxWipe{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}10%{opacity:1;transform:translate(-50%,-50%) scale(1.18)}16%{transform:translate(-50%,-50%) scale(1)}20%{transform:translate(-53%,-50%) scale(1)}24%{transform:translate(-47%,-50%) scale(1)}28%{transform:translate(-52%,-50%) scale(1)}32%{transform:translate(-48%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1)}85%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-58%) scale(1)}}";
+      var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+      var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
+    })();
+
+    function fxSpawn(node, dur) {
+      var r = document.getElementById("fx"); if (!r) return;
+      r.appendChild(node);
+      setTimeout(function () { if (node.parentNode) node.remove(); }, dur);
+    }
+    function fxFlash(kind) { var f = document.createElement("div"); f.className = "fx-flash fx-flash--" + kind; fxSpawn(f, 1300); }
+    function fxBadge(data, n) {
+      fxFlash("gold");
+      var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
+      if (badge) {
+        label = badge.name + " Badge!";
+        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
+      }
+      var b = document.createElement("div"); b.className = "fx-banner fx-badge"; b.innerHTML = img + "<span>" + label + "</span>";
+      fxSpawn(b, 2400);
+    }
+    function fxDeath() {
+      fxFlash("red");
+      var b = document.createElement("div"); b.className = "fx-banner fx-death"; b.innerHTML = "💀 <span>Death</span>";
+      fxSpawn(b, 1900);
+    }
+    function fxWipe() {
+      fxFlash("red");
+      var w = document.createElement("div"); w.className = "fx-wipe"; w.textContent = "WIPED";
+      fxSpawn(w, 2600);
+    }
+    // Fire effects when stats increase (resets to 0 on a new run never fire).
+    function detectFx(data) {
+      if (!document.getElementById("fx")) return;
+      var b = earnedBadges(data.badges), d = parseInt(data.deaths, 10) || 0, a = parseInt(data.attempt, 10) || 0;
+      if (detectFx.seen) {
+        if (b > detectFx.b) fxBadge(data, b);
+        if (d > detectFx.d) fxDeath();
+        if (a > detectFx.a) fxWipe();
+      }
+      detectFx.b = b; detectFx.d = d; detectFx.a = a; detectFx.seen = true;
+    }
     function renderBadges(data) {
       var el = document.getElementById("badges");
       if (!el) return;
@@ -836,6 +951,7 @@ function lamprozo_render_layout_page() {
         }
       });
       renderBadges(data);
+      detectFx(data);
       // Re-theme the background live when the active game changes (unless ?bg= locked it).
       if (!THEME_LOCKED && data.theme && THEMES[data.theme] && data.theme !== themeName) {
         themeName = data.theme;
