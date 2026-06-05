@@ -345,16 +345,16 @@ function lamprozo_render_overlay_page() {
         + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
         + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
         + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
-        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:fxSoulsBg 3.6s ease forwards}"
+        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);opacity:0;will-change:opacity;animation:fxFade 3.6s ease forwards}"
         + ".fx-souls__band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:46%;background:radial-gradient(ellipse 60% 100% at center,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 72%)}"
-        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;animation:fxSoulsT 3.6s ease forwards}"
+        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;will-change:transform;animation:fxSoulsScale 3.6s ease forwards}"
         + ".fx-flash{position:absolute;inset:0;opacity:0}"
         + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
         + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
         + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
         + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
-        + "@keyframes fxSoulsBg{0%{background:rgba(0,0,0,0)}16%{background:rgba(0,0,0,.6)}82%{background:rgba(0,0,0,.6)}100%{background:rgba(0,0,0,0)}}"
-        + "@keyframes fxSoulsT{0%{opacity:0;transform:scale(.85);letter-spacing:.22em}26%{opacity:1}86%{opacity:1}100%{opacity:0;transform:scale(1.07);letter-spacing:.08em}}";
+        + "@keyframes fxFade{0%{opacity:0}16%{opacity:1}82%{opacity:1}100%{opacity:0}}"
+        + "@keyframes fxSoulsScale{0%{transform:scale(.86)}26%{transform:scale(1)}100%{transform:scale(1.06)}}";
       var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
       var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
     })();
@@ -774,7 +774,7 @@ function lamprozo_render_layout_page() {
       { ox: 0.50, oy: 0.15, r: 0.20, hueOff: -10, phase: 3.50 },
       { ox: 0.30, oy: 0.80, r: 0.23, hueOff: 15,  phase: 2.20 }
     ];
-    var PARTICLES = Array.from({ length: 90 }, function() {
+    var PARTICLES = Array.from({ length: 55 }, function() {
       return {
         x: Math.random(), y: Math.random(),
         size: Math.random() * 2.5 + 0.4,
@@ -796,7 +796,11 @@ function lamprozo_render_layout_page() {
       c.arcTo(x,     y,     x + w, y,     r);
       c.closePath();
     }
+    var bgLast = 0;
     function bgDraw(ts) {
+      requestAnimationFrame(bgDraw);
+      if (ts - bgLast < 33) return;   // ~30fps cap so the main thread stays free for effects
+      bgLast = ts;
       var W = bgCanvas.width, H = bgCanvas.height, t = ts * 0.001;
       var hue = THEME.hue, sat = THEME.sat;
 
@@ -852,8 +856,6 @@ function lamprozo_render_layout_page() {
         bgCtx.fill();
       }
       bgCtx.globalCompositeOperation = 'source-over';
-
-      requestAnimationFrame(bgDraw);
     }
     requestAnimationFrame(bgDraw);
 
@@ -875,16 +877,16 @@ function lamprozo_render_layout_page() {
         + ".fx-badge{background:linear-gradient(135deg,#f7b733,#fc4a1a);box-shadow:0 0 5vh rgba(250,204,21,.85);animation:fxPop 2.4s ease forwards}"
         + ".fx-death{background:linear-gradient(135deg,#b31217,#e52d27);box-shadow:0 0 5vh rgba(255,23,68,.75);animation:fxPop 1.9s ease forwards}"
         + ".fx-emote{height:1.3em;width:auto;vertical-align:middle}"
-        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:fxSoulsBg 3.6s ease forwards}"
+        + ".fx-souls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);opacity:0;will-change:opacity;animation:fxFade 3.6s ease forwards}"
         + ".fx-souls__band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:46%;background:radial-gradient(ellipse 60% 100% at center,rgba(0,0,0,.92) 0%,rgba(0,0,0,0) 72%)}"
-        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;animation:fxSoulsT 3.6s ease forwards}"
+        + ".fx-souls__t{position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:12.5vh;letter-spacing:.12em;color:#a11414;text-shadow:0 0 4vh rgba(150,0,0,.55),0 2px 4px rgba(0,0,0,.6);white-space:nowrap;will-change:transform;animation:fxSoulsScale 3.6s ease forwards}"
         + ".fx-flash{position:absolute;inset:0;opacity:0}"
         + ".fx-flash--gold{background:radial-gradient(ellipse at center,transparent 38%,rgba(250,204,21,.4) 100%);animation:fxFlash 1.3s ease forwards}"
         + ".fx-flash--red{background:radial-gradient(ellipse at center,transparent 32%,rgba(220,20,20,.5) 100%);animation:fxFlash 1.1s ease forwards}"
         + "@keyframes fxPop{0%{opacity:0;transform:translateX(-50%) scale(.4)}12%{opacity:1;transform:translateX(-50%) scale(1.12)}20%{transform:translateX(-50%) scale(1)}82%{opacity:1;transform:translateX(-50%) scale(1)}100%{opacity:0;transform:translateX(-50%) scale(.96)}}"
         + "@keyframes fxFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}"
-        + "@keyframes fxSoulsBg{0%{background:rgba(0,0,0,0)}16%{background:rgba(0,0,0,.6)}82%{background:rgba(0,0,0,.6)}100%{background:rgba(0,0,0,0)}}"
-        + "@keyframes fxSoulsT{0%{opacity:0;transform:scale(.85);letter-spacing:.22em}26%{opacity:1}86%{opacity:1}100%{opacity:0;transform:scale(1.07);letter-spacing:.08em}}";
+        + "@keyframes fxFade{0%{opacity:0}16%{opacity:1}82%{opacity:1}100%{opacity:0}}"
+        + "@keyframes fxSoulsScale{0%{transform:scale(.86)}26%{transform:scale(1)}100%{transform:scale(1.06)}}";
       var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
       var root = document.createElement("div"); root.id = "fx"; document.body.appendChild(root);
     })();
