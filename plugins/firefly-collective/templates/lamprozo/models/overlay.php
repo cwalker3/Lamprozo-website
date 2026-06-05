@@ -365,8 +365,14 @@ function lamprozo_render_overlay_page() {
       setTimeout(function () { if (node.parentNode) node.remove(); }, dur);
     }
     function fxFlash(kind) { var f = document.createElement("div"); f.className = "fx-flash fx-flash--" + kind; fxSpawn(f, 1300); }
+    // Optional sound per effect from uploads/lamprozo/sfx/{name}.mp3 (?vol=0..1).
+    var SFX_VOL = (function () { var v = parseFloat(new URLSearchParams(location.search).get("vol")); return isNaN(v) ? 0.7 : Math.max(0, Math.min(1, v)); })();
+    function fxSound(name) {
+      if (SFX_VOL <= 0) return;
+      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3"); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
+    }
     function fxBadge(data, n) {
-      fxFlash("gold");
+      fxFlash("gold"); fxSound("badge");
       var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
       if (badge) {
         label = badge.name + " Badge!";
@@ -376,11 +382,12 @@ function lamprozo_render_overlay_page() {
       fxSpawn(b, 2400);
     }
     function fxDeath() {
-      fxFlash("red");
+      fxFlash("red"); fxSound("death");
       var b = document.createElement("div"); b.className = "fx-banner fx-death"; b.innerHTML = "💀 <span>Death</span>";
       fxSpawn(b, 1900);
     }
     function fxWipe() {
+      fxSound("wipe");
       var o = document.createElement("div"); o.className = "fx-souls";
       var band = document.createElement("div"); band.className = "fx-souls__band";
       var t = document.createElement("div"); t.className = "fx-souls__t"; t.textContent = "YOU DIED";
@@ -888,8 +895,14 @@ function lamprozo_render_layout_page() {
       setTimeout(function () { if (node.parentNode) node.remove(); }, dur);
     }
     function fxFlash(kind) { var f = document.createElement("div"); f.className = "fx-flash fx-flash--" + kind; fxSpawn(f, 1300); }
+    // Optional sound per effect from uploads/lamprozo/sfx/{name}.mp3 (?vol=0..1).
+    var SFX_VOL = (function () { var v = parseFloat(new URLSearchParams(location.search).get("vol")); return isNaN(v) ? 0.7 : Math.max(0, Math.min(1, v)); })();
+    function fxSound(name) {
+      if (SFX_VOL <= 0) return;
+      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3"); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
+    }
     function fxBadge(data, n) {
-      fxFlash("gold");
+      fxFlash("gold"); fxSound("badge");
       var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
       if (badge) {
         label = badge.name + " Badge!";
@@ -899,11 +912,12 @@ function lamprozo_render_layout_page() {
       fxSpawn(b, 2400);
     }
     function fxDeath() {
-      fxFlash("red");
+      fxFlash("red"); fxSound("death");
       var b = document.createElement("div"); b.className = "fx-banner fx-death"; b.innerHTML = "💀 <span>Death</span>";
       fxSpawn(b, 1900);
     }
     function fxWipe() {
+      fxSound("wipe");
       var o = document.createElement("div"); o.className = "fx-souls";
       var band = document.createElement("div"); band.className = "fx-souls__band";
       var t = document.createElement("div"); t.className = "fx-souls__t"; t.textContent = "YOU DIED";
