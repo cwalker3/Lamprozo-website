@@ -10,18 +10,19 @@
         </div> <!-- Close .content -->
     </main>
 
-    <footer class="site-footer">
+    <footer class="site-footer" role="contentinfo" itemscope itemtype="https://schema.org/WPFooter">
         <div class="footer-background">
             <div class="footer-overlay"></div>
         </div>
-        <div class="footer-content">
+        <div class="footer-content" itemscope itemtype="https://schema.org/Organization">
+            <meta itemprop="name" content="<?php echo esc_attr( get_bloginfo('name') ); ?>">
             <div class="footer-main">
                 <div class="footer-section footer-brand">
                     <div class="footer-logo">
                         <?php if (has_custom_logo()) : ?>
                             <?php the_custom_logo(); ?>
                         <?php else : ?>
-                            <h2 class="footer-site-name"><?php bloginfo('name'); ?></h2>
+                            <h2 class="footer-site-name" itemprop="legalName"><?php bloginfo('name'); ?></h2>
                         <?php endif; ?>
                     </div>
                     <p class="footer-tagline"><?php bloginfo('description'); ?></p>
