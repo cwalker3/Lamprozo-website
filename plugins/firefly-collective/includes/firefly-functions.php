@@ -10,7 +10,7 @@
     require_once('const.php');
 
     // Load core backend models (always loaded regardless of template)
-    $core_models = array('cache', 'db', 'init', 'util', 'geo-schema', 'geo-admin', 'seo-admin', 'analytics', 'debug', 'link-tracking');
+    $core_models = array('cache', 'db', 'init', 'util', 'geo-schema', 'geo-admin', 'seo-admin', 'analytics', 'debug', 'link-tracking', 'encryption', 'migrations-admin');
     foreach($core_models as $model) {
         require_once(plugin_dir_path(__FILE__) . "apps/backend/models/$model.php");
     }
