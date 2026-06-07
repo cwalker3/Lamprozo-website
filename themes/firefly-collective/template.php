@@ -33,6 +33,9 @@
     require_once get_template_directory() . '/models/seo-meta.php';
     require_once get_template_directory() . '/models/seo-schema.php';
 
+    // Email verification codes (signup/login/password-reset primitive).
+    require_once get_template_directory() . '/models/email-verification.php';
+
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {
         require_once get_template_directory() . '/models/template-scoping-admin.php';
