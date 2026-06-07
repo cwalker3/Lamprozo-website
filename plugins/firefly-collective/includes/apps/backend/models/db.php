@@ -2,6 +2,10 @@
 
     // plugin/models/db.php
 
+    if (!defined('ABSPATH')) {
+        exit; // Exit if accessed directly
+    }
+
     function create_table($sql) {
         global $wpdb;
 

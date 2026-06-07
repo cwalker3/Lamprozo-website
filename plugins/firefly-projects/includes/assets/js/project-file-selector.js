@@ -1002,6 +1002,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const checkData = await checkResponse.json();
 
+                    // Surface shared-secret / auth failures as errors instead
+                    // of silently falling through to the "not-exists" branch
+                    // (which would offer to bootstrap an env that may already
+                    // exist — the check just failed auth).
+                    if (!checkData.success) {
+                        throw new Error(checkData.message || 'Server returned an error (status ' + checkResponse.status + ')');
+                    }
+
                     if (checkData.exists) {
                         this.bootstrapStatus = 'exists';
                     } else {
