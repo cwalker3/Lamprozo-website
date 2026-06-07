@@ -1,0 +1,141 @@
+/* Card layout and buttons (your existing styles) */
+
+#referral-program-admin {
+    max-width: 1200px;
+    margin: 0 auto;
+    margin-top: 5vh;
+    padding: 2rem;
+    background-color: #f9f9f9;
+    font-family: Arial, sans-serif;
+  }
+  
+  #referral-program-admin h1 {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  
+  #referral-submissions,
+  #paid-referrals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .referral-card {
+    position: relative;
+    background-color: white;
+    padding: 2.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .referral-card:nth-child(odd)  { background-color: #ffffff; }
+  .referral-card:nth-child(even) { background-color: #f1f1f1; }
+  
+  .referral-details p { margin: 0.25rem 0; }
+  
+  .referral-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .btn-primary {
+    background-color: #0073aa;
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background-color: #005177;
+  }
+  
+  .btn-secondary {
+    background-color: #dc3232;
+    color: #fff;
+  }
+  .btn-secondary:hover {
+    background-color: #a00;
+  }
+  
+  .loader {
+    position: absolute;
+    bottom: 2%;
+    right: 2%;
+  }
+  .loader > img {
+    display: none;
+    max-width: 20px;
+    height: auto;
+  }
+  
+  #paid-referrals-container {
+    margin-top: 3rem;
+  }
+  
+  /* Responsive */
+  @media (max-width: 600px) {
+    .referral-card { padding: 1rem; }
+    .referral-actions {
+      flex-direction: column-reverse;
+      align-items: stretch;
+    }
+    .referral-actions .btn {
+      width: 100%;
+    }
+  }
+  
+  /* ——— Confirmation Modal Styles ——— */
+  
+  .modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .modal.hidden {
+    display: none;
+  }
+  
+  .modal-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+  }
+  
+  .modal-content {
+    position: relative;
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    text-align: center;
+  }
+  
+  .modal-content p {
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+  }
+  
+  .modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  
