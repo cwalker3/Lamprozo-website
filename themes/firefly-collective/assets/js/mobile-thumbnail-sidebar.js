@@ -56,9 +56,13 @@
 			return v ? parseInt( v, 10 ) : 0; // 0 = use framework default
 		}, [] );
 
+		// getEntityRecord('postType', 'attachment', id) is the modern
+		// successor to getMedia(id) — same data, same caching, but the
+		// generic entity API. getMedia was deprecated in WP 6.9; this
+		// avoids the console warning AND survives future removal.
 		const attachment = useSelect( ( select ) => {
 			if ( ! attachmentId ) return null;
-			return select( 'core' ).getMedia( attachmentId );
+			return select( 'core' ).getEntityRecord( 'postType', 'attachment', attachmentId );
 		}, [ attachmentId ] );
 
 		const { editPost } = useDispatch( 'core/editor' );
