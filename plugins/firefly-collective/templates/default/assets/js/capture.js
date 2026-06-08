@@ -78,6 +78,229 @@
         return { show: show, hide: hide, wrap: wrap };
     })();
 
+    // ---------- Warm-up toast ----------
+    // Bottom-right non-blocking progress toast used by the Warm up button.
+    // Same shape as the Agent admin's toast helpers (openToast / updateToast
+    // / succeedToast / failToast / closeToast). Each toast is a fresh DOM
+    // node — the helpers below build, update, and tear it down.
+    function openToast(title, status) {
+        const el = document.createElement('div');
+        el.className = 'firefly-capture-toast';
+        el.innerHTML =
+            '<div class="firefly-capture-toast-head">'
+          +   '<span class="dashicons dashicons-update" aria-hidden="true"></span>'
+          +   '<span class="firefly-capture-toast-title"></span>'
+          + '</div>'
+          + '<div class="firefly-capture-toast-status"></div>'
+          + '<div class="firefly-capture-toast-bar"><div class="firefly-capture-toast-bar-fill"></div></div>';
+        document.body.appendChild(el);
+        el.querySelector('.firefly-capture-toast-title').textContent = title;
+        el.querySelector('.firefly-capture-toast-status').textContent = status || '';
+        return el;
+    }
+    function updateToast(el, status, loaded, total) {
+        if (!el) return;
+        const statusEl = el.querySelector('.firefly-capture-toast-status');
+        const barEl    = el.querySelector('.firefly-capture-toast-bar-fill');
+        if (statusEl) statusEl.textContent = status + (total > 0 ? ' (' + loaded + '/' + total + ')' : '');
+        if (barEl) {
+            const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+            barEl.style.width = pct + '%';
+        }
+    }
+    function succeedToast(el, title, status) {
+        if (!el) return;
+        el.classList.add('is-success');
+        el.querySelector('.dashicons').className = 'dashicons dashicons-yes-alt';
+        el.querySelector('.firefly-capture-toast-title').textContent = title;
+        el.querySelector('.firefly-capture-toast-status').textContent = status || '';
+        const bar = el.querySelector('.firefly-capture-toast-bar-fill');
+        if (bar) bar.style.width = '100%';
+        setTimeout(() => closeToast(el), 3500);
+    }
+    function failToast(el, title, status) {
+        if (!el) return;
+        el.classList.add('is-error');
+        el.querySelector('.dashicons').className = 'dashicons dashicons-warning';
+        el.querySelector('.firefly-capture-toast-title').textContent = title;
+        el.querySelector('.firefly-capture-toast-status').textContent = status || '';
+        setTimeout(() => closeToast(el), 6000);
+    }
+    function closeToast(el) {
+        if (!el || !el.parentNode) return;
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+    }
+
+    // ---------- Warm up handler ----------
+    // POSTs the existing firefly-capture/v1/agent/warm route — the same
+    // endpoint the Agent admin's Warm up button uses. The route is an SSE
+    // pass-through that hits Ragsmith's POST /agents/{name}/load, which
+    // emits start | progress | <final> events as it loads KBs, the
+    // embedding model, helper LLMs (doc chooser, vision), and the chat
+    // model into VRAM. Browser parses with the same fetch().body.getReader()
+    // pattern the Agent uses (EventSource doesn't support POST).
+    let warmInFlight = false;
+    async function onWarm() {
+        if (warmInFlight) return;
+        warmInFlight = true;
+        const btn = els.warmBtn;
+        if (btn) btn.classList.add('is-warming');
+        const toast = openToast('Warming up agent…', 'Talking to Ragsmith…');
+
+        try {
+            const resp = await fetch(REST + '/agent/warm', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-WP-Nonce': NONCE,
+                    'Accept': 'text/event-stream',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),  // server fills agent + model from settings
+            });
+            if (!resp.ok) {
+                const txt = await resp.text().catch(() => '');
+                throw new Error('Warm HTTP ' + resp.status + ': ' + txt.slice(0, 200));
+            }
+            if (!resp.body) throw new Error('No response body to stream.');
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let total = 0;
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const blocks = buffer.split('\n\n');
+                buffer = blocks.pop();
+                for (const block of blocks) {
+                    let dataLine = '';
+                    for (const line of block.split('\n')) {
+                        if (line.startsWith('data:')) dataLine += line.slice(5).trim() + '\n';
+                    }
+                    dataLine = dataLine.replace(/\n$/, '');
+                    if (!dataLine) continue;
+                    let data = null;
+                    try { data = JSON.parse(dataLine); } catch (e) { data = dataLine; }
+                    if (data && typeof data === 'object') {
+                        if (typeof data.total === 'number' && data.loaded === undefined) {
+                            total = data.total;
+                            updateToast(toast, 'Starting…', 0, total);
+                        } else if (typeof data.loaded === 'number') {
+                            total = total || data.total || 0;
+                            updateToast(toast, data.status || 'Loading…', data.loaded, total || data.loaded);
+                        } else if (data.name !== undefined && data.settings !== undefined) {
+                            updateToast(toast, 'Ready', 1, 1);
+                        }
+                    }
+                }
+            }
+            succeedToast(toast, 'Agent warmed up', 'KBs loaded · model in VRAM · ready');
+            // Refresh the warm-state pill so it picks up the new
+            // last_activity timestamp immediately. fetchWarmStatus()
+            // re-renders the pill from the server's truth, then the
+            // 60s tick interval keeps "Xm ago" current.
+            fetchWarmStatus().catch(() => {});
+        } catch (e) {
+            console.error('[FireflyCapture] warm failed:', e);
+            failToast(toast, 'Warm-up failed', String(e && e.message ? e.message : e));
+        } finally {
+            warmInFlight = false;
+            if (btn) btn.classList.remove('is-warming');
+        }
+    }
+
+    // ---------- Warm-state pill ----------
+    // Indicator next to the Warm up button. Hidden until we confirm the
+    // agent is loaded via GET /firefly-capture/v1/agent/status, then
+    // shows "Warm · Xm ago" sourced from the response's last_activity.
+    // The "Xm ago" text ticks every 60s via a local interval so it
+    // stays accurate without hitting the server. localStorage caches
+    // the last known state so the pill renders instantly on page
+    // reopen (no flicker before the fresh status fetch lands).
+    const LS_WARM_KEY = 'firefly-capture/last-warm/v1';
+    let warmPillState = null;   // { ready: bool, lastActivity: <ms>, agent: <name> }
+    let warmTickHandle = null;
+
+    function renderWarmPill() {
+        if (!els.warmPill) return;
+        if (!warmPillState || !warmPillState.ready || !warmPillState.lastActivity) {
+            els.warmPill.hidden = true;
+            return;
+        }
+        const ago = Date.now() - warmPillState.lastActivity;
+        if (els.warmPillText) {
+            els.warmPillText.textContent = 'Warm · ' + fmtAgo(ago);
+        }
+        els.warmPill.hidden = false;
+    }
+    function fmtAgo(ms) {
+        if (ms < 0) return 'just now';
+        const s = Math.floor(ms / 1000);
+        if (s < 60)    return 'just now';
+        const m = Math.floor(s / 60);
+        if (m < 60)    return m + 'm ago';
+        const h = Math.floor(m / 60);
+        if (h < 24)    return h + 'h ago';
+        return Math.floor(h / 24) + 'd ago';
+    }
+    function startWarmTick() {
+        if (warmTickHandle) return;
+        warmTickHandle = setInterval(renderWarmPill, 60000);
+    }
+    function saveWarmCache(state) {
+        try {
+            if (state && state.ready) {
+                window.localStorage.setItem(LS_WARM_KEY, JSON.stringify(state));
+            } else {
+                window.localStorage.removeItem(LS_WARM_KEY);
+            }
+        } catch (e) { /* localStorage blocked; in-memory state still works */ }
+    }
+    function loadWarmCache() {
+        try {
+            const raw = window.localStorage.getItem(LS_WARM_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.ready && typeof parsed.lastActivity === 'number') return parsed;
+        } catch (e) {}
+        return null;
+    }
+    async function fetchWarmStatus() {
+        try {
+            const resp = await fetch(REST + '/agent/status', {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'X-WP-Nonce': NONCE, 'Accept': 'application/json' },
+            });
+            if (!resp.ok) {
+                // 400 means no agent configured; clear the pill quietly.
+                warmPillState = null;
+                saveWarmCache(null);
+                renderWarmPill();
+                return;
+            }
+            const data = await resp.json();
+            const ready = !!(data && data.ready);
+            const last  = (data && data.readiness && data.readiness.last_activity) || null;
+            const lastMs = last ? Date.parse(last) : null;
+            if (ready && lastMs) {
+                warmPillState = { ready: true, lastActivity: lastMs, agent: data.agent || '' };
+            } else {
+                warmPillState = null;
+            }
+            saveWarmCache(warmPillState);
+            renderWarmPill();
+        } catch (e) {
+            // Network errors are non-fatal — keep whatever state we had.
+            console.warn('[FireflyCapture] warm status fetch failed:', e);
+        }
+    }
+
     // ---------- Modal ----------
     // Promise-returning replacement for window.alert / confirm / prompt.
     // One root element is appended to <body> on first open and reused — the
@@ -1172,6 +1395,9 @@
         els.status         = $('firefly-capture-status');
         els.newBtn         = $('firefly-capture-new');
         els.toggleList     = $('firefly-capture-toggle-list');
+        els.warmBtn        = $('firefly-capture-warm');
+        els.warmPill       = $('firefly-capture-warm-pill');
+        els.warmPillText   = $('firefly-capture-warm-pill-text');
         els.sessionBtn     = $('firefly-capture-session-btn');
         els.sessionLabel   = $('firefly-capture-session-label');
         els.sessionPopover = $('firefly-capture-session-popover');
@@ -1234,6 +1460,9 @@
         if (els.sessionNew) {
             els.sessionNew.addEventListener('click', () => { createSession(); closeSessionPopover(); });
         }
+        if (els.warmBtn) {
+            els.warmBtn.addEventListener('click', onWarm);
+        }
         if (els.toggleList) {
             els.toggleList.addEventListener('click', () => {
                 const wrap = document.querySelector('.firefly-capture');
@@ -1282,6 +1511,16 @@
         bindRefs();
         if (!els.list) return;
         bindEvents();
+
+        // Warm-state pill: paint from localStorage immediately (no flicker),
+        // start the 60s "Xm ago" tick, then fire a single fresh status
+        // fetch against /agent/status. The fetch overrides the cached
+        // state when it lands. After this, the pill updates only on
+        // warm-up success or the next page load.
+        warmPillState = loadWarmCache();
+        renderWarmPill();
+        startWarmTick();
+        fetchWarmStatus().catch(() => {});
 
         // While async work is in flight, give the user something to look at.
         els.list.innerHTML = '<li class="firefly-capture-empty">Loading&hellip;</li>';

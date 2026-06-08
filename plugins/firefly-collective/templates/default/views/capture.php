@@ -15,6 +15,30 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
     <div class="firefly-capture-header">
         <h1 class="wp-heading-inline">Capture</h1>
 
+        <!-- Warm up button. Pre-loads everything the next chat / dictation
+             save will need (KBs into memory, embedding model, helper LLMs,
+             chat model in VRAM) by hitting the existing
+             firefly-capture/v1/agent/warm route — the same endpoint the
+             Agent admin uses. Streams progress events to a bottom-right
+             toast so the user can keep working while the warm-up runs. -->
+        <button type="button"
+                class="page-title-action firefly-capture-icon-btn firefly-capture-warm-btn"
+                id="firefly-capture-warm"
+                aria-label="Warm up agent"
+                title="Pre-load KBs, embeddings, helper LLMs, and the chat model so the first message responds fast">
+            <span class="dashicons dashicons-superhero" aria-hidden="true"></span>
+            <span class="firefly-capture-btn-label">Warm up</span>
+        </button>
+
+        <!-- Warm-state indicator pill. Hidden by default; the JS shows it
+             when GET /agent/status returns `ready: true`, with text like
+             "Warm · 4m ago" sourced from the response's last_activity.
+             Local 60s tick keeps the relative time fresh without polling. -->
+        <span class="firefly-capture-warm-pill" id="firefly-capture-warm-pill" hidden role="status" aria-live="polite">
+            <span class="firefly-capture-warm-dot" aria-hidden="true"></span>
+            <span class="firefly-capture-warm-pill-text" id="firefly-capture-warm-pill-text"></span>
+        </span>
+
         <!-- Session picker: the session is the shared container across all three
              modes. The bound Ragsmith conversation receives messages from
              every mode in the active session. -->
