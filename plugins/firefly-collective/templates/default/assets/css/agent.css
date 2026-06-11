@@ -1,0 +1,1303 @@
+/* ==========================================================================
+   Firefly Agent — admin page styling.
+
+   Borrows the layout chrome (header, sidebar, layout grid, mobile slide-
+   over) from capture.css by reusing the `.firefly-capture-*` class names
+   in the agent view's wrapper. Anything *agent-specific* (transcript,
+   message bubbles, composer input bar, thinking/steps disclosures, tool
+   approval card) lives below with the `.firefly-agent-*` prefix.
+
+   Visual language: WP admin defaults (Calibri/system-ui body, dashicons)
+   with firefly amber accents on highlights. Conversation flow uses
+   neutral grays so the user's eye lands on the actual prose, not on UI.
+   ========================================================================== */
+
+:root {
+    --firefly-agent-bubble-user:     #fff7e3;
+    --firefly-agent-bubble-user-bd:  #f3d995;
+    --firefly-agent-bubble-asst:     #f8fafc;
+    --firefly-agent-bubble-asst-bd:  #e2e8f0;
+    --firefly-agent-text:            #1f2937;
+    --firefly-agent-text-muted:      #6b7280;
+    --firefly-agent-accent:          #f5b544;
+    --firefly-agent-accent-strong:   #d99b2c;
+    --firefly-agent-accent-soft:     #fff7e3;
+    --firefly-agent-bg:              #ffffff;
+    --firefly-agent-border:          #e5e7eb;
+}
+
+/* The firefly-agent wrapper inherits Capture's chrome where possible.
+   We re-declare a few things to scope them tighter to agent and avoid
+   surprises if Capture's CSS isn't loaded on this page (it isn't —
+   Capture and Agent are separate admin pages with their own enqueues). */
+
+.firefly-agent,
+.firefly-agent *,
+.firefly-agent *::before,
+.firefly-agent *::after {
+    box-sizing: border-box;
+}
+
+/* HTML's default `[hidden] { display: none }` (specificity 0,1,0) loses to
+   any class rule that sets `display: …` (specificity 0,2,0 once nested),
+   which is why the typing caret was sticking around after a stream ended
+   even with `hidden="true"` set. Re-asserting it at higher specificity +
+   !important wins regardless of what later rules set. */
+.firefly-agent [hidden] { display: none !important; }
+
+/* ============================================================
+   Header (mirror of Capture's header for visual consistency)
+   ============================================================ */
+.firefly-agent .firefly-agent-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+    padding-inline: 12px;
+}
+.firefly-agent .firefly-agent-header h1.wp-heading-inline {
+    margin: 0 auto 0 0;
+    line-height: 1.3;
+}
+.firefly-agent .firefly-capture-btn-label {
+    /* hide labels on header buttons; icon-only */
+}
+@media (max-width: 782px) {
+    .firefly-agent .firefly-capture-btn-label { display: none; }
+}
+.firefly-agent .firefly-capture-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    line-height: 1;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    color: #50575e !important;
+    text-shadow: none !important;
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
+    min-height: 36px;
+    min-width: 36px;
+    font-weight: 500;
+    transition: background-color 120ms ease, color 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.firefly-agent .firefly-capture-icon-btn:hover {
+    background: rgba(15, 23, 42, 0.06) !important;
+    color: #1d2327 !important;
+}
+.firefly-agent .firefly-capture-icon-btn:focus,
+.firefly-agent .firefly-capture-icon-btn:active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: #50575e !important;
+    outline: none !important;
+}
+.firefly-agent .firefly-capture-icon-btn:focus-visible {
+    outline: 2px solid var(--firefly-agent-accent) !important;
+    outline-offset: 1px;
+}
+.firefly-agent .firefly-capture-icon-btn .dashicons {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transform: translateY(1px);
+}
+
+.firefly-agent hr.wp-header-end {
+    margin-bottom: 12px;
+    border-color: var(--firefly-agent-border);
+}
+
+/* ============================================================
+   Layout (sidebar + main)
+   ============================================================ */
+.firefly-agent .firefly-agent-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    align-items: stretch;
+    min-height: calc(100vh - 200px);
+}
+
+/* Sidebar */
+.firefly-agent .firefly-agent-sidebar {
+    background: var(--firefly-agent-bg);
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 6px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    padding: 10px 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.firefly-agent .firefly-agent-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 12px 8px;
+    border-bottom: 1px solid var(--firefly-agent-border);
+}
+.firefly-agent .firefly-agent-sidebar-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    font-weight: 600;
+}
+.firefly-agent .firefly-agent-count {
+    font-size: 11px;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+.firefly-agent .firefly-agent-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+.firefly-agent .firefly-agent-item {
+    display: block;
+    position: relative;
+    padding: 0;
+    margin: 0;
+}
+.firefly-agent .firefly-agent-item-row {
+    display: flex;
+    align-items: stretch;
+    position: relative;
+}
+.firefly-agent .firefly-agent-item-link {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.firefly-agent .firefly-agent-item-row:hover {
+    background: rgba(15, 23, 42, 0.04);
+}
+.firefly-agent .firefly-agent-item.is-active .firefly-agent-item-row {
+    background: var(--firefly-agent-accent-soft);
+}
+
+/* Per-item trash button — hidden until hover on desktop so the sidebar
+   stays clean; always-visible on mobile (no hover). */
+.firefly-agent .firefly-agent-item-delete {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    margin: 4px 8px 4px 0;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.firefly-agent .firefly-agent-item-row:hover .firefly-agent-item-delete,
+.firefly-agent .firefly-agent-item-delete:focus-visible {
+    opacity: 1;
+}
+.firefly-agent .firefly-agent-item-delete:hover {
+    background: rgba(220, 38, 38, 0.10);
+    color: #b91c1c;
+}
+.firefly-agent .firefly-agent-item-delete .dashicons {
+    width: 16px; height: 16px;
+    font-size: 16px;
+    line-height: 1;
+}
+@media (max-width: 782px) {
+    .firefly-agent .firefly-agent-item-delete { opacity: 1; }
+}
+
+/* ============================================================
+   Modal dialog (confirm / alert)
+   Forced box-sizing on every descendant since the modal mounts to
+   <body>, outside .firefly-agent's global border-box scope.
+   ============================================================ */
+.firefly-agent-modal-root,
+.firefly-agent-modal-root *,
+.firefly-agent-modal-root *::before,
+.firefly-agent-modal-root *::after {
+    box-sizing: border-box;
+}
+.firefly-agent-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100001; /* above WP admin bar + the warm-up toast */
+}
+.firefly-agent-modal-root[hidden] { display: none !important; }
+.firefly-agent-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 18, 22, 0.55);
+    backdrop-filter: blur(2px);
+    animation: firefly-agent-modal-bg-in 140ms ease-out;
+}
+@keyframes firefly-agent-modal-bg-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.firefly-agent-modal-dialog {
+    position: relative;
+    margin: 12vh auto 0;
+    width: min(440px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 24vh);
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 22px 22px 16px;
+    animation: firefly-agent-modal-in 160ms ease-out;
+}
+@keyframes firefly-agent-modal-in {
+    from { transform: translateY(-8px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.firefly-agent-modal-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #1d2327;
+}
+.firefly-agent-modal-message {
+    margin: 0 0 14px;
+    color: #4b5563;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.firefly-agent-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.firefly-agent-modal-cancel,
+.firefly-agent-modal-ok {
+    min-width: 88px;
+    padding: 7px 16px !important;
+    border-radius: 8px !important;
+    border: 1px solid #d1d5db !important;
+    background: #fff !important;
+    color: #1f2937 !important;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: background-color 120ms ease, border-color 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.firefly-agent-modal-cancel:hover {
+    background: #f3f4f6 !important;
+}
+.firefly-agent-modal-ok {
+    background: var(--firefly-agent-accent) !important;
+    border-color: var(--firefly-agent-accent-strong) !important;
+    color: #1d2327 !important;
+}
+.firefly-agent-modal-ok:hover {
+    background: var(--firefly-agent-accent-strong) !important;
+}
+.firefly-agent-modal-ok.is-danger {
+    background: #dc2626 !important;
+    border-color: #b91c1c !important;
+    color: #fff !important;
+}
+.firefly-agent-modal-ok.is-danger:hover {
+    background: #b91c1c !important;
+}
+.firefly-agent-modal-ok:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+.firefly-agent-modal-cancel:focus-visible,
+.firefly-agent-modal-ok:focus-visible {
+    outline: 2px solid var(--firefly-agent-accent);
+    outline-offset: 2px;
+}
+.firefly-agent .firefly-agent-item-title {
+    font-weight: 500;
+    color: var(--firefly-agent-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-agent .firefly-agent-item-meta {
+    font-size: 11px;
+    color: var(--firefly-agent-text-muted);
+}
+.firefly-agent .firefly-capture-empty {
+    padding: 16px 14px;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Main pane */
+.firefly-agent .firefly-agent-main {
+    background: var(--firefly-agent-bg);
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 6px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.firefly-agent .firefly-agent-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--firefly-agent-border);
+    background: linear-gradient(180deg, #fbfcfd 0%, #ffffff 100%);
+}
+.firefly-agent .firefly-agent-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--firefly-agent-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-agent .firefly-agent-meta {
+    font-size: 11px;
+    color: var(--firefly-agent-text-muted);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   Transcript + bubbles
+   ============================================================ */
+.firefly-agent .firefly-agent-transcript {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 18px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+}
+
+/* Empty state shown on a fresh/unbound session before any messages exist. */
+.firefly-agent .firefly-agent-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--firefly-agent-text-muted);
+    gap: 8px;
+    padding: 32px 16px;
+}
+.firefly-agent .firefly-agent-empty-icon {
+    color: #cbd5e1;
+}
+.firefly-agent .firefly-agent-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--firefly-agent-text);
+}
+.firefly-agent .firefly-agent-empty-hint {
+    font-size: 13px;
+    max-width: 360px;
+    line-height: 1.5;
+}
+
+/* Common message styling */
+.firefly-agent .firefly-agent-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 86%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.55;
+    font-size: 14px;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
+.firefly-agent .firefly-agent-msg-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--firefly-agent-text-muted);
+}
+.firefly-agent .firefly-agent-msg-role {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    color: var(--firefly-agent-text);
+}
+.firefly-agent .firefly-agent-msg-model,
+.firefly-agent .firefly-agent-msg-time {
+    font-size: 11px;
+}
+.firefly-agent .firefly-agent-msg-body {
+    color: var(--firefly-agent-text);
+    white-space: pre-wrap;
+}
+/* When markdown has been rendered into innerHTML we drop pre-wrap so
+   <p>, <ul>, etc. flow naturally. */
+.firefly-agent .firefly-agent-msg-body.is-rendered {
+    white-space: normal;
+}
+.firefly-agent .firefly-agent-msg-body p:first-child  { margin-top: 0; }
+.firefly-agent .firefly-agent-msg-body p:last-child   { margin-bottom: 0; }
+.firefly-agent .firefly-agent-msg-body ul,
+.firefly-agent .firefly-agent-msg-body ol {
+    margin: .35em 0 .55em;
+    padding-left: 1.4em;
+}
+.firefly-agent .firefly-agent-msg-body code {
+    background: #f3f4f6;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 0.92em;
+}
+.firefly-agent .firefly-agent-msg-body pre {
+    background: #f3f4f6;
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
+    margin: .5em 0;
+}
+.firefly-agent .firefly-agent-msg-body pre code {
+    background: transparent;
+    padding: 0;
+    font-size: inherit;
+}
+.firefly-agent .firefly-agent-msg-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: .5em 0;
+    font-size: 13px;
+}
+.firefly-agent .firefly-agent-msg-body th,
+.firefly-agent .firefly-agent-msg-body td {
+    border: 1px solid var(--firefly-agent-border);
+    padding: 5px 8px;
+    text-align: left;
+}
+.firefly-agent .firefly-agent-msg-body th {
+    background: #f9fafb;
+    font-weight: 600;
+}
+.firefly-agent .firefly-agent-msg-body blockquote {
+    border-left: 3px solid var(--firefly-agent-accent);
+    margin: .5em 0;
+    padding: 0 0 0 12px;
+    color: #4b5563;
+}
+.firefly-agent .firefly-agent-msg-body a {
+    color: var(--firefly-agent-accent-strong);
+    text-decoration: underline;
+}
+
+/* User bubble — right-aligned, amber tint */
+.firefly-agent .firefly-agent-msg--user {
+    align-self: flex-end;
+    background: var(--firefly-agent-bubble-user);
+    border: 1px solid var(--firefly-agent-bubble-user-bd);
+}
+.firefly-agent .firefly-agent-msg--user .firefly-agent-msg-role {
+    color: #8a6c2d;
+}
+
+/* Assistant bubble — left-aligned, slate */
+.firefly-agent .firefly-agent-msg--assistant {
+    align-self: flex-start;
+    background: var(--firefly-agent-bubble-asst);
+    border: 1px solid var(--firefly-agent-bubble-asst-bd);
+}
+
+/* Error bubble — full width, soft red */
+.firefly-agent .firefly-agent-msg--error {
+    align-self: stretch;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    padding: 10px 14px;
+}
+.firefly-agent .firefly-agent-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #991b1b;
+    font-size: 13px;
+}
+.firefly-agent .firefly-agent-error .dashicons {
+    color: #b91c1c;
+}
+.firefly-agent .firefly-agent-error-text { flex: 1; }
+.firefly-agent .firefly-agent-retry {
+    margin-left: auto;
+}
+
+/* Typing caret while text_chunk events flow in */
+.firefly-agent .firefly-agent-typing-caret {
+    display: inline-block;
+    color: var(--firefly-agent-accent-strong);
+    margin-left: 2px;
+    animation: firefly-agent-blink 1s steps(2) infinite;
+}
+@keyframes firefly-agent-blink {
+    50% { opacity: 0; }
+}
+
+/* ============================================================
+   Disclosures — Thinking + Steps panels above the assistant prose
+   ============================================================ */
+.firefly-agent .firefly-agent-disclosure {
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 8px;
+    background: #fcfcfd;
+    margin: 0 0 4px;
+    font-size: 12px;
+}
+.firefly-agent .firefly-agent-disclosure > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--firefly-agent-text-muted);
+    user-select: none;
+}
+.firefly-agent .firefly-agent-disclosure > summary::-webkit-details-marker { display: none; }
+.firefly-agent .firefly-agent-disclosure > summary::before {
+    content: '▸';
+    color: #94a3b8;
+    transition: transform 120ms ease;
+}
+.firefly-agent .firefly-agent-disclosure[open] > summary::before {
+    transform: rotate(90deg);
+}
+.firefly-agent .firefly-agent-disclosure-icon .dashicons {
+    width: 14px; height: 14px;
+    font-size: 14px;
+    line-height: 1;
+    color: #94a3b8;
+}
+.firefly-agent .firefly-agent-disclosure-label {
+    font-weight: 500;
+    color: #475569;
+}
+.firefly-agent .firefly-agent-disclosure-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #94a3b8;
+}
+.firefly-agent .firefly-agent-disclosure-body {
+    padding: 8px 12px 10px;
+    color: #475569;
+    white-space: pre-wrap;
+    line-height: 1.55;
+    font-size: 12.5px;
+    max-height: 240px;
+    overflow-y: auto;
+    border-top: 1px solid var(--firefly-agent-border);
+}
+.firefly-agent .firefly-agent-steps-list {
+    margin: 0;
+    padding: 8px 12px 10px 30px;
+    border-top: 1px solid var(--firefly-agent-border);
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #475569;
+}
+.firefly-agent .firefly-agent-steps-list li {
+    margin: 2px 0;
+}
+.firefly-agent .firefly-agent-steps-list li .firefly-agent-step-kind {
+    color: #6b7280;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    margin-right: 6px;
+}
+
+/* ============================================================
+   Busy overlay — fullscreen blocker shown during destructive
+   ops that talk to Ragsmith (session delete cascade). Ported
+   from Capture's busy module for visual consistency.
+   ============================================================ */
+.firefly-agent-busy-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999; /* below modal-root's higher z so confirms always win */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(15, 18, 22, 0.35);
+    backdrop-filter: blur(1px);
+    cursor: wait;
+    pointer-events: all;
+}
+.firefly-agent-busy-overlay[hidden] { display: none; }
+.firefly-agent-busy-spinner {
+    width: 44px;
+    height: 44px;
+    border: 4px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: firefly-agent-busy-spin 0.9s linear infinite;
+}
+@keyframes firefly-agent-busy-spin {
+    to { transform: rotate(360deg); }
+}
+.firefly-agent-busy-label {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ============================================================
+   Capture header — surfaces notes / recordings / documents from
+   the bound Capture session above the chat transcript so they
+   don't pollute the conversation flow. Built on the existing
+   .firefly-agent-disclosure pattern; sections + items add the
+   nested-list look on top.
+   ============================================================ */
+.firefly-agent .firefly-agent-capture {
+    margin: 0 0 8px;
+}
+.firefly-agent .firefly-agent-capture[hidden] { display: none !important; }
+.firefly-agent .firefly-agent-capture-body {
+    border-top: 1px solid var(--firefly-agent-border);
+    padding: 6px 10px 8px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+.firefly-agent .firefly-agent-capture-section {
+    margin: 4px 0 8px;
+}
+.firefly-agent .firefly-agent-capture-section[hidden] { display: none !important; }
+.firefly-agent .firefly-agent-capture-section-title {
+    margin: 6px 0 4px;
+    padding: 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+}
+.firefly-agent .firefly-agent-capture-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.firefly-agent .firefly-agent-capture-list li { margin: 0; padding: 0; }
+.firefly-agent .firefly-agent-capture-item {
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 6px;
+    background: var(--firefly-agent-bg);
+    margin: 0 0 4px;
+    font-size: 12.5px;
+}
+.firefly-agent .firefly-agent-capture-item > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--firefly-agent-text);
+    user-select: none;
+}
+.firefly-agent .firefly-agent-capture-item > summary::-webkit-details-marker { display: none; }
+.firefly-agent .firefly-agent-capture-item > summary::before {
+    content: '▸';
+    color: #94a3b8;
+    transition: transform 120ms ease;
+    flex-shrink: 0;
+}
+.firefly-agent .firefly-agent-capture-item[open] > summary::before { transform: rotate(90deg); }
+.firefly-agent .firefly-agent-capture-item-title {
+    font-weight: 500;
+    color: #1f2937;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.firefly-agent .firefly-agent-capture-item-meta {
+    font-size: 11px;
+    color: var(--firefly-agent-text-muted);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.firefly-agent .firefly-agent-capture-item-body {
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--firefly-agent-border);
+    background: #fcfcfd;
+}
+.firefly-agent .firefly-agent-capture-loading {
+    color: var(--firefly-agent-text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+.firefly-agent .firefly-agent-capture-subsection { margin: 6px 0 0; }
+.firefly-agent .firefly-agent-capture-subsection:first-child { margin-top: 0; }
+.firefly-agent .firefly-agent-capture-subsection[hidden] { display: none !important; }
+.firefly-agent .firefly-agent-capture-subtitle {
+    margin: 0 0 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+}
+.firefly-agent .firefly-agent-capture-subcount {
+    font-weight: 400;
+    color: #94a3b8;
+    margin-left: 4px;
+}
+.firefly-agent .firefly-agent-capture-subbody {
+    color: #374151;
+    line-height: 1.55;
+    font-size: 12.5px;
+}
+.firefly-agent .firefly-agent-capture-subbody--pre {
+    white-space: pre-wrap;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+}
+.firefly-agent .firefly-agent-capture-audio {
+    width: 100%;
+    margin-bottom: 8px;
+}
+.firefly-agent .firefly-agent-capture-facts {
+    list-style: disc;
+    margin: 0;
+    padding: 0 0 0 20px;
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: #374151;
+}
+.firefly-agent .firefly-agent-capture-facts li { margin: 2px 0; }
+
+/* Thin, translucent scrollbars for the Capture header scrollers so the
+   chrome doesn't distract from the content. Firefox uses scrollbar-color
+   + scrollbar-width; WebKit/Chromium uses the ::-webkit-scrollbar pseudo
+   elements. The disclosure bodies (Thinking / Steps) reuse the same
+   treatment for visual consistency. */
+.firefly-agent .firefly-agent-capture-body,
+.firefly-agent .firefly-agent-capture-subbody--pre,
+.firefly-agent .firefly-agent-capture-facts,
+.firefly-agent .firefly-agent-disclosure-body,
+.firefly-agent .firefly-agent-steps-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+.firefly-agent .firefly-agent-capture-body::-webkit-scrollbar,
+.firefly-agent .firefly-agent-capture-subbody--pre::-webkit-scrollbar,
+.firefly-agent .firefly-agent-capture-facts::-webkit-scrollbar,
+.firefly-agent .firefly-agent-disclosure-body::-webkit-scrollbar,
+.firefly-agent .firefly-agent-steps-list::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.firefly-agent .firefly-agent-capture-body::-webkit-scrollbar-track,
+.firefly-agent .firefly-agent-capture-subbody--pre::-webkit-scrollbar-track,
+.firefly-agent .firefly-agent-capture-facts::-webkit-scrollbar-track,
+.firefly-agent .firefly-agent-disclosure-body::-webkit-scrollbar-track,
+.firefly-agent .firefly-agent-steps-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.firefly-agent .firefly-agent-capture-body::-webkit-scrollbar-thumb,
+.firefly-agent .firefly-agent-capture-subbody--pre::-webkit-scrollbar-thumb,
+.firefly-agent .firefly-agent-capture-facts::-webkit-scrollbar-thumb,
+.firefly-agent .firefly-agent-disclosure-body::-webkit-scrollbar-thumb,
+.firefly-agent .firefly-agent-steps-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+}
+.firefly-agent .firefly-agent-capture-body::-webkit-scrollbar-thumb:hover,
+.firefly-agent .firefly-agent-capture-subbody--pre::-webkit-scrollbar-thumb:hover,
+.firefly-agent .firefly-agent-capture-facts::-webkit-scrollbar-thumb:hover,
+.firefly-agent .firefly-agent-disclosure-body::-webkit-scrollbar-thumb:hover,
+.firefly-agent .firefly-agent-steps-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.28);
+}
+.firefly-agent .firefly-agent-capture-body::-webkit-scrollbar-corner,
+.firefly-agent .firefly-agent-capture-subbody--pre::-webkit-scrollbar-corner,
+.firefly-agent .firefly-agent-capture-facts::-webkit-scrollbar-corner,
+.firefly-agent .firefly-agent-disclosure-body::-webkit-scrollbar-corner,
+.firefly-agent .firefly-agent-steps-list::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* ============================================================
+   Per-message action bar (Redo + Delete on assistant bubbles)
+   Mirrors Ragsmith Web UI's footer on assistant messages.
+   ============================================================ */
+.firefly-agent .firefly-agent-msg-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--firefly-agent-border);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+.firefly-agent .firefly-agent-msg-actions[hidden] { display: none !important; }
+/* Reveal on bubble hover (desktop) — matches Web UI's subtle reveal. */
+.firefly-agent .firefly-agent-msg--assistant:hover .firefly-agent-msg-actions,
+.firefly-agent .firefly-agent-msg--assistant:focus-within .firefly-agent-msg-actions {
+    opacity: 1;
+}
+/* On touch devices (no hover capability), keep the bar visible since
+   there's no hover state to trigger it. */
+@media (hover: none) {
+    .firefly-agent .firefly-agent-msg-actions { opacity: 1; }
+}
+.firefly-agent .firefly-agent-msg-action {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--firefly-agent-text-muted);
+    cursor: pointer;
+    transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.firefly-agent .firefly-agent-msg-action:hover {
+    background: #f3f4f6;
+    color: var(--firefly-agent-text);
+    border-color: var(--firefly-agent-border);
+}
+.firefly-agent .firefly-agent-msg-action:focus-visible {
+    outline: 2px solid var(--firefly-agent-accent);
+    outline-offset: 1px;
+}
+.firefly-agent .firefly-agent-msg-action.firefly-agent-msg-delete:hover {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+.firefly-agent .firefly-agent-msg-action[hidden] { display: none !important; }
+
+/* ============================================================
+   Redo modal — reuses confirm-modal chrome but adds a textarea
+   for editing the prompt before resubmitting. Same backdrop +
+   dialog as confirmModal() so the styling is consistent.
+   ============================================================ */
+.firefly-agent-modal-dialog.firefly-agent-redo-dialog {
+    max-width: 580px;
+    width: 92vw;
+}
+.firefly-agent-redo-dialog .firefly-agent-redo-textarea {
+    width: 100%;
+    min-height: 140px;
+    resize: vertical;
+    padding: 10px 12px;
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--firefly-agent-text);
+    background: #ffffff;
+    box-sizing: border-box;
+}
+.firefly-agent-redo-dialog .firefly-agent-redo-textarea:focus {
+    outline: none;
+    border-color: var(--firefly-agent-accent);
+    box-shadow: 0 0 0 3px var(--firefly-agent-accent-soft);
+}
+.firefly-agent-redo-dialog .firefly-agent-redo-hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--firefly-agent-text-muted);
+}
+
+/* ============================================================
+   Tool approval card
+   ============================================================ */
+.firefly-agent .firefly-agent-approval {
+    align-self: stretch;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.firefly-agent .firefly-agent-approval-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #92400e;
+}
+.firefly-agent .firefly-agent-approval-head .dashicons {
+    color: #d97706;
+}
+.firefly-agent .firefly-agent-approval-title {
+    font-weight: 600;
+    font-size: 13px;
+}
+.firefly-agent .firefly-agent-approval-body {
+    color: #1f2937;
+    font-size: 13px;
+    white-space: pre-wrap;
+    background: #fff;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.firefly-agent .firefly-agent-approval-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ============================================================
+   Per-chat toggle chips — sit just above the composer.
+   Browser-side overrides that the PHP route unions with the
+   agent's admin-config defaults. Each chip can only further
+   restrict what tools the LLM may use, never enable what was
+   admin-disabled.
+   ============================================================ */
+.firefly-agent .firefly-agent-chips {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px 0;
+    background: #fbfcfd;
+}
+.firefly-agent .firefly-agent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--firefly-agent-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.firefly-agent .firefly-agent-chip:hover {
+    border-color: #cbd5e1;
+    color: var(--firefly-agent-text);
+}
+.firefly-agent .firefly-agent-chip:focus-visible {
+    outline: 2px solid var(--firefly-agent-accent);
+    outline-offset: 1px;
+}
+/* "On" state — the toggle is enabled for the next chat turn. The
+   accent fill mirrors the user bubble color so the chip reads
+   visually as "active" without needing extra labels. */
+.firefly-agent .firefly-agent-chip[aria-pressed="true"] {
+    background: var(--firefly-agent-accent-soft);
+    border-color: var(--firefly-agent-accent);
+    color: var(--firefly-agent-accent-strong);
+}
+.firefly-agent .firefly-agent-chip[aria-pressed="true"]:hover {
+    background: #ffefcf;
+}
+.firefly-agent .firefly-agent-chip-icon {
+    flex-shrink: 0;
+}
+.firefly-agent .firefly-agent-chip-label { white-space: nowrap; }
+
+/* ============================================================
+   Composer / input bar
+   ============================================================ */
+.firefly-agent .firefly-agent-composer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 12px 14px;
+    border-top: 1px solid var(--firefly-agent-border);
+    background: #fbfcfd;
+}
+.firefly-agent .firefly-agent-input-wrap {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--firefly-agent-border);
+    border-radius: 12px;
+    padding: 6px 10px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.firefly-agent .firefly-agent-input-wrap:focus-within {
+    border-color: var(--firefly-agent-accent);
+    box-shadow: 0 0 0 2px rgba(245, 181, 68, 0.18);
+}
+.firefly-agent .firefly-agent-input {
+    width: 100%;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--firefly-agent-text);
+    resize: none;
+    max-height: 200px;
+    min-height: 24px;
+    padding: 4px 0;
+}
+.firefly-agent .firefly-agent-send,
+.firefly-agent .firefly-agent-cancel {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--firefly-agent-accent);
+    color: #1d2327;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    transition: background-color 120ms ease, transform 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.firefly-agent .firefly-agent-send:hover:not(:disabled) {
+    background: var(--firefly-agent-accent-strong);
+}
+.firefly-agent .firefly-agent-send:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.firefly-agent .firefly-agent-cancel {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+.firefly-agent .firefly-agent-cancel:hover {
+    background: #fecaca;
+}
+.firefly-agent .firefly-agent-send .dashicons,
+.firefly-agent .firefly-agent-cancel .dashicons {
+    width: 18px; height: 18px;
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* ============================================================
+   Warm-state indicator pill — sits to the right of the Warm up
+   button in the header. Populated by GET /agent/status. Same UX
+   as Capture's pill.
+   ============================================================ */
+.firefly-agent-warm-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-left: 4px;
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #15803d;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+.firefly-agent-warm-pill[hidden] { display: none !important; }
+.firefly-agent-warm-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+    flex-shrink: 0;
+}
+.firefly-agent-warm-pill-text { white-space: nowrap; }
+
+/* ============================================================
+   Warm-up state — pulse the button + show a progress toast
+   ============================================================ */
+.firefly-agent .firefly-agent-warm-btn.is-warming {
+    color: var(--firefly-agent-accent-strong) !important;
+    animation: firefly-agent-pulse 1.2s ease-in-out infinite;
+}
+@keyframes firefly-agent-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
+.firefly-agent-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100000;
+    background: #fff;
+    border: 1px solid var(--firefly-agent-border);
+    border-left: 4px solid var(--firefly-agent-accent);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    padding: 12px 16px;
+    min-width: 280px;
+    max-width: 380px;
+    font-size: 13px;
+    color: var(--firefly-agent-text);
+    transition: opacity 200ms ease, transform 200ms ease;
+}
+.firefly-agent-toast[hidden] { display: none !important; }
+.firefly-agent-toast.is-success { border-left-color: #16a34a; }
+.firefly-agent-toast.is-error   { border-left-color: #dc2626; }
+.firefly-agent-toast-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.firefly-agent-toast-head .dashicons {
+    color: var(--firefly-agent-accent-strong);
+}
+.firefly-agent-toast.is-success .firefly-agent-toast-head .dashicons { color: #16a34a; }
+.firefly-agent-toast.is-error   .firefly-agent-toast-head .dashicons { color: #dc2626; }
+.firefly-agent-toast-status {
+    color: var(--firefly-agent-text-muted);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+.firefly-agent-toast-bar {
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.firefly-agent-toast-bar-fill {
+    height: 100%;
+    background: var(--firefly-agent-accent);
+    width: 0%;
+    transition: width 200ms ease;
+}
+.firefly-agent-toast.is-success .firefly-agent-toast-bar-fill { background: #16a34a; }
+
+/* ============================================================
+   Mobile slide-over sidebar (same UX as Capture)
+   ============================================================ */
+@media (max-width: 782px) {
+    /* Kill WP-admin horizontal chrome so the chat goes edge-to-edge. */
+    body.toplevel_page_firefly-agent #wpcontent,
+    body.toplevel_page_firefly-agent #wpbody,
+    body.toplevel_page_firefly-agent #wpbody-content {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    body.toplevel_page_firefly-agent .wrap.firefly-agent {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .firefly-agent {
+        margin: 0;
+        padding: 12px 0 0;
+        height: calc(100vh - 46px);
+        height: calc(100dvh - 46px);
+        max-width: 100vw;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .firefly-agent .firefly-agent-layout {
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        position: relative;
+        grid-template-columns: none;
+    }
+    .firefly-agent .firefly-agent-sidebar {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        margin: 0;
+    }
+    .firefly-agent.show-sidebar .firefly-agent-sidebar {
+        display: flex;
+    }
+    .firefly-agent .firefly-agent-main {
+        flex: 1;
+        min-height: 0;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        margin: 0;
+    }
+    .firefly-agent .firefly-agent-msg { max-width: 92%; font-size: 15px; }
+    .firefly-agent .firefly-agent-input { font-size: 16px; /* iOS no-zoom */ }
+}

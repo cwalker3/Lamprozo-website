@@ -86,13 +86,19 @@
                             })
                         )
                     ),
+                    // __next40pxDefaultSize: true opts into the modern
+                    // 40px control height (default in WP 7.1+). Without
+                    // it, WP 6.8+ logs a deprecation warning on every
+                    // editor mount that renders this block.
                     el(TextControl, {
+                        __next40pxDefaultSize: true,
                         label: __('Question', 'firefly-projects'),
                         value: faq.question || '',
                         onChange: (val) => updateFaq(index, 'question', val),
                         placeholder: __('Enter your question...', 'firefly-projects')
                     }),
                     el(TextareaControl, {
+                        __next40pxDefaultSize: true,
                         label: __('Answer', 'firefly-projects'),
                         value: faq.answer || '',
                         onChange: (val) => updateFaq(index, 'answer', val),
@@ -120,8 +126,12 @@
         return null;
     };
 
-    // Register the block
+    // Register the block. apiVersion: 3 opts into the iframed editor +
+    // modern block-instance API (default expectation in WP 6.3+).
+    // Without it the block is treated as API v1 (deprecated since 6.9)
+    // and Gutenberg logs a console warning on every editor load.
     registerBlockType('firefly/faq', {
+        apiVersion: 3,
         title: __('FAQ Section', 'firefly-projects'),
         description: __('Add frequently asked questions with accordion UI and FAQPage schema for AI visibility.', 'firefly-projects'),
         icon: 'editor-help',

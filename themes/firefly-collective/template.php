@@ -25,10 +25,16 @@
     // Include centralised template options (Customizer registration, save, preview, CSS)
     require_once get_template_directory() . '/models/template-options.php';
 
+    // Include mobile featured image (parallel thumbnail with <picture> rendering)
+    require_once get_template_directory() . '/models/template-mobile-thumbnail.php';
+
     // Framework SEO: Open Graph / Twitter + JSON-LD + meta description + canonical + robots.
     // Per-page _seo_* overrides resolve inside these files; nothing else to wire.
     require_once get_template_directory() . '/models/seo-meta.php';
     require_once get_template_directory() . '/models/seo-schema.php';
+
+    // Email verification codes (signup/login/password-reset primitive).
+    require_once get_template_directory() . '/models/email-verification.php';
 
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {

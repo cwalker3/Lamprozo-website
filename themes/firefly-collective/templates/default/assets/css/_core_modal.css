@@ -1,0 +1,246 @@
+/**
+ * Professional Modal System Styles
+ * Firefly Collective Branding
+ */
+
+/* Backdrop */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+    padding: 20px;
+}
+
+.modal-backdrop.active {
+    opacity: 1;
+}
+
+/* Modal Container */
+.modal-container {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 100%;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 200ms ease-out;
+}
+
+.modal-backdrop.active .modal-container {
+    transform: scale(1);
+}
+
+/* Modal Header */
+.modal-header {
+    padding: 24px 24px 16px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.modal-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.modal-icon-question {
+    background-color: #dbeafe;
+    color: #0066cc;
+}
+
+.modal-icon-warning {
+    background-color: #fef3c7;
+    color: #f59e0b;
+}
+
+.modal-icon-error {
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.modal-icon-info {
+    background-color: #dbeafe;
+    color: #3b82f6;
+}
+
+.modal-icon svg {
+    width: 32px;
+    height: 32px;
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    flex: 1;
+}
+
+/* Modal Body */
+.modal-body {
+    padding: 16px 24px 24px 24px;
+}
+
+.modal-message {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #4b5563;
+    margin: 0;
+}
+
+/* Modal Footer */
+.modal-footer {
+    padding: 16px 24px 24px 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.modal-footer-single {
+    justify-content: center;
+}
+
+/* Modal Buttons */
+.modal-btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    outline: none;
+    min-width: 100px;
+}
+
+.modal-btn:focus {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}
+
+.modal-btn:active {
+    transform: scale(0.98);
+}
+
+/* Cancel Button */
+.modal-btn-cancel {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.modal-btn-cancel:hover {
+    background-color: #e5e7eb;
+}
+
+.modal-btn-cancel:active {
+    background-color: #d1d5db;
+}
+
+/* Primary Button */
+.modal-btn-primary {
+    background-color: #0066cc;
+    color: #ffffff;
+}
+
+.modal-btn-primary:hover {
+    background-color: #0052a3;
+}
+
+.modal-btn-primary:active {
+    background-color: #003d7a;
+}
+
+/* Danger Button */
+.modal-btn-danger {
+    background-color: #ef4444;
+    color: #ffffff;
+}
+
+.modal-btn-danger:hover {
+    background-color: #dc2626;
+}
+
+.modal-btn-danger:active {
+    background-color: #b91c1c;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+    .modal-backdrop {
+        padding: 16px;
+    }
+
+    .modal-container {
+        border-radius: 8px;
+    }
+
+    .modal-header {
+        padding: 20px 20px 12px 20px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .modal-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .modal-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .modal-title {
+        font-size: 18px;
+    }
+
+    .modal-body {
+        padding: 12px 20px 20px 20px;
+    }
+
+    .modal-message {
+        font-size: 14px;
+    }
+
+    .modal-footer {
+        padding: 12px 20px 20px 20px;
+        flex-direction: column-reverse;
+    }
+
+    .modal-btn {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .modal-footer-single {
+        flex-direction: column;
+    }
+}
+
+/* Accessibility: Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    .modal-backdrop,
+    .modal-container,
+    .modal-btn {
+        transition: none;
+    }
+}

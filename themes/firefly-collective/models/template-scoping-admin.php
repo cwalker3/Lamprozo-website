@@ -316,6 +316,99 @@ function firefly_fix_recently_edited_menu() {
 }
 
 /**
+ * Prepare the Menus screen for template scoping before WordPress processes it.
+ *
+ * 1. Heal orphaned menus: any nav_menu term with no _firefly_template meta is
+ *    adopted into the active template. Such menus are otherwise invisible on
+ *    every template (firefly_filter_nav_menus_by_template matches on template).
+ * 2. Intercept menu creation: WordPress treats nav_menu *names* as globally
+ *    unique (wp_update_nav_menu_object rejects a name already used by any menu,
+ *    via get_term_by('name') which uses suppress_filter and cannot be hooked).
+ *    That defeats template scoping, where each template should be free to have
+ *    its own "Main Menu" just like pages/posts share slugs per template. So we
+ *    create the menu ourselves with a per-template-unique slug -- which
+ *    wp_insert_term allows for a duplicate name -- and tag it with the template.
+ *    Name uniqueness is still enforced, but only *within* the active template.
+ */
+add_action('load-nav-menus.php', 'firefly_prepare_menus_screen', 5);
+
+function firefly_prepare_menus_screen() {
+    $template = firefly_get_scoping_template();
+
+    // 1. Heal orphaned menus. Query terms directly so we bypass the
+    //    wp_get_nav_menus template filter, which would hide the very orphans
+    //    we need to fix (get_terms_args scoping does not touch nav_menu).
+    $all_menus = get_terms(array(
+        'taxonomy'   => 'nav_menu',
+        'hide_empty' => false,
+    ));
+    if (is_array($all_menus)) {
+        foreach ($all_menus as $menu) {
+            $menu_template = get_term_meta($menu->term_id, FIREFLY_TEMPLATE_META_KEY, true);
+            if (empty($menu_template)) {
+                update_term_meta($menu->term_id, FIREFLY_TEMPLATE_META_KEY, $template);
+            }
+        }
+    }
+
+    // 2. Intercept the "Create Menu" submit (menu id 0) so the new menu is
+    //    scoped to the active template and may reuse a name from another one.
+    $is_create = (
+        isset($_SERVER['REQUEST_METHOD']) && 'POST' === $_SERVER['REQUEST_METHOD']
+        && !empty($_POST['save_menu'])
+        && 0 === (isset($_REQUEST['menu']) ? (int) $_REQUEST['menu'] : 0)
+        && isset($_POST['menu-name'])
+        && isset($_POST['update-nav-menu-nonce'])
+        && wp_verify_nonce($_POST['update-nav-menu-nonce'], 'update-nav_menu')
+    );
+    if (!$is_create) {
+        return;
+    }
+
+    $name = trim(wp_unslash($_POST['menu-name']));
+
+    // Enforce name uniqueness within the active template only. If this template
+    // already has a menu with this name, fall through and let core show its
+    // standard "conflicts with another menu name" notice.
+    $named = get_terms(array('taxonomy' => 'nav_menu', 'hide_empty' => false, 'name' => $name));
+    if (is_array($named)) {
+        foreach ($named as $term) {
+            if (get_term_meta($term->term_id, FIREFLY_TEMPLATE_META_KEY, true) === $template) {
+                return;
+            }
+        }
+    }
+
+    $new_id = firefly_create_scoped_menu($name, $template);
+    if (is_wp_error($new_id)) {
+        return; // Let core surface the error (e.g. empty name).
+    }
+
+    // Honor the new-menu form settings, mirroring wp-admin/nav-menus.php.
+    if (!empty($_POST['menu-locations'])) {
+        $new_locations = array_map('absint', (array) $_POST['menu-locations']);
+        $locations     = get_nav_menu_locations();
+        foreach (array_keys($new_locations) as $location) {
+            $locations[$location] = $new_id;
+        }
+        set_theme_mod('nav_menu_locations', $locations);
+    }
+    if (!empty($_POST['auto-add-pages'])) {
+        $nav_menu_option              = (array) get_option('nav_menu_options');
+        $nav_menu_option['auto_add']  = isset($nav_menu_option['auto_add']) ? $nav_menu_option['auto_add'] : array();
+        if (!in_array($new_id, $nav_menu_option['auto_add'], true)) {
+            $nav_menu_option['auto_add'][] = $new_id;
+        }
+        update_option('nav_menu_options', $nav_menu_option);
+    }
+
+    // Land on the freshly created menu.
+    update_user_meta(get_current_user_id(), 'nav_menu_recently_edited', $new_id);
+    wp_safe_redirect(admin_url('nav-menus.php?menu=' . $new_id));
+    exit;
+}
+
+/**
  * Filter menu dropdown on nav-menus.php to only show active template's menus.
  */
 add_filter('wp_get_nav_menus', 'firefly_filter_nav_menus_by_template', 10, 2);
@@ -369,6 +462,7 @@ function firefly_filter_nav_menu_queries($query) {
  * Auto-assign template meta when a new menu is created via the admin UI.
  */
 add_action('wp_update_nav_menu', 'firefly_auto_scope_new_menu', 10, 2);
+add_action('wp_create_nav_menu', 'firefly_auto_scope_new_menu', 10, 2);
 
 function firefly_auto_scope_new_menu($menu_id, $menu_data = array()) {
     // Only set if no template meta exists yet

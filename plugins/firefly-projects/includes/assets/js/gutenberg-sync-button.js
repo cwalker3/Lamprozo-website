@@ -649,7 +649,10 @@
                     path: '/firefly-plugin/v1/pull-page',
                     method: 'POST',
                     data: {
+                        firefly_page_id: selectedPage.firefly_page_id || '',
                         post_slug: selectedPage.slug,
+                        template: selectedPage.firefly_page_id && selectedPage.firefly_page_id.indexOf(':') !== -1
+                            ? selectedPage.firefly_page_id.split(':')[0] : '',
                         source_env: sourceEnv
                     }
                 });

@@ -1,0 +1,2081 @@
+/* Firefly Notes — admin page styling.
+   Native wp-admin chrome with firefly amber accents. The recording mic
+   stays red on purpose — "recording" reads more clearly as red than amber.
+*/
+
+:root {
+    --firefly-capture-accent:        #f5b544;             /* firefly amber */
+    --firefly-capture-accent-strong: #d99b2c;             /* amber hover/strong */
+    --firefly-capture-accent-soft:   #fff7e3;             /* amber-tinted cream for active-row bg */
+    --firefly-capture-accent-text:   #8a6c2d;             /* dark amber for saved-status text */
+    --firefly-capture-bg:            #f6f7f7;
+    --firefly-capture-border:        #dcdcde;
+    --firefly-capture-shadow:        0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Border-box everywhere inside this page so width:100% + padding never
+   overflows. (Without this, narrow viewports like iPhone SE 375px get
+   a horizontal scrollbar from the textarea + main panel padding.) */
+.firefly-capture,
+.firefly-capture *,
+.firefly-capture *::before,
+.firefly-capture *::after {
+    box-sizing: border-box;
+}
+
+/* Header row: keep h1 + action buttons on the same line, wrap if needed */
+.firefly-capture-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.firefly-capture-header h1.wp-heading-inline {
+    margin: 0 auto 0 0; /* push buttons to the right */
+    line-height: 1.3;
+}
+
+/* All icon-bearing buttons: force flex centering so dashicons sit
+   centered in the button regardless of WP's vertical-align: top default. */
+.firefly-capture-icon-btn,
+.firefly-capture-edit,
+.firefly-capture-mute {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    line-height: 1;
+}
+.firefly-capture-icon-btn .dashicons,
+.firefly-capture-edit .dashicons,
+.firefly-capture-mute .dashicons,
+.firefly-capture-mic .dashicons {
+    vertical-align: middle; /* override WP's .dashicons { vertical-align: top } */
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.firefly-capture-icon-btn .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.firefly-capture hr.wp-header-end {
+    margin-bottom: 16px;
+}
+
+/* Session picker: header button + click-out popover with CRUD over local sessions. */
+.firefly-capture-session-picker {
+    position: relative;
+    display: inline-flex;
+}
+.firefly-capture-session-btn {
+    /* Make the active session label visually distinct from the action buttons. */
+    border-color: var(--firefly-capture-border);
+}
+.firefly-capture-session-btn .firefly-capture-session-label {
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-capture-session-btn .dashicons-arrow-down-alt2 {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+.firefly-capture-session-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 30;
+    width: 280px;
+    background: #fff;
+    border: 1px solid var(--firefly-capture-border);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+    padding: 10px 10px 8px;
+}
+.firefly-capture-session-popover[hidden] { display: none; }
+.firefly-capture-session-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.firefly-capture-session-popover-head strong {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #2c3338;
+}
+.firefly-capture-session-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.firefly-capture-session-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    padding: 2px;
+}
+.firefly-capture-session-item:hover { background: var(--firefly-capture-bg); }
+.firefly-capture-session-item.is-active { background: var(--firefly-capture-accent-soft); }
+.firefly-capture-session-pick {
+    flex: 1 1 auto;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 6px 8px;
+    cursor: pointer;
+    font: inherit;
+    color: #1d2327;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-capture-session-pick:focus { outline: 2px solid var(--firefly-capture-accent); outline-offset: -2px; }
+.firefly-capture-session-action {
+    background: none;
+    border: 0;
+    padding: 6px;
+    cursor: pointer;
+    color: #50575e;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.firefly-capture-session-action:hover { color: #1d2327; background: rgba(0, 0, 0, 0.06); }
+.firefly-capture-session-delete:hover { color: #b32d2e; }
+.firefly-capture-session-action .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+.firefly-capture-session-hint {
+    margin: 8px 2px 0;
+    color: #646970;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+/* Save to AI button — explicit user-triggered persist of the note's
+   content to the Ragsmith conversation with fact extraction. */
+.firefly-capture-ai-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #f5b544 0%, #ff8a3d 100%);
+    border-color: #d99b2c;
+    color: #1d2327;
+    font-weight: 600;
+}
+.firefly-capture-ai-save:hover {
+    background: linear-gradient(135deg, #ffc764 0%, #ff9a4d 100%);
+    border-color: #c98a1d;
+    color: #1d2327;
+}
+.firefly-capture-ai-save:disabled {
+    background: #e3e3e3;
+    border-color: #c6c6c6;
+    color: #757575;
+    cursor: not-allowed;
+}
+.firefly-capture-ai-save.is-synced {
+    background: #f0f0f1;
+    border-color: #c6c6c6;
+    color: #50575e;
+    font-weight: 500;
+}
+.firefly-capture-ai-save.is-synced:hover {
+    background: #e6e6e7;
+    color: #1d2327;
+}
+.firefly-capture-ai-sparkles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+}
+.firefly-capture-ai-sparkles svg {
+    display: block;
+}
+/* On mobile the label hides and we show just the sparkles icon, like the
+   other icon-only buttons. */
+@media (max-width: 782px) {
+    .firefly-capture-ai-save .firefly-capture-ai-save-label {
+        display: none;
+    }
+}
+
+/* Modal — Promise-based replacement for window.alert/confirm/prompt.
+   The modal-root is appended to <body>, NOT inside .firefly-capture,
+   so the global `box-sizing: border-box` rule (which is scoped to
+   `.firefly-capture *`) doesn't reach it. Without an explicit border-
+   box here, `width: min(440px, calc(100vw - 32px))` measures only the
+   content area — the 22px side padding then bloats the outer box to
+   ~440px on a 428 viewport, spilling off the right edge. Forcing
+   border-box on every modal descendant makes the width calculation
+   include padding so the dialog stays inside its gutter. */
+.firefly-capture-modal-root,
+.firefly-capture-modal-root *,
+.firefly-capture-modal-root *::before,
+.firefly-capture-modal-root *::after {
+    box-sizing: border-box;
+}
+.firefly-capture-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100000; /* above WP admin bar and notice areas */
+}
+.firefly-capture-modal-root[hidden] { display: none; }
+.firefly-capture-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 18, 22, 0.55);
+    backdrop-filter: blur(2px);
+}
+.firefly-capture-modal-dialog {
+    position: relative;
+    margin: 12vh auto 0;
+    /* Belt-and-suspenders: width caps + max-width caps + a max-height
+       with internal scroll for unusually long messages. The 16px
+       per-side gutter shrinks to 12px on narrow phones via the media
+       query below. */
+    width: min(440px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 24vh);
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 22px 22px 16px;
+    animation: firefly-capture-modal-in 140ms ease-out;
+}
+@media (max-width: 480px) {
+    .firefly-capture-modal-dialog {
+        width: calc(100vw - 24px);
+        max-width: calc(100vw - 24px);
+        margin-top: 8vh;
+        padding: 18px 18px 14px;
+    }
+}
+@keyframes firefly-capture-modal-in {
+    from { transform: translateY(-8px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.firefly-capture-modal-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #1d2327;
+}
+.firefly-capture-modal-body {
+    color: #1d2327;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.firefly-capture-modal-message {
+    margin: 0 0 12px;
+}
+.firefly-capture-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 4px 0 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--firefly-capture-border);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+    background: #fff;
+    color: #1d2327;
+    outline: none;
+}
+.firefly-capture-modal-input:focus {
+    border-color: var(--firefly-capture-accent-strong);
+    box-shadow: 0 0 0 2px rgba(245, 181, 68, 0.25);
+}
+.firefly-capture-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.firefly-capture-modal-cancel,
+.firefly-capture-modal-ok {
+    min-width: 88px;
+}
+/* Danger variant — destructive confirms (delete note, delete session) */
+.firefly-capture-modal-ok.button-danger {
+    background: #b32d2e;
+    border-color: #a02526;
+    color: #fff;
+}
+.firefly-capture-modal-ok.button-danger:hover {
+    background: #9c1f20;
+    border-color: #8a1819;
+    color: #fff;
+}
+.firefly-capture-modal-ok.button-danger:focus {
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px rgba(179, 45, 46, 0.45);
+}
+.firefly-capture-modal-dialog.is-danger .firefly-capture-modal-title {
+    color: #8a1819;
+}
+
+/* Fullscreen busy overlay shown during destructive async ops (delete note,
+   delete session). Sits above everything except the modal — modal stacks
+   higher because it's the foreground confirm. */
+.firefly-capture-busy-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999; /* below modal-root's 100000 so confirms always win */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(15, 18, 22, 0.35);
+    backdrop-filter: blur(1px);
+    cursor: wait;
+    /* Block clicks beneath. */
+    pointer-events: all;
+}
+.firefly-capture-busy-overlay[hidden] { display: none; }
+.firefly-capture-busy-spinner {
+    width: 44px;
+    height: 44px;
+    border: 4px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: firefly-capture-busy-spin 0.9s linear infinite;
+}
+@keyframes firefly-capture-busy-spin {
+    to { transform: rotate(360deg); }
+}
+.firefly-capture-busy-label {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ============================================================
+   Warm-up state — pulse the button + show a progress toast.
+   Same pattern as the Agent admin's warm-up affordance, so a
+   user moving between Capture and Agent sees identical UX.
+   ============================================================ */
+.firefly-capture-warm-btn.is-warming {
+    color: #d99b2c !important;
+    animation: firefly-capture-warm-pulse 1.2s ease-in-out infinite;
+}
+@keyframes firefly-capture-warm-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
+
+/* Warm-state indicator pill — sits to the right of the Warm up button
+   in the header. Populated by GET /agent/status (last_activity drives
+   the "Xm ago" text). Hidden until the JS confirms ready: true. */
+.firefly-capture-warm-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-left: 4px;
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #15803d;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+.firefly-capture-warm-pill[hidden] { display: none !important; }
+.firefly-capture-warm-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+    flex-shrink: 0;
+}
+.firefly-capture-warm-pill-text { white-space: nowrap; }
+
+/* Bottom-right non-blocking toast that streams warm-up progress.
+   Lives at z-index above the busy overlay (which is 99999) so the
+   two never collide visually if the user fires a destructive op
+   while warm-up is in flight. */
+.firefly-capture-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100000;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #f5b544;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 12px 16px;
+    min-width: 280px;
+    max-width: 380px;
+    font-size: 13px;
+    color: #1f2937;
+    transition: opacity 200ms ease, transform 200ms ease;
+}
+.firefly-capture-toast[hidden] { display: none !important; }
+.firefly-capture-toast.is-success { border-left-color: #16a34a; }
+.firefly-capture-toast.is-error   { border-left-color: #dc2626; }
+.firefly-capture-toast-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.firefly-capture-toast-head .dashicons {
+    color: #d99b2c;
+}
+.firefly-capture-toast.is-success .firefly-capture-toast-head .dashicons { color: #16a34a; }
+.firefly-capture-toast.is-error   .firefly-capture-toast-head .dashicons { color: #dc2626; }
+.firefly-capture-toast-status {
+    color: #6b7280;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+.firefly-capture-toast-bar {
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.firefly-capture-toast-bar-fill {
+    height: 100%;
+    background: #f5b544;
+    width: 0%;
+    transition: width 200ms ease;
+}
+.firefly-capture-toast.is-success .firefly-capture-toast-bar-fill { background: #16a34a; }
+
+/* Layout */
+.firefly-capture-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+/* Hide the firefly-ragsmith built-in dictation panel — we drive it via API. */
+#firefly-capture-dictation-host .ffrs-dictation-panel,
+#firefly-capture-dictation-host {
+    position: absolute !important;
+    left: -10000px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+}
+
+/* Sidebar */
+.firefly-capture-sidebar {
+    background: #fff;
+    border: 1px solid var(--firefly-capture-border);
+    border-radius: 6px;
+    box-shadow: var(--firefly-capture-shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 46px;
+}
+.firefly-capture-sidebar-head {
+    padding: 12px 14px;
+    background: var(--firefly-capture-bg);
+    border-bottom: 1px solid var(--firefly-capture-border);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1d2327;
+}
+.firefly-capture-count {
+    font-weight: 400;
+    color: #646970;
+    font-size: 12px;
+    background: #fff;
+    padding: 1px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--firefly-capture-border);
+}
+.firefly-capture-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+.firefly-capture-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--firefly-capture-border);
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 8px;
+    transition: background-color .12s ease;
+}
+.firefly-capture-item-link {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+}
+.firefly-capture-item:hover {
+    background: var(--firefly-capture-bg);
+}
+.firefly-capture-item.is-active {
+    background: var(--firefly-capture-accent-soft);
+    border-left: 3px solid var(--firefly-capture-accent);
+    padding-left: 11px;
+}
+.firefly-capture-item-delete {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: #c92a2a;
+    font-size: 18px;
+    line-height: 1;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity .15s ease, background-color .15s ease;
+}
+.firefly-capture-item-delete:hover {
+    opacity: 1;
+    background: rgba(201, 42, 42, 0.1);
+}
+.firefly-capture-item-title {
+    font-weight: 500;
+    color: #1d2327;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.firefly-capture-item-date {
+    font-size: 11px;
+    color: #646970;
+}
+.firefly-capture-empty {
+    padding: 16px 14px;
+    color: #646970;
+    font-style: italic;
+}
+
+/* Main panel */
+.firefly-capture-main {
+    background: #fff;
+    border: 1px solid var(--firefly-capture-border);
+    border-radius: 6px;
+    box-shadow: var(--firefly-capture-shadow);
+    padding: 18px 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: calc(100vh - 200px);
+}
+
+.firefly-capture-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.firefly-capture-title-input {
+    flex: 1;
+    font-size: 18px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 6px 8px;
+    border-radius: 4px;
+    color: #1d2327;
+}
+.firefly-capture-title-input:hover { border-color: var(--firefly-capture-border); }
+.firefly-capture-title-input:focus {
+    border-color: var(--firefly-capture-accent);
+    outline: 2px solid rgba(245, 181, 68, .25);
+    background: #fff;
+}
+
+.firefly-capture-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #646970;
+    padding: 0 8px;
+}
+.firefly-capture-saved-status {
+    color: var(--firefly-capture-accent-text);
+    font-weight: 500;
+}
+
+/* Transcript */
+.firefly-capture-transcript {
+    flex: 1;
+    width: 100%;
+    min-height: 360px;
+    border: 1px solid var(--firefly-capture-border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 15px;
+    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    resize: vertical;
+    background: #fff;
+    color: #1d2327;
+}
+.firefly-capture-transcript:focus {
+    border-color: var(--firefly-capture-accent);
+    outline: 2px solid rgba(245, 181, 68, .25);
+}
+
+/* Mic bar */
+.firefly-capture-mic-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 8px 4px;
+}
+.firefly-capture-mic {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: var(--firefly-capture-accent);
+    color: #1d2327;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color .15s ease, transform .12s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+.firefly-capture-mic .dashicons {
+    font-size: 26px;
+    width: 26px;
+    height: 26px;
+    line-height: 1;
+}
+.firefly-capture-mic:hover  { background: var(--firefly-capture-accent-strong); }
+.firefly-capture-mic:active { transform: scale(.96); }
+/* Recording: stay red — universally readable "live mic" signal. */
+.firefly-capture-mic.is-on  { background: hsl(0, 70%, 50%); color: #fff; }
+.firefly-capture-mic.is-on:hover { background: hsl(0, 70%, 44%); }
+
+/* Pulsing ring while listening */
+.firefly-capture-mic-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid hsla(0, 70%, 50%, .4);
+    opacity: 0;
+    pointer-events: none;
+}
+.firefly-capture-mic.is-on .firefly-capture-mic-ring {
+    opacity: 1;
+    animation: firefly-capture-pulse 1.4s ease-out infinite;
+}
+@keyframes firefly-capture-pulse {
+    0%   { transform: scale(.95); opacity: .7; }
+    100% { transform: scale(1.35); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .firefly-capture-mic.is-on .firefly-capture-mic-ring { animation: none; opacity: .5; }
+}
+
+/* Mute */
+.firefly-capture-mute {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.firefly-capture-mute-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.firefly-capture-mute .dashicons {
+    transition: opacity .15s ease;
+}
+.firefly-capture-mute.is-muted .dashicons {
+    opacity: 0.4;
+}
+/* Diagonal red slash through the mic icon when muted */
+.firefly-capture-mute.is-muted .firefly-capture-mute-icon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -3px;
+    right: -3px;
+    height: 2.5px;
+    background: hsl(0, 72%, 50%);
+    border-radius: 1px;
+    transform: translateY(-50%) rotate(-22deg);
+    transform-origin: center;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .8); /* white halo so slash reads on any bg */
+}
+.firefly-capture-mute.is-muted {
+    background: #fef2f2;
+    border-color: hsl(0, 55%, 70%);
+    color: hsl(0, 45%, 35%);
+}
+.firefly-capture-mute[disabled] {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+/* Status text */
+.firefly-capture-status {
+    font-size: 13px;
+    color: #646970;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+/* Edit toggle button */
+.firefly-capture-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.firefly-capture-edit .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+}
+.firefly-capture-edit.is-on {
+    background: var(--firefly-capture-accent);
+    border-color: var(--firefly-capture-accent);
+    color: #1d2327;
+}
+.firefly-capture-edit.is-on:hover {
+    background: var(--firefly-capture-accent-strong);
+    border-color: var(--firefly-capture-accent-strong);
+}
+
+/* Read-only state visual cue */
+.firefly-capture-transcript[readonly],
+.firefly-capture-title-input[readonly] {
+    background: #fafafa;
+    cursor: default;
+}
+.firefly-capture-transcript:not([readonly]) {
+    background: #fff;
+}
+
+/* Sidebar toggle (mobile-only) */
+.firefly-capture-toggle-list {
+    display: none;
+}
+
+/* Edit + delete: keep them visible when no note is loaded; disabled
+   state shows the user the action exists but isn't currently usable. */
+.firefly-capture-edit[disabled],
+.firefly-capture-delete-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------------------
+   Mobile (<=782px): full-viewport-fit, no scroll.
+   - The whole admin page uses 100vh minus the WP admin bar.
+   - Sidebar becomes a slide-over panel, hidden by default; the
+     "All notes" button toggles it.
+   - Main flex-fills with the transcript expanding to take the
+     remaining space and the mic bar pinned to the bottom.
+   ---------------------------------------------------------------------- */
+@media (max-width: 782px) {
+    /* Suppress WP admin chrome that would steal vertical space.
+       Pin overflow-x to belt-and-suspenders against any descendant
+       trying to push past the viewport width. */
+    body.toplevel_page_firefly-capture,
+    body.toplevel_page_firefly-capture #wpwrap,
+    body.toplevel_page_firefly-capture #wpcontent,
+    body.toplevel_page_firefly-capture #wpbody,
+    body.toplevel_page_firefly-capture #wpbody-content {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+    body.toplevel_page_firefly-capture #wpcontent {
+        padding-left: 0 !important;
+    }
+    body.toplevel_page_firefly-capture #wpbody-content {
+        padding-bottom: 0;
+    }
+    body.toplevel_page_firefly-capture #wpfooter {
+        display: none;
+    }
+
+    .firefly-capture {
+        margin: 0;
+        padding: 12px 10px env(safe-area-inset-bottom, 0);
+        /* Use dvh so iOS Safari's expanding/collapsing chrome doesn't
+           leave the mic clipped under the URL bar. Falls back to vh. */
+        height: calc(100vh - 46px);
+        height: calc(100dvh - 46px);
+        max-width: 100vw;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+    }
+    /* Header row: H1 on the left, action buttons on the right, breathing room */
+    .firefly-capture-header {
+        gap: 8px;
+        margin: 0 0 8px;
+        align-items: center;
+    }
+    .firefly-capture h1.wp-heading-inline {
+        margin: 0 auto 0 0;
+        padding: 0;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .firefly-capture .page-title-action.firefly-capture-icon-btn {
+        margin: 0;
+        padding: 6px 10px;
+        min-height: 36px;
+        min-width: 36px;
+    }
+    .firefly-capture .page-title-action.firefly-capture-icon-btn .dashicons {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+    }
+    .firefly-capture-btn-label {
+        display: none; /* icon-only on mobile */
+    }
+    /* Hide the session label text on mobile too — the chat icon + caret is enough. */
+    .firefly-capture-session-btn .firefly-capture-session-label {
+        display: none;
+    }
+    /* Switch to viewport-fixed positioning on mobile so positionSessionPopover()
+       in notes.js can center the popover under the button regardless of where
+       the button sits in the flex row, then clamp to the viewport on either
+       side so it never spills off-screen. */
+    .firefly-capture-session-popover {
+        position: fixed;
+        top: 0;       /* placeholder — JS sets the real top from button rect */
+        left: 0;      /* placeholder — JS sets the real left after centering */
+        right: auto;
+        bottom: auto;
+        width: min(320px, calc(100vw - 16px));
+        max-height: calc(100dvh - 120px);
+        overflow-y: auto;
+    }
+    .firefly-capture hr.wp-header-end {
+        margin: 0 0 10px;
+        border-color: var(--firefly-capture-border);
+    }
+    .firefly-capture-toggle-list {
+        display: inline-flex;
+    }
+
+    .firefly-capture-layout {
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        /* The desktop rule above sets `align-items: start` for the grid
+           layout. We flip to flex column on mobile but `align-items`
+           carries over — and in flex column, `start` means children
+           DON'T stretch horizontally, leaving main at its intrinsic
+           content width (~340px on a 428 viewport, the source of the
+           "pane not reaching the viewport edges" bug we chased for a
+           while). Force stretch so main fills layout's full width. */
+        align-items: stretch;
+        gap: 0;
+        position: relative;
+    }
+    /* Force every column flex child to be shrinkable below its
+       intrinsic content width — this is what was causing the 5%
+       overflow on 375px viewports (iPhone SE). */
+    .firefly-capture-main,
+    .firefly-capture-toolbar,
+    .firefly-capture-meta,
+    .firefly-capture-mic-bar {
+        min-width: 0;
+        max-width: 100%;
+    }
+    .firefly-capture-transcript {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Sidebar = slide-over panel, hidden until toggled */
+    .firefly-capture-sidebar {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        max-height: none;
+        margin: 0;
+    }
+    .firefly-capture.show-sidebar .firefly-capture-sidebar {
+        display: flex;
+        flex-direction: column;
+    }
+    .firefly-capture-list {
+        max-height: none;
+        flex: 1;
+    }
+
+    /* Main fills viewport */
+    .firefly-capture-main {
+        flex: 1;
+        min-height: 0;
+        padding: 10px 12px 8px;
+        gap: 8px;
+        border-radius: 6px;
+        margin: 0;
+    }
+    /* Toolbar: edit + delete pinned top-right; title takes its own row.
+       Order overrides put buttons on row 1 (right-aligned) and the
+       title on row 2 (full width). */
+    .firefly-capture-toolbar {
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        align-items: center;
+        justify-content: flex-end;
+    }
+    :is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit,
+    :is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-delete-btn {
+        order: 1;
+        flex: 0 0 auto;
+        min-height: 36px;
+    }
+    :is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-title-input {
+        order: 2;
+        flex: 1 1 100%;
+        font-size: 18px;
+        font-weight: 600;
+        padding: 8px 10px;
+        min-height: 40px;
+    }
+    .firefly-capture-edit-label,
+    .firefly-capture-mute-label {
+        display: none; /* icon-only on mobile */
+    }
+    .firefly-capture-meta {
+        font-size: 11px;
+        padding: 0 4px;
+        gap: 10px;
+        margin-top: 2px;
+    }
+
+    /* Transcript flexes to fill remaining vertical space */
+    .firefly-capture-transcript {
+        flex: 1;
+        min-height: 0;
+        resize: none;
+        font-size: 16px; /* prevent iOS zoom-on-focus */
+        padding: 10px 12px;
+    }
+
+    /* Mic bar pinned to bottom */
+    .firefly-capture-mic-bar {
+        flex: 0 0 auto;
+        gap: 12px;
+        padding: 6px 4px 8px;
+    }
+    .firefly-capture-mic {
+        width: 52px;
+        height: 52px;
+    }
+    .firefly-capture-status {
+        font-size: 12px;
+    }
+
+    /* ============ Recording pane: stack toggles + entry on mobile,
+       give the loaded-recording detail panel its own scroll. ============ */
+    .firefly-capture-rec-toggles {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .firefly-capture-rec-entry { padding: 16px; }
+    .firefly-capture-rec-entry-hint { font-size: 12px; }
+    /* Loaded-recording detail panel: shrink the fixed-height scroll
+       boxes so the panel fits a single screen on a phone. */
+    .firefly-capture-rec-detail { padding: 12px; }
+    .firefly-capture-rec-transcript {
+        height: 180px;
+        font-size: 12px;
+    }
+    .firefly-capture-rec-summary {
+        height: 160px;
+        font-size: 13px;
+    }
+    .firefly-capture-rec-detail-actions { gap: 6px; }
+
+    /* Mode tab strip: smaller padding + smaller icons */
+    .firefly-capture-modetab { padding: 8px 10px; font-size: 13px; }
+    .firefly-capture-modetab .dashicons { width: 14px; height: 14px; font-size: 14px; }
+
+    /* Document dropzone: just trim padding on small phones. The flex
+       chain that makes the dropzone fill the remaining viewport space
+       lives in the END-OF-FILE mobile block (it has to come after the
+       desktop base rules to win on source order). */
+    .firefly-capture-doc-dropzone { padding: 26px 12px; }
+    .firefly-capture-doc-detail-head { flex-wrap: wrap; }
+    .ffdoc-card { width: calc(100vw - 24px); padding: 20px 16px; }
+    .ffdoc-spinner { width: 36px; height: 36px; border-width: 3px; }
+    .ffdoc-phase-title { font-size: 15px; }
+    .ffdoc-phase-desc  { font-size: 12px; }
+
+    /* Speaker dialog previews shrink on mobile so the dialog still fits */
+    .ffrec-kb-preview { height: 140px; }
+
+    /* In-recording overlay: lock the meter rows to viewport width */
+    .ffrec-controls-row { flex-wrap: wrap; justify-content: center; }
+    .ffrec-level-meter  { max-width: 100%; }
+}
+
+/* ==========================================================================
+   Mode tabs (Notes | Recordings | Documents)
+   ========================================================================== */
+
+.firefly-capture-modetabs {
+    display: flex;
+    gap: 4px;
+    margin: 12px 0 16px;
+    border-bottom: 1px solid #dcdcde;
+}
+.firefly-capture-modetab {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 8px 14px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: #50575e;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px 4px 0 0;
+}
+.firefly-capture-modetab:hover { background: #f6f7f7; color: #1d2327; }
+.firefly-capture-modetab.is-active {
+    color: #1d2327;
+    border-bottom-color: #f5b544;
+    background: #fff;
+}
+.firefly-capture-modetab .dashicons {
+    width: 16px; height: 16px; font-size: 16px; line-height: 1;
+}
+.firefly-capture-pane[hidden] { display: none; }
+/* Active pane fills the main column so the notes textarea and
+   recording/document scrollable areas can grow into the available
+   viewport height (especially important on mobile). */
+.firefly-capture-pane:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* ==========================================================================
+   Recordings mode
+   ========================================================================== */
+
+.firefly-capture-rec-toolbar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+}
+.firefly-capture-rec-toggles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin: 8px 0 16px;
+}
+.firefly-capture-rec-toggle {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+.firefly-capture-rec-toggle:has(input:checked) {
+    border-color: #f5b544;
+    background: #fff8e6;
+}
+/* Use default WP checkbox sizing so the rendered checkmark aligns with
+   the box. The previous explicit width/height was causing the check to
+   draw outside the box on some browsers. */
+.firefly-capture-rec-toggle input {
+    grid-row: span 2;
+    margin: 0;
+    align-self: center;
+    justify-self: center;
+}
+.firefly-capture-rec-toggle-label { font-weight: 600; color: #1d2327; }
+.firefly-capture-rec-toggle-hint  { grid-column: 2; color: #646970; font-size: 12px; line-height: 1.4; }
+
+/* Loaded-recording detail panel (sibling of the entry point). */
+.firefly-capture-rec-detail {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    background: #fff;
+}
+.firefly-capture-rec-detail-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.firefly-capture-rec-detail-status {
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid #dcdcde;
+    background: #f0f0f1;
+    color: #50575e;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.firefly-capture-rec-detail-actions { display: flex; gap: 8px; }
+
+/* Heading row with copy button on the right */
+.firefly-capture-rec-output-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 14px;
+}
+.firefly-capture-rec-output-head .firefly-capture-rec-output-heading {
+    margin: 0;
+}
+/* Icon-only copy button: no border, no background, no padding box.
+   Just the dashicon as the affordance. Hover/focus only changes color. */
+.firefly-capture-copy-btn {
+    background: none;
+    border: 0;
+    padding: 4px;
+    margin: 0;
+    cursor: pointer;
+    color: #646970;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+.firefly-capture-copy-btn:hover { color: #2271b1; background: rgba(34, 113, 177, 0.08); }
+.firefly-capture-copy-btn:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: 1px;
+}
+.firefly-capture-copy-btn .dashicons {
+    width: 18px; height: 18px;
+    font-size: 18px;
+    line-height: 1;
+    vertical-align: middle;
+}
+.firefly-capture-copy-btn.is-copied { color: #00a32a; }
+.firefly-capture-rec-output-heading {
+    margin: 14px 0 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #646970;
+}
+.firefly-capture-rec-transcript {
+    white-space: pre-wrap;
+    background: #fafafa;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 12px;
+    height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+}
+.firefly-capture-rec-summary {
+    background: #fafafa;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 12px;
+    height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+/* Entry point: in-pane Record button (NOT the overlay record button).
+   Centered vertical stack: button on top, label centered below. */
+.firefly-capture-rec-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px 16px;
+    margin-top: 12px;
+    border: 1px solid #dcdcde; border-radius: 10px; background: #fafafa;
+}
+.firefly-capture-rec-btn {
+    appearance: none;
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 2px solid #c92a2a;
+    background: #fff;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 2px;
+    font: inherit; color: #c92a2a;
+    transition: background 0.15s ease;
+}
+.firefly-capture-rec-btn:hover { background: #fff4f4; }
+.firefly-capture-rec-btn-dot   { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
+.firefly-capture-rec-btn-label { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.firefly-capture-rec-entry-hint {
+    color: #646970;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   Fullscreen overlays — WP admin pro skin (light, clean)
+   Mirrors Ragsmith's recording UX but uses WP admin colours
+   (#2271b1 primary, #1d2327 text, #c3c4c7 borders, white cards)
+   so it sits naturally inside wp-admin.
+   ============================================================ */
+.ffrec-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(29, 35, 39, 0.55);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+}
+.ffrec-overlay.is-active { display: flex; }
+
+.ffrec-bar {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 1.1rem;
+    padding: 1.5rem 1.75rem;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-top: 4px solid #c92a2a;
+    border-radius: 6px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    width: min(480px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    color: #1d2327;
+    box-sizing: border-box;
+}
+.ffrec-bar.complete   { border-top-color: #2271b1; }
+.ffrec-bar.processing { border-top-color: #2271b1; }
+
+.ffrec-top-row { display: flex; align-items: center; gap: 0.6rem; }
+
+.ffrec-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #c92a2a;
+    animation: ffrec-pulse 1.2s ease-in-out infinite;
+    flex-shrink: 0;
+}
+.ffrec-dot.paused { animation: none; opacity: 0.4; }
+@keyframes ffrec-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
+.ffrec-label {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+    color: #c92a2a; text-transform: uppercase;
+}
+.ffrec-timer {
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 0.95rem; color: #1d2327;
+    min-width: 5.5em;
+}
+.ffrec-complete-label {
+    font-size: 1rem; font-weight: 600; color: #1d2327;
+}
+
+/* 21-bar equalizer in WP accent (subtle blue gradient) */
+.ffrec-level-meter {
+    display: flex; align-items: flex-end; justify-content: center;
+    gap: 3px;
+    height: 60px;
+    padding: 0 0.5rem;
+}
+.ffrec-level-bar {
+    width: 4px; height: 4px;
+    background: linear-gradient(to top, #2271b1, #4f94d4);
+    border-radius: 2px;
+    transition: height 0.08s ease-out;
+}
+
+.ffrec-controls-row, .ffrec-complete-actions, .ffrec-error-actions {
+    display: flex; gap: 0.6rem;
+}
+
+/* Overlay control buttons styled as WP secondary buttons */
+.ffrec-control-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 6px 14px;
+    background: #f6f7f7;
+    color: #1d2327;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.6;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ffrec-control-btn:hover { background: #f0f0f1; border-color: #8c8f94; }
+.ffrec-control-btn.stop {
+    background: #fff;
+    border-color: #c92a2a;
+    color: #c92a2a;
+}
+.ffrec-control-btn.stop:hover { background: #fff4f4; }
+/* Inline stop square inherits the button's red text color via
+   fill="currentColor", so it matches red default + white-on-hover states. */
+.ffrec-stop-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+.ffrec-control-btn.primary {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+.ffrec-control-btn.primary:hover { background: #1f5e98; border-color: #1f5e98; }
+.ffrec-control-btn.secondary { background: #fff; }
+.ffrec-control-btn.muted { color: #c92a2a; }
+
+/* Processing overlay progress bar */
+.ffrec-progress-container {
+    width: min(360px, calc(100vw - 80px));
+    max-width: 100%;
+    display: flex; flex-direction: column; gap: 0.5rem;
+}
+.ffrec-progress-track {
+    height: 8px;
+    background: #f0f0f1;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ffrec-progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #2271b1, #4f94d4);
+    transition: width 0.25s ease;
+}
+.ffrec-progress-text {
+    font-size: 13px; color: #50575e; text-align: center;
+}
+.ffrec-progress-text.error { color: #c92a2a; }
+
+/* ============================================================
+   Dialog backdrop (chips before processing, KB stats after)
+   ============================================================ */
+.ffrec-dialog-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 99999;
+    background: rgba(29, 35, 39, 0.55);
+    backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+}
+.ffrec-dialog-backdrop.is-active { display: flex; }
+.ffrec-dialog {
+    background: #fff;
+    color: #1d2327;
+    border: 1px solid #c3c4c7;
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    /* Clamp to viewport with safe gutters on mobile while keeping a
+       comfortable desktop width. min(480px, …) so small phones never
+       trigger horizontal overflow. */
+    width: min(480px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    box-sizing: border-box;
+}
+.ffrec-dialog-title { margin: 0 0 0.25rem; font-size: 1.1rem; color: #1d2327; font-weight: 600; }
+.ffrec-dialog-section { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+.ffrec-dialog-label {
+    font-size: 11px; color: #50575e; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.ffrec-dialog-input {
+    background: #fff;
+    color: #1d2327;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 14px;
+    box-shadow: 0 0 0 transparent;
+    transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+.ffrec-dialog-input:focus {
+    outline: none;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.ffrec-dialog-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.ffrec-chip {
+    padding: 4px 12px;
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-radius: 9999px;
+    color: #50575e;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.6;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.ffrec-chip:hover { background: #f0f0f1; }
+.ffrec-chip.is-active {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+    font-weight: 600;
+}
+
+.ffrec-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
+.ffrec-dialog-btn {
+    padding: 6px 14px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #f6f7f7;
+    color: #1d2327;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.ffrec-dialog-btn:hover { background: #f0f0f1; border-color: #8c8f94; }
+.ffrec-dialog-btn.primary {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+    font-weight: 600;
+}
+.ffrec-dialog-btn.primary:hover { background: #1f5e98; border-color: #1f5e98; }
+.ffrec-dialog-btn.secondary { background: #fff; }
+
+.ffrec-kb-stats { color: #50575e; margin: 0 0 0.5rem; font-size: 13px; }
+
+/* Wider dialog when transcript / summary previews are visible.
+   Still respects the viewport on mobile (clamp wins). */
+.ffrec-dialog--wide { width: min(720px, calc(100vw - 24px)); }
+
+/* View Transcript / View Summary ref buttons */
+.ffrec-kb-refs {
+    display: flex; gap: 0.5rem;
+    margin: 0.25rem 0 0.5rem;
+}
+.ffrec-kb-ref-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: #f6f7f7;
+    color: #1d2327;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.6;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ffrec-kb-ref-btn:hover { background: #f0f0f1; border-color: #8c8f94; }
+.ffrec-kb-ref-btn[aria-pressed="true"] {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+.ffrec-kb-ref-btn .dashicons { width: 14px; height: 14px; font-size: 14px; line-height: 1; }
+
+/* Inline transcript / summary preview panels */
+.ffrec-kb-preview {
+    background: #fafafa;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    padding: 10px 12px;
+    height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0 0 0.75rem;
+    white-space: pre-wrap;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+#ffrec-kb-preview-summary {
+    font-family: inherit;
+}
+
+.ffrec-speakers-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ffrec-speaker-row {
+    display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 0.6rem;
+}
+.ffrec-speaker-label {
+    font-size: 12px; color: #50575e;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    background: #f0f0f1;
+    padding: 4px 8px; border-radius: 4px;
+    text-align: center;
+}
+.ffrec-speaker-input {
+    background: #fff;
+    color: #1d2327;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 13px;
+}
+.ffrec-speaker-input:focus {
+    outline: none;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+/* ==========================================================================
+   Documents mode
+   ========================================================================== */
+
+.firefly-capture-doc-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 6px;
+}
+.firefly-capture-doc-title { font-size: 15px; font-weight: 600; color: #1d2327; }
+
+/* Entry wrapper holds the dropzone and grows to fill the rest of the
+   pane so the empty state covers the full viewport height (especially
+   important on mobile where there's nothing else in the pane). */
+.firefly-capture-doc-entry {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 12px;
+}
+.firefly-capture-doc-entry[hidden] { display: none; }
+
+.firefly-capture-doc-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    /* fill the entry wrapper, with a sensible minimum so the dropzone
+       still has presence on very tall viewports. */
+    flex: 1 1 auto;
+    min-height: 220px;
+    padding: 40px 20px;
+    border: 2px dashed #c3c4c7;
+    border-radius: 10px;
+    background: #fafafa;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.firefly-capture-doc-dropzone:hover,
+.firefly-capture-doc-dropzone.is-dragover {
+    border-color: #f5b544;
+    background: #fff8e6;
+}
+.firefly-capture-doc-dropzone-icon { font-size: 28px; width: 28px; height: 28px; color: #646970; }
+.firefly-capture-doc-dropzone-headline { font-size: 15px; font-weight: 600; color: #1d2327; }
+.firefly-capture-doc-dropzone-hint { color: #646970; font-size: 12px; }
+.firefly-capture-doc-file {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+.firefly-capture-doc-output { margin-top: 18px; }
+.firefly-capture-doc-output-heading {
+    margin: 14px 0 6px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #646970;
+}
+.firefly-capture-doc-text {
+    white-space: pre-wrap;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 12px;
+    /* Always show a reading-sized window. Short docs don't collapse to
+       2-line height; long docs scroll internally instead of pushing the
+       facts list off the page. */
+    min-height: 280px;
+    max-height: 55vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    box-sizing: border-box;
+}
+.firefly-capture-doc-facts { list-style: disc inside; padding-left: 8px; line-height: 1.55; }
+.firefly-capture-doc-facts li { margin: 4px 0; }
+.firefly-capture-doc-kb {
+    margin-top: 10px;
+    color: #646970;
+    font-size: 12px;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+/* ---- Loaded-state layout: download + text + facts ---- */
+.firefly-capture-doc-detail {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 12px;
+    gap: 6px;
+}
+.firefly-capture-doc-detail[hidden] { display: none; }
+/* WP admin's `.button` class sets `display: inline-block` which has the
+   same specificity as the `[hidden]` attribute selector — depending on
+   stylesheet load order, the button stays visible despite the hidden
+   attribute being set. Force display: none on hidden so the Delete
+   button truly disappears when no doc is loaded. */
+.firefly-capture-doc-delete[hidden] { display: none !important; }
+.firefly-capture-doc-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+.firefly-capture-doc-download {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    text-decoration: none;
+}
+.firefly-capture-doc-download .dashicons {
+    width: 16px; height: 16px; font-size: 16px; line-height: 1;
+}
+.firefly-capture-doc-facts-count {
+    color: #646970; font-size: 12px;
+}
+.firefly-capture-doc-facts-section { margin-top: 14px; }
+
+/* ---- Documents processing overlay (uses .ffrec-overlay backdrop) ---- */
+.ffdoc-card {
+    /* Override the recording card's red top-stripe — docs are always
+       "in progress" not "recording", so match the processing blue. */
+    border-top-color: #2271b1 !important;
+    width: min(440px, calc(100vw - 24px));
+}
+.ffdoc-spinner {
+    width: 44px; height: 44px;
+    border: 4px solid #e5e5e5;
+    border-top-color: #2271b1;
+    border-radius: 50%;
+    animation: ffdoc-spin 0.9s linear infinite;
+}
+@keyframes ffdoc-spin {
+    to { transform: rotate(360deg); }
+}
+.ffdoc-phase-title {
+    font-size: 16px; font-weight: 600; color: #1d2327;
+    text-align: center;
+}
+.ffdoc-phase-desc {
+    font-size: 13px; color: #646970;
+    text-align: center; max-width: 360px;
+    line-height: 1.45;
+}
+
+/* ==========================================================================
+   Mobile final overrides — MUST come after the desktop base rules above
+   so source-order wins at equal specificity. CSS bug we're working
+   around: the desktop base rule sets `flex: 1 1 auto; min-height: 220px`
+   on the dropzone. Two problems with that on mobile:
+     1. `flex-basis: auto` means each level's preferred size is its
+        content. With content-based bases stacking up the chain, the
+        dropzone never gets enough free space to grow into.
+     2. `min-height: 220px` (or larger fallbacks like 100dvh - X) can
+        FORCE the dropzone above the available space, causing the whole
+        .firefly-capture container to overflow past its fixed height.
+   Fix: use `flex: 1 1 0` (basis 0) on the dropzone AND its wrapping
+   entry div AND the pane itself so every level "claims no preferred
+   size, just grow to fill my parent." Then the natural flex chain
+   propagates all the way from .firefly-capture's fixed height down to
+   the dropzone without anyone overshooting.
+   ========================================================================== */
+@media (max-width: 782px) {
+    .firefly-capture-pane-documents:not([hidden]) { flex: 1 1 0; min-height: 0; }
+    .firefly-capture-doc-entry {
+        flex: 1 1 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .firefly-capture-doc-dropzone {
+        flex: 1 1 0;
+        min-height: 0;
+    }
+    /* Kill the HORIZONTAL padding/margin on every WP admin chrome layer
+       between the viewport edge and our pane (.wrap, #wpcontent,
+       #wpbody-content, .firefly-capture, .firefly-capture-main each
+       contribute their own gutter — stacked that's ~100px of horizontal
+       whitespace eating the pane's width). Leave VERTICAL spacing alone
+       on top so the H1 still clears the WP admin bar — only zero the
+       padding-bottom so the pane can reach the viewport's bottom edge.
+       !important because WP admin styles use the same single-class
+       specificity we do and source-order isn't reliable across plugins. */
+    body.toplevel_page_firefly-capture #wpcontent {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    body.toplevel_page_firefly-capture #wpbody,
+    body.toplevel_page_firefly-capture #wpbody-content {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    body.toplevel_page_firefly-capture .wrap {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 0 !important;
+        /* keep .wrap's default 10px top margin — it's the safe gap
+           between the WP admin bar and our H1. */
+    }
+    .firefly-capture {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        padding-bottom: 0 !important;
+        /* keep padding-top: 12px from the base rule */
+    }
+    .firefly-capture-main {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        padding-bottom: 0 !important;
+        margin: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    /* Extracted text + facts: on mobile the pre's bottom border was
+       sitting flush against the "Facts" heading because we relied on
+       the section's margin-top alone. Give the pre its own bottom
+       margin AND a subtle separator before the facts so the eye doesn't
+       confuse the pre's border with the facts text. */
+    .firefly-capture-doc-text { margin: 0 0 14px 0; }
+    .firefly-capture-doc-facts-section {
+        margin-top: 0;
+        padding-top: 12px;
+        border-top: 1px solid #f0f0f1;
+    }
+}
+
+/* ==========================================================================
+   Icon-button alignment fix (Edit, Mute, and the header icon-btns).
+   These buttons are flex containers — the icon span + label span should
+   sit perfectly center-aligned vertically. They were drifting slightly
+   high because:
+     (a) WP admin's base `.button` rule sets line-height: 2.15 which our
+         `line-height: 1` override didn't reach into the children.
+     (b) Dashicons font glyphs render in the upper half of their em box
+         (font baseline puts the ink above center). align-items: center
+         centers the BOX, not the visual ink.
+   Fix: force flex centering + zero the WP padding-y so the inner content
+   block reflects the actual button height, AND nudge the dashicon down
+   1px so the perceived glyph center matches the text mid-line.
+   ========================================================================== */
+.button.firefly-capture-edit,
+.button.firefly-capture-mute,
+.button.firefly-capture-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: 30px;
+}
+.firefly-capture-edit > *,
+.firefly-capture-mute > * {
+    align-self: center;
+}
+.firefly-capture-edit .dashicons,
+.firefly-capture-mute .dashicons,
+.firefly-capture-icon-btn .dashicons,
+.firefly-capture-delete-btn .dashicons,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button .dashicons,
+.firefly-capture-header .button .dashicons,
+.firefly-capture-header .page-title-action .dashicons {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    /* Optical correction: dashicons glyphs sit ~1px above their em-box
+       center. Nudge down so the ink aligns with the text x-height —
+       AND so dashicons sit at the same y as inline SVG icons (like the
+       Save-to-AI sparkle) which render at their true geometric center. */
+    transform: translateY(1px);
+}
+
+/* ==========================================================================
+   Sleek icon-only top nav + note toolbar
+   ==========================================================================
+   Strips the WP `.button` chrome (background, border, box-shadow) from the
+   header nav (session picker, New, All) and the note toolbar (Edit,
+   Save-to-AI, Delete). Every action becomes a clean dashicon with a soft
+   tinted hover state. Two affordances kept on color alone:
+     - Save-to-AI sparkle: amber when the note has unsaved changes; goes
+       muted gray + the "Synced" text once everything's on Ragsmith.
+     - Delete trash: red ink + red-tinted hover so destructive intent
+       still reads at a glance.
+   Header gets padding-inline so the title + buttons don't sit flush
+   against the viewport edges. The pane and tabs below intentionally
+   stay edge-to-edge to keep the content area wide. */
+.firefly-capture-header {
+    padding-inline: 12px;
+}
+
+/* Universal sleek-button reset — applied to ALL action buttons in the
+   header and the per-note toolbar. !important because WP admin's
+   `.button` rule wins source order otherwise. Also kills the default
+   mobile tap-highlight flash (the blue/gray rectangle the browser
+   draws on touch) — we render our own soft hover/active tint instead. */
+/* Apply tap-highlight: transparent to ANY interactive element inside
+   the Capture page — mode tabs, mic, mute, copy buttons, overlays,
+   etc. all share the same no-flash policy. */
+.firefly-capture button,
+.firefly-capture a,
+.firefly-capture label,
+.firefly-capture [role="button"],
+.firefly-capture [role="tab"],
+.ffrec-overlay button,
+.ffrec-overlay a,
+.ffrec-overlay [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+.firefly-capture-header .button,
+.firefly-capture-header .page-title-action,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button {
+    /* Layout-mode: flex centering applies to EVERY child (dashicon span,
+       SVG wrapper, label span). Without this, WP's `.button-link-delete`
+       stays inline-block and the dashicon inside renders at its
+       default top-aligned position — which is why the trash sat
+       higher than the edit pencil and the synced sparkle. */
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    color: #50575e !important;
+    text-shadow: none !important;
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
+    min-height: 36px;
+    min-width: 36px;
+    font-weight: 500;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.firefly-capture-header .button:hover,
+.firefly-capture-header .page-title-action:hover,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button:hover:not([disabled]) {
+    background: rgba(15, 23, 42, 0.06) !important;
+    color: #1d2327 !important;
+}
+/* Reset every focus / active flavor first so WP's `.button:focus`
+   gray box never leaks through after a click/tap. We then add the
+   amber outline back ONLY for true keyboard navigation via
+   :focus-visible. */
+.firefly-capture-header .button:focus,
+.firefly-capture-header .page-title-action:focus,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button:focus,
+.firefly-capture-header .button:active,
+.firefly-capture-header .page-title-action:active,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button:active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: #50575e !important;
+    outline: none !important;
+}
+/* Keyboard focus only: amber outline for a11y. Mouse/touch clicks
+   trigger :focus but NOT :focus-visible in modern Chromium, so this
+   correctly stays invisible after taps. */
+.firefly-capture-header .button:focus-visible,
+.firefly-capture-header .page-title-action:focus-visible,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button:focus-visible {
+    outline: 2px solid var(--firefly-capture-accent) !important;
+    outline-offset: 1px;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .button:disabled {
+    color: #c3c4c7 !important;
+    background: transparent !important;
+    cursor: not-allowed;
+}
+
+/* Save-to-AI: amber sparkle while there are unsaved changes; "Synced"
+   state shows the sparkle + label both in muted gray ("you're good"). */
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-ai-save {
+    color: var(--firefly-capture-accent-strong) !important;
+    gap: 6px;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-ai-save:hover:not([disabled]):not(.is-synced) {
+    background: rgba(245, 181, 68, 0.15) !important;
+    color: var(--firefly-capture-accent-strong) !important;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-ai-save.is-synced {
+    color: #8c8f94 !important;
+    font-weight: 400;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-ai-save.is-synced:hover {
+    background: rgba(15, 23, 42, 0.05) !important;
+    color: #50575e !important;
+}
+
+/* Edit toggle ON state: amber pill across every flavor (hover/focus/
+   active/focus-visible) so the visual cue never blinks off mid-tap. */
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on:hover,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on:focus,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on:active,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on:focus-visible {
+    background: rgba(245, 181, 68, 0.22) !important;
+    color: var(--firefly-capture-accent-text) !important;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on:hover {
+    background: rgba(245, 181, 68, 0.32) !important;
+    color: #6b521f !important;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit.is-on .dashicons {
+    color: var(--firefly-capture-accent-text);
+}
+
+/* Edit toggle OFF state: just the icon at its default gray, period.
+   Zero background AND zero color shift in any state — hover/focus/
+   active/focus-visible all keep the icon at its resting color. The
+   hover-color-shift affordance I had earlier got "stuck" in amber
+   when the user clicked from on→off while the cursor was still over
+   the button (mouse-hover state doesn't release until the cursor
+   moves), so we drop it entirely. Toolbar icons read as interactive
+   by convention; no extra hover cue needed. */
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit:not(.is-on),
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit:not(.is-on):hover,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit:not(.is-on):focus,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit:not(.is-on):active,
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-edit:not(.is-on):focus-visible {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    color: #50575e !important;
+}
+
+/* Delete (trash): red ink, red-tinted hover. */
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-delete-btn {
+    color: #b32d2e !important;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-delete-btn:hover {
+    background: rgba(179, 45, 46, 0.1) !important;
+    color: #b32d2e !important;
+}
+:is(.firefly-capture-toolbar, .firefly-capture-doc-toolbar, .firefly-capture-rec-toolbar) .firefly-capture-delete-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Hide labels universally so every action is purely icon-driven.
+   Save-to-AI label is the ONE exception: it stays hidden when there
+   are unsaved changes (the amber sparkle is signal enough) but becomes
+   visible once the note is synced — that's the moment the user wants
+   confirmation, so we show "Synced" text alongside the sparkle. */
+.firefly-capture-btn-label,
+.firefly-capture-session-label,
+.firefly-capture-edit-label,
+.firefly-capture-delete-label,
+.firefly-capture-mute-label {
+    display: none !important;
+}
+.firefly-capture-ai-save-label { display: none !important; }
+.firefly-capture-ai-save.is-synced .firefly-capture-ai-save-label {
+    display: inline-flex !important;
+    align-items: center;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    /* line-height: 1 collapses the text line box to font-size height
+       so the glyph centerline matches the sparkle SVG centerline. With
+       the inherited line-height (~1.4) the text glyph would sit in the
+       lower portion of a taller box and look offset below the sparkle. */
+    line-height: 1;
+}
+/* Same alignment fix for the sparkles wrapper so the SVG sits at a
+   stable y regardless of WP's default vertical-align: top on inline SVGs. */
+.firefly-capture-ai-save .firefly-capture-ai-sparkles {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+.firefly-capture-ai-save .firefly-capture-ai-sparkles svg {
+    display: block;
+    vertical-align: middle;
+}
+
+/* Session picker chevron sits cleaner without the box framing it. */
+.firefly-capture-session-btn .dashicons-arrow-down-alt2 {
+    margin-left: -2px;
+    opacity: 0.55;
+}

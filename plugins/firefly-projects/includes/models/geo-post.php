@@ -70,6 +70,9 @@ function firefly_projects_register_geo_meta() {
  */
 function firefly_projects_register_faq_block() {
     register_block_type('firefly/faq', array(
+        // Match the JS-side apiVersion: 3 so the server registration
+        // doesn't fall back to v1 metadata defaults.
+        'api_version'     => 3,
         'render_callback' => 'firefly_projects_render_faq_block',
         'attributes'      => array(
             'faqs' => array(
