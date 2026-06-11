@@ -45,6 +45,14 @@ if (function_exists('lamprozo_badge_sets')) {
 .cd-caps__row { display:flex; gap:6px; flex-wrap:wrap; }
 .cap-cell { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:0.7em; color:#888; font-weight:700; }
 .cap-cell input { width:46px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:13px; color:#1d2327; }
+.cd-fights { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; max-height:340px; overflow-y:auto; padding:2px; }
+.fight-row { display:flex; align-items:center; gap:6px; }
+.fight-row__num { width:20px; text-align:right; color:#aaa; font-size:0.78em; font-weight:700; flex-shrink:0; }
+.fight-row__ord { display:flex; gap:2px; flex-shrink:0; }
+.fight-row__ord .button { min-width:24px; padding:0 5px; }
+.fight-row__name { flex:1; padding:5px 8px; border:1px solid #ccc; border-radius:4px; }
+.fight-row__cap { width:54px; padding:5px; border:1px solid #ccc; border-radius:4px; text-align:center; }
+.fight-row__gym { display:inline-flex; align-items:center; gap:3px; font-size:0.78em; color:#555; font-weight:600; flex-shrink:0; }
 .cd-subhead { margin:18px 0 8px; padding-top:14px; border-top:1px solid #eee; font-size:0.78em; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; }
 #cd-attempts iframe { width:100%; border:0; display:block; background:#f6f7f7; border-radius:4px; }
 </style>
@@ -151,12 +159,19 @@ function renderInfo() {
     const el = document.getElementById('cd-info');
     if (!c || !el) return;
     const isComplete = c.status==='completed', isOnHold = c.status==='on_hold';
-    const n = badgeCounts[c.badgeset] || 8;
-    const caps = c.caps || [];
-    let capCells = '';
-    for (let i = 0; i <= n; i++) {
-        capCells += `<label class="cap-cell"><span>${i}</span><input type="text" value="${esc(caps[i]||'')}" onchange="updateCaps('${esc(c.slug)}',${i},this.value)"></label>`;
-    }
+    const fights = c.fights || [];
+    const fightRows = fights.map((f, i) => `
+        <div class="fight-row">
+            <span class="fight-row__num">${i+1}</span>
+            <span class="fight-row__ord">
+                <button class="button button-small" title="Move up" onclick="moveFight('${esc(c.slug)}',${i},-1)" ${i===0?'disabled':''}>&uarr;</button>
+                <button class="button button-small" title="Move down" onclick="moveFight('${esc(c.slug)}',${i},1)" ${i===fights.length-1?'disabled':''}>&darr;</button>
+            </span>
+            <input class="fight-row__name" type="text" placeholder="Boss / event" value="${esc(f.name||'')}" onchange="updateFight('${esc(c.slug)}',${i},'name',this.value)">
+            <input class="fight-row__cap" type="text" placeholder="cap" value="${esc(f.cap||'')}" onchange="updateFight('${esc(c.slug)}',${i},'cap',this.value)">
+            <label class="fight-row__gym" title="Beating this awards a gym badge"><input type="checkbox" ${f.badge?'checked':''} onchange="toggleFightBadge('${esc(c.slug)}',${i})">gym</label>
+            <button class="button button-small button-link-delete" onclick="removeFight('${esc(c.slug)}',${i})">&times;</button>
+        </div>`).join('');
     el.innerHTML = `
         <div class="cd-head">
             <h2>${esc(c.title)} ${statusBadge(c.status)}</h2>
@@ -177,8 +192,9 @@ function renderInfo() {
             <label>Badge set${badgeSelect(c.slug, c.badgeset)}</label>
         </div>
         <div class="cd-caps">
-            <div class="cd-caps__label">Level cap by badges <span>(badges &rarr; cap; auto-applies to the ongoing attempt)</span></div>
-            <div class="cd-caps__row">${capCells}</div>
+            <div class="cd-caps__label">Fights <span>(in order; each carries the level cap heading into it. Tick &ldquo;gym&rdquo; for badge fights &mdash; mini-bosses go between them.)</span></div>
+            <div class="cd-fights" id="cd-fights-${esc(c.slug)}">${fightRows || '<p style="color:#888;margin:4px 0">No fights yet.</p>'}</div>
+            <button class="button button-small" onclick="addFight('${esc(c.slug)}')">+ Add fight</button>
         </div>`;
 }
 
@@ -223,13 +239,41 @@ async function updateField(slug, field, value) {
     if (!data.success) alert(data.message || ('Error saving ' + field + '.'));
 }
 
-// Save the per-badge level caps array for a challenge.
-function updateCaps(slug, idx, val) {
+// Fight list — the ordered boss progression. Each fight carries a level cap and a
+// gym flag; the attempt's "current fight" pointer (on the Attempts panel) reads this.
+function saveFights(slug, rerender) {
     const c = challengesData.find(x => x.slug === slug); if (!c) return;
-    c.caps = c.caps || [];
-    c.caps[idx] = val;
-    fetch(apiBase + '/challenges/' + slug, { method:'PUT', headers, body: JSON.stringify({ caps: c.caps }) })
-        .then(r => r.json()).then(d => { if (!d.success) alert(d.message || 'Error saving caps.'); });
+    if (rerender) renderInfo();
+    fetch(apiBase + '/challenges/' + slug, { method:'PUT', headers, body: JSON.stringify({ fights: c.fights || [] }) })
+        .then(r => r.json()).then(d => { if (!d.success) alert(d.message || 'Error saving fights.'); });
+}
+function updateFight(slug, idx, key, val) {
+    const c = challengesData.find(x => x.slug === slug); if (!c || !c.fights || !c.fights[idx]) return;
+    c.fights[idx][key] = val;
+    saveFights(slug, false);
+}
+function toggleFightBadge(slug, idx) {
+    const c = challengesData.find(x => x.slug === slug); if (!c || !c.fights || !c.fights[idx]) return;
+    c.fights[idx].badge = !c.fights[idx].badge;
+    saveFights(slug, false);
+}
+function addFight(slug) {
+    const c = challengesData.find(x => x.slug === slug); if (!c) return;
+    c.fights = c.fights || [];
+    c.fights.push({ name:'', cap:'', badge:false });
+    saveFights(slug, true);
+}
+function removeFight(slug, idx) {
+    const c = challengesData.find(x => x.slug === slug); if (!c || !c.fights) return;
+    c.fights.splice(idx, 1);
+    saveFights(slug, true);
+}
+function moveFight(slug, idx, dir) {
+    const c = challengesData.find(x => x.slug === slug); if (!c || !c.fights) return;
+    const j = idx + dir;
+    if (j < 0 || j >= c.fights.length) return;
+    [c.fights[idx], c.fights[j]] = [c.fights[j], c.fights[idx]];
+    saveFights(slug, true);
 }
 
 async function toggleStatus(slug, newStatus) {

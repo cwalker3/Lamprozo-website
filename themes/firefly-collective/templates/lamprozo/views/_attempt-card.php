@@ -3,10 +3,28 @@
  * Single attempt card partial.
  * Expects: $attempt (array), $status_labels (array), $attempt_index (int)
  */
-$vods  = $attempt['vods']  ?? [];
+// VODs live on the challenge and link to attempt numbers; pull the ones covering this
+// attempt (a wipe-spanning VOD appears under each attempt it's tied to). Fall back to a
+// legacy per-attempt list if rendered without the challenge-level data in scope.
+$vods  = (isset($challenge_vods) && function_exists('lamprozo_vods_for_attempt'))
+    ? lamprozo_vods_for_attempt($challenge_vods, $attempt['number'])
+    : ($attempt['vods'] ?? []);
 $split = $attempt['split'] ?? '';
 $notes = $attempt['notes'] ?? '';
+$badges = $attempt['badges'] ?? '';
+$has_badges = ($badges !== '' && is_numeric($badges));
+$earned_badges = $has_badges ? (int) $badges : 0;
 $is_ongoing = $attempt['status'] === 'ongoing';
+
+// Resolve the challenge's gym-badge set so the collapsed card can show the actual
+// earned badge icons (falls back to a plain count when no image set is configured).
+$badgeset  = isset($challenge) ? ($challenge['badgeset'] ?? 'none') : 'none';
+$badge_list = (function_exists('lamprozo_badge_sets') ? lamprozo_badge_sets() : [])[$badgeset] ?? [];
+$badge_dir  = function_exists('lamprozo_badge_image_set') ? lamprozo_badge_image_set($badgeset) : $badgeset;
+$badge_base = trailingslashit(wp_get_upload_dir()['baseurl']) . 'lamprozo/badges/' . $badge_dir . '/';
+$earned_badge_icons = ($badge_list && $earned_badges > 0)
+    ? array_slice($badge_list, 0, min($earned_badges, count($badge_list)))
+    : [];
 
 if (!function_exists('lamprozo_yt_id')) {
     function lamprozo_yt_id($url) {
@@ -73,24 +91,41 @@ usort($fragsheet_dead,  fn($a, $b) => $b['fragCount'] - $a['fragCount']);
 ?>
 <div class="attempt-card attempt-card--<?php echo esc_attr($attempt['status']); ?><?php echo $is_ongoing ? ' attempt-card--open' : ''; ?>">
     <button class="attempt-card__header" onclick="this.closest('.attempt-card').classList.toggle('attempt-card--open')" aria-expanded="<?php echo $is_ongoing ? 'true' : 'false'; ?>">
-        <div class="attempt-card__left">
-            <span class="attempt-card__number">Attempt #<?php echo $attempt['number']; ?></span>
-            <span class="status-badge status-badge--<?php echo esc_attr($attempt['status']); ?>">
-                <?php echo esc_html($status_labels[$attempt['status']] ?? $attempt['status']); ?>
-            </span>
-            <?php if ($split): ?>
-            <span class="attempt-card__split">📍 <?php echo esc_html($split); ?></span>
-            <?php endif; ?>
+        <div class="attempt-card__header-row">
+            <div class="attempt-card__left">
+                <span class="attempt-card__number">Attempt #<?php echo $attempt['number']; ?></span>
+                <span class="status-badge status-badge--<?php echo esc_attr($attempt['status']); ?>">
+                    <?php echo esc_html($status_labels[$attempt['status']] ?? $attempt['status']); ?>
+                </span>
+                <?php if ($split): ?>
+                <span class="attempt-card__split">📍 <?php echo esc_html($split); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="attempt-card__meta-right">
+                <?php if (!empty($earned_badge_icons)): ?>
+                <span class="attempt-card__badges">
+                    <?php foreach ($earned_badge_icons as $badge):
+                        $bslug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $badge['name'])); ?>
+                    <img class="attempt-card__badge-img" src="<?php echo esc_url($badge_base . $bslug . '.png'); ?>"
+                         alt="<?php echo esc_attr($badge['name']); ?>" title="<?php echo esc_attr($badge['name'] . ' Badge'); ?>"
+                         onerror="this.style.display='none'">
+                    <?php endforeach; ?>
+                </span>
+                <?php elseif ($has_badges): ?>
+                <span class="attempt-card__vod-count">🎖 <?php echo $earned_badges; ?></span>
+                <?php endif; ?>
+                <?php if (!empty($fragsheet_dead)): ?>
+                <span class="attempt-card__vod-count">💀 <?php echo count($fragsheet_dead); ?></span>
+                <?php endif; ?>
+                <?php if (!empty($vods)): ?>
+                <span class="attempt-card__vod-count"><?php echo count($vods); ?> VOD<?php echo count($vods) !== 1 ? 's' : ''; ?><?php if ($total_duration): ?> · <?php echo esc_html($total_duration); ?><?php endif; ?></span>
+                <?php endif; ?>
+                <span class="attempt-card__chevron">▼</span>
+            </div>
         </div>
-        <div class="attempt-card__meta-right">
-            <?php if (!empty($fragsheet_dead)): ?>
-            <span class="attempt-card__vod-count">💀 <?php echo count($fragsheet_dead); ?></span>
-            <?php endif; ?>
-            <?php if (!empty($vods)): ?>
-            <span class="attempt-card__vod-count"><?php echo count($vods); ?> VOD<?php echo count($vods) !== 1 ? 's' : ''; ?><?php if ($total_duration): ?> · <?php echo esc_html($total_duration); ?><?php endif; ?></span>
-            <?php endif; ?>
-            <span class="attempt-card__chevron">▼</span>
-        </div>
+        <?php if ($notes): ?>
+        <span class="attempt-card__notes-preview"><?php echo esc_html($notes); ?></span>
+        <?php endif; ?>
     </button>
 
     <div class="attempt-card__body">

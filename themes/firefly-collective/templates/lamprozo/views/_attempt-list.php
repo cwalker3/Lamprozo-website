@@ -11,18 +11,21 @@ $failures   = count(array_filter($attempts, fn($a) => $a['status'] === 'failed')
 $completed  = count(array_filter($attempts, fn($a) => $a['status'] === 'completed'));
 $run_status = !empty($ongoing) ? 'ongoing' : ($completed > 0 ? 'completed' : 'wiped');
 
-// Total time across all VODs in all attempts
+// VODs now live at the challenge level (tied to attempt numbers). Derive the slug the
+// same way challenge.php does so the legacy per-challenge wrapper views need no change.
+$ffc_slug      = sanitize_title(parse_request_uri()[0] ?? '');
+$challenge_vods = function_exists('lamprozo_get_vods') ? lamprozo_get_vods($ffc_slug) : [];
+
+// Total time across the challenge's VODs (each counted once, even if it spans attempts).
 $total_all_seconds = 0;
-foreach ($attempts as $a) {
-    foreach ($a['vods'] ?? [] as $vod) {
-        $dur = !empty($vod['duration'])
-            ? $vod['duration']
-            : (function_exists('lamprozo_yt_duration') ? lamprozo_yt_duration($vod['url'] ?? '') : null);
-        if (!$dur) continue;
-        $parts = array_map('intval', explode(':', $dur));
-        if (count($parts) === 3) $total_all_seconds += $parts[0] * 3600 + $parts[1] * 60 + $parts[2];
-        elseif (count($parts) === 2) $total_all_seconds += $parts[0] * 60 + $parts[1];
-    }
+foreach ($challenge_vods as $vod) {
+    $dur = !empty($vod['duration'])
+        ? $vod['duration']
+        : (function_exists('lamprozo_yt_duration') ? lamprozo_yt_duration($vod['url'] ?? '') : null);
+    if (!$dur) continue;
+    $parts = array_map('intval', explode(':', $dur));
+    if (count($parts) === 3) $total_all_seconds += $parts[0] * 3600 + $parts[1] * 60 + $parts[2];
+    elseif (count($parts) === 2) $total_all_seconds += $parts[0] * 60 + $parts[1];
 }
 $total_time = null;
 if ($total_all_seconds > 0) {

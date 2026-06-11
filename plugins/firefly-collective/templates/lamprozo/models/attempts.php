@@ -190,6 +190,69 @@ function lamprozo_save_attempts($challenge, $attempts) {
 }
 
 /**
+ * Per-challenge VOD list. VODs live at the challenge level and each links to one or
+ * more attempt NUMBERS (a wipe-spanning VOD covers two attempts). On first read the
+ * legacy per-attempt `vods` are migrated up into this list, oldest attempt first, so
+ * the run reads chronologically. The per-attempt `vods` are left in place untouched.
+ */
+function lamprozo_get_vods($challenge) {
+    $key  = 'lamprozo_vods_' . sanitize_key($challenge);
+    $vods = get_option($key, null);
+    if ($vods !== null) {
+        return $vods;
+    }
+
+    $attempts = lamprozo_get_attempts($challenge);
+    usort($attempts, fn($a, $b) => ($a['number'] ?? 0) - ($b['number'] ?? 0));
+
+    $vods = [];
+    foreach ($attempts as $attempt) {
+        foreach ($attempt['vods'] ?? [] as $vod) {
+            $vods[] = [
+                'id'       => lamprozo_new_vod_id(),
+                'url'      => $vod['url']      ?? '',
+                'label'    => $vod['label']    ?? '',
+                'duration' => $vod['duration'] ?? '',
+                'summary'  => $vod['summary']  ?? '',
+                'attempts' => [ (int) ($attempt['number'] ?? 0) ],
+            ];
+        }
+    }
+
+    update_option($key, $vods);
+    return $vods;
+}
+
+function lamprozo_save_vods($challenge, $vods) {
+    $clean = [];
+    foreach ((array) $vods as $vod) {
+        $attempts = array_values(array_unique(array_map('intval', (array) ($vod['attempts'] ?? []))));
+        $clean[] = [
+            'id'       => !empty($vod['id']) ? sanitize_text_field($vod['id']) : lamprozo_new_vod_id(),
+            'url'      => esc_url_raw($vod['url'] ?? ''),
+            'label'    => sanitize_text_field($vod['label'] ?? ''),
+            'duration' => sanitize_text_field($vod['duration'] ?? ''),
+            'summary'  => sanitize_textarea_field($vod['summary'] ?? ''),
+            'attempts' => $attempts,
+        ];
+    }
+    update_option('lamprozo_vods_' . sanitize_key($challenge), $clean);
+    return $clean;
+}
+
+function lamprozo_new_vod_id() {
+    return 'v' . dechex(time()) . dechex(random_int(0x1000, 0xffff));
+}
+
+/** VODs from a challenge list that cover a given attempt number. */
+function lamprozo_vods_for_attempt($vods, $number) {
+    return array_values(array_filter(
+        (array) $vods,
+        fn($v) => in_array((int) $number, array_map('intval', (array) ($v['attempts'] ?? [])), true)
+    ));
+}
+
+/**
  * Convert a legacy HZLA fragsheet (species-keyed object) into a flat box array.
  * Filters HZLA "shadow prevo" artifacts (mirrored + zero-stat stub placeholders
  * left behind on evolution) and merges their kill counts into the evolved form.
@@ -245,8 +308,12 @@ function lamprozo_box_from_fragsheet($fragsheet) {
  * Count of dead box members in an attempt. Falls back to deriving the box from a
  * legacy fragsheet if `box` hasn't been materialized yet.
  */
-/** Number of gym badges for a challenge (from its badge set, default 8). */
+/** Number of gym badges for a challenge — gym fights if defined, else the badge set. */
 function lamprozo_challenge_badge_count($challenge) {
+    if (!empty($challenge['fights']) && is_array($challenge['fights'])) {
+        $gyms = count(array_filter($challenge['fights'], fn($f) => !empty($f['badge'])));
+        if ($gyms > 0) { return $gyms; }
+    }
     $set = $challenge['badgeset'] ?? 'none';
     if (function_exists('lamprozo_badge_sets')) {
         $sets = lamprozo_badge_sets();
@@ -266,6 +333,69 @@ function lamprozo_badge_count_from_string($badges) {
 function lamprozo_cap_for_badges($challenge, $badge_count) {
     $caps = $challenge['caps'] ?? [];
     return (is_array($caps) && isset($caps[$badge_count]) && $caps[$badge_count] !== '') ? $caps[$badge_count] : '';
+}
+
+/**
+ * A challenge's fight list — the ordered progression of bosses. Each fight is
+ * ['name' => str, 'cap' => str (level cap heading into it), 'badge' => bool (gym?)].
+ * Mini-bosses sit between gyms, which is why caps can't be keyed by badge count.
+ */
+function lamprozo_sanitize_fights($fights) {
+    $clean = [];
+    foreach ((array) $fights as $f) {
+        $name = sanitize_text_field($f['name'] ?? '');
+        $cap  = sanitize_text_field((string) ($f['cap'] ?? ''));
+        if ($name === '' && $cap === '') { continue; }
+        $clean[] = ['name' => $name, 'cap' => $cap, 'badge' => !empty($f['badge'])];
+    }
+    return $clean;
+}
+
+/** Migrate a legacy badge-count caps array into a gym-only fight list. */
+function lamprozo_fights_from_caps($challenge) {
+    $caps   = $challenge['caps'] ?? [];
+    $set    = $challenge['badgeset'] ?? 'none';
+    $badges = (function_exists('lamprozo_badge_sets') ? lamprozo_badge_sets() : [])[$set] ?? [];
+    $n      = $badges ? count($badges) : (is_array($caps) ? max(0, count($caps) - 1) : 0);
+    $fights = [];
+    for ($i = 0; $i < $n; $i++) {
+        $label = $badges[$i]['name'] ?? ('Gym ' . ($i + 1));
+        $fights[] = [
+            'name'  => $badges ? ($label . ' (Gym ' . ($i + 1) . ')') : $label,
+            'cap'   => isset($caps[$i]) ? (string) $caps[$i] : '',
+            'badge' => true,
+        ];
+    }
+    // A trailing cap (all badges earned) becomes a non-badge "Champion" checkpoint.
+    if (is_array($caps) && isset($caps[$n]) && $caps[$n] !== '') {
+        $fights[] = ['name' => 'Champion', 'cap' => (string) $caps[$n], 'badge' => false];
+    }
+    return $fights;
+}
+
+/**
+ * Resolve an attempt's fight pointer (step = fights completed) to a live level cap
+ * and badge count. cap = the upcoming fight's cap; badges = gyms cleared so far.
+ */
+function lamprozo_resolve_step($fights, $step) {
+    $fights = array_values((array) $fights);
+    $n      = count($fights);
+    $step   = max(0, (int) $step);
+    if ($n === 0) {
+        return ['cap' => '', 'badges' => 0, 'name' => '', 'index' => 0, 'total' => 0];
+    }
+    $cap    = $fights[min($step, $n - 1)]['cap'] ?? '';
+    $badges = 0;
+    for ($i = 0, $stop = min($step, $n); $i < $stop; $i++) {
+        if (!empty($fights[$i]['badge'])) { $badges++; }
+    }
+    return [
+        'cap'    => (string) $cap,
+        'badges' => $badges,
+        'name'   => $step < $n ? ($fights[$step]['name'] ?? '') : 'Done',
+        'index'  => $step,
+        'total'  => $n,
+    ];
 }
 
 function lamprozo_attempt_deaths($attempt) {
@@ -484,6 +614,44 @@ function lamprozo_default_challenges() {
             'layout'      => 'ds',
             'status'      => 'on_hold',
         ],
+        'run-and-bun' => [
+            'slug'        => 'run-and-bun',
+            'title'       => 'Run & Bun',
+            'game'        => 'Pokémon Run & Bun',
+            'type'        => 'ROM Hack',
+            'gen'         => 'III',
+            'description' => 'A hardcore Nuzlocke of the Pokémon Emerald ROM hack Run & Bun.',
+            'ruleset'     => 'Hardcore Nuzlocke',
+            'theme'       => 'emerald',
+            'layout'      => 'gba',
+            'badgeset'    => 'run-and-bun',
+            'status'      => 'on_hold',
+            'fights'      => [
+                ['name' => 'Route 104 Aqua Grunt',     'cap' => '12', 'badge' => false],
+                ['name' => 'Museum Aqua Grunts',       'cap' => '17', 'badge' => false],
+                ['name' => 'Leader Brawly',            'cap' => '21', 'badge' => true],
+                ['name' => 'Leader Roxanne',           'cap' => '25', 'badge' => true],
+                ['name' => 'Route 117 Chelle',         'cap' => '32', 'badge' => false],
+                ['name' => 'Leader Wattson',           'cap' => '35', 'badge' => true],
+                ['name' => 'Cycling Road Rival',       'cap' => '38', 'badge' => false],
+                ['name' => 'Leader Norman',            'cap' => '42', 'badge' => true],
+                ['name' => 'Fallarbor Town Vito',      'cap' => '48', 'badge' => false],
+                ['name' => 'Mt. Chimney Maxie',        'cap' => '54', 'badge' => false],
+                ['name' => 'Leader Flannery',          'cap' => '57', 'badge' => true],
+                ['name' => 'Weather Institute Shelly', 'cap' => '65', 'badge' => false],
+                ['name' => 'Route 119 Rival',          'cap' => '66', 'badge' => false],
+                ['name' => 'Leader Winona',            'cap' => '69', 'badge' => true],
+                ['name' => 'Lilycove City Rival',      'cap' => '73', 'badge' => false],
+                ['name' => 'Mt. Pyre Archie',          'cap' => '76', 'badge' => false],
+                ['name' => 'Magma Hideout Maxie',      'cap' => '79', 'badge' => false],
+                ['name' => 'Aqua Hideout Matt',        'cap' => '81', 'badge' => false],
+                ['name' => 'Leaders Tate & Liza',      'cap' => '85', 'badge' => true],
+                ['name' => 'Seafloor Cavern Archie',   'cap' => '89', 'badge' => false],
+                ['name' => 'Leader Juan',              'cap' => '91', 'badge' => true],
+                ['name' => 'Victory Road Vito',        'cap' => '95', 'badge' => false],
+                ['name' => 'Champion Wallace',         'cap' => '99', 'badge' => false],
+            ],
+        ],
     ];
 }
 
@@ -522,8 +690,21 @@ function lamprozo_get_challenges_data() {
             $challenge['layout'] = $defaults[$slug]['layout'] ?? 'gba';
             $updated = true;
         }
+        // Migrate badge-count caps into the ordered fight list (gyms only); the
+        // user can then insert mini-boss fights between them in the editor.
+        if (!isset($challenge['fights'])) {
+            $challenge['fights'] = $defaults[$slug]['fights'] ?? lamprozo_fights_from_caps($challenge);
+            $updated = true;
+        }
     }
     unset($challenge);
+    // Seed any new built-in challenge that didn't exist yet (e.g. Run & Bun).
+    foreach ($defaults as $slug => $def) {
+        if (!isset($stored[$slug])) {
+            $stored[$slug] = $def;
+            $updated = true;
+        }
+    }
     if ($updated) update_option('lamprozo_challenges', $stored);
     return $stored;
 }
@@ -580,6 +761,21 @@ add_action('rest_api_init', function() {
         'callback'            => 'lamprozo_rest_set_attempt_meta',
         'permission_callback' => fn() => current_user_can('manage_options'),
     ]);
+
+    // Per-challenge VOD list (tied to attempt numbers).
+    register_rest_route('lamprozo/v1', '/vods/(?P<challenge>[a-z0-9-]+)', [
+        'methods'             => 'GET',
+        'callback'            => fn($r) => rest_ensure_response(lamprozo_get_vods($r['challenge'])),
+        'permission_callback' => fn() => current_user_can('manage_options'),
+    ]);
+    register_rest_route('lamprozo/v1', '/vods/(?P<challenge>[a-z0-9-]+)', [
+        'methods'             => 'POST',
+        'callback'            => fn($r) => rest_ensure_response([
+            'success' => true,
+            'vods'    => lamprozo_save_vods($r['challenge'], $r->get_json_params()),
+        ]),
+        'permission_callback' => fn() => current_user_can('manage_options'),
+    ]);
 });
 
 function lamprozo_rest_set_attempt_meta($request) {
@@ -599,15 +795,14 @@ function lamprozo_rest_set_attempt_meta($request) {
                     $attempts[$i][$f] = sanitize_text_field((string) $body[$f]);
                 }
             }
-            // When badges change, auto-set the level cap from the challenge's
-            // per-badge caps (if defined), unless cap was explicitly sent too.
-            if (array_key_exists('badges', $body) && !array_key_exists('cap', $body)) {
-                $cd  = lamprozo_get_challenges_data()[$challenge] ?? [];
-                $bc  = lamprozo_badge_count_from_string($attempts[$i]['badges']);
-                $cap = lamprozo_cap_for_badges($cd, $bc);
-                if ($cap !== '') {
-                    $attempts[$i]['cap'] = $cap;
-                }
+            // The fight pointer drives the level cap and badge count. Advancing it
+            // (next/prev boss) recomputes both, unless either was sent explicitly.
+            if (array_key_exists('step', $body)) {
+                $attempts[$i]['step'] = max(0, (int) $body['step']);
+                $cd = lamprozo_get_challenges_data()[$challenge] ?? [];
+                $r  = lamprozo_resolve_step($cd['fights'] ?? [], $attempts[$i]['step']);
+                if (!array_key_exists('cap', $body))    { $attempts[$i]['cap']    = $r['cap']; }
+                if (!array_key_exists('badges', $body)) { $attempts[$i]['badges'] = (string) $r['badges']; }
             }
             $found = true;
             break;
@@ -620,6 +815,7 @@ function lamprozo_rest_set_attempt_meta($request) {
             'cap'     => $attempts[$i]['cap']    ?? '',
             'badges'  => $attempts[$i]['badges'] ?? '',
             'deaths'  => $attempts[$i]['deaths'] ?? '',
+            'step'    => $attempts[$i]['step']   ?? 0,
         ]);
     }
     return rest_ensure_response(['success' => false]);
@@ -662,6 +858,7 @@ function lamprozo_rest_create_challenge($request) {
         'theme'       => sanitize_key($body['theme'] ?? 'emerald'),
         'badgeset'    => sanitize_key($body['badgeset'] ?? 'none'),
         'caps'        => (isset($body['caps']) && is_array($body['caps'])) ? array_map(fn($v) => sanitize_text_field((string) $v), $body['caps']) : [],
+        'fights'      => (isset($body['fights']) && is_array($body['fights'])) ? lamprozo_sanitize_fights($body['fights']) : [],
         'layout'      => sanitize_key($body['layout'] ?? 'gba'),
     ];
     update_option('lamprozo_challenges', $challenges);
@@ -692,6 +889,9 @@ function lamprozo_rest_update_challenge($request) {
     }
     if (isset($body['caps']) && is_array($body['caps'])) {
         $challenges[$slug]['caps'] = array_map(fn($v) => sanitize_text_field((string) $v), $body['caps']);
+    }
+    if (isset($body['fights']) && is_array($body['fights'])) {
+        $challenges[$slug]['fights'] = lamprozo_sanitize_fights($body['fights']);
     }
     update_option('lamprozo_challenges', $challenges);
 
@@ -743,16 +943,17 @@ function lamprozo_rest_new_attempt($request) {
     // Get next number
     $next = empty($attempts) ? 1 : (max(array_column($attempts, 'number')) + 1);
 
-    // A fresh run starts at 0 badges, the starting level cap, and 0 deaths
+    // A fresh run starts before fight #1: step 0, that fight's cap, 0 badges, 0 deaths
     // (empty box -> box-derived deaths = 0).
     $challenge_data = lamprozo_get_challenges_data()[$challenge] ?? [];
+    $start = lamprozo_resolve_step($challenge_data['fights'] ?? [], 0);
 
     array_unshift($attempts, [
         'number' => $next,
         'status' => 'ongoing',
-        'cap'    => lamprozo_cap_for_badges($challenge_data, 0),
-        'badges' => '0',
-        'vods'   => [],
+        'step'   => 0,
+        'cap'    => $start['cap'],
+        'badges' => (string) $start['badges'],
         'box'    => [],
     ]);
 

@@ -2,6 +2,15 @@
 // $preselect / $embed may be injected by the embed endpoint; otherwise derive.
 $preselect = isset($preselect) ? $preselect : (isset($_GET['challenge']) ? sanitize_title($_GET['challenge']) : '');
 $embed     = isset($embed) ? (bool) $embed : false;
+
+// Per-challenge fight lists, so the attempt's "current fight" stepper can resolve
+// the level cap + badge count client-side.
+$ffc_all_fights = [];
+if (function_exists('lamprozo_get_challenges_data')) {
+    foreach (lamprozo_get_challenges_data() as $cslug => $cdata) {
+        $ffc_all_fights[$cslug] = $cdata['fights'] ?? [];
+    }
+}
 ?>
 <div id="attempts-app" style="max-width:1000px;padding:<?php echo $embed ? '0' : '1.5rem 0'; ?>">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:0.75rem">
@@ -18,6 +27,8 @@ $embed     = isset($embed) ? (bool) $embed : false;
     </div>
 
     <div id="attempts-notice" style="display:none;margin-bottom:1rem"></div>
+
+    <div id="vods-section"></div>
 
     <div id="attempts-list"></div>
 </div>
@@ -38,14 +49,25 @@ $embed     = isset($embed) ? (bool) $embed : false;
 .attempt-field { flex:1; min-width:160px; }
 .attempt-field input, .attempt-field select, .attempt-field textarea { width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; }
 .attempt-field textarea { resize:vertical; min-height:60px; }
-.vod-list { display:flex; flex-direction:column; gap:14px; margin-bottom:6px; }
+.vod-list { display:flex; flex-direction:column; gap:8px; margin-bottom:0; max-height:330px; overflow-y:auto; padding:2px; }
 .vod-item { display:flex; flex-direction:column; gap:4px; padding:6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
 .vod-row { display:flex; gap:6px; align-items:center; }
 .vod-row input { padding:4px 7px; border:1px solid #ccc; border-radius:4px; }
 .vod-label-input { width:100px; }
 .vod-url-input { flex:1; }
 .vod-dur-input { width:90px; }
-.vod-summary-input { width:100%; padding:5px 7px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:0.9em; resize:vertical; min-height:50px; }
+.vod-summary-input { width:100%; padding:5px 7px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:0.9em; resize:vertical; min-height:34px; }
+.vods-section { background:#fff; border:1px solid #ddd; border-radius:6px; margin-bottom:18px; padding:10px 14px; }
+.vods-section__title { font-size:1em; font-weight:700; cursor:pointer; user-select:none; margin:0; list-style-position:inside; }
+.vods-section__title span { font-weight:400; color:#888; }
+.vods-section[open] .vods-section__title { margin-bottom:8px; }
+.vods-section__bar { margin-bottom:8px; }
+.vod-attempts { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:2px 2px 0; font-size:0.82em; color:#555; }
+.vod-attempts__label { font-weight:600; }
+.vod-chip { display:inline-flex; align-items:center; gap:2px; padding:1px 4px 1px 8px; border:1px solid #9146ff; border-radius:12px; background:#f3ecff; color:#333; }
+.vod-chip button { border:none; background:none; cursor:pointer; color:#9146ff; font-size:1.05em; line-height:1; padding:0 2px; }
+.vod-chip button:hover { color:#d63638; }
+.vod-add-att { font-size:0.82em; padding:2px 4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
 .box-grid { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
 .box-mon { display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
 .box-mon--dead { opacity:0.65; background:#f7eaea; }
@@ -61,11 +83,24 @@ $embed     = isset($embed) ? (bool) $embed : false;
 
 <script>
 (function() {
-    const nonce   = '<?php echo wp_create_nonce('wp_rest'); ?>';
-    const apiBase = '<?php echo esc_url(rest_url('lamprozo/v1/attempts/')); ?>';
+    const nonce    = '<?php echo wp_create_nonce('wp_rest'); ?>';
+    const apiBase  = '<?php echo esc_url(rest_url('lamprozo/v1/attempts/')); ?>';
+    const vodsBase = '<?php echo esc_url(rest_url('lamprozo/v1/vods/')); ?>';
     let attempts  = [];
+    let vods      = [];
     let challenge = document.getElementById('challenge-select').value;
     let openCards = new Set();
+    const CHALLENGE_FIGHTS = <?php echo wp_json_encode($ffc_all_fights ?: new stdClass()); ?>;
+    function fightsFor()   { return (CHALLENGE_FIGHTS && CHALLENGE_FIGHTS[challenge]) || []; }
+    function gymTotal(fs)  { return fs.filter(f => f.badge).length; }
+    function gymsAt(fs, step) { let g = 0; for (let k = 0; k < Math.min(step, fs.length); k++) if (fs[k].badge) g++; return g; }
+    function inferStep(fs, badgeNum) { let g = 0; for (let k = 0; k < fs.length; k++) if (fs[k].badge) { if (++g === badgeNum) return k + 1; } return badgeNum > 0 ? fs.length : 0; }
+    function fightLabel(fs, step) {
+        if (!fs.length) return 'No fights defined';
+        if (step >= fs.length) return '✓ All fights done';
+        const f = fs[step];
+        return (f.name || ('Fight ' + (step + 1))) + (f.cap ? ' — cap ' + f.cap : '');
+    }
 
     function headers() { return { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce }; }
 
@@ -86,10 +121,11 @@ $embed     = isset($embed) ? (bool) $embed : false;
     function renderCard(attempt, i) {
         const isOpen = openCards.has(i) || attempt.status === 'ongoing';
         const notes  = attempt.notes || '';
-        const vods   = attempt.vods || [];
         const cap    = attempt.cap || '';
         const badges = attempt.badges || '';
         const badgeNum = parseInt((String(badges).match(/\d+/) || ['0'])[0], 10);
+        const fights = fightsFor();
+        const step   = (attempt.step != null) ? attempt.step : inferStep(fights, badgeNum);
         const deaths = attempt.deaths ?? '';
         const box    = attempt.box || [];
         const deadCount = box.filter(m => m.alive === false).length;
@@ -107,25 +143,6 @@ $embed     = isset($embed) ? (bool) $embed : false;
                     onchange="updateBoxMon(${i},${bi},'kills',this.value)">
                 <button class="button button-small" onclick="toggleBoxAlive(${i},${bi})">${m.alive === false ? '💀 Dead' : 'Alive'}</button>
                 <button class="button button-small button-link-delete" onclick="removeBoxMon(${i},${bi})">✕</button>
-            </div>`).join('');
-
-        const vodRows = vods.map((v, vi) => `
-            <div class="vod-item">
-                <div class="vod-row">
-                    <input class="vod-url-input" type="text" placeholder="https://youtu.be/..." value="${esc(v.url||'')}"
-                        onchange="updateVod(${i},${vi},'url',this.value)"
-                        onblur="fetchYtMeta(${i},${vi},this.value)">
-                    <input class="vod-label-input" type="text" placeholder="Title (auto-filled from YouTube)" value="${esc(v.label||'')}"
-                        id="vod-label-${i}-${vi}"
-                        onchange="updateVod(${i},${vi},'label',this.value)">
-                    <input class="vod-dur-input" type="text" placeholder="Duration (e.g. 1:23:45)"
-                        id="vod-dur-${i}-${vi}"
-                        value="${esc(v.duration||'')}"
-                        onchange="updateVod(${i},${vi},'duration',this.value)">
-                    <button class="button button-small" onclick="removeVod(${i},${vi})">✕</button>
-                </div>
-                <textarea class="vod-summary-input" placeholder="What happened in this VOD?"
-                    onchange="updateVod(${i},${vi},'summary',this.value)">${esc(v.summary||'')}</textarea>
             </div>`).join('');
 
         return `<div class="attempt-card">
@@ -151,6 +168,15 @@ $embed     = isset($embed) ? (bool) $embed : false;
                         <input type="text" id="cap-input-${i}" placeholder="e.g. 16" value="${esc(cap)}"
                             onchange="saveMeta(${i},'cap',this.value)">
                     </div>
+                    ${fights.length ? `
+                    <div class="attempt-field" style="flex:1 1 300px;min-width:240px">
+                        <label>Current fight <span style="font-weight:400;color:#888">· 🎖 ${gymsAt(fights, step)}/${gymTotal(fights)}</span></label>
+                        <div style="display:flex;gap:5px;align-items:center">
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpStep(${i},-1)" ${step<=0?'disabled':''}>&minus;</button>
+                            <span style="flex:1;min-width:0;padding:5px 8px;border:1px solid #e0e0e0;border-radius:4px;background:#fafafa;font-size:0.86em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(fightLabel(fights, step))}</span>
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpStep(${i},1)" ${step>=fights.length?'disabled':''}>+</button>
+                        </div>
+                    </div>` : `
                     <div class="attempt-field" style="flex:0 0 auto;min-width:0">
                         <label>Badges</label>
                         <div style="display:flex;gap:4px;align-items:center">
@@ -159,7 +185,7 @@ $embed     = isset($embed) ? (bool) $embed : false;
                                 onchange="saveMeta(${i},'badges',this.value)">
                             <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpBadges(${i},1)">+</button>
                         </div>
-                    </div>
+                    </div>`}
                     <div class="attempt-field" style="min-width:90px;max-width:120px">
                         <label>Deaths</label>
                         <input type="text" placeholder="auto: ${deadCount}" value="${esc(deaths)}"
@@ -172,12 +198,7 @@ $embed     = isset($embed) ? (bool) $embed : false;
                         <textarea placeholder="What happened this run?" onchange="updateField(${i},'notes',this.value)">${esc(notes)}</textarea>
                     </div>
                 </div>
-                <div>
-                    <label style="font-size:0.85em;font-weight:600;color:#555;display:block;margin-bottom:6px">VODs</label>
-                    <div class="vod-list">${vodRows}</div>
-                    <button class="button button-small" onclick="addVod(${i})">+ Add VOD</button>
-                </div>
-                <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
+                <div style="padding-top:4px">
                     <label style="font-size:0.85em;font-weight:600;color:#555;display:block;margin-bottom:6px">
                         Box <span style="font-weight:400;color:#888">(${box.length} Pokémon, ${deadCount} dead)</span>
                     </label>
@@ -203,24 +224,61 @@ $embed     = isset($embed) ? (bool) $embed : false;
     }
 
     function render() {
+        renderVods();
         document.getElementById('attempts-list').innerHTML = attempts.length
             ? attempts.map((a, i) => renderCard(a, i)).join('')
             : '<p style="color:#888">No attempts yet.</p>';
     }
 
-    window.fetchYtMeta = (i, vi, url) => {
-        if (!url) return;
+    // Challenge-level VOD list. Each VOD links to one or more attempt NUMBERS, shown as
+    // removable chips with a compact dropdown to attach more (a wipe-spanning VOD covers
+    // two attempts). Numbers run newest-first so recent attempts are easy to reach.
+    function renderVods() {
+        const numbersDesc = attempts.map(a => a.number).sort((x, y) => y - x);
+        const rows = vods.map((v, vi) => {
+            const linked = (v.attempts || []).slice().sort((x, y) => y - x);
+            const chips  = linked.map(n =>
+                `<span class="vod-chip">#${n}<button title="Unlink attempt #${n}" onclick="removeVodAttempt(${vi},${n})">✕</button></span>`
+            ).join('');
+            const addable = numbersDesc.filter(n => !linked.includes(n));
+            const addSel = addable.length
+                ? `<select class="vod-add-att" onchange="addVodAttempt(${vi},this.value)"><option value="">+ attempt…</option>${addable.map(n => `<option value="${n}">#${n}</option>`).join('')}</select>`
+                : '';
+            return `<div class="vod-item">
+                <div class="vod-row">
+                    <input class="vod-url-input" type="text" placeholder="https://youtu.be/..." value="${esc(v.url||'')}"
+                        onchange="updateVod(${vi},'url',this.value)" onblur="fetchYtMeta(${vi},this.value)">
+                    <input class="vod-label-input" type="text" placeholder="Title (auto-filled from YouTube)" value="${esc(v.label||'')}"
+                        id="vod-label-${vi}" onchange="updateVod(${vi},'label',this.value)">
+                    <input class="vod-dur-input" type="text" placeholder="Duration (e.g. 1:23:45)"
+                        id="vod-dur-${vi}" value="${esc(v.duration||'')}" onchange="updateVod(${vi},'duration',this.value)">
+                    <button class="button button-small" onclick="removeVod(${vi})">✕</button>
+                </div>
+                <textarea class="vod-summary-input" placeholder="What happened in this VOD?"
+                    onchange="updateVod(${vi},'summary',this.value)">${esc(v.summary||'')}</textarea>
+                <div class="vod-attempts"><span class="vod-attempts__label">Covers:</span>${chips || '<em style="color:#bbb">unlinked</em>'}${addSel}</div>
+            </div>`;
+        }).join('');
+        document.getElementById('vods-section').innerHTML = `<details class="vods-section"${vods.length ? '' : ' open'}>
+            <summary class="vods-section__title">VODs <span>(${vods.length})</span></summary>
+            <div class="vods-section__bar"><button class="button button-small" onclick="addVod()">+ Add VOD</button></div>
+            <div class="vod-list">${rows || '<p style="color:#888;margin:0">No VODs yet.</p>'}</div>
+        </details>`;
+    }
+
+    window.fetchYtMeta = (vi, url) => {
+        if (!url || !vods[vi]) return;
         fetch('<?php echo esc_url(rest_url('lamprozo/v1/yt-meta')); ?>?url=' + encodeURIComponent(url), { headers: headers() })
             .then(r => r.json())
             .then(data => {
-                if (data.title && !attempts[i].vods[vi].label) {
-                    attempts[i].vods[vi].label = data.title;
-                    const labelEl = document.getElementById(`vod-label-${i}-${vi}`);
+                if (data.title && !vods[vi].label) {
+                    vods[vi].label = data.title;
+                    const labelEl = document.getElementById(`vod-label-${vi}`);
                     if (labelEl) labelEl.value = data.title;
                 }
-                if (data.duration && !attempts[i].vods[vi].duration) {
-                    attempts[i].vods[vi].duration = data.duration;
-                    const durEl = document.getElementById(`vod-dur-${i}-${vi}`);
+                if (data.duration && !vods[vi].duration) {
+                    vods[vi].duration = data.duration;
+                    const durEl = document.getElementById(`vod-dur-${vi}`);
                     if (durEl) durEl.value = data.duration;
                 }
             });
@@ -349,6 +407,28 @@ $embed     = isset($embed) ? (bool) $embed : false;
         saveMeta(i, 'badges', String(next));
     };
 
+    // Advance/retreat the attempt's fight pointer; the cap + badge count follow it.
+    window.bumpStep = (i, delta) => {
+        const fights = fightsFor();
+        const cur = (attempts[i].step != null)
+            ? attempts[i].step
+            : inferStep(fights, parseInt((String(attempts[i].badges || '').match(/\d+/) || ['0'])[0], 10));
+        const next = Math.max(0, Math.min(fights.length, cur + delta));
+        if (next === cur) return;
+        attempts[i].step = next;
+        fetch(apiBase + challenge + '/meta', {
+            method: 'POST', headers: headers(),
+            body: JSON.stringify({ number: attempts[i].number, step: next })
+        }).then(r => r.json()).then(d => {
+            if (d && d.success) {
+                if (d.cap    !== undefined) attempts[i].cap    = d.cap;
+                if (d.badges !== undefined) attempts[i].badges = d.badges;
+                if (d.step   !== undefined) attempts[i].step   = d.step;
+            }
+            render();
+        }).catch(() => {});
+    };
+
     window.saveMeta = (i, key, val) => {
         attempts[i][key] = val;
         fetch(apiBase + challenge + '/meta', {
@@ -363,9 +443,29 @@ $embed     = isset($embed) ? (bool) $embed : false;
             }
         }).catch(() => {});
     };
-    window.updateVod     = (i, vi, key, val) => { attempts[i].vods[vi][key] = val; };
-    window.addVod        = (i) => { attempts[i].vods = attempts[i].vods || []; attempts[i].vods.push({label:'VOD',url:'',summary:''}); render(); };
-    window.removeVod     = (i, vi) => { attempts[i].vods.splice(vi, 1); render(); };
+    function newVodId() { return 'v' + Date.now().toString(16) + Math.floor(Math.random()*0xffff).toString(16); }
+    window.updateVod        = (vi, key, val) => { vods[vi][key] = val; };
+    window.addVodAttempt    = (vi, val) => {
+        const n = parseInt(val, 10);
+        if (!n) return;
+        const set = new Set(vods[vi].attempts || []);
+        set.add(n);
+        vods[vi].attempts = [...set].sort((a, b) => a - b);
+        renderVods();
+    };
+    window.removeVodAttempt = (vi, n) => {
+        vods[vi].attempts = (vods[vi].attempts || []).filter(x => x !== n);
+        renderVods();
+    };
+    window.addVod = () => {
+        const ongoing = attempts.find(a => a.status === 'ongoing');
+        // Prepend so the new VOD lands at the top — no scrolling to find it.
+        vods.unshift({ id: newVodId(), url:'', label:'VOD', duration:'', summary:'', attempts: ongoing ? [ongoing.number] : [] });
+        renderVods();
+        const list = document.querySelector('.vod-list');
+        if (list) list.scrollTop = 0;
+    };
+    window.removeVod = (vi) => { vods.splice(vi, 1); renderVods(); };
     window.deleteAttempt = (i) => { if (confirm('Delete attempt #' + attempts[i].number + '?')) { attempts.splice(i, 1); render(); } };
 
     document.getElementById('challenge-select').addEventListener('change', function() {
@@ -373,8 +473,10 @@ $embed     = isset($embed) ? (bool) $embed : false;
     });
 
     document.getElementById('btn-save').addEventListener('click', () => {
-        fetch(apiBase + challenge, { method: 'POST', headers: headers(), body: JSON.stringify(attempts) })
-            .then(r => r.json())
+        Promise.all([
+            fetch(apiBase + challenge,  { method: 'POST', headers: headers(), body: JSON.stringify(attempts) }).then(r => r.json()),
+            fetch(vodsBase + challenge, { method: 'POST', headers: headers(), body: JSON.stringify(vods) }).then(r => r.json()),
+        ])
             .then(() => {
                 notice('Saved!');
                 fetch('<?php echo esc_js(rest_url('firefly/v1/clear-cache')); ?>', {
@@ -409,9 +511,14 @@ $embed     = isset($embed) ? (bool) $embed : false;
     });
 
     function load() {
-        fetch(apiBase + challenge, { headers: headers() })
-            .then(r => r.json())
-            .then(data => { attempts = data; render(); });
+        Promise.all([
+            fetch(apiBase + challenge, { headers: headers() }).then(r => r.json()),
+            fetch(vodsBase + challenge, { headers: headers() }).then(r => r.json()),
+        ]).then(([a, v]) => {
+            attempts = Array.isArray(a) ? a : [];
+            vods     = Array.isArray(v) ? v : [];
+            render();
+        });
     }
 
     load();

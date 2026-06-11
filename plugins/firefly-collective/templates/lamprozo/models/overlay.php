@@ -93,7 +93,81 @@ add_action('rest_api_init', function() {
             return (is_string($given) && hash_equals($expected, $given)) || current_user_can('manage_options');
         },
     ]);
+
+    // Admin-only: upload a badge image or an alert sound from the dashboard. Saves to
+    // the fixed paths the overlay reads (uploads/lamprozo/badges/{set}/{slug}.png and
+    // uploads/lamprozo/sfx/{name}.mp3) so no manual file copying is needed.
+    register_rest_route('lamprozo/v1', '/overlay-asset', [
+        'methods'             => 'POST',
+        'callback'            => 'lamprozo_rest_upload_asset',
+        'permission_callback' => fn() => current_user_can('manage_options'),
+    ]);
 });
+
+/** Badge filename slug — must match the overlay's badgeSlug() and _attempt-card.php. */
+function lamprozo_badge_slug($name) {
+    return strtolower(preg_replace('/[^a-z0-9]+/i', '-', (string) $name));
+}
+
+function lamprozo_rest_upload_asset($request) {
+    $files = $request->get_file_params();
+    $file  = $files['file'] ?? null;
+    if (!$file || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || !empty($file['error'])) {
+        return new WP_Error('no_file', 'No file was uploaded.', ['status' => 400]);
+    }
+
+    $kind    = sanitize_key((string) $request->get_param('kind'));
+    $uploads = wp_upload_dir();
+    if (!empty($uploads['error'])) {
+        return new WP_Error('uploads_dir', 'Uploads directory is not writable.', ['status' => 500]);
+    }
+
+    if ('sfx' === $kind) {
+        $name = sanitize_key((string) $request->get_param('name'));
+        if (!in_array($name, ['badge', 'death', 'wipe'], true)) {
+            return new WP_Error('bad_name', 'Unknown sound slot.', ['status' => 400]);
+        }
+        $check = wp_check_filetype($file['name'], ['mp3' => 'audio/mpeg']);
+        if ('mp3' !== strtolower((string) $check['ext'])) {
+            return new WP_Error('bad_type', 'Sounds must be an .mp3 file.', ['status' => 400]);
+        }
+        $dir = $uploads['basedir'] . '/lamprozo/sfx';
+        $rel = '/lamprozo/sfx/' . $name . '.mp3';
+        $dest = $dir . '/' . $name . '.mp3';
+    } elseif ('badge' === $kind) {
+        $set  = sanitize_key((string) $request->get_param('set'));
+        $sets = lamprozo_badge_sets();
+        if (!isset($sets[$set])) {
+            return new WP_Error('bad_set', 'Unknown badge set.', ['status' => 400]);
+        }
+        $slug  = lamprozo_badge_slug((string) $request->get_param('badge'));
+        $valid = array_map(fn($b) => lamprozo_badge_slug($b['name']), $sets[$set]);
+        if (!in_array($slug, $valid, true)) {
+            return new WP_Error('bad_badge', 'Unknown badge for this set.', ['status' => 400]);
+        }
+        $check = wp_check_filetype($file['name'], ['png' => 'image/png']);
+        $info  = @getimagesize($file['tmp_name']);
+        if ('png' !== strtolower((string) $check['ext']) || !$info || IMAGETYPE_PNG !== $info[2]) {
+            return new WP_Error('bad_type', 'Badge images must be a .png file.', ['status' => 400]);
+        }
+        $img_set = lamprozo_badge_image_set($set);   // shared-image sets write to the source folder
+        $dir = $uploads['basedir'] . '/lamprozo/badges/' . $img_set;
+        $rel = '/lamprozo/badges/' . $img_set . '/' . $slug . '.png';
+        $dest = $dir . '/' . $slug . '.png';
+    } else {
+        return new WP_Error('bad_kind', 'Unknown asset kind.', ['status' => 400]);
+    }
+
+    if (!wp_mkdir_p($dir)) {
+        return new WP_Error('mkdir', 'Could not create the destination folder.', ['status' => 500]);
+    }
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        return new WP_Error('move', 'Could not save the uploaded file.', ['status' => 500]);
+    }
+    @chmod($dest, 0644);
+
+    return rest_ensure_response(['success' => true, 'url' => $uploads['baseurl'] . $rel]);
+}
 
 /**
  * Store the live party (for the overlay) and merge any new mons into the active
@@ -331,6 +405,8 @@ function lamprozo_render_overlay_page() {
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
     var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var BADGE_IMG   = <?php echo wp_json_encode(lamprozo_badge_image_sets()); ?>;
+    function badgeDir(set) { return (BADGE_IMG && BADGE_IMG[set]) || set; }
     var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
     var BADGE_CB = Date.now(); // per-load cache-bust so a stale 404 can't stick
 
@@ -369,14 +445,14 @@ function lamprozo_render_overlay_page() {
     var SFX_VOL = (function () { var v = parseFloat(new URLSearchParams(location.search).get("vol")); return isNaN(v) ? 0.7 : Math.max(0, Math.min(1, v)); })();
     function fxSound(name) {
       if (SFX_VOL <= 0) return;
-      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3"); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
+      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3?v=" + BADGE_CB); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
     }
     function fxBadge(data, n) {
       fxFlash("gold"); fxSound("badge");
       var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
       if (badge) {
         label = badge.name + " Badge!";
-        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
+        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + badgeDir(data.badgeset) + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
       }
       var b = document.createElement("div"); b.className = "fx-banner fx-badge"; b.innerHTML = img + "<span>" + label + "</span>";
       fxSpawn(b, 2400);
@@ -422,7 +498,7 @@ function lamprozo_render_overlay_page() {
         // Prefer an uploaded badge image; fall back to a colored pip if absent.
         var img = document.createElement("img");
         img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
-        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + badgeDir(data.badgeset) + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
         img.alt = b.name; img.title = b.name;
         img.onerror = function() {
           var pip = document.createElement("span");
@@ -521,7 +597,30 @@ function lamprozo_badge_sets() {
             ['name' => 'Glacier', 'color' => '#5dade2'],
             ['name' => 'Rising',  'color' => '#c0392b'],
         ],
+        // Run & Bun (Emerald hack) — the Hoenn badges, but in this hack's gym order.
+        // Reuses the hoenn badge images (see lamprozo_badge_image_set).
+        'run-and-bun' => [
+            ['name' => 'Knuckle', 'color' => '#d9534f'],
+            ['name' => 'Stone',   'color' => '#9aa3ad'],
+            ['name' => 'Dynamo',  'color' => '#f1c40f'],
+            ['name' => 'Balance', 'color' => '#c8a24a'],
+            ['name' => 'Heat',    'color' => '#e67e22'],
+            ['name' => 'Feather', 'color' => '#48c9b0'],
+            ['name' => 'Mind',    'color' => '#af7ac5'],
+            ['name' => 'Rain',    'color' => '#2e86de'],
+        ],
     ];
+}
+
+/**
+ * Some badge sets share another set's images (same badges, different gym order).
+ * Returns the folder under uploads/lamprozo/badges/ that holds a set's PNGs.
+ */
+function lamprozo_badge_image_sets() {
+    return ['run-and-bun' => 'hoenn'];
+}
+function lamprozo_badge_image_set($set) {
+    return lamprozo_badge_image_sets()[$set] ?? $set;
 }
 
 add_action('template_redirect', function() {
@@ -863,6 +962,8 @@ function lamprozo_render_layout_page() {
     var REST_URL = <?php echo wp_json_encode($rest_url); ?>;
     var FIELDS   = ["game", "ruleset", "attempt", "cap", "deaths"];
     var BADGE_SETS  = <?php echo wp_json_encode(lamprozo_badge_sets()); ?>;
+    var BADGE_IMG   = <?php echo wp_json_encode(lamprozo_badge_image_sets()); ?>;
+    function badgeDir(set) { return (BADGE_IMG && BADGE_IMG[set]) || set; }
     var UPLOADS_URL = <?php echo wp_json_encode($uploads_url); ?>;
     var BADGE_CB = Date.now(); // per-load cache-bust so a stale 404 can't stick
 
@@ -901,14 +1002,14 @@ function lamprozo_render_layout_page() {
     var SFX_VOL = (function () { var v = parseFloat(new URLSearchParams(location.search).get("vol")); return isNaN(v) ? 0.7 : Math.max(0, Math.min(1, v)); })();
     function fxSound(name) {
       if (SFX_VOL <= 0) return;
-      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3"); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
+      try { var a = new Audio(UPLOADS_URL + "/lamprozo/sfx/" + name + ".mp3?v=" + BADGE_CB); a.volume = SFX_VOL; a.play().catch(function () {}); } catch (e) {}
     }
     function fxBadge(data, n) {
       fxFlash("gold"); fxSound("badge");
       var set = BADGE_SETS[data.badgeset], badge = set && set[n - 1], img = "", label = "Badge earned!";
       if (badge) {
         label = badge.name + " Badge!";
-        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
+        img = '<img class="fx-emote" src="' + UPLOADS_URL + "/lamprozo/badges/" + badgeDir(data.badgeset) + "/" + badgeSlug(badge.name) + ".png?v=" + BADGE_CB + '" onerror="this.style.display=\'none\'">';
       }
       var b = document.createElement("div"); b.className = "fx-banner fx-badge"; b.innerHTML = img + "<span>" + label + "</span>";
       fxSpawn(b, 2400);
@@ -954,7 +1055,7 @@ function lamprozo_render_layout_page() {
         // Prefer an uploaded badge image; fall back to a colored pip if absent.
         var img = document.createElement("img");
         img.className = "badge-img" + (on ? " badge-img--on" : " badge-img--off");
-        img.src = UPLOADS_URL + "/lamprozo/badges/" + data.badgeset + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
+        img.src = UPLOADS_URL + "/lamprozo/badges/" + badgeDir(data.badgeset) + "/" + badgeSlug(b.name) + ".png?v=" + BADGE_CB;
         img.alt = b.name; img.title = b.name;
         img.onerror = function() {
           var pip = document.createElement("span");
