@@ -102,6 +102,26 @@ add_action('rest_api_init', function() {
         'callback'            => 'lamprozo_rest_upload_asset',
         'permission_callback' => fn() => current_user_can('manage_options'),
     ]);
+
+    // Admin-only: badge-set manager. GET lists every set (built-in + custom),
+    // POST creates/replaces a custom set, DELETE removes one.
+    register_rest_route('lamprozo/v1', '/badge-sets', [
+        [
+            'methods'             => 'GET',
+            'callback'            => 'lamprozo_rest_badge_sets',
+            'permission_callback' => fn() => current_user_can('manage_options'),
+        ],
+        [
+            'methods'             => 'POST',
+            'callback'            => 'lamprozo_rest_save_badge_set',
+            'permission_callback' => fn() => current_user_can('manage_options'),
+        ],
+    ]);
+    register_rest_route('lamprozo/v1', '/badge-sets/(?P<key>[a-z0-9-]+)', [
+        'methods'             => 'DELETE',
+        'callback'            => 'lamprozo_rest_delete_badge_set',
+        'permission_callback' => fn() => current_user_can('manage_options'),
+    ]);
 });
 
 /** Badge filename slug — must match the overlay's badgeSlug() and _attempt-card.php. */
@@ -167,6 +187,66 @@ function lamprozo_rest_upload_asset($request) {
     @chmod($dest, 0644);
 
     return rest_ensure_response(['success' => true, 'url' => $uploads['baseurl'] . $rel]);
+}
+
+/**
+ * GET /lamprozo/v1/badge-sets — every badge set (built-in + custom) for the
+ * dashboard manager.
+ */
+function lamprozo_rest_badge_sets() {
+    return rest_ensure_response(['sets' => lamprozo_badge_sets_payload()]);
+}
+
+/**
+ * POST /lamprozo/v1/badge-sets — create or replace a CUSTOM badge set.
+ * Body: { key|name, badges: [ {name, color}, ... ] }. Built-in keys are
+ * reserved. Returns the full set list so the UI can re-render.
+ */
+function lamprozo_rest_save_badge_set($request) {
+    $body = $request->get_json_params();
+    $raw  = (string) ($body['key'] ?? ($body['name'] ?? ''));
+    $key  = sanitize_title($raw);
+    if ($key === '') {
+        return new WP_Error('bad_key', 'Give the badge set a name.', ['status' => 400]);
+    }
+    if ($key === 'none' || in_array($key, lamprozo_default_badge_set_keys(), true)) {
+        return new WP_Error('reserved', 'That name is taken by a built-in set — pick another.', ['status' => 400]);
+    }
+    $badges = lamprozo_sanitize_badge_set($body['badges'] ?? []);
+    if (empty($badges)) {
+        return new WP_Error('empty', 'Add at least one badge (each needs a name).', ['status' => 400]);
+    }
+    $custom = get_option('lamprozo_badge_sets_custom', []);
+    if (!is_array($custom)) { $custom = []; }
+    $custom[$key] = $badges;
+    update_option('lamprozo_badge_sets_custom', $custom);
+    return rest_ensure_response(['success' => true, 'key' => $key, 'sets' => lamprozo_badge_sets_payload()]);
+}
+
+/**
+ * DELETE /lamprozo/v1/badge-sets/{key} — remove a custom set and its uploaded
+ * badge images. Built-in sets are protected.
+ */
+function lamprozo_rest_delete_badge_set($request) {
+    $key = sanitize_title((string) $request['key']);
+    if (in_array($key, lamprozo_default_badge_set_keys(), true)) {
+        return new WP_Error('protected', "Built-in sets can't be deleted.", ['status' => 400]);
+    }
+    $custom = get_option('lamprozo_badge_sets_custom', []);
+    if (is_array($custom) && isset($custom[$key])) {
+        unset($custom[$key]);
+        update_option('lamprozo_badge_sets_custom', $custom);
+        // Best-effort: drop the uploaded PNG folder for this set.
+        $uploads = wp_upload_dir();
+        if (empty($uploads['error'])) {
+            $dir = $uploads['basedir'] . '/lamprozo/badges/' . $key;
+            if (is_dir($dir)) {
+                foreach ((array) glob($dir . '/*') as $f) { @unlink($f); }
+                @rmdir($dir);
+            }
+        }
+    }
+    return rest_ensure_response(['success' => true, 'sets' => lamprozo_badge_sets_payload()]);
 }
 
 /**
@@ -569,11 +649,13 @@ function lamprozo_layout_themes() {
 }
 
 /**
- * Gym-badge sets per game region. Each badge has a name + color; the overlay
- * lights them up in order according to the attempt's earned badge count. A
- * challenge's `badgeset` field selects one ('none' falls back to plain text).
+ * Built-in gym-badge sets per game region. These ship with the plugin and
+ * can't be renamed or deleted from the dashboard — user-defined sets layer on
+ * top via the lamprozo_badge_sets_custom option (see lamprozo_badge_sets()).
+ * Each badge has a name + color; the overlay lights them up in gym order by
+ * the attempt's earned badge count.
  */
-function lamprozo_badge_sets() {
+function lamprozo_default_badge_sets() {
     return [
         // Hoenn (Emerald / Emerald Kaizo), in gym order.
         'hoenn' => [
@@ -613,14 +695,69 @@ function lamprozo_badge_sets() {
 }
 
 /**
- * Some badge sets share another set's images (same badges, different gym order).
- * Returns the folder under uploads/lamprozo/badges/ that holds a set's PNGs.
+ * All gym-badge sets = built-ins + user-defined custom sets (stored in the
+ * lamprozo_badge_sets_custom option), custom winning on a key collision. A
+ * challenge's `badgeset` field selects one ('none' falls back to plain text).
+ */
+function lamprozo_badge_sets() {
+    $custom = get_option('lamprozo_badge_sets_custom', []);
+    if (!is_array($custom)) { $custom = []; }
+    $clean = [];
+    foreach ($custom as $key => $badges) {
+        $key = sanitize_key($key);
+        if ($key === '' || $key === 'none') { continue; }
+        $badges = lamprozo_sanitize_badge_set($badges);
+        if (!empty($badges)) { $clean[$key] = $badges; }
+    }
+    return array_merge(lamprozo_default_badge_sets(), $clean);
+}
+
+/** Keys of the protected, built-in sets — can't be renamed or deleted in the UI. */
+function lamprozo_default_badge_set_keys() {
+    return array_keys(lamprozo_default_badge_sets());
+}
+
+/** Normalize a posted badge list into [ ['name'=>str, 'color'=>'#rrggbb'], ... ]. */
+function lamprozo_sanitize_badge_set($badges) {
+    $clean = [];
+    foreach ((array) $badges as $b) {
+        $name = sanitize_text_field($b['name'] ?? '');
+        if ($name === '') { continue; }
+        $color = (string) ($b['color'] ?? '');
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) { $color = '#888888'; }
+        $clean[] = ['name' => $name, 'color' => strtolower($color)];
+    }
+    return $clean;
+}
+
+/**
+ * Some built-in sets share another set's images (same badges, different gym
+ * order). Returns the folder under uploads/lamprozo/badges/ that holds a set's
+ * PNGs. Custom sets always own their own folder (keyed by their own slug).
  */
 function lamprozo_badge_image_sets() {
     return ['run-and-bun' => 'hoenn'];
 }
 function lamprozo_badge_image_set($set) {
     return lamprozo_badge_image_sets()[$set] ?? $set;
+}
+
+/**
+ * Wire-shape for the dashboard badge-set manager: every set with its badges,
+ * the uploads folder its images live in, and whether it's a protected built-in.
+ */
+function lamprozo_badge_sets_payload() {
+    $protected = lamprozo_default_badge_set_keys();
+    $out = [];
+    foreach (lamprozo_badge_sets() as $key => $badges) {
+        $out[] = [
+            'key'       => $key,
+            'badges'    => array_values($badges),
+            'image_set' => lamprozo_badge_image_set($key),
+            'protected' => in_array($key, $protected, true),
+        ];
+    }
+    return $out;
 }
 
 add_action('template_redirect', function() {
