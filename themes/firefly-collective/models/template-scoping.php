@@ -362,16 +362,23 @@ function firefly_scope_adjacent_post_where($where, $in_same_term, $excluded_term
 // =============================================================================
 
 /**
- * Automatically assign template to new posts and pages.
+ * Auto-assign the active template to any post/page/attachment that ends up
+ * with empty _firefly_template meta. Idempotent: bails immediately when the
+ * meta is already set, so it's safe to fire on every save.
+ *
+ * Previously this only ran for new inserts ($update === false), but Gutenberg's
+ * "Add New Post" flow first creates an auto-draft (skipped by the status check
+ * below), then PUBLISHES via an update — and the update path used to bail
+ * unconditionally, leaving the post with the default empty meta value the
+ * REST register_post_meta() exposes. Empty meta makes the admin-list scoping
+ * filter exclude the post AND blocks the snippet save_post hook from writing
+ * the HTML file, so the post effectively vanishes from local without anything
+ * showing up in version control. Treating every save as a fill-empty pass
+ * closes that hole without affecting posts that already carry a valid value.
  */
 add_action('wp_insert_post', 'firefly_assign_template_to_new_post', 10, 3);
 
 function firefly_assign_template_to_new_post($post_id, $post, $update) {
-    // Only on new posts, not updates
-    if ($update) {
-        return;
-    }
-
     // Skip revisions and auto-drafts
     if (wp_is_post_revision($post_id) || $post->post_status === 'auto-draft') {
         return;
@@ -390,6 +397,44 @@ function firefly_assign_template_to_new_post($post_id, $post, $update) {
 
     $template = firefly_get_scoping_template();
     update_post_meta($post_id, FIREFLY_TEMPLATE_META_KEY, $template);
+}
+
+/**
+ * REST post/page saves apply registered post-meta AFTER wp_insert_post fires.
+ * Gutenberg's editor holds _firefly_template in its local state and sends it
+ * back on save, sourced from the meta's registered default of '' — so even
+ * if wp_insert_post above filled the meta correctly, the REST meta write that
+ * follows clobbers it back to empty. rest_after_insert_{post,page} runs AFTER
+ * the meta write, so this handler gets the last word and restores the active
+ * template when the value lands empty.
+ */
+foreach (array('post', 'page') as $firefly_rest_type) {
+    add_action('rest_after_insert_' . $firefly_rest_type, 'firefly_rest_fill_empty_template_meta', 10, 1);
+}
+
+function firefly_rest_fill_empty_template_meta($post) {
+    if (!($post instanceof WP_Post)) {
+        return;
+    }
+    if (wp_is_post_revision($post->ID) || $post->post_status === 'auto-draft') {
+        return;
+    }
+
+    $existing = get_post_meta($post->ID, FIREFLY_TEMPLATE_META_KEY, true);
+    if (!empty($existing)) {
+        return;
+    }
+
+    $template = firefly_get_scoping_template();
+    update_post_meta($post->ID, FIREFLY_TEMPLATE_META_KEY, $template);
+
+    // The original save_post snippet sync already ran with empty meta and
+    // bailed — call it explicitly now that the meta is filled, so the
+    // snippet HTML + schema entry land without requiring the user to
+    // re-save the post.
+    if (function_exists('firefly_save_snippet')) {
+        firefly_save_snippet($post->ID);
+    }
 }
 
 /**
