@@ -121,6 +121,9 @@ function firefly_collective_cache_save($html) {
 
     // Build cache file path
     $cache_path = firefly_collective_cache_get_file_path($template);
+    if ( ! $cache_path ) {
+        return $html; // No HTTP_HOST/REQUEST_URI — don't try to write a cache file
+    }
 
     // Create directory structure if needed
     $cache_dir = dirname($cache_path);
@@ -162,6 +165,19 @@ function firefly_collective_cache_save($html) {
  * Determine if current request should be excluded from caching
  */
 function firefly_collective_cache_should_exclude() {
+    // Skip entirely when we're not handling an HTTP request — WP-CLI,
+    // wp-cron.php direct invocation, and PHPUnit bootstraps all reach
+    // here via the `init` hook but have no $_SERVER['HTTP_HOST'] or
+    // REQUEST_URI to build a cache path from. Without this guard the
+    // downstream code emits "Undefined array key HTTP_HOST" warnings
+    // into debug.log every time a CLI hook fires.
+    if ( defined( 'WP_CLI' ) && WP_CLI ) {
+        return true;
+    }
+    if ( empty( $_SERVER['HTTP_HOST'] ) || empty( $_SERVER['REQUEST_URI'] ) ) {
+        return true;
+    }
+
     // Don't cache logged-in users (personalized content)
     if (is_user_logged_in()) {
         return true;
@@ -265,10 +281,17 @@ function firefly_collective_cache_is_query_whitelisted() {
 // ============================================================================
 
 /**
- * Build cache file path for current request
+ * Build cache file path for current request. Returns false in non-HTTP
+ * contexts (WP-CLI, direct cron) where HTTP_HOST / REQUEST_URI aren't
+ * populated — should_exclude() catches those cases at the top of the
+ * cache hooks, but this belt-and-suspenders guard keeps any future
+ * caller from tripping the same undefined-array-key warning.
  */
 function firefly_collective_cache_get_file_path($template) {
     $cache_base = WP_CONTENT_DIR . '/cache/firefly-collective';
+    if ( empty( $_SERVER['HTTP_HOST'] ) || empty( $_SERVER['REQUEST_URI'] ) ) {
+        return false;
+    }
     $host = $_SERVER['HTTP_HOST'];
     $request_uri = $_SERVER['REQUEST_URI'];
 
