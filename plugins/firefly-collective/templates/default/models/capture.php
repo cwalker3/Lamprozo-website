@@ -1419,7 +1419,42 @@ function firefly_capture_create_child( WP_REST_Request $req, $post_type, $field_
             update_post_meta( $id, $meta_key, $body[ $body_key ] );
         }
     }
+    firefly_capture_touch_session( $parent_session_id );
     return rest_ensure_response( call_user_func( $formatter, get_post( $id ) ) );
+}
+
+/**
+ * Bump a session's post_modified to "now" so it floats to the top of the
+ * default-DESC session list whenever any of its child notes/recordings/
+ * documents change. Without this bump, the Capture default-session
+ * resolver (URL → localStorage → first-in-list) could pick a session that
+ * was last edited days before the child the user actually wants to see.
+ *
+ * Direct $wpdb update on purpose — wp_update_post() would re-fire save_post
+ * hooks (and could clobber the post_modified bump with its own value via
+ * inferred defaults). The session's content hasn't actually changed, only
+ * its "freshness" indicator, so post-update side effects aren't wanted.
+ */
+function firefly_capture_touch_session( $session_id ) {
+    $session_id = (int) $session_id;
+    if ( $session_id <= 0 ) return;
+    global $wpdb;
+    $now_local = current_time( 'mysql' );
+    $now_gmt   = current_time( 'mysql', 1 );
+    $wpdb->update(
+        $wpdb->posts,
+        array(
+            'post_modified'     => $now_local,
+            'post_modified_gmt' => $now_gmt,
+        ),
+        array(
+            'ID'        => $session_id,
+            'post_type' => FIREFLY_CAPTURE_SESSION_POST_TYPE,
+        ),
+        array( '%s', '%s' ),
+        array( '%d', '%s' )
+    );
+    clean_post_cache( $session_id );
 }
 
 /**
@@ -1439,6 +1474,7 @@ function firefly_capture_update_child( WP_REST_Request $req, $post_type, $field_
             update_post_meta( $post->ID, $meta_key, $body[ $body_key ] );
         }
     }
+    firefly_capture_touch_session( $post->post_parent );
     return rest_ensure_response( call_user_func( $formatter, get_post( $post->ID ) ) );
 }
 
@@ -1467,7 +1503,9 @@ function firefly_capture_delete_child( WP_REST_Request $req, $post_type, $rs_msg
         }
     }
 
+    $parent_id = (int) $post->post_parent;
     wp_trash_post( $post->ID );
+    firefly_capture_touch_session( $parent_id );
     return rest_ensure_response( array( 'deleted' => (int) $post->ID ) );
 }
 
