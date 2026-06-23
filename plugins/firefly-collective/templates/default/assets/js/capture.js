@@ -585,6 +585,13 @@
 
     // ---------- Notes CRUD ----------
     async function loadList(autoLoadFirst = false) {
+        // Show the same "Loading…" placeholder that loadModeList() uses for
+        // recordings + documents. Without it, switching from Recordings or
+        // Documents back to Notes leaves the previous mode's items visible
+        // until the /notes fetch lands — feels broken on slow connections.
+        if (els.list) {
+            els.list.innerHTML = '<li class="firefly-capture-empty">Loading&hellip;</li>';
+        }
         // Scope notes to the active session via the server's ?session= filter.
         // Without an active session (rare — only between init and the first
         // resolveInitialActiveSession()), we ask for the unfiltered list as
@@ -2015,6 +2022,202 @@
         }
     }
 
+    // ── IndexedDB recording recovery ────────────────────────────────────────
+    // Ports the persistence layer from ragsmith's audio-recorder.js so an
+    // interrupted upload (502 from the SSH tunnel going down, browser
+    // crash, accidental tab close) can be recovered on next page load.
+    //
+    // During recording, MediaRecorder fires `dataavailable` on a 30s
+    // timeslice (matching ragsmith's CHUNK_INTERVAL_MS). Each fired chunk
+    // is appended to the in-memory `state.rec.chunks` array AND persisted
+    // to the `chunks` object store keyed by `[recordingId, chunkIndex]`.
+    // On successful upload (HTTP 2xx), we delete the per-recording rows.
+    // On any upload failure we leave them in place — on the next Capture
+    // page load, `recFindIncomplete()` finds them and the recovery banner
+    // offers Resume or Discard.
+    const REC_DB_NAME = 'firefly_capture_recordings';
+    const REC_DB_VERSION = 1;
+    const REC_STORE = 'chunks';
+    const REC_CHUNK_INTERVAL_MS = 30000; // 30s — matches ragsmith
+    let _recDb = null;
+
+    function recOpenDB() {
+        return new Promise((resolve, reject) => {
+            if (_recDb) { resolve(_recDb); return; }
+            const req = indexedDB.open(REC_DB_NAME, REC_DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const store = e.target.result.createObjectStore(REC_STORE, { keyPath: ['recordingId', 'chunkIndex'] });
+                store.createIndex('byRecording', 'recordingId');
+            };
+            req.onsuccess = (e) => { _recDb = e.target.result; resolve(_recDb); };
+            req.onerror  = (e) => reject(e.target.error);
+        });
+    }
+
+    async function recSaveChunk(recordingId, chunkIndex, blob, totalDuration, status) {
+        const db = await recOpenDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(REC_STORE, 'readwrite');
+            tx.objectStore(REC_STORE).put({
+                recordingId, chunkIndex, blob,
+                timestamp: Date.now(),
+                totalDuration, status,
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    async function recGetChunks(recordingId) {
+        const db = await recOpenDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(REC_STORE, 'readonly');
+            const idx = tx.objectStore(REC_STORE).index('byRecording');
+            const req = idx.getAll(recordingId);
+            req.onsuccess = () => resolve(req.result.sort((a, b) => a.chunkIndex - b.chunkIndex));
+            req.onerror   = () => reject(req.error);
+        });
+    }
+
+    async function recClearChunks(recordingId) {
+        const db = await recOpenDB();
+        const chunks = await recGetChunks(recordingId);
+        if (!chunks.length) return;
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(REC_STORE, 'readwrite');
+            const store = tx.objectStore(REC_STORE);
+            for (const c of chunks) store.delete([c.recordingId, c.chunkIndex]);
+            tx.oncomplete = () => resolve();
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    /**
+     * Scan all chunks; if the latest chunk for any recording isn't yet
+     * marked 'complete', return that recording. Only the first incomplete
+     * recording is surfaced — concurrent unfinished recordings are an
+     * edge case we don't bother UI'ing in v1.
+     */
+    async function recFindIncomplete() {
+        const db = await recOpenDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(REC_STORE, 'readonly');
+            const req = tx.objectStore(REC_STORE).getAll();
+            req.onsuccess = () => {
+                const all = req.result;
+                if (!all.length) { resolve(null); return; }
+                const byRec = {};
+                for (const c of all) (byRec[c.recordingId] ||= []).push(c);
+                for (const [id, chunks] of Object.entries(byRec)) {
+                    const sorted = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+                    const latest = sorted[sorted.length - 1];
+                    if (latest.status !== 'complete') {
+                        resolve({ recordingId: id, chunks: sorted, duration: latest.totalDuration || 0 });
+                        return;
+                    }
+                }
+                resolve(null);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    // ── Recovery banner: surfaces an unfinished recording on page load ──
+    function renderRecoveryBanner(info) {
+        const banner = document.getElementById('ffrec-recovery-banner');
+        if (!banner) return;
+        const durEl = banner.querySelector('.ffrec-recovery-duration');
+        if (durEl) durEl.textContent = formatHMS(Math.round(info.duration || 0));
+        banner.style.display = '';
+        banner.dataset.recordingId = info.recordingId;
+    }
+
+    function hideRecoveryBanner() {
+        const banner = document.getElementById('ffrec-recovery-banner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    async function maybeShowRecoveryBanner() {
+        try {
+            const incomplete = await recFindIncomplete();
+            if (incomplete) renderRecoveryBanner(incomplete);
+        } catch (e) {
+            // Non-fatal — Safari private mode etc. Let recording continue.
+            console.warn('[FireflyCapture] recovery check failed:', e);
+        }
+    }
+
+    /**
+     * Resume button — stitch IDB chunks into a single Blob, retry the
+     * upload via the same /audio/upload bridge endpoint, and on success
+     * jump into the Recording Complete overlay so the user can hit
+     * Process exactly as if the original upload had succeeded.
+     */
+    async function recoveryResume() {
+        const banner = document.getElementById('ffrec-recovery-banner');
+        const resumeBtn = document.getElementById('ffrec-recovery-resume');
+        if (!banner || !banner.dataset.recordingId) return;
+        const recordingId = banner.dataset.recordingId;
+        if (resumeBtn) { resumeBtn.disabled = true; resumeBtn.textContent = 'Resuming…'; }
+        try {
+            const chunks = await recGetChunks(recordingId);
+            if (!chunks.length) { hideRecoveryBanner(); return; }
+            const blob = new Blob(chunks.map(c => c.blob), { type: 'audio/webm;codecs=opus' });
+            const lastDuration = chunks[chunks.length - 1].totalDuration || 0;
+
+            // Re-prime the recording state so the Recording Complete
+            // overlay's Preview + Process buttons behave normally.
+            state.rec.recordedBlob = blob;
+            if (state.rec.recordedUrl) URL.revokeObjectURL(state.rec.recordedUrl);
+            state.rec.recordedUrl = URL.createObjectURL(blob);
+            state.rec.durationSec = Math.round(lastDuration);
+            state.rec.recordingId = recordingId;
+
+            const fd = new FormData();
+            const titleInput = modeEls.recTitle ? modeEls.recTitle.value.trim() : '';
+            fd.append('file', blob, (titleInput || 'recovered-recording') + '.webm');
+            if (titleInput) fd.append('title', titleInput);
+
+            const upRes = await fetch(ragsmithRest() + '/audio/upload', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-WP-Nonce': NONCE, Accept: 'application/json' },
+                body: fd,
+            });
+            if (!upRes.ok) throw new Error('HTTP ' + upRes.status);
+            const upJson = await upRes.json();
+            state.rec.ragsmithAudioPath = upJson && (upJson.file_path || upJson.path);
+
+            // Upload survived — chunks no longer needed.
+            await recClearChunks(recordingId);
+            hideRecoveryBanner();
+
+            // Surface the Recording Complete overlay so the user can Process.
+            if (modeEls.recCompleteDuration) modeEls.recCompleteDuration.textContent = formatHMS(state.rec.durationSec);
+            if (modeEls.recPreviewAudio) {
+                modeEls.recPreviewAudio.src = state.rec.recordedUrl;
+                modeEls.recPreviewAudio.style.display = 'none';
+            }
+            openOverlay(modeEls.recCompleteOverlay);
+        } catch (e) {
+            console.error('[FireflyCapture] resume failed:', e);
+            alert('Resume failed: ' + (e && e.message ? e.message : e) +
+                  '\n\nYour recording is still safe in browser storage. Try again in a moment.');
+            if (resumeBtn) { resumeBtn.disabled = false; resumeBtn.textContent = 'Resume upload'; }
+        }
+    }
+
+    async function recoveryDiscard() {
+        const banner = document.getElementById('ffrec-recovery-banner');
+        if (!banner || !banner.dataset.recordingId) return;
+        if (!confirm('Discard the unfinished recording? This cannot be undone.')) return;
+        try {
+            await recClearChunks(banner.dataset.recordingId);
+        } catch (e) {
+            console.warn('[FireflyCapture] discard cleanup failed:', e);
+        }
+        hideRecoveryBanner();
+    }
+
     function bindModeEvents() {
         modeEls.tabs.forEach((tab) => {
             tab.addEventListener('click', () => { setActiveMode(tab.getAttribute('data-mode')); });
@@ -2028,6 +2231,12 @@
         // ---- Loaded-recording detail buttons ----
         if (modeEls.recBackBtn)      modeEls.recBackBtn.addEventListener('click', () => showRecordingEntry());
         if (modeEls.recReprocessBtn) modeEls.recReprocessBtn.addEventListener('click', () => openPreprocessDialog());
+
+        // ---- Recovery banner (shown when an earlier upload didn't complete) ----
+        const resumeBtn  = document.getElementById('ffrec-recovery-resume');
+        const discardBtn = document.getElementById('ffrec-recovery-discard');
+        if (resumeBtn)  resumeBtn.addEventListener('click', recoveryResume);
+        if (discardBtn) discardBtn.addEventListener('click', recoveryDiscard);
 
         // ---- Recording overlay controls (during capture) ----
         if (modeEls.recMuteBtn)  modeEls.recMuteBtn.addEventListener('click', toggleRecMute);
@@ -2224,9 +2433,29 @@
 
             const recorder = new MediaRecorder(state.rec.combinedStream, { mimeType: 'audio/webm;codecs=opus' });
             state.rec.chunks = [];
-            recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) state.rec.chunks.push(e.data); };
+
+            // Unique id for this recording's IDB chunk rows. Survives across
+            // a tab close / refresh / browser crash so the recovery banner
+            // can pick it back up via recFindIncomplete() on next load.
+            state.rec.recordingId = 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            state.rec.chunkIndex = 0;
+
+            recorder.ondataavailable = (e) => {
+                if (!e.data || e.data.size === 0) return;
+                state.rec.chunks.push(e.data);
+                // Mirror to IDB so an upload failure or crash is recoverable.
+                // Effective duration = wall-clock minus paused intervals,
+                // matching the value we'd show in the recovery banner.
+                const elapsedMs = Date.now() - state.rec.startedAt - state.rec.pausedAccum;
+                const duration  = Math.max(0, Math.round(elapsedMs / 1000));
+                recSaveChunk(state.rec.recordingId, state.rec.chunkIndex++, e.data, duration, 'in_progress')
+                    .catch((err) => console.warn('[FireflyCapture] IDB chunk save failed:', err));
+            };
             recorder.onstop = onRecordingStopped;
-            recorder.start(1000);
+            // 30s timeslice matches ragsmith. The level meter is driven by
+            // a separate AnalyserNode loop so this slower cadence doesn't
+            // affect the visualized waveform.
+            recorder.start(REC_CHUNK_INTERVAL_MS);
 
             state.rec.recorder = recorder;
             state.rec.startedAt = Date.now();
@@ -2340,6 +2569,15 @@
             const upJson = await upRes.json();
             state.rec.ragsmithAudioPath = upJson && (upJson.file_path || upJson.path);
 
+            // Upload landed on the server — the IDB chunks are no longer
+            // needed for recovery. Anything that fails after this point
+            // (WP record creation, processing) is recoverable via the
+            // ragsmithAudioPath alone.
+            if (state.rec.recordingId) {
+                recClearChunks(state.rec.recordingId)
+                    .catch((err) => console.warn('[FireflyCapture] IDB cleanup failed:', err));
+            }
+
             // Persist a WP-side record so the sidebar reflects it.
             const created = await api('/recordings', {
                 method: 'POST',
@@ -2372,6 +2610,12 @@
         if (state.rec.recordedUrl) URL.revokeObjectURL(state.rec.recordedUrl);
         state.rec.recordedUrl = null;
         state.rec.recordedBlob = null;
+        // Clear any IDB-persisted chunks for this recording so the recovery
+        // banner doesn't resurrect a recording the user explicitly threw away.
+        if (state.rec.recordingId) {
+            try { await recClearChunks(state.rec.recordingId); } catch (e) { /* non-fatal */ }
+            state.rec.recordingId = null;
+        }
         if (state.rec.currentPostId) {
             try { await api('/recordings/' + state.rec.currentPostId, { method: 'DELETE' }); } catch (e) {}
             state.rec.currentPostId = null;
@@ -2983,6 +3227,8 @@
         bindModeRefs();
         if (!modeEls.tabs || !modeEls.tabs.length) return;
         bindModeEvents();
+        // Surface the recovery banner if an earlier recording was interrupted.
+        maybeShowRecoveryBanner();
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initCaptureModes);
