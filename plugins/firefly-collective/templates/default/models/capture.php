@@ -558,12 +558,18 @@ function firefly_capture_route_list( WP_REST_Request $req ) {
     $args = array(
         'post_type'      => FIREFLY_CAPTURE_POST_TYPE,
         'post_status'    => array( 'publish', 'draft' ),
-        'author'         => get_current_user_id(),
         'posts_per_page' => 200,
         'orderby'        => 'modified',
         'order'          => 'DESC',
         'no_found_rows'  => true,
     );
+    // Match the admin-permissive pattern used by every other Capture list
+    // endpoint (firefly_capture_route_list_sessions, firefly_capture_list_children).
+    // Administrators see everyone's notes — Capture is shared workspace for
+    // the admin team — while non-admin roles stay scoped to their own.
+    if ( ! current_user_can( 'manage_options' ) ) {
+        $args['author'] = get_current_user_id();
+    }
     $session_id = (int) $req->get_param( 'session' );
     if ( $session_id > 0 ) {
         $args['post_parent'] = $session_id;
