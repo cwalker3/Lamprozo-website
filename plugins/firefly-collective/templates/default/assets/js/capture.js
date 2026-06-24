@@ -1840,6 +1840,10 @@
             state.rec.finalSummary        = r.summary    || '';
 
             if (modeEls.recTitle)             modeEls.recTitle.value = r.title || '';
+            // Snapshot the loaded title so the blur-save handler (bindModeEvents)
+            // can tell whether the user actually edited it. Non-null also doubles
+            // as the "we're in detail view" gate — entry-mode reset clears it.
+            state.rec.lastSavedTitle = r.title || '';
             if (modeEls.recDetailStatus)      modeEls.recDetailStatus.textContent = r.status || 'ready';
             if (modeEls.recDetailTranscript)  modeEls.recDetailTranscript.textContent = r.transcript || '(no transcript)';
             if (modeEls.recDetailSummary)     modeEls.recDetailSummary.textContent    = r.summary    || '(no summary)';
@@ -1879,6 +1883,11 @@
         state.rec.finalTranscript   = '';
         state.rec.finalSummary      = '';
         if (modeEls.recTitle) modeEls.recTitle.value = '';
+        // Clearing lastSavedTitle disarms the blur-save handler — entry
+        // mode is for typing the title of the NEXT recording, not for
+        // editing a loaded one. Without this, a blur in entry mode with
+        // a stale state.rec.currentPostId would PATCH the wrong post.
+        state.rec.lastSavedTitle = null;
         if (modeEls.recShareAudio) modeEls.recShareAudio.checked = false;
         if (modeEls.recRoomAudio)  modeEls.recRoomAudio.checked  = false;
         if (modeEls.recStartMuted) modeEls.recStartMuted.checked = false;
@@ -2231,6 +2240,60 @@
         // ---- Loaded-recording detail buttons ----
         if (modeEls.recBackBtn)      modeEls.recBackBtn.addEventListener('click', () => showRecordingEntry());
         if (modeEls.recReprocessBtn) modeEls.recReprocessBtn.addEventListener('click', () => openPreprocessDialog());
+
+        // ---- Inline title rename on blur (loaded-recording detail view) ----
+        // The title input is shared between "new recording" (entry mode) and
+        // "view loaded recording" (detail mode) — same DOM element, different
+        // semantics. We only PATCH on blur when:
+        //   1. state.rec.currentPostId is set (a recording is loaded), AND
+        //   2. state.rec.lastSavedTitle was snapshotted in openRecording (so
+        //      we know what the saved value looked like before the user
+        //      touched it — entry mode clears this to null), AND
+        //   3. The trimmed value differs from the snapshot (no-op blurs
+        //      shouldn't burn a REST round-trip).
+        // On success we also rewrite the sidebar item's visible title and
+        // update state.modeItems.recordings so subsequent re-renders use the
+        // new value without another /recordings list fetch.
+        if (modeEls.recTitle) {
+            modeEls.recTitle.addEventListener('blur', async () => {
+                const id = state.rec.currentPostId;
+                if (!id || state.rec.lastSavedTitle === null || state.rec.lastSavedTitle === undefined) return;
+                const next = (modeEls.recTitle.value || '').trim();
+                const prev = state.rec.lastSavedTitle;
+                if (next === prev) return;
+                if (next === '') {
+                    // Don't allow a blank title to overwrite a real one —
+                    // restore the snapshot and bail.
+                    modeEls.recTitle.value = prev;
+                    return;
+                }
+                try {
+                    await api('/recordings/' + id, { method: 'POST', body: { title: next } });
+                    state.rec.lastSavedTitle = next;
+                    // Sidebar item — update the visible title without re-fetching.
+                    const li = els.list && els.list.querySelector('[data-id="' + id + '"]');
+                    if (li) {
+                        const titleEl = li.querySelector('.firefly-capture-item-title');
+                        if (titleEl) titleEl.textContent = next;
+                    }
+                    // Cached items list — keep state.modeItems in sync so any
+                    // later renderModeList() call (mode-switch, refresh) uses
+                    // the new title instead of stomping on it with the stale one.
+                    const items = state.modeItems && state.modeItems.recordings;
+                    if (Array.isArray(items)) {
+                        for (const it of items) {
+                            if (Number(it.id) === Number(id)) { it.title = next; break; }
+                        }
+                    }
+                } catch (e) {
+                    console.error('[FireflyCapture] rename failed:', e);
+                    // Revert the input so the user isn't left thinking the
+                    // change persisted.
+                    modeEls.recTitle.value = prev;
+                    alert('Rename failed: ' + (e && e.message ? e.message : e));
+                }
+            });
+        }
 
         // ---- Recovery banner (shown when an earlier upload didn't complete) ----
         const resumeBtn  = document.getElementById('ffrec-recovery-resume');
