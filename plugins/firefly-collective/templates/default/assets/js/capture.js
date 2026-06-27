@@ -2196,7 +2196,35 @@
             const upJson = await upRes.json();
             state.rec.ragsmithAudioPath = upJson && (upJson.file_path || upJson.path);
 
-            // Upload survived — chunks no longer needed.
+            // Create the WP-side firefly_recording post — mirrors what
+            // onRecordingStopped does after a successful upload. Without
+            // this, the audio uploads + processes fine on ragsmith but no
+            // WP post exists, so the sidebar never shows the recording and
+            // startProcessing's status patches silently no-op (they're
+            // gated on state.rec.currentPostId). Net effect: a successful
+            // recovery looked like a silent failure to the user.
+            const recoveredTitle = (modeEls.recTitle && modeEls.recTitle.value.trim()) ||
+                                   ('Recovered recording — ' + new Date().toLocaleString());
+            const created = await api('/recordings', {
+                method: 'POST',
+                body: {
+                    session_id:  state.activeSessionId,
+                    title:       recoveredTitle,
+                    audio_url:   state.rec.ragsmithAudioPath || '',
+                    duration:    state.rec.durationSec,
+                    share_audio: !!(modeEls.recShareAudio && modeEls.recShareAudio.checked),
+                    room_audio:  !!(modeEls.recRoomAudio  && modeEls.recRoomAudio.checked),
+                    status:      'uploaded',
+                },
+            });
+            state.rec.currentPostId = created && created.id;
+            // Snapshot the saved title so the inline-rename blur handler can
+            // diff against it (mirrors openRecording's behavior — without
+            // this, editing the title after a recovery would silently no-op).
+            state.rec.lastSavedTitle = recoveredTitle;
+            await loadModeList();
+
+            // Upload + WP post both landed — chunks no longer needed.
             await recClearChunks(recordingId);
             hideRecoveryBanner();
 
