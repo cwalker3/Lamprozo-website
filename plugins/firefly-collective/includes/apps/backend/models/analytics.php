@@ -10,15 +10,106 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Collection + enrichment + geo helpers (parsers, ingest handlers, GeoIP).
+require_once __DIR__ . '/analytics-geo.php';
+require_once __DIR__ . '/analytics-collect.php';
+// Reporting layer (window resolver + aggregation queries).
+require_once __DIR__ . '/analytics-report.php';
+
+// Bump when the analytics schema changes so the version-gated installer
+// re-runs the idempotent column/index ensure exactly once per environment.
+if ( ! defined( 'FIREFLY_ANALYTICS_DB_VERSION' ) ) {
+    define( 'FIREFLY_ANALYTICS_DB_VERSION', '2' );
+}
+
 /**
- * Initialize analytics system
+ * Initialize analytics system.
+ *
+ * Hooked to `init` (not `admin_init`) so the schema is guaranteed present
+ * on front-end REST requests — the /hit + /engagement ingest handlers run
+ * there and INSERT/UPDATE the new columns. Gated behind a version option
+ * so the SHOW COLUMNS / ALTER work happens at most once per version bump;
+ * the steady-state cost is a single autoloaded get_option() per request.
  */
 function firefly_analytics_init() {
+    firefly_analytics_schedule_cleanup();
+
+    if ( get_option( 'firefly_analytics_db_version' ) === FIREFLY_ANALYTICS_DB_VERSION ) {
+        return;
+    }
     firefly_analytics_create_table();
     firefly_analytics_create_admin_activity_table();
-    firefly_analytics_schedule_cleanup();
+    firefly_analytics_ensure_columns();
+    update_option( 'firefly_analytics_db_version', FIREFLY_ANALYTICS_DB_VERSION );
 }
-add_action('admin_init', 'firefly_analytics_init');
+add_action('init', 'firefly_analytics_init');
+
+/**
+ * Idempotently add the rich-collection columns + indexes to ffc_analytics.
+ * Shared by the installer above and migration 001 so there is a single
+ * source of truth for the schema delta. Returns the list of columns added.
+ *
+ * @return array<string> column names that were created this call
+ */
+function firefly_analytics_ensure_columns() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'ffc_analytics';
+    if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
+        return array();
+    }
+
+    // column => DDL fragment (with a stable position for readability)
+    $columns = array(
+        'visit_id'     => "ADD COLUMN visit_id CHAR(36) DEFAULT NULL AFTER session_hash",
+        'event_id'     => "ADD COLUMN event_id CHAR(36) DEFAULT NULL AFTER visit_id",
+        'is_entry'     => "ADD COLUMN is_entry TINYINT(1) NOT NULL DEFAULT 0 AFTER event_id",
+        'device_type'  => "ADD COLUMN device_type VARCHAR(10) DEFAULT NULL AFTER is_entry",
+        'browser'      => "ADD COLUMN browser VARCHAR(40) DEFAULT NULL AFTER device_type",
+        'os'           => "ADD COLUMN os VARCHAR(40) DEFAULT NULL AFTER browser",
+        'country'      => "ADD COLUMN country CHAR(2) DEFAULT NULL AFTER os",
+        'utm_source'   => "ADD COLUMN utm_source VARCHAR(100) DEFAULT NULL AFTER country",
+        'utm_medium'   => "ADD COLUMN utm_medium VARCHAR(100) DEFAULT NULL AFTER utm_source",
+        'utm_campaign' => "ADD COLUMN utm_campaign VARCHAR(120) DEFAULT NULL AFTER utm_medium",
+        'screen_w'     => "ADD COLUMN screen_w SMALLINT UNSIGNED DEFAULT NULL AFTER utm_campaign",
+        'duration_s'   => "ADD COLUMN duration_s INT UNSIGNED DEFAULT NULL AFTER screen_w",
+        'max_scroll'   => "ADD COLUMN max_scroll TINYINT UNSIGNED DEFAULT NULL AFTER duration_s",
+    );
+
+    $added = array();
+    foreach ( $columns as $name => $ddl ) {
+        $exists = $wpdb->get_results( "SHOW COLUMNS FROM {$table} LIKE '{$name}'" );
+        if ( empty( $exists ) ) {
+            $wpdb->query( "ALTER TABLE {$table} {$ddl}" );
+            $added[] = $name;
+        }
+    }
+
+    // Secondary indexes for the new breakdown dimensions (ignore dup errors).
+    $indexes = array(
+        'idx_visit'     => 'visit_id',
+        'idx_event'     => 'event_id',
+        'idx_country'   => 'country',
+        'idx_device'    => 'device_type',
+        'idx_utm_camp'  => 'utm_campaign',
+    );
+    foreach ( $indexes as $idx => $col ) {
+        $have = $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = '{$idx}'" );
+        if ( empty( $have ) ) {
+            $wpdb->query( "ALTER TABLE {$table} ADD INDEX {$idx} ({$col})" );
+        }
+    }
+
+    return $added;
+}
+
+/**
+ * Register analytics schema migration with the framework migration runner
+ * so the column delta is visible + replayable in Tools → Migrations.
+ */
+add_action( 'firefly_register_migrations', function ( $runner ) {
+    require_once dirname( __DIR__ ) . '/migrations/001_add_analytics_dimensions.php';
+    $runner->registerMigration( new FFC_Migration_001_AddAnalyticsDimensions() );
+} );
 
 /**
  * Create analytics table
@@ -126,6 +217,13 @@ function firefly_analytics_register_rest_routes() {
         'permission_callback' => '__return_true'
     ));
 
+    // Engagement update (time-on-page + scroll depth) keyed by event_id.
+    register_rest_route('firefly-collective/v1', '/engagement', array(
+        'methods' => 'POST',
+        'callback' => 'firefly_analytics_record_engagement',
+        'permission_callback' => '__return_true'
+    ));
+
     register_rest_route('firefly-collective/v1', '/analytics', array(
         'methods' => 'GET',
         'callback' => 'firefly_analytics_get_data',
@@ -194,68 +292,6 @@ function firefly_analytics_get_session_hash() {
 }
 
 /**
- * Record a page hit
- */
-function firefly_analytics_record_hit($request) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'ffc_analytics';
-
-    // Parse JSON body
-    $body = $request->get_body();
-    $data = json_decode($body, true);
-
-    if (!$data || empty($data['p'])) {
-        return new WP_REST_Response(null, 204);
-    }
-
-    $page_path = sanitize_text_field(substr($data['p'], 0, 255));
-    $page_title = isset($data['t']) ? sanitize_text_field(substr($data['t'], 0, 255)) : null;
-    $post_id = isset($data['i']) && is_numeric($data['i']) ? absint($data['i']) : null;
-    $post_type = isset($data['y']) ? sanitize_text_field(substr($data['y'], 0, 20)) : null;
-    $template = isset($data['tp']) ? sanitize_text_field(substr($data['tp'], 0, 50)) : null;
-    $referrer = isset($data['r']) ? sanitize_text_field(substr($data['r'], 0, 500)) : null;
-    $session_hash = firefly_analytics_get_session_hash();
-
-    // Skip bots
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    if (preg_match('/bot|crawl|spider|slurp|facebookexternalhit|linkedinbot/i', $ua)) {
-        return new WP_REST_Response(null, 204);
-    }
-
-    // Rate limit: 1 hit per path per session per hour
-    $existing = $wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM $table_name
-         WHERE session_hash = %s
-         AND page_path = %s
-         AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-        $session_hash,
-        $page_path
-    ));
-
-    if ($existing > 0) {
-        return new WP_REST_Response(null, 204);
-    }
-
-    // Insert hit (use GMT time to match MySQL CURDATE())
-    $wpdb->insert(
-        $table_name,
-        array(
-            'page_path' => $page_path,
-            'page_title' => $page_title,
-            'post_id' => $post_id,
-            'post_type' => $post_type ?: null,
-            'template' => $template,
-            'referrer' => $referrer,
-            'session_hash' => $session_hash,
-            'created_at' => current_time('mysql', 1)  // 1 = GMT
-        ),
-        array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
-    );
-
-    return new WP_REST_Response(null, 204);
-}
-
-/**
  * Get analytics data for dashboard
  */
 function firefly_analytics_get_data($request) {
@@ -263,20 +299,38 @@ function firefly_analytics_get_data($request) {
     $table_name = $wpdb->prefix . 'ffc_analytics';
 
     $days = absint($request->get_param('days') ?: 30);
-    $type = sanitize_text_field($request->get_param('type') ?: 'overview');
+    $type = sanitize_text_field($request->get_param('type') ?: 'kpis');
+    $dim  = sanitize_text_field((string) $request->get_param('dim'));
 
-    // Get active template (filter by template)
-    $template = function_exists('firefly_collective_get_active_template')
-        ? firefly_collective_get_active_template()
-        : 'firefly';
+    // Template: the dashboard's site selector may override the active one.
+    $req_tpl  = sanitize_text_field((string) $request->get_param('template'));
+    $template = $req_tpl !== '' ? $req_tpl : (
+        function_exists('firefly_collective_get_active_template')
+            ? firefly_collective_get_active_template()
+            : 'firefly'
+    );
 
+    // New windowed reporting API.
+    $new_types = array('kpis','timeseries','sources','pages','posts','devices','countries','engagement','realtime');
+    if (in_array($type, $new_types, true)) {
+        $win = firefly_analytics_resolve_window($request);
+        switch ($type) {
+            case 'kpis':       return firefly_analytics_report_kpis($table_name, $win, $template);
+            case 'timeseries': return firefly_analytics_report_timeseries($table_name, $win, $template, sanitize_text_field((string) $request->get_param('metric')) ?: 'visitors');
+            case 'sources':    return firefly_analytics_report_sources($table_name, $win, $template, $dim ?: 'channels');
+            case 'pages':      return firefly_analytics_report_pages($table_name, $win, $template, $dim ?: 'top');
+            case 'posts':      return firefly_analytics_report_posts($table_name, $win, $template);
+            case 'devices':    return firefly_analytics_report_devices($table_name, $win, $template, $dim ?: 'device');
+            case 'countries':  return firefly_analytics_report_countries($table_name, $win, $template);
+            case 'engagement': return firefly_analytics_report_engagement($table_name, $win, $template);
+            case 'realtime':   return firefly_analytics_report_realtime($table_name, $template);
+        }
+    }
+
+    // Legacy types (kept for backward compatibility / sync tooling).
     switch ($type) {
         case 'overview':
             return firefly_analytics_get_overview($table_name, $days, $template);
-        case 'pages':
-            return firefly_analytics_get_top_pages($table_name, $days, $template);
-        case 'posts':
-            return firefly_analytics_get_top_posts($table_name, $days, $template);
         case 'referrers':
             return firefly_analytics_get_referrers($table_name, $days, $template);
         case 'chart':
