@@ -284,6 +284,7 @@
         template:
             '<div class="ffa-chart-wrap">' +
             '<svg class="ffa-chart-svg" ref="svg" :viewBox="\'0 0 \'+W+\' \'+H" preserveAspectRatio="xMidYMid meet" ' +
+            'role="img" :aria-label="(label||\'value\')+\' over time chart\'" ' +
             '@mousemove="onMove" @mouseleave="onLeave" @touchmove.prevent="onMove($event.touches[0])" @touchend="onLeave">' +
             '<defs><linearGradient id="ffaGrad" x1="0" y1="0" x2="0" y2="1">' +
             '<stop offset="0%" stop-color="#f5b544" stop-opacity="0.32"/>' +
@@ -347,8 +348,16 @@
                 pullSource: 'dev',
                 modal: null,
                 busy: false,
-                // revenue (Group 5) — placeholders so template never errors
-                revenue: null
+                // Revenue / conversions
+                revLoading: true,
+                revenue: {
+                    kpis: null,
+                    ts: { series: [], granularity: 'day' },
+                    products: [], campaigns: [],
+                    bookings: { total: 0, confirmed: 0, by_type: [] },
+                    submissions: { total: 0, by_form: [] },
+                    referrals: { total: 0, by_status: [], available: false }
+                }
             };
         },
         computed: {
@@ -362,7 +371,17 @@
                     { id: 'dur', label: 'Avg visit time', metric: 'visitors', fmt: dur, data: k && k.avg_duration, invert: false }
                 ];
             },
-            sparkSeries: function () { return (this.ts.series || []).map(function (d) { return d.value; }); }
+            sparkSeries: function () { return (this.ts.series || []).map(function (d) { return d.value; }); },
+            revSparkSeries: function () { return (this.revenue.ts.series || []).map(function (d) { return d.value; }); },
+            revTiles: function () {
+                var k = this.revenue.kpis;
+                return [
+                    { id: 'revenue', label: 'Revenue', fmt: money, data: k && k.revenue },
+                    { id: 'orders', label: 'Orders', fmt: nfmt, data: k && k.orders },
+                    { id: 'conversion', label: 'Conversion rate', fmt: function (v) { return (Number(v) || 0) + '%'; }, data: k && k.conversion },
+                    { id: 'aov', label: 'Avg order value', fmt: money, data: k && k.aov }
+                ];
+            }
         },
         methods: {
             nfmt: nfmt, dur: dur, money: money, flag: flag,
@@ -389,13 +408,26 @@
             loadAll: function () {
                 this.loadKpis(); this.loadTs(); this.loadSources(); this.loadPages();
                 this.loadDevices(); this.loadCountries(); this.loadEngagement(); this.loadPosts();
-                this.loadAdmin();
+                this.loadAdmin(); this.loadRevenue();
             },
             loadAdmin: function () {
                 var self = this;
                 // Legacy endpoint takes ?days; map the active range to a day count.
                 var days = { 'today': 1, '24h': 1, '7d': 7, '30d': 30, '90d': 90, '12mo': 365 }[this.range] || 30;
                 return api('admin', { template: this.template, days: days }).then(function (d) { if (d) self.admin = d; });
+            },
+            loadRevenue: function () {
+                var self = this, p = this.params(), rev = this.revenue;
+                this.revLoading = true;
+                Promise.all([
+                    api('revenue_kpis', p).then(function (d) { if (d) rev.kpis = d; }),
+                    api('revenue_timeseries', p).then(function (d) { if (d) rev.ts = { series: d.series || [], granularity: d.granularity || 'day' }; }),
+                    api('revenue_products', p).then(function (d) { rev.products = d || []; }),
+                    api('revenue_campaigns', p).then(function (d) { rev.campaigns = d || []; }),
+                    api('revenue_bookings', p).then(function (d) { if (d) rev.bookings = d; }),
+                    api('revenue_submissions', p).then(function (d) { if (d) rev.submissions = d; }),
+                    api('revenue_referrals', p).then(function (d) { if (d) rev.referrals = d; })
+                ]).then(function () { self.revLoading = false; });
             },
             loadKpis: function () {
                 var self = this; this.loading.kpis = true;

@@ -122,7 +122,9 @@ wp_localize_script( 'firefly-analytics', 'fireflyAnalytics', array(
 
         <!-- ===== KPI tiles ===== -->
         <div class="ffa-kpis ffa-fade">
-            <div v-for="tile in kpiTiles" :key="tile.id" class="ffa-kpi" :class="{'is-active': metric===tile.metric}" @click="setMetric(tile.metric)">
+            <div v-for="tile in kpiTiles" :key="tile.id" class="ffa-kpi" :class="{'is-active': metric===tile.metric}"
+                 @click="setMetric(tile.metric)" @keydown.enter="setMetric(tile.metric)" @keydown.space.prevent="setMetric(tile.metric)"
+                 tabindex="0" role="button" :aria-pressed="metric===tile.metric" :aria-label="tile.label">
                 <div class="ffa-kpi-label">{{ tile.label }}</div>
                 <div class="ffa-kpi-value">{{ tileValue(tile) }}</div>
                 <div class="ffa-kpi-foot">
@@ -254,8 +256,64 @@ wp_localize_script( 'firefly-analytics', 'fireflyAnalytics', array(
             </div>
         </div>
 
-        <!-- ===== Revenue / Conversions (populated in Group 5) ===== -->
-        <!-- ffa:revenue-anchor -->
+        <!-- ===== Revenue / Conversions ===== -->
+        <div class="ffa-section-head ffa-fade">
+            <h2>Revenue &amp; conversions</h2>
+            <span class="ffa-chip">site-wide</span>
+            <span class="ffa-rule"></span>
+        </div>
+
+        <div class="ffa-kpis cols-4 ffa-fade">
+            <div v-for="tile in revTiles" :key="tile.id" class="ffa-kpi" style="cursor:default">
+                <div class="ffa-kpi-label">{{ tile.label }}</div>
+                <div class="ffa-kpi-value">{{ tileValue(tile) }}</div>
+                <div class="ffa-kpi-foot">
+                    <span class="ffa-delta" :class="deltaClass(tile)">{{ deltaText(tile) }}</span>
+                    <spark-line :data="revSparkSeries" color="#15a07a"></spark-line>
+                </div>
+            </div>
+        </div>
+
+        <div class="ffa-card ffa-fade">
+            <div class="ffa-card-head"><h2>Revenue over time</h2></div>
+            <area-chart :series="revenue.ts.series" :granularity="revenue.ts.granularity" label="revenue" :money="true"></area-chart>
+        </div>
+
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Top products</h2></div>
+                <ranked-bars :rows="revenue.products" :loading="revLoading" label-key="label" val-key="revenue" val2-key="orders" :money="true"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Campaign attribution</h2></div>
+                <ranked-bars :rows="revenue.campaigns" :loading="revLoading" label-key="label" val-key="revenue" val2-key="orders" :money="true"></ranked-bars>
+            </div>
+        </div>
+
+        <div class="ffa-grid cols-3 ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Bookings</h2>
+                    <div class="ffa-spacer"></div>
+                    <span class="ffa-chip">{{ nfmt(revenue.bookings.confirmed) }} confirmed</span>
+                </div>
+                <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.bookings.total) }}</span><span class="ffa-rt-online-label">requests</span></div>
+                <ranked-bars :rows="revenue.bookings.by_type" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Form submissions</h2></div>
+                <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.submissions.total) }}</span><span class="ffa-rt-online-label">submissions</span></div>
+                <ranked-bars :rows="revenue.submissions.by_form" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Referrals</h2></div>
+                <template v-if="revenue.referrals.available">
+                    <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.referrals.total) }}</span><span class="ffa-rt-online-label">referrals</span></div>
+                    <ranked-bars :rows="revenue.referrals.by_status" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+                </template>
+                <div v-else class="ffa-empty">Referral program not installed on this site</div>
+            </div>
+        </div>
 
         <!-- Pull confirm -->
         <div v-if="modal==='pull'" class="ffa-modal-overlay" @click.self="modal=null">

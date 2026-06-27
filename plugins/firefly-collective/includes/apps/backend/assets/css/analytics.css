@@ -38,6 +38,12 @@
 }
 .ffa *, .ffa *::before, .ffa *::after { box-sizing: border-box; }
 .ffa [v-cloak] { display: none; }
+/* Keyboard focus visibility (mouse clicks stay clean via :focus-visible). */
+.ffa [tabindex]:focus-visible,
+.ffa button:focus-visible,
+.ffa select:focus-visible {
+    outline: 2px solid var(--ffa-amber-strong); outline-offset: 2px; border-radius: 8px;
+}
 
 /* ---- Loading / skeleton -------------------------------------------------- */
 .ffa-boot {
@@ -225,6 +231,14 @@
    ============================================================================ */
 .ffa-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; }
 .ffa-grid .ffa-card { margin-bottom: 0; }
+/* 3-up grid (bookings / submissions / referrals) — responsive collapse. */
+.ffa-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .ffa-grid.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .ffa-grid.cols-3 { grid-template-columns: 1fr; } }
+/* 4-up KPI row (revenue) — responsive collapse independent of the 5-up row. */
+.ffa-kpis.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .ffa-kpis.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .ffa-kpis.cols-4 { grid-template-columns: 1fr 1fr; } }
 
 .ffa-ranked { display: flex; flex-direction: column; gap: 2px; }
 .ffa-row {

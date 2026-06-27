@@ -15,6 +15,7 @@ require_once __DIR__ . '/analytics-geo.php';
 require_once __DIR__ . '/analytics-collect.php';
 // Reporting layer (window resolver + aggregation queries).
 require_once __DIR__ . '/analytics-report.php';
+require_once __DIR__ . '/analytics-report-revenue.php';
 
 // Bump when the analytics schema changes so the version-gated installer
 // re-runs the idempotent column/index ensure exactly once per environment.
@@ -110,6 +111,45 @@ add_action( 'firefly_register_migrations', function ( $runner ) {
     require_once dirname( __DIR__ ) . '/migrations/001_add_analytics_dimensions.php';
     $runner->registerMigration( new FFC_Migration_001_AddAnalyticsDimensions() );
 } );
+
+/**
+ * Build a full ffc_analytics insert payload (all columns, old + new) from
+ * an exported row. Shared by import + pull so a cross-environment sync
+ * carries device / browser / OS / country / UTM / engagement data instead
+ * of silently dropping every dimension column added in v2.
+ *
+ * @param array       $row              One exported analytics row.
+ * @param string|null $template_override Force the template (used by pull to
+ *                                       remap remote → local active template).
+ * @return array{data:array,format:array}
+ */
+function firefly_analytics_import_row( $row, $template_override = null ) {
+    $data = array(
+        'page_path'    => $row['page_path'] ?? '',
+        'page_title'   => $row['page_title'] ?? null,
+        'post_id'      => $row['post_id'] ?? null,
+        'post_type'    => $row['post_type'] ?? null,
+        'template'     => $template_override !== null ? $template_override : ( $row['template'] ?? null ),
+        'referrer'     => $row['referrer'] ?? null,
+        'session_hash' => $row['session_hash'] ?? null,
+        'visit_id'     => $row['visit_id'] ?? null,
+        'event_id'     => $row['event_id'] ?? null,
+        'is_entry'     => isset( $row['is_entry'] ) ? (int) $row['is_entry'] : 0,
+        'device_type'  => $row['device_type'] ?? null,
+        'browser'      => $row['browser'] ?? null,
+        'os'           => $row['os'] ?? null,
+        'country'      => $row['country'] ?? null,
+        'utm_source'   => $row['utm_source'] ?? null,
+        'utm_medium'   => $row['utm_medium'] ?? null,
+        'utm_campaign' => $row['utm_campaign'] ?? null,
+        'screen_w'     => isset( $row['screen_w'] ) ? $row['screen_w'] : null,
+        'duration_s'   => isset( $row['duration_s'] ) ? $row['duration_s'] : null,
+        'max_scroll'   => isset( $row['max_scroll'] ) ? $row['max_scroll'] : null,
+        'created_at'   => $row['created_at'] ?? current_time( 'mysql', 1 ),
+    );
+    $format = array( '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s' );
+    return array( 'data' => $data, 'format' => $format );
+}
 
 /**
  * Create analytics table
@@ -324,6 +364,21 @@ function firefly_analytics_get_data($request) {
             case 'countries':  return firefly_analytics_report_countries($table_name, $win, $template);
             case 'engagement': return firefly_analytics_report_engagement($table_name, $win, $template);
             case 'realtime':   return firefly_analytics_report_realtime($table_name, $template);
+        }
+    }
+
+    // Revenue / conversions reporting API (install-wide commerce data).
+    $rev_types = array('revenue_kpis','revenue_timeseries','revenue_products','revenue_campaigns','revenue_bookings','revenue_submissions','revenue_referrals');
+    if (in_array($type, $rev_types, true)) {
+        $win = firefly_analytics_resolve_window($request);
+        switch ($type) {
+            case 'revenue_kpis':        return firefly_analytics_revenue_kpis($win, $template);
+            case 'revenue_timeseries':  return firefly_analytics_revenue_timeseries($win);
+            case 'revenue_products':    return firefly_analytics_revenue_products($win);
+            case 'revenue_campaigns':   return firefly_analytics_revenue_campaigns($win);
+            case 'revenue_bookings':    return firefly_analytics_revenue_bookings($win);
+            case 'revenue_submissions': return firefly_analytics_revenue_submissions($win);
+            case 'revenue_referrals':   return firefly_analytics_revenue_referrals($win);
         }
     }
 
@@ -681,25 +736,11 @@ function firefly_analytics_import_data($request) {
     // Truncate existing data
     $wpdb->query("TRUNCATE TABLE $table_name");
 
-    // Insert imported data
+    // Insert imported data (carries all dimension columns).
     $inserted = 0;
     foreach ($data as $row) {
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'page_path' => $row['page_path'],
-                'page_title' => $row['page_title'] ?? null,
-                'post_id' => $row['post_id'] ?? null,
-                'post_type' => $row['post_type'] ?? null,
-                'template' => $row['template'] ?? null,
-                'referrer' => $row['referrer'] ?? null,
-                'session_hash' => $row['session_hash'] ?? null,
-                'created_at' => $row['created_at']
-            ),
-            array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
-        );
-
-        if ($result) {
+        $r = firefly_analytics_import_row($row);
+        if ($wpdb->insert($table_name, $r['data'], $r['format'])) {
             $inserted++;
         }
     }
@@ -784,25 +825,11 @@ function firefly_analytics_pull_data($request) {
     $wpdb->query("TRUNCATE TABLE $table_name");
     $wpdb->query("DELETE FROM $link_clicks_table");
 
-    // Insert imported analytics data
+    // Insert imported analytics data (remap template → local; carry all columns).
     $inserted = 0;
     foreach ($data['data'] as $row) {
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'page_path' => $row['page_path'],
-                'page_title' => $row['page_title'] ?? null,
-                'post_id' => $row['post_id'] ?? null,
-                'post_type' => $row['post_type'] ?? null,
-                'template' => $local_template,
-                'referrer' => $row['referrer'] ?? null,
-                'session_hash' => $row['session_hash'] ?? null,
-                'created_at' => $row['created_at']
-            ),
-            array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
-        );
-
-        if ($result) {
+        $r = firefly_analytics_import_row($row, $local_template);
+        if ($wpdb->insert($table_name, $r['data'], $r['format'])) {
             $inserted++;
         }
     }
