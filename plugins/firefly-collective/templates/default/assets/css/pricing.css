@@ -159,10 +159,54 @@
 /* Max field */
 .fpa-max-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
+/* Header action buttons (clone/delete) */
+.fpa-actions { display: inline-flex; gap: 5px; flex: 0 0 auto; opacity: 0.55; transition: opacity 0.15s; }
+.fpa-card-head:hover .fpa-actions { opacity: 1; }
+.fpa-add-row { margin-top: 4px; }
+
+/* Inline add form */
+.fpa-addform {
+    border: 1px dashed var(--fpa-border-strong); border-radius: var(--fpa-radius-sm);
+    background: var(--fpa-surface-2); padding: 14px; margin-top: 8px;
+}
+.fpa-addform-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fpa-ink-3); margin-bottom: 10px; }
+.fpa-addform-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.fpa-invalid { border-color: var(--fpa-red) !important; box-shadow: 0 0 0 3px var(--fpa-red-soft) !important; }
+
+/* Modal */
+.fpa-modal-overlay {
+    position: fixed; inset: 0; background: rgba(16,18,23,0.42); z-index: 100000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.fpa-modal { background: var(--fpa-surface); border-radius: var(--fpa-radius); box-shadow: var(--fpa-shadow-pop); max-width: 440px; width: 100%; padding: 22px; }
+.fpa-modal h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
+.fpa-modal p { margin: 0 0 16px; font-size: 13.5px; color: var(--fpa-ink-2); line-height: 1.5; }
+.fpa-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Sticky save bar */
+.fpa-savebar {
+    position: sticky; bottom: 0; z-index: 50; margin-top: 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 16px; background: rgba(255,255,255,0.86); backdrop-filter: blur(8px);
+    border: 1px solid var(--fpa-border); border-radius: var(--fpa-radius); box-shadow: var(--fpa-shadow-pop);
+}
+.fpa-savebar-hint { font-size: 12.5px; color: var(--fpa-ink-3); margin-right: auto; }
+.fpa-savebar .fpa-btn-primary { min-width: 140px; }
+
+/* Toast */
+.fpa-toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100001;
+    background: var(--fpa-ink); color: #fff; border-radius: 10px; padding: 12px 16px;
+    font-size: 13px; box-shadow: var(--fpa-shadow-pop); animation: fpa-fade 0.25s var(--fpa-ease) both;
+}
+.fpa-toast.is-error { background: var(--fpa-red); }
+
 /* Responsive */
 @media (max-width: 782px) {
     .fpa { margin-right: 10px; }
     .fpa-title { width: 100%; margin-right: 0; }
     .fpa-card-body { padding: 6px 12px 14px; }
     .fpa-field input, .fpa-field textarea, .fpa-field select { max-width: 100%; }
+    .fpa-savebar-hint { display: none; }
+    .fpa-savebar .fpa-btn-primary { width: 100%; }
 }

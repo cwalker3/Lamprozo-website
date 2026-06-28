@@ -10,6 +10,7 @@ import { DynamicFields } from './fields/DynamicFields.js';
 import { RepeatableRows } from './fields/RepeatableRows.js';
 import { MaxField } from './fields/MaxField.js';
 import { ensureArrayObj, ensureNumber } from './util.js';
+import { clone } from './create.js';
 
 const ADDON_KNOWN = [
     'addonName', 'description', 'addOnMetric', 'pricingType',
@@ -21,7 +22,7 @@ const ADDON_KNOWN = [
 export const AddonCard = {
     name: 'AddonCard',
     components: { Field, SelectField, DynamicFields, RepeatableRows, MaxField },
-    inject: ['store'],
+    inject: ['store', 'ui'],
     props: { addon: Object, option: Object, fIndex: Number, oIndex: Number, index: Number },
     data() {
         return {
@@ -40,11 +41,24 @@ export const AddonCard = {
             this.addon.enableGrouping = !!(this.addon.groupName);
         }
     },
+    watch: {
+        'addon.addonName'(n, o) {
+            if (n !== o) this.store.dataManager.recordNameChange('addons', [this.fIndex, this.oIndex, this.index], o, n);
+        }
+    },
     computed: {
         ptype() { return (this.addon.pricingType && this.addon.pricingType.value && this.addon.pricingType.value.selected) || 0; },
         groupRows() { return this.addon.groupThresholdDiscounts.value.types; }
     },
     methods: {
+        async cloneSelf() {
+            const ok = await this.ui.confirm({ title: 'Clone “' + (this.addon.addonName || 'add-on') + '”?', message: 'Creates a copy you can rename.', confirmText: 'Clone' });
+            if (ok) { this.option.addons.splice(this.index + 1, 0, clone(this.addon)); this.store.dataManager.save(); }
+        },
+        async deleteSelf() {
+            const ok = await this.ui.confirm({ title: 'Delete “' + (this.addon.addonName || 'add-on') + '”?', message: 'This removes the add-on.', confirmText: 'Delete', danger: true });
+            if (ok) this.store.dataManager.deleteAddon(this.fIndex, this.oIndex, this.index);
+        },
         syncGroupThresholds() {
             if (!this.addon.enableGrouping || !this.addon.groupName) return;
             this.store.groupSync.synchronizeThresholdDiscounts(
@@ -66,6 +80,10 @@ export const AddonCard = {
             <strong>{{ addon.addonName || 'Untitled add-on' }}</strong>
             <span class="fpa-spacer"></span>
             <span class="fpa-chip" v-if="addon.enableGrouping && addon.groupName">group · {{ addon.groupName }}</span>
+            <span class="fpa-actions">
+                <button type="button" class="fpa-icon-btn" title="Clone add-on" @click.stop="cloneSelf">⧉</button>
+                <button type="button" class="fpa-icon-btn fpa-icon-danger" title="Delete add-on" @click.stop="deleteSelf">🗑</button>
+            </span>
         </div>
         <div class="fpa-card-body" v-show="expanded">
             <Field label="Add-on name" type="text" v-model="addon.addonName" />
