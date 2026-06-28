@@ -56,8 +56,8 @@
 
 /* Card primitive (a feature / option / addon) */
 .fpa-card { background: var(--fpa-surface); border: 1px solid var(--fpa-border); border-radius: var(--fpa-radius); box-shadow: var(--fpa-shadow); margin-bottom: 12px; overflow: hidden; }
-.fpa-card-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; user-select: none; }
-.fpa-card-head strong { font-size: 14px; font-weight: 650; }
+.fpa-card-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; user-select: none; min-width: 0; }
+.fpa-card-head strong { font-size: 14px; font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fpa-card-head .fpa-spacer { margin-left: auto; }
 
 .fpa-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--fpa-ink-2); background: var(--fpa-surface-2); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
@@ -209,4 +209,14 @@
     .fpa-field input, .fpa-field textarea, .fpa-field select { max-width: 100%; }
     .fpa-savebar-hint { display: none; }
     .fpa-savebar .fpa-btn-primary { width: 100%; }
+}
+@media (max-width: 600px) {
+    .fpa-rep, .fpa-field input, .fpa-field textarea, .fpa-field select { max-width: 100%; }
+    .fpa-rep-row { flex-wrap: wrap; }
+    .fpa-rep-cell { flex: 1 1 42%; }
+    .fpa-rep-ctrls { flex: 1 0 100%; justify-content: flex-end; }
+}
+/* Touch devices have no hover — keep card actions fully visible. */
+@media (hover: none) {
+    .fpa-actions { opacity: 1; }
 }
