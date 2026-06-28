@@ -1,622 +1,168 @@
-/* plugin/assets/css/pricing.css */
+/* ============================================================================
+   Firefly Pricing admin — design system (scoped under .fpa).
+   Matches the Analytics admin (.ffa) language: light, brand-accented
+   (firefly amber + phosphor green), rounded cards, soft shadows, fully
+   responsive. No design tokens leak into wp-admin chrome.
+   ============================================================================ */
 
-html, body {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    overflow-y: scroll !important;
-  }
-  body {
-    font-family: Arial, sans-serif;
-  }
-  .container {
-    max-width: 1200px;
-    margin: 20px auto;
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-  }
-  #pricing-form {
-    display: grid;
-  }
-  #pricing-form button.add-button {
-    justify-self: end;
-  }
-  h1 {
-    color: #333;
-    text-align: center;
-    margin-bottom: 30px;
-  }
-  
-  /* Reset all field groups to white background by default */
-  .field-group {
-    background-color: #ffffff;
-    transition: background-color 0.2s;
-    padding: 8px;
-    border-radius: 4px;
-    margin-bottom: 5px;
-  }
-  
-  /* ALTERNATING ROW BACKGROUNDS - Feature rows */
-  .feature-content-inner > .field-group:nth-of-type(odd) {
-    background-color: #f7f7f7;
-  }
-  
-  /* ALTERNATING ROW BACKGROUNDS - Option rows */
-  .option .content-inner > .field-group:nth-of-type(odd) {
-    background-color: #f7f7f7;
-  }
-  
-  /* ALTERNATING ROW BACKGROUNDS - Addon rows */
-  .addon .content-inner > .field-group:nth-of-type(odd) {
-    background-color: #f7f7f7;
-  }
-  
-  /* Fix for section headers to not disrupt the alternating pattern */
-  .section-header {
-    background-color: transparent !important;
-    margin-top: 25px;
-  }
-  
-  /* Price options special handling */
-  .field-group.price-options-field {
-    /* Use the background color determined by the nth-of-type rule */
-    background-color: inherit;
-  }
-  
-  /* Ensure headers keep their colors */
-  .feature-header {
-    background-color: #0073aa !important;
-    color: #fff !important;
-  }
-  
-  .option-header {
-    background-color: #196081 !important;
-    color: white !important;
-  }
-  
-  .addon-header {
-    background-color: #0c4d6b !important;
-    color: white !important;
-  }
-  
-  /* New elements always get white background */
-  #new-feature-form,
-  #new-option-form,
-  #new-addon-form {
-    background-color: #ffffff !important;
-  }
-  
-  .feature {
-    border: 1px solid #ddd;
-    margin-bottom: 20px;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .feature .feature-content-inner > .field-group:first-of-type input,
-  .option .content-inner > .field-group:first-of-type input,
-  .addon .content-inner > .field-group:first-of-type input {
-    font-weight: bold;
-  }
-  .feature-header {
-    cursor: pointer;
-    background-color: #0073aa;
-    color: #fff;
-    padding: 10px 15px;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    scroll-margin: 10vh;
-  }
-  .feature-header:hover {
-    background-color: #005177;
-  }
-  .feature-header-left {
-    display: flex;
-    align-items: center;
-  }
-  .feature-header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  /* Header styling for options and addons */
-  .header {
-    cursor: pointer;
-    padding: 10px;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    scroll-margin: 10vh;
-  }
-  
-  .option-header {
-    background-color: #196081;
-    color: white;
-    border-radius: 4px 4px 0 0;
-  }
+.fpa {
+    --fpa-bg:            #f5f6f8;
+    --fpa-surface:       #ffffff;
+    --fpa-surface-2:     #f3f5f8;
+    --fpa-ink:           #15171c;
+    --fpa-ink-2:         #5c6270;
+    --fpa-ink-3:         #99a0ac;
+    --fpa-border:        #e7e9ee;
+    --fpa-border-strong: #d6dae1;
+    --fpa-amber:         #f5b544;
+    --fpa-amber-strong:  #d99b2c;
+    --fpa-amber-soft:    rgba(245, 181, 68, 0.14);
+    --fpa-green:         #15a07a;
+    --fpa-green-soft:    rgba(21, 160, 122, 0.12);
+    --fpa-red:           #e5484d;
+    --fpa-red-soft:      rgba(229, 72, 77, 0.10);
+    --fpa-indigo:        #5b6cff;
+    --fpa-radius:        14px;
+    --fpa-radius-sm:     9px;
+    --fpa-shadow:        0 1px 2px rgba(16,18,23,0.04), 0 6px 20px rgba(16,18,23,0.05);
+    --fpa-shadow-pop:    0 8px 28px rgba(16,18,23,0.14);
+    --fpa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 
-  #new-option-form,
-  #new-addon-form {
-    padding: 0.5rem; 
-  }
-  
-  .addon-header {
-    background-color: #0c4d6b;
-    color: white;
-    border-radius: 4px 4px 0 0;
-  }
-  
-  .header-left {
-    display: flex;
-    align-items: center;
-  }
-  
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  /* Content area for options and addons */
-  .content {
-    max-height: 0;
-    overflow: hidden !important; /* Force hidden for animations */
-    transition: max-height 0.4s ease-out; /* Slightly faster, ease-out for smoother finish */
-  }
-  
-  .content-inner {
-    padding: 15px;
-    overflow: visible; /* Prevent content from being cut off */
-  }
-  
-  /* Option styling */
-  .option {
-    margin-bottom: 15px;
-    border-radius: 4px;
-    overflow: visible; /* Change from hidden to visible */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-    background-color: #ffffff;
-  }
-  
-  /* Addon styling */
-  .addon {
-    margin: 10px 0 10px 20px;
-    border-radius: 4px;
-    overflow: visible; /* Change from hidden to visible */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-    background-color: #ffffff;
-  }
-  
-  .addon-content-area {
-    margin-top: 15px;
-    overflow: visible;
-  }
-
-  /* Section headers for options and add-ons */
-  .section-header {
-    margin: 20px 0 10px 0;
-    font-size: 1.1em;
-    font-weight: bold;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-  }
-
-  .feature-options-header {
-    color: #0073aa;
-  }
-
-  .option-addons-header {
-    color: #0c4d6b;
-  }
-
-  /* Name reference spans */
-  .feature-name-reference,
-  .option-name-reference {
-    font-style: italic;
-  }
-  
-  /* Clone button styling */
-  .clone-button {
-    background-color: #ffc107;
-    color: #212529;
-    border: none;
-    padding: 5px 10px;
-    font-size: 0.9em;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .clone-button:hover {
-    background-color: #e0a800;
-  }
-  #new-feature-form {
-    padding: 1rem;
-  }
-  .toggle-indicator {
-    font-size: 1.2em;
-    color: white;
-  }
-  
-  /* Feature content with adjusted transitions */
-  .feature-content {
-    max-height: 0;
-    overflow: hidden !important; /* Force hidden for animations */
-    transition: max-height 0.4s ease-out; /* Slightly faster, ease-out for smoother finish */
-    margin-bottom: 15px;
-  }
-
-  .feature-content-inner {
-    padding: 15px;
-    overflow: visible;
-  }
-  
-  /* Adjustments for old styles */
- .option {
-    margin-bottom: 15px;
-    border-radius: 4px;
-    overflow: hidden !important; /* Force hidden for animations */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
- }
-  
- .addon {
-    margin: 10px 0 10px 20px;
-    border-radius: 4px;
-    overflow: hidden !important; /* Force hidden for animations */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-  }
-  
-  .add-addon-row {
-    margin-top: 10px;
-    margin-left: 20px;
-  }
-  
-  .field-group {
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-  }
-  .field-group label {
-    width: 150px;
-    font-weight: bold;
-  }
-  .field-group input[type="checkbox"] {
-    min-height:20px;
-    max-height: 20px;
-    min-width: 20px;
-    max-width: 20px;
-    margin-left: 0;
-  }
-  .field-group input,
-  .field-group select,
-  .field-group textarea {
-    flex: 1;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  input[disabled], select[disabled], textarea[disabled] {
-    opacity: 0.4;
-  }
-  .button-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    justify-content: center;
-    margin-top: 10px;
-    gap: 1vw;
-  }
-  .button-row:has(.add-button),
-  .button-row:has(.delete-button) {
-    display: block;
-    text-align: right;
-  }
-  .button-row:has(.add-button) > button,
-  .button-row:has(.delete-button) > button {
-    max-width: 20%;
-  }
-  .button-row > button {
-    width: 70%;
-    justify-self: center;
-  }
-  .button-group {
-    width: 100%;
-    text-align: center;
-    margin-top: 20px;
-  }
-  button {
-    color: white;
-  }
-  .confirm-dialog-content button {
-    color: black;
-  }
-  button,
-  .add-button,
-  .delete-button {
-    cursor: pointer !important;
-  }
-  #apply-button {
-    background-color: #0073aa !important;
-    color: #fff !important;
-    border: none !important;
-    padding: 10px 20px !important;
-    margin: 5px !important;
-    cursor: pointer !important;
-    border-radius: 4px !important;
-    transition: background-color 0.3s ease !important;
-    font-size: 14px !important;
-    display: inline-block !important;
-    text-indent: 0 !important;
-    line-height: normal !important;
-  }
-  .button-group button {
-    background-color: #0073aa;
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
-    margin: 5px;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
-  }
-  .button-group button:hover {
-    background-color: #005177;
-  }
-  .add-button {
-    margin-top: 2vh;
-    background-color: #28a745;
-    padding: 5px 10px;
-    font-size: 0.9em;
-    border-radius: 5px;
-  }
-  .add-button:hover {
-    background-color: #218838;
-  }
-  .delete-button {
-    background-color: #dc3545;
-    padding: 5px 10px;
-    font-size: 0.9em;
-  }
-  .delete-button:hover {
-    background-color: #c82333;
-  }
-
-  /* Price options styling - full width alignment */
-  .price-options-field {
-    align-items: flex-start !important;
-    display: flex;
-    width: 100% !important;
-  }
-
-  .price-options-container {
-    flex: 1;
-    margin-top: 0;
-    margin-bottom: 10px;
-    width: 100%;
-  }
-
-  .price-option-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 12px;
-    gap: 8px;
-    width: 100%;
-  }
-
-  /* Label input styling */
-  .price-option-row input:first-of-type {
-    flex: 1;
-    min-width: 120px;
-  }
-
-  /* Price input styling */
-  .price-option-row input:nth-of-type(2) {
-    width: 80px;
-    min-width: 80px;
-    flex: 0 0 80px;
-  }
-
-  /* Controls container */
-  .controls-container {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex: 0 0 auto;
-  }
-
-  /* Delete button styling */
-  .price-option-delete {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    width: 26px;
-    height: 26px;
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    flex-shrink: 0;
-  }
-
-  .price-option-delete:hover {
-    background-color: #c82333;
-  }
-
-  /* Arrow buttons styling */
-  .price-option-arrow {
-    background-color: #4dabf7;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    width: 26px;
-    height: 26px;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: background-color 0.2s;
-    flex-shrink: 0;
-  }
-
-  .price-option-arrow:hover:not(:disabled) {
-    background-color: #339af0;
-  }
-
-  .price-option-arrow:disabled {
-    background-color: #adb5bd;
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  /* Add button in price options */
-  .price-options-container .add-button {
-    margin-top: 5px;
-    padding: 3px 8px;
-    font-size: 14px;
-  }
-
-  /* Ensure the buttons row aligns with other elements */
-  .price-options-container > div:last-child {
-    display: flex;
-    justify-content: flex-end;
-    width: 100%;
-  }
-
-  .fade-in {
-    opacity: 0;
-    animation: fadeIn 0.5s forwards;
-  }
-  .fade-out {
-    animation: fadeOut 0.5s forwards;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 800px) {
-    .price-option-row {
-      flex-wrap: nowrap;
-    }
-    
-    .price-option-row input:first-of-type {
-      min-width: 100px;
-    }
-    
-    .price-option-row input:nth-of-type(2) {
-      flex: 0 0 60px;
-      width: 60px;
-      min-width: 60px;
-    }
-  }
-
-  @media (max-width: 600px) {
-    .field-group {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .field-group label {
-      width: 100%;
-      margin-bottom: 5px;
-    }
-    .field-group input,
-    .field-group select,
-    .field-group textarea {
-      width: 100%;
-    }
-    .button-row:has(.add-button) > button,
-    .button-row:has(.delete-button) > button {
-      max-width: 50%;
-    }
-    .button-row:has(.delete-button) > button {
-      margin-right: 10px;
-      margin-top: 2vh;
-    }
-    
-    /* Price options responsive adjustments for very small screens */
-    .price-option-row {
-      gap: 5px;
-    }
-    
-    .price-option-row input:first-of-type {
-      min-width: 80px;
-    }
-    
-    .price-option-row input:nth-of-type(2) {
-      flex: 0 0 50px;
-      width: 50px;
-      min-width: 50px;
-    }
-    
-    .controls-container {
-      gap: 3px;
-    }
-    
-    .price-option-delete,
-    .price-option-arrow {
-      width: 24px;
-      height: 24px;
-      font-size: 12px;
-    }
-  }
-  
-  /* Confirmation Dialog */
-  .confirm-dialog {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-  }
-  .confirm-dialog.show {
-    display: flex;
-    animation: fadeIn 0.3s forwards;
-  }
-  .confirm-dialog-content {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 4px;
-    text-align: center;
-    max-width: 80vw;
-  }
-  
-  /* Alternative row styling for better definition */
-  .field-group:nth-of-type(odd) {
-    border-left: 3px solid #e9e9e9;
-  }
-  
-  /* Special handling for price options rows */
-  .price-option-row:nth-of-type(odd) {
-    background-color: #f7f7f7;
-    padding: 5px;
-    border-radius: 4px;
-  }
-  
-  .price-option-row:nth-of-type(even) {
-    background-color: #ffffff;
-    padding: 5px;
-    border-radius: 4px;
-  }
-
-.user-display-field {
-    background-color: #f0f7ff;
+    margin: 0 20px 80px 0;
+    color: var(--fpa-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+.fpa *, .fpa *::before, .fpa *::after { box-sizing: border-box; }
+.fpa [v-cloak] { display: none; }
+.fpa [tabindex]:focus-visible, .fpa button:focus-visible, .fpa select:focus-visible,
+.fpa input:focus-visible, .fpa textarea:focus-visible {
+    outline: 2px solid var(--fpa-amber-strong); outline-offset: 1px;
 }
 
-.user-display-value {
-    display: inline-block;
-    font-weight: normal;
-    margin-left: 8px;
+/* Boot / error */
+.fpa-boot { display: flex; align-items: center; justify-content: center; min-height: 50vh; color: var(--fpa-ink-3); font-size: 14px; gap: 10px; }
+.fpa-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--fpa-border-strong); border-top-color: var(--fpa-amber); animation: fpa-spin 0.7s linear infinite; }
+@keyframes fpa-spin { to { transform: rotate(360deg); } }
+.fpa-error { padding: 18px; border: 1px solid var(--fpa-red); background: var(--fpa-red-soft); border-radius: var(--fpa-radius); color: #721c24; }
+@keyframes fpa-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fpa-fade { animation: fpa-fade 0.3s var(--fpa-ease) both; }
+
+/* Top bar */
+.fpa-topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 4px 0 18px; }
+.fpa-title { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.fpa-title h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.fpa-title .fpa-sub { font-size: 13px; color: var(--fpa-ink-3); }
+
+/* Card primitive (a feature / option / addon) */
+.fpa-card { background: var(--fpa-surface); border: 1px solid var(--fpa-border); border-radius: var(--fpa-radius); box-shadow: var(--fpa-shadow); margin-bottom: 12px; overflow: hidden; }
+.fpa-card-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; user-select: none; }
+.fpa-card-head strong { font-size: 14px; font-weight: 650; }
+.fpa-card-head .fpa-spacer { margin-left: auto; }
+
+.fpa-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--fpa-ink-2); background: var(--fpa-surface-2); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+
+.fpa-empty { color: var(--fpa-ink-3); font-size: 13px; text-align: center; padding: 32px 10px; font-style: italic; }
+.fpa-empty-sm { padding: 14px 10px; font-size: 12.5px; }
+
+/* Expand/collapse toggle */
+.fpa-toggle {
+    border: 0; background: transparent; cursor: pointer; color: var(--fpa-ink-3);
+    font-size: 13px; line-height: 1; padding: 2px; width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    transition: transform 0.18s var(--fpa-ease), color 0.15s;
+}
+.fpa-toggle.open { transform: rotate(90deg); color: var(--fpa-amber-strong); }
+.fpa-card-head:hover .fpa-toggle { color: var(--fpa-ink); }
+
+/* Card nesting accents (feature > option > addon) via a left rail */
+.fpa-feature { border-left: 3px solid var(--fpa-amber); }
+.fpa-option  { border-left: 3px solid var(--fpa-green); }
+.fpa-addon   { border-left: 3px solid var(--fpa-indigo); }
+
+.fpa-card-body { padding: 6px 16px 16px; border-top: 1px solid var(--fpa-border); }
+
+/* Nested cards sit on a tinted surface so depth reads clearly */
+.fpa-option, .fpa-addon { background: var(--fpa-surface); box-shadow: none; border-radius: var(--fpa-radius-sm); }
+.fpa-section { margin-top: 14px; }
+.fpa-section-head {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--fpa-ink-3); margin: 6px 0 8px;
+}
+
+/* Fields */
+.fpa-field { margin-bottom: 12px; }
+.fpa-field > label {
+    display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;
+    color: var(--fpa-ink-2); margin-bottom: 5px;
+}
+.fpa-field input[type="text"], .fpa-field input[type="number"], .fpa-field input[type="date"],
+.fpa-field textarea, .fpa-field select {
+    width: 100%; max-width: 520px; border: 1px solid var(--fpa-border-strong); border-radius: 8px;
+    padding: 8px 11px; font-size: 13.5px; color: var(--fpa-ink); background: var(--fpa-surface);
+    font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.fpa-field input:focus, .fpa-field textarea:focus, .fpa-field select:focus {
+    outline: none; border-color: var(--fpa-amber); box-shadow: 0 0 0 3px var(--fpa-amber-soft);
+}
+.fpa-field textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.fpa-field-check { margin-bottom: 12px; }
+.fpa-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--fpa-ink); cursor: pointer; }
+.fpa-check input { width: 16px; height: 16px; accent-color: var(--fpa-amber-strong); }
+
+/* user-display field styling */
+.fpa-field.is-display input, .fpa-field.is-display textarea { background: #f0f7ff; border-color: #cfe3f7; }
+.fpa-display-tag {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--fpa-indigo); background: rgba(91,108,255,0.10); border-radius: 999px; padding: 1px 7px;
+}
+.fpa-dynamic { margin-top: 2px; }
+
+/* Buttons */
+.fpa-btn {
+    border: 1px solid var(--fpa-border-strong); background: var(--fpa-surface); color: var(--fpa-ink);
+    font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.fpa-btn:hover { background: var(--fpa-surface-2); }
+.fpa-btn-sm { padding: 5px 11px; font-size: 12px; }
+.fpa-btn-primary { background: var(--fpa-amber); border-color: var(--fpa-amber-strong); color: #1d1402; }
+.fpa-btn-primary:hover { background: var(--fpa-amber-strong); }
+.fpa-btn-green { background: var(--fpa-green); border-color: var(--fpa-green); color: #fff; }
+.fpa-btn-green:hover { filter: brightness(0.96); }
+.fpa-btn-danger { background: var(--fpa-red); border-color: var(--fpa-red); color: #fff; }
+.fpa-btn-ghost { border-color: transparent; background: transparent; color: var(--fpa-ink-2); }
+
+.fpa-icon-btn {
+    border: 1px solid var(--fpa-border); background: var(--fpa-surface); color: var(--fpa-ink-2);
+    width: 26px; height: 26px; border-radius: 7px; cursor: pointer; font-size: 13px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.fpa-icon-btn:hover:not(:disabled) { background: var(--fpa-surface-2); color: var(--fpa-ink); }
+.fpa-icon-btn:disabled { opacity: 0.4; cursor: default; }
+.fpa-icon-danger:hover:not(:disabled) { background: var(--fpa-red-soft); color: var(--fpa-red); border-color: var(--fpa-red); }
+
+/* Repeatable rows (price options / threshold discounts) */
+.fpa-rep { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.fpa-rep-empty { color: var(--fpa-ink-3); font-size: 12.5px; font-style: italic; padding: 2px 0; }
+.fpa-rep-row { display: flex; align-items: center; gap: 8px; }
+.fpa-rep-cell { flex: 1; min-width: 0; }
+.fpa-rep-cell input {
+    width: 100%; border: 1px solid var(--fpa-border-strong); border-radius: 7px; padding: 7px 10px;
+    font-size: 13px; color: var(--fpa-ink); background: var(--fpa-surface); font-family: inherit;
+}
+.fpa-rep-cell input:focus { outline: none; border-color: var(--fpa-amber); box-shadow: 0 0 0 3px var(--fpa-amber-soft); }
+.fpa-rep-ctrls { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.fpa-rep .fpa-btn-sm { align-self: flex-start; }
+
+/* Max field */
+.fpa-max-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+/* Responsive */
+@media (max-width: 782px) {
+    .fpa { margin-right: 10px; }
+    .fpa-title { width: 100%; margin-right: 0; }
+    .fpa-card-body { padding: 6px 12px 14px; }
+    .fpa-field input, .fpa-field textarea, .fpa-field select { max-width: 100%; }
 }
