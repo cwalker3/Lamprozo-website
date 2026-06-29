@@ -87,8 +87,8 @@ wp_localize_script( 'firefly-analytics', 'fireflyAnalytics', array(
 
             <span class="ffa-live"><span class="ffa-dot"></span>{{ realtime.online }} online</span>
 
-            <!-- Manage menu: track-local toggle, pull-from-remote, reset -->
-            <div class="ffa-menu-wrap">
+            <!-- Manage menu (local only): track-local toggle, pull-from-remote, reset -->
+            <div class="ffa-menu-wrap" v-if="cfg.isDev">
                 <button class="ffa-control" :class="{'is-on': showSettings}" @click="showSettings = !showSettings" aria-label="Manage analytics data">
                     <span class="dashicons dashicons-admin-generic" style="font-size:15px;width:15px;height:15px"></span>
                     Manage

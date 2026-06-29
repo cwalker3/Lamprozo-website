@@ -65,6 +65,11 @@
 .ffa-topbar {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     padding: 4px 0 18px;
+    /* The .ffa-fade animation leaves a transform on every section, creating a
+       stacking context per section. Lift the topbar above later siblings (the
+       KPI tiles) so the Manage popover isn't painted behind them. */
+    position: relative;
+    z-index: 30;
 }
 .ffa-title { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
 .ffa-title h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; color: var(--ffa-ink); }
