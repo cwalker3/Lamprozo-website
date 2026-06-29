@@ -271,19 +271,19 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-name">Organization Name</label>
-                            <input type="text" id="org-name" v-model="config.organization.name" placeholder="Firefly Creative, LLC">
+                            <input type="text" id="org-name" v-model="config.organization.name" placeholder="Your Business Name">
                             <p class="description">Display name for your organization</p>
                         </div>
                         <div class="geo-field">
                             <label for="org-legal-name">Legal Name</label>
-                            <input type="text" id="org-legal-name" v-model="config.organization.legalName" placeholder="Firefly Creative, LLC">
+                            <input type="text" id="org-legal-name" v-model="config.organization.legalName" placeholder="Your Business, LLC">
                             <p class="description">Registered business name</p>
                         </div>
                     </div>
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-url">Website URL</label>
-                            <input type="url" id="org-url" v-model="config.organization.url" placeholder="https://fireflycreative.co">
+                            <input type="url" id="org-url" v-model="config.organization.url" placeholder="https://yourbusiness.com">
                         </div>
                         <div class="geo-field">
                             <label for="org-founded">Year Founded</label>
@@ -296,12 +296,12 @@ if (!current_user_can('manage_options')) {
                     <h3>Descriptions</h3>
                     <div class="geo-field">
                         <label for="org-description">Short Description</label>
-                        <textarea id="org-description" v-model="config.organization.description" rows="3" placeholder="Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses."></textarea>
+                        <textarea id="org-description" v-model="config.organization.description" rows="3" placeholder="A short sentence about what your business does and who it serves."></textarea>
                         <p class="description">Brief description of your organization (1-2 sentences)</p>
                     </div>
                     <div class="geo-field">
                         <label for="org-disambiguation">Disambiguation Description</label>
-                        <textarea id="org-disambiguation" v-model="config.organization.disambiguatingDescription" rows="4" placeholder="Firefly Creative, LLC is a Redding, California-based digital agency... Not affiliated with Adobe Firefly or other companies using the Firefly name."></textarea>
+                        <textarea id="org-disambiguation" v-model="config.organization.disambiguatingDescription" rows="4" placeholder="A detailed description that sets your business apart from others with a similar name."></textarea>
                         <p class="description">Detailed description that distinguishes you from other entities with similar names. Important for AI search engines.</p>
                     </div>
                 </div>
@@ -311,11 +311,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-logo">Logo URL</label>
-                            <input type="url" id="org-logo" v-model="config.organization.logo" placeholder="https://fireflycreative.co/wp-content/uploads/logo.png">
+                            <input type="url" id="org-logo" v-model="config.organization.logo" placeholder="https://yourbusiness.com/logo.png">
                         </div>
                         <div class="geo-field">
                             <label for="org-image">OG Image URL</label>
-                            <input type="url" id="org-image" v-model="config.organization.image" placeholder="https://fireflycreative.co/wp-content/uploads/og-image.png">
+                            <input type="url" id="org-image" v-model="config.organization.image" placeholder="https://yourbusiness.com/og-image.png">
                             <p class="description">Social sharing image (1200x630px recommended)</p>
                         </div>
                     </div>
@@ -329,11 +329,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="loc-city">City</label>
-                            <input type="text" id="loc-city" v-model="config.location.city" placeholder="Redding">
+                            <input type="text" id="loc-city" v-model="config.location.city" placeholder="City">
                         </div>
                         <div class="geo-field">
                             <label for="loc-state">State / Province</label>
-                            <input type="text" id="loc-state" v-model="config.location.state" placeholder="California">
+                            <input type="text" id="loc-state" v-model="config.location.state" placeholder="State / Province">
                         </div>
                     </div>
                     <div class="geo-field-row">
@@ -362,11 +362,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="contact-email">Email Address</label>
-                            <input type="email" id="contact-email" v-model="config.contact.email" placeholder="info@fireflycreative.co">
+                            <input type="email" id="contact-email" v-model="config.contact.email" placeholder="info@yourbusiness.com">
                         </div>
                         <div class="geo-field">
                             <label for="contact-phone">Phone Number</label>
-                            <input type="tel" id="contact-phone" v-model="config.contact.phone" placeholder="+1 (530) 555-0123">
+                            <input type="tel" id="contact-phone" v-model="config.contact.phone" placeholder="+1 (555) 123-4567">
                             <p class="description">Include country code for international format</p>
                         </div>
                     </div>
@@ -390,11 +390,11 @@ if (!current_user_can('manage_options')) {
                             <div class="geo-field-row">
                                 <div class="geo-field">
                                     <label>Full Name</label>
-                                    <input type="text" v-model="founder.name" placeholder="Alex Strait">
+                                    <input type="text" v-model="founder.name" placeholder="Full name">
                                 </div>
                                 <div class="geo-field">
                                     <label>Job Title</label>
-                                    <input type="text" v-model="founder.jobTitle" placeholder="Co-Founder & Lead Developer">
+                                    <input type="text" v-model="founder.jobTitle" placeholder="Job title">
                                 </div>
                             </div>
                             <div class="geo-field">
@@ -427,11 +427,11 @@ if (!current_user_can('manage_options')) {
                             </div>
                             <div class="geo-field">
                                 <label>Service Name</label>
-                                <input type="text" v-model="service.name" placeholder="Custom WordPress Development">
+                                <input type="text" v-model="service.name" placeholder="Service name">
                             </div>
                             <div class="geo-field">
                                 <label>Description</label>
-                                <textarea v-model="service.description" rows="2" placeholder="Bespoke WordPress themes and plugins built from scratch"></textarea>
+                                <textarea v-model="service.description" rows="2" placeholder="What this service includes"></textarea>
                             </div>
                         </div>
                     </div>
