@@ -36,6 +36,10 @@
     // Email verification codes (signup/login/password-reset primitive).
     require_once get_template_directory() . '/models/email-verification.php';
 
+    // SMTP relay for wp_mail() (opt-in via FIREFLY_SMTP_* wp-config constants;
+    // falls back to the default PHP mailer when unset).
+    require_once get_template_directory() . '/models/firefly-smtp.php';
+
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {
         require_once get_template_directory() . '/models/template-scoping-admin.php';
