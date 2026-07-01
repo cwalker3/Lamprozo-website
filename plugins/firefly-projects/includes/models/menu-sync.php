@@ -248,18 +248,50 @@ function firefly_projects_handle_incoming_menu($request) {
     $menu_data = $data['menu_data'];
     $items = $data['items'];
 
-    // Find or create menu by slug
-    $menu = wp_get_nav_menu_object($menu_data['slug']);
+    // Find or create the scoped menu.
+    //
+    // Menu names are shared across templates (e.g. "Main Menu"), but the theme
+    // keeps them distinct with a per-template unique slug + a _firefly_template
+    // termmeta (see firefly_create_scoped_menu). So resolve the existing menu by
+    // that scoped slug first, then by name + template, and only create if we
+    // truly have none. Create via wp_insert_term() with a unique slug rather than
+    // wp_create_nav_menu(), which rejects duplicate display names and would fail
+    // the moment a second template's "Main Menu" is synced.
+    $menu_template = !empty($menu_data['template']) ? $menu_data['template'] : '';
+
+    $menu = get_term_by('slug', $menu_data['slug'], 'nav_menu');
+
+    if (!$menu && '' !== $menu_template) {
+        // Heal a drifted slug: match by name + template scope.
+        $candidates = get_terms(array(
+            'taxonomy'   => 'nav_menu',
+            'hide_empty' => false,
+            'name'       => $menu_data['name'],
+            'meta_query' => array(array(
+                'key'   => '_firefly_template',
+                'value' => $menu_template,
+            )),
+        ));
+        if (!is_wp_error($candidates) && !empty($candidates)) {
+            $menu = $candidates[0];
+        }
+    }
 
     if (!$menu) {
-        // Create new menu
-        $menu_id = wp_create_nav_menu($menu_data['name']);
-        if (is_wp_error($menu_id)) {
+        // Create with a unique slug so the shared display name can repeat.
+        $desired_slug = !empty($menu_data['slug']) ? $menu_data['slug'] : sanitize_title($menu_data['name']);
+        $slug = wp_unique_term_slug(
+            $desired_slug,
+            (object) array('taxonomy' => 'nav_menu', 'parent' => 0)
+        );
+        $result = wp_insert_term($menu_data['name'], 'nav_menu', array('slug' => $slug));
+        if (is_wp_error($result)) {
             return array(
                 'success' => false,
-                'message' => 'Failed to create menu: ' . $menu_id->get_error_message()
+                'message' => 'Failed to create menu: ' . $result->get_error_message()
             );
         }
+        $menu_id = (int) $result['term_id'];
     } else {
         $menu_id = $menu->term_id;
 
@@ -280,7 +312,7 @@ function firefly_projects_handle_incoming_menu($request) {
     // Map menu_order to new item ID for parent resolution
     $order_to_id = array();
     $template_warnings = array();
-    $menu_template = !empty($menu_data['template']) ? $menu_data['template'] : '';
+    // $menu_template already resolved above.
 
     // First pass: create all menu items
     foreach ($items as $item) {
