@@ -26,9 +26,13 @@ if (!defined('ABSPATH')) {
  * Handles: src, href, url(), data-src, srcset, poster attributes
  *
  * @param string $content The post content
+ * @param bool   $include_page_assets When true, also detect already-materialized
+ *   /uploads/pages/<slug>/ inline assets. Export/sync needs these so a page whose
+ *   content was rewritten to page-asset URLs by a prior sync stays reference-complete;
+ *   the initial original->pages mapping pass wants originals only (default false).
  * @return array List of unique asset URLs found
  */
-function firefly_projects_detect_all_assets($content) {
+function firefly_projects_detect_all_assets($content, $include_page_assets = false) {
     $assets = array();
 
     // Common media file extensions
@@ -59,13 +63,13 @@ function firefly_projects_detect_all_assets($content) {
                 if (strpos($pattern, 'srcset') !== false) {
                     $srcset_urls = firefly_projects_parse_srcset($url);
                     foreach ($srcset_urls as $srcset_url) {
-                        $normalized = firefly_projects_normalize_asset_url($srcset_url);
+                        $normalized = firefly_projects_normalize_asset_url($srcset_url, $include_page_assets);
                         if ($normalized && !in_array($normalized, $assets)) {
                             $assets[] = $normalized;
                         }
                     }
                 } else {
-                    $normalized = firefly_projects_normalize_asset_url($url);
+                    $normalized = firefly_projects_normalize_asset_url($url, $include_page_assets);
                     if ($normalized && !in_array($normalized, $assets)) {
                         $assets[] = $normalized;
                     }
@@ -108,9 +112,12 @@ function firefly_projects_parse_srcset($srcset) {
  * Normalize asset URL (handle relative, absolute, CDN URLs)
  *
  * @param string $url The asset URL
+ * @param bool   $include_page_assets When false (initial mapping) skip
+ *   already-materialized /uploads/pages/ URLs — we want originals only. When true
+ *   (export/sync) keep them so the transfer stays reference-complete.
  * @return string|false Normalized URL or false if invalid
  */
-function firefly_projects_normalize_asset_url($url) {
+function firefly_projects_normalize_asset_url($url, $include_page_assets = false) {
     $url = trim($url);
 
     // Skip empty, data URIs, or anchors
@@ -118,9 +125,11 @@ function firefly_projects_normalize_asset_url($url) {
         return false;
     }
 
-    // Skip page-specific asset URLs when detecting for initial mapping
-    // (we want original URLs only)
-    if (strpos($url, '/uploads/pages/') !== false) {
+    // Skip page-specific asset URLs only when detecting for initial mapping
+    // (we want original URLs only). Export/sync passes $include_page_assets=true
+    // so inline assets already living under /uploads/pages/<slug>/ travel too —
+    // otherwise a re-sync of already-rewritten content drops every inline image.
+    if (!$include_page_assets && strpos($url, '/uploads/pages/') !== false) {
         return false;
     }
 
