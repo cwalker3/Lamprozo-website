@@ -902,6 +902,19 @@ function firefly_projects_handle_incoming_page($request) {
         define( 'FIREFLY_PROJECTS_SYNCING_INBOUND', true );
     }
 
+    // TRUE SYNC: store post_content byte-for-byte, exactly as authored on the
+    // source (local). The receiver runs with no logged-in user (shared-secret
+    // auth), so WordPress registers KSES on `content_save_pre` and
+    // wp_insert/update_post would silently run safecss_filter_attr() over the
+    // content — dropping any inline CSS property not on its allowlist (e.g.
+    // `margin-inline`, which vanished from a synced hosting-care paragraph).
+    // The content originates from a trusted admin-authored environment and the
+    // endpoint is shared-secret authenticated, so we remove the KSES save
+    // filters for this request. kses_init_filters() is re-registered on
+    // shutdown so nothing else in the process is left unfiltered.
+    kses_remove_filters();
+    add_action( 'shutdown', 'kses_init_filters' );
+
     // Get content type to determine how data was sent
     $content_type = $request->get_content_type();
 
