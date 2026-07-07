@@ -78,6 +78,7 @@ foreach ($box as $mon) {
         'nickname'  => $mon['nickname'] ?? null,
         'fragCount' => (int) ($mon['kills'] ?? 0),
         'met'       => $mon['met']     ?? '',
+        'level'     => $mon['level']   ?? '',
         'nature'    => $mon['nature']  ?? '',
         'ability'   => $mon['ability'] ?? '',
         'alive'     => (bool) ($mon['alive'] ?? false),
@@ -186,6 +187,7 @@ usort($fragsheet_dead,  fn($a, $b) => $b['fragCount'] - $a['fragCount']);
                     $ivs     = $mon['ivs'] ?? [];
                     $iv_str  = implode('/', array_map(fn($k) => $ivs[$k] ?? '?', ['hp','at','df','sa','sd','sp']));
                     $tooltip = json_encode([
+                        'level'   => $mon['level'],
                         'nature'  => $mon['nature'],
                         'ability' => $mon['ability'],
                         'met'     => $mon['met'],
@@ -226,6 +228,7 @@ usort($fragsheet_dead,  fn($a, $b) => $b['fragCount'] - $a['fragCount']);
 <?php if (!defined('LAMPROZO_MON_TOOLTIP_RENDERED')): define('LAMPROZO_MON_TOOLTIP_RENDERED', true); ?>
 <div id="mon-tooltip" class="mon-tooltip" style="display:none">
     <div class="mon-tooltip__name"></div>
+    <div class="mon-tooltip__level"></div>
     <div class="mon-tooltip__nature"></div>
     <div class="mon-tooltip__ability"></div>
     <div class="mon-tooltip__met"></div>
@@ -243,6 +246,7 @@ function lamprozoShowMonTooltip(el) {
     const data = JSON.parse(el.dataset.mon || '{}');
     const tip  = document.getElementById('mon-tooltip');
     tip.querySelector('.mon-tooltip__name').textContent    = el.querySelector('.frag-mon__name')?.textContent || '';
+    tip.querySelector('.mon-tooltip__level').textContent   = data.level ? 'Lv. ' + data.level : '';
     tip.querySelector('.mon-tooltip__nature').textContent  = data.nature  || '';
     tip.querySelector('.mon-tooltip__ability').textContent = data.ability || '';
     tip.querySelector('.mon-tooltip__met').textContent     = data.met ? 'Caught: ' + data.met : '';

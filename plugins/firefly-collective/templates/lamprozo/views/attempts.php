@@ -69,7 +69,11 @@ if (function_exists('lamprozo_get_challenges_data')) {
 .vod-chip button:hover { color:#d63638; }
 .vod-add-att { font-size:0.82em; padding:2px 4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
 .box-grid { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
-.box-mon { display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
+.box-mon { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:4px 6px; border:1px solid #eee; border-radius:4px; background:#fafafa; }
+.box-mon__meta { flex:1 0 100%; font-size:0.78em; color:#666; padding:1px 2px 0 46px; }
+.box-mon__meta b { color:#444; font-weight:600; }
+.box-mon__meta .iv-max { color:#1e7e34; font-weight:700; }
+.box-mon__meta .iv-zero { color:#c0392b; font-weight:700; }
 .box-mon--dead { opacity:0.65; background:#f7eaea; }
 .box-mon__sprite { width:40px; height:40px; image-rendering:pixelated; object-fit:contain; flex-shrink:0; }
 .box-mon__species { width:130px; }
@@ -118,6 +122,25 @@ if (function_exists('lamprozo_get_challenges_data')) {
     function statusLabel(s) { return s === 'failed' ? 'Wiped' : s === 'completed' ? 'Completed' : 'Ongoing'; }
     function statusColor(s) { return s === 'ongoing' ? '#00a32a' : s === 'failed' ? '#d63638' : '#9146ff'; }
 
+    // Read-only line under a box mon showing the enrichment imported from Showdown
+    // (level, nature, ability, IVs). Omitted entirely when none of it is present.
+    function boxMonMeta(m) {
+        const parts = [];
+        if (m.level)   parts.push('<b>Lv ' + esc(m.level) + '</b>');
+        if (m.nature)  parts.push(esc(m.nature));
+        if (m.ability) parts.push(esc(m.ability));
+        if (m.ivs && Object.keys(m.ivs).length) {
+            const iv = ['hp','at','df','sa','sd','sp'].map(k => {
+                const v = m.ivs[k];
+                if (v == null) return '<span>–</span>';
+                const cls = v === 31 ? ' class="iv-max"' : v === 0 ? ' class="iv-zero"' : '';
+                return '<span' + cls + '>' + v + '</span>';
+            }).join('/');
+            parts.push('IVs ' + iv);
+        }
+        return parts.length ? `<div class="box-mon__meta">${parts.join(' · ')}</div>` : '';
+    }
+
     function renderCard(attempt, i) {
         const isOpen = openCards.has(i) || attempt.status === 'ongoing';
         const notes  = attempt.notes || '';
@@ -143,6 +166,7 @@ if (function_exists('lamprozo_get_challenges_data')) {
                     onchange="updateBoxMon(${i},${bi},'kills',this.value)">
                 <button class="button button-small" onclick="toggleBoxAlive(${i},${bi})">${m.alive === false ? '💀 Dead' : 'Alive'}</button>
                 <button class="button button-small button-link-delete" onclick="removeBoxMon(${i},${bi})">✕</button>
+                ${boxMonMeta(m)}
             </div>`).join('');
 
         return `<div class="attempt-card">
@@ -186,10 +210,14 @@ if (function_exists('lamprozo_get_challenges_data')) {
                             <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpBadges(${i},1)">+</button>
                         </div>
                     </div>`}
-                    <div class="attempt-field" style="min-width:90px;max-width:120px">
+                    <div class="attempt-field" style="flex:0 0 auto;min-width:0">
                         <label>Deaths</label>
-                        <input type="text" placeholder="auto: ${deadCount}" value="${esc(deaths)}"
-                            onchange="saveMeta(${i},'deaths',this.value)">
+                        <div style="display:flex;gap:4px;align-items:center">
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpDeaths(${i},-1)">&minus;</button>
+                            <input type="text" id="deaths-input-${i}" placeholder="auto: ${deadCount}" value="${esc(deaths)}" style="width:56px;flex:0 0 56px;text-align:center"
+                                onchange="saveMeta(${i},'deaths',this.value)">
+                            <button type="button" class="button button-small" style="min-width:28px;padding:0 8px" onclick="bumpDeaths(${i},1)">+</button>
+                        </div>
                     </div>
                 </div>
                 <div class="attempt-card__row">
@@ -405,6 +433,22 @@ if (function_exists('lamprozo_get_challenges_data')) {
         const el = document.getElementById('badges-input-' + i);
         if (el) el.value = next;
         saveMeta(i, 'badges', String(next));
+    };
+
+    // Deaths can be a manual override or auto-derived from the box's dead count.
+    // Bumping starts from whichever is currently in effect and writes the result
+    // as a manual override (so it sticks even as the box changes).
+    window.bumpDeaths = (i, delta) => {
+        const box  = attempts[i].box || [];
+        const auto = box.filter(m => m.alive === false).length;
+        const raw  = attempts[i].deaths;
+        const cur  = (raw !== '' && raw != null)
+            ? parseInt((String(raw).match(/\d+/) || ['0'])[0], 10)
+            : auto;
+        const next = Math.max(0, cur + delta);
+        const el = document.getElementById('deaths-input-' + i);
+        if (el) el.value = next;
+        saveMeta(i, 'deaths', String(next));
     };
 
     // Advance/retreat the attempt's fight pointer; the cap + badge count follow it.
