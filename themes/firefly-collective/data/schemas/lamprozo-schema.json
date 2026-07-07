@@ -32,6 +32,13 @@
             "menu_order": 0
         },
         {
+            "slug": "y-nouveau",
+            "title": "Y Nouveau",
+            "snippet": "y-nouveau.html",
+            "in_menu": false,
+            "menu_order": 0
+        },
+        {
             "slug": "home",
             "title": "Home",
             "snippet": "home.html",
