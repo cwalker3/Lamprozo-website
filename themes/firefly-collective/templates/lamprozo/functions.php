@@ -18,6 +18,7 @@ $models = array(
     'view',
     'pages',
     'nav',
+    'sitemap',
 );
 
 foreach ($models as $model) {
