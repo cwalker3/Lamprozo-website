@@ -128,7 +128,7 @@ function badgeSelect(slug, current) {
 }
 
 function layoutSelect(slug, current) {
-    const opts = [['gba','GBA (1 screen)'],['ds','DS (2 screens)']]
+    const opts = [['gba','GBA (1 screen)'],['ds','DS (2 screens)'],['3ds','3DS (2 screens)']]
         .map(([v,l]) => `<option value="${v}"${v===(current||'gba')?' selected':''}>${l}</option>`).join('');
     return `<select onchange="updateField('${esc(slug)}','layout',this.value)">${opts}</select>`;
 }

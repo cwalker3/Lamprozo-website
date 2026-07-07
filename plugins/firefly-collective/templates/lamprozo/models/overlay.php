@@ -824,8 +824,10 @@ function lamprozo_render_layout_page() {
     // Layout mode: ?mode= override, else the active challenge's layout, else gba.
     // Region positions are [left, top, width, height] in % of the 16:9 canvas.
     // gba screen is 3:2; DS screens are 4:3 (width% = 0.75 * height%).
+    // Region positions are [left, top, width, height] in % of the 16:9 canvas;
+    // for a screen of pixel aspect R (= w:h), width% = R * height% * 0.5625.
     $mode = isset($_GET['mode']) ? sanitize_key($_GET['mode']) : ($overlay['layout'] ?? 'gba');
-    if (!in_array($mode, ['gba', 'ds'], true)) { $mode = 'gba'; }
+    if (!in_array($mode, ['gba', 'ds', '3ds'], true)) { $mode = 'gba'; }
     if ($mode === 'ds') {
         // Even gaps: 3.7% (left) + 57% + 3.7% (center) + 32% + 3.7% (right) = 100%.
         $regions = [
@@ -835,20 +837,39 @@ function lamprozo_render_layout_page() {
             'bottom' => [64.4, 53.5, 32.0, 42.5],   // bottom screen (4:3)
             'status' => [3.7,  81.5, 57.0, 14.5],
         ];
-    } else {
+    } elseif ($mode === '3ds') {
+        // 3DS: top screen is 400x240 (5:3), bottom is 320x240 (4:3). Column gaps
+        // are tightened (2% margins) so the right sidebar can be wide enough for
+        // the bottom screen (4:3) to line its bottom edge up with the status bar
+        // at y=96 — without shrinking the top screen. Sidebar stacks webcam, chat,
+        // then the bottom screen (same order as the DS layout).
         $regions = [
-            'game'   => [3.45, 7.8,  62.6, 74.2],   // GBA screen (3:2)
-            'cam'    => [70.0, 7.8,  28.0, 29.9],
-            'chat'   => [70.0, 46.5, 28.0, 45.5],
-            'status' => [3.45, 84.0, 62.6, 14.0],
+            'game'   => [2.0,  3.0,  67.0, 71.5],   // top screen (5:3)
+            'cam'    => [71.0, 3.0,  27.0, 27.0],   // webcam (16:9)
+            'chat'   => [71.0, 33.0, 27.0, 24.0],   // chat (middle)
+            'bottom' => [71.0, 60.0, 27.0, 36.0],   // bottom screen (4:3), ends at y=96
+            'status' => [2.0,  77.0, 67.0, 19.0],
+        ];
+    } else {
+        // GBA: single 3:2 screen. Tight 2% margins + small gaps so the game
+        // screen is as large as possible. The sidebar (webcam + chat) is centered
+        // against the game's height with even 4% gaps above the webcam, between
+        // the two, and below the chat (staggered, not flush to the game edges).
+        $regions = [
+            'game'   => [2.0,  2.5,  67.0, 79.4],   // GBA screen (3:2)
+            'cam'    => [70.5, 6.5,  28.0, 29.9],   // webcam
+            'chat'   => [70.5, 40.4, 28.0, 37.5],   // chat
+            'status' => [2.0,  84.0, 67.0, 14.0],
         ];
     }
     $pos = function ($r) {
         return sprintf('left:%s%%;top:%s%%;width:%s%%;height:%s%%;', $r[0], $r[1], $r[2], $r[3]);
     };
-    // Transparent holes for OBS captures: the game screen(s) + webcam.
+    // Transparent holes for OBS captures: the game screen(s) + webcam. The DS
+    // and 3DS layouts add a second hole for the bottom screen.
+    $has_bottom = in_array($mode, ['ds', '3ds'], true);
     $holes = [$regions['game'], $regions['cam']];
-    if ($mode === 'ds') { $holes[] = $regions['bottom']; }
+    if ($has_bottom) { $holes[] = $regions['bottom']; }
 
     header('Content-Type: text/html; charset=utf-8');
     nocache_headers();
@@ -877,6 +898,15 @@ function lamprozo_render_layout_page() {
     body {
       background: transparent; overflow: hidden;
       font-family: "Inter", "Segoe UI", Arial, sans-serif; color: var(--text);
+    }
+    /* The whole layout lives in a centered 16:9 box. Region positions are %s of
+       this box (never the raw viewport), so aspect ratios stay correct and the
+       canvas holes stay aligned no matter what size the browser source is. */
+    #frame {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 100vw; height: 56.25vw;          /* 16:9 */
+      max-height: 100vh; max-width: 177.78vh;  /* letterbox to fit any viewport */
+      overflow: hidden;
     }
     #bg { position: absolute; inset: 0; z-index: 0; }
     .stage { position: absolute; inset: 0; z-index: 1; }
@@ -956,6 +986,7 @@ function lamprozo_render_layout_page() {
   </style>
 </head>
 <body>
+  <div id="frame">
   <canvas id="bg"></canvas>
   <div class="stage">
     <div class="region" style="<?php echo $pos($regions['game']); ?>"></div>
@@ -966,7 +997,7 @@ function lamprozo_render_layout_page() {
       <div class="chat" id="chat"></div>
     </div>
 
-    <?php if ($mode === 'ds'): ?>
+    <?php if ($has_bottom): ?>
     <div class="region" style="<?php echo $pos($regions['bottom']); ?>"></div>
     <?php endif; ?>
 
@@ -987,6 +1018,7 @@ function lamprozo_render_layout_page() {
       </div>
     </div>
   </div>
+  </div>
 
   <script>
     // ── Background theme (per active game) ─────────────────────────────────────
@@ -1000,7 +1032,10 @@ function lamprozo_render_layout_page() {
     // BEHIND this browser source show through.
     var bgCanvas = document.getElementById('bg');
     var bgCtx    = bgCanvas.getContext('2d');
-    function bgResize() { bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight; }
+    var bgFrame  = document.getElementById('frame');
+    // Size the canvas to the 16:9 frame (not the raw window) so hole coordinates
+    // line up with the region frames and stay square regardless of viewport size.
+    function bgResize() { bgCanvas.width = bgFrame.clientWidth; bgCanvas.height = bgFrame.clientHeight; }
     bgResize(); window.addEventListener('resize', bgResize);
 
     var HOLES = <?php echo wp_json_encode(array_map(function ($r) { return ['x' => $r[0], 'y' => $r[1], 'w' => $r[2], 'h' => $r[3]]; }, $holes)); ?>;
