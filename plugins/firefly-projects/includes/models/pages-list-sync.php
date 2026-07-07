@@ -12,20 +12,28 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Sync all published pages to remote site
+ * Sync all published pages/posts to remote site
  *
  * @param string $sync_mode 'safe' or 'mirror'
  * @param string $target_env 'dev' or 'prod'
+ * @param string $post_type 'page' or 'post' — the REST layer has passed this
+ *                          all along; the handler previously ignored it and
+ *                          hardcoded 'page', so a bulk sync launched from the
+ *                          Posts list silently synced pages instead.
  * @return array Results array with counts and errors
  */
-function firefly_projects_sync_all_pages_handler($sync_mode, $target_env) {
+function firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type = 'page') {
     // Load the page sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 
-    // Get all published pages for the active template
+    if (!in_array($post_type, array('page', 'post'), true)) {
+        $post_type = 'page';
+    }
+
+    // Get all published pages/posts for the active template
     $active_template = firefly_get_scoping_template();
     $pages = get_posts(array(
-        'post_type'      => 'page',
+        'post_type'      => $post_type,
         'post_status'    => 'publish',
         'numberposts'    => -1,
         'orderby'        => 'menu_order',
@@ -71,9 +79,9 @@ function firefly_projects_sync_all_pages_handler($sync_mode, $target_env) {
         }
     }
 
-    // Mirror mode: delete remote pages not on local
+    // Mirror mode: delete remote pages/posts not on local
     if ($sync_mode === 'mirror') {
-        $delete_result = firefly_projects_delete_remote_orphans($local_page_ids, $target_env);
+        $delete_result = firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $post_type);
         $results['deleted'] = $delete_result['deleted'];
         if (!empty($delete_result['deleted_pages'])) {
             $results['deleted_pages'] = $delete_result['deleted_pages'];
@@ -90,11 +98,15 @@ function firefly_projects_sync_all_pages_handler($sync_mode, $target_env) {
  * @param string $target_env Target environment
  * @return array Result with deleted count and page list
  */
-function firefly_projects_delete_remote_orphans($local_page_ids, $target_env) {
+function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $post_type = 'page') {
     $result = array(
         'deleted'       => 0,
         'deleted_pages' => array()
     );
+
+    if (!in_array($post_type, array('page', 'post'), true)) {
+        $post_type = 'page';
+    }
 
     // Get remote endpoint based on target environment
     $endpoint = ($target_env === 'prod') ? PROD_ENDPOINT : LIVE_DEV_ENDPOINT;
@@ -105,8 +117,10 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env) {
     }
     $base_url = $matches[1];
 
-    // Fetch remote pages list
-    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages', array(
+    // Fetch remote list for the SAME post type being synced. Without this,
+    // a posts mirror compared local POST ids against remote PAGE ids — every
+    // page of the template looked orphaned and got deleted.
+    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages?post_type=' . rawurlencode($post_type), array(
         'headers' => array('X-Firefly-Secret' => FIREFLY_SHARED_SECRET),
         'timeout' => 30
     ));
@@ -158,7 +172,10 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env) {
             'Content-Type'     => 'application/json',
             'X-Firefly-Secret' => FIREFLY_SHARED_SECRET
         ),
-        'body'    => json_encode(array('firefly_page_ids' => array_values($orphan_page_ids))),
+        'body'    => json_encode(array(
+            'firefly_page_ids' => array_values($orphan_page_ids),
+            'post_type'        => $post_type,
+        )),
         'timeout' => 60
     ));
 
@@ -182,11 +199,15 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env) {
  * @param string $target_env Target environment
  * @return int Number of pages that would be deleted
  */
-function firefly_projects_get_orphan_count($target_env) {
-    // Get local page IDs (firefly_page_id meta) for active template
+function firefly_projects_get_orphan_count($target_env, $post_type = 'page') {
+    if (!in_array($post_type, array('page', 'post'), true)) {
+        $post_type = 'page';
+    }
+
+    // Get local page/post IDs (firefly_page_id meta) for active template
     $active_template = firefly_get_scoping_template();
     $pages = get_posts(array(
-        'post_type'      => 'page',
+        'post_type'      => $post_type,
         'post_status'    => 'publish',
         'numberposts'    => -1,
         'fields'         => 'ids',
@@ -216,8 +237,8 @@ function firefly_projects_get_orphan_count($target_env) {
     }
     $base_url = $matches[1];
 
-    // Fetch remote pages
-    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages', array(
+    // Fetch remote list for the same post type (see delete_remote_orphans)
+    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages?post_type=' . rawurlencode($post_type), array(
         'headers' => array('X-Firefly-Secret' => FIREFLY_SHARED_SECRET),
         'timeout' => 30
     ));
@@ -334,6 +355,10 @@ function firefly_projects_list_pages_handler($request) {
 function firefly_projects_delete_pages_handler($request) {
     $firefly_page_ids = $request->get_param('firefly_page_ids');
     $slugs = $request->get_param('slugs');
+    $post_type = $request->get_param('post_type');
+    if (!in_array($post_type, array('page', 'post'), true)) {
+        $post_type = 'page';
+    }
 
     $deleted = 0;
     $deleted_pages = array();
@@ -342,7 +367,7 @@ function firefly_projects_delete_pages_handler($request) {
     if (is_array($firefly_page_ids) && !empty($firefly_page_ids)) {
         foreach ($firefly_page_ids as $fpid) {
             $posts = get_posts(array(
-                'post_type'            => 'page',
+                'post_type'            => $post_type,
                 'post_status'          => 'any',
                 'numberposts'          => 1,
                 'meta_key'             => '_firefly_page_id',
@@ -380,7 +405,7 @@ function firefly_projects_delete_pages_handler($request) {
     }
 
     foreach ($slugs as $slug) {
-        $page = get_page_by_path($slug);
+        $page = get_page_by_path($slug, OBJECT, $post_type);
         if ($page) {
             $title = $page->post_title;
             $result = wp_delete_post($page->ID, true);

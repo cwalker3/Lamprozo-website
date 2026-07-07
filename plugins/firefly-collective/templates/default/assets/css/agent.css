@@ -116,6 +116,19 @@
 
 /* ============================================================
    Layout (sidebar + main)
+   ============================================================
+   Desktop: viewport-locked app shell. Both columns fill the
+   available viewport height (minus WP admin chrome above the
+   plugin wrap), each scrolls internally. Net effect: the
+   composer naturally sits at the bottom of the viewport and the
+   sidebar stays in view as the user moves around inside it —
+   no page-level scroll for the chat workspace.
+
+   The 110px chrome offset = admin bar (32px) + wp-admin content
+   top padding (~20px) + the .firefly-agent-header block above the
+   layout (~48px) + a small breathing-room cushion. Tuned visually
+   on dev.fireflycreative.io; if WP changes admin chrome heights
+   this value is the one to adjust.
    ============================================================ */
 .firefly-agent .firefly-agent-layout {
     display: grid;
@@ -123,6 +136,12 @@
     gap: 16px;
     align-items: stretch;
     min-height: calc(100vh - 200px);
+}
+@media (min-width: 783px) {
+    .firefly-agent .firefly-agent-layout {
+        height: calc(100dvh - 110px);
+        min-height: 0;
+    }
 }
 
 /* Sidebar */
@@ -166,6 +185,18 @@
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+}
+/* Infinite-loader sentinel inserted at the bottom of the session list
+   when more sessions exist than have been rendered yet. The
+   IntersectionObserver in agent.js targets this element; once it
+   intersects the list viewport, the next batch is appended and the
+   sentinel hops to the new end. */
+.firefly-agent .firefly-agent-list-sentinel {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--firefly-agent-text-muted);
+    text-align: center;
+    font-style: italic;
 }
 .firefly-agent .firefly-agent-item {
     display: block;

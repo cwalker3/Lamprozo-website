@@ -356,50 +356,125 @@
         else showEmptyState('Start a conversation', 'Click + New chat above to create your first session.');
     }
 
+    // Initial render batch size + the increment when the user scrolls
+    // near the bottom of the sidebar. Picked so that even on tall
+    // 1440p monitors the first batch overfills the viewport (so the
+    // user sees a normal list, not a half-empty one), but keeps the
+    // initial DOM tree small enough for snappy mount even with 500+
+    // sessions cached. Tuning lever — bump if power users complain.
+    const SESSIONS_BATCH = 30;
+    // IntersectionObserver instance for the bottom-sentinel. Held on
+    // the module scope so successive renders can disconnect the prior
+    // one cleanly (the sentinel <li> gets replaced on each batch).
+    let sessionsObserver = null;
+
+    function buildSessionLi(s) {
+        const isActive = Number(s.id) === Number(state.activeSessionId);
+        const title = escapeHtml(s.label || 'Untitled');
+        const meta  = escapeHtml(s.modified ? fmtDate(s.modified) : '');
+        return ''
+            + `<li class="firefly-agent-item${isActive ? ' is-active' : ''}" data-id="${s.id}">`
+            +   '<div class="firefly-agent-item-row">'
+            +     `<a class="firefly-agent-item-link" href="#" data-id="${s.id}">`
+            +       `<span class="firefly-agent-item-title">${title}</span>`
+            +       `<span class="firefly-agent-item-meta">${meta}</span>`
+            +     '</a>'
+            +     `<button type="button" class="firefly-agent-item-delete" data-id="${s.id}" `
+            +       `aria-label="Delete this chat" title="Delete this chat">`
+            +       '<span class="dashicons dashicons-trash" aria-hidden="true"></span>'
+            +     '</button>'
+            +   '</div>'
+            + '</li>';
+    }
+
+    /**
+     * Wire row-click and delete-button handlers across a set of <li>s.
+     * Idempotent — used by both the initial render and each appended batch.
+     */
+    function wireSessionRows(rows) {
+        rows.forEach((li) => {
+            const link = li.querySelector('.firefly-agent-item-link');
+            const del  = li.querySelector('.firefly-agent-item-delete');
+            if (link) link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const id = Number(link.getAttribute('data-id'));
+                if (id) openSession(id);
+            });
+            if (del) del.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const id = Number(del.getAttribute('data-id'));
+                if (id) confirmAndDeleteSession(id);
+            });
+        });
+    }
+
+    /**
+     * Append the next batch of session rows + manage the bottom
+     * sentinel. The sentinel <li> auto-removes once everything is
+     * rendered, otherwise stays at the end as the IntersectionObserver
+     * target — once it scrolls into view the next batch loads, the
+     * sentinel is moved back to the new end, and observation resumes.
+     */
+    function appendNextSessionsBatch() {
+        if (!els.list) return;
+        const total = state.sessions.length;
+        const start = state.sessionsRenderedCount || 0;
+        if (start >= total) return;
+        const end = Math.min(start + SESSIONS_BATCH, total);
+
+        // Remove the prior sentinel (if any) — we always re-add it at the
+        // new end so the observer keeps pointing at the actual bottom.
+        const oldSentinel = els.list.querySelector('.firefly-agent-list-sentinel');
+        if (oldSentinel) oldSentinel.remove();
+
+        const html = state.sessions.slice(start, end).map(buildSessionLi).join('');
+        els.list.insertAdjacentHTML('beforeend', html);
+
+        // Bind handlers for just the newly-inserted rows (avoids
+        // re-binding earlier batches and triggering listener leaks).
+        const newRows = Array.from(els.list.children).slice(-(end - start));
+        wireSessionRows(newRows);
+
+        state.sessionsRenderedCount = end;
+
+        // More to render? Put a sentinel at the new end and observe it.
+        if (end < total) {
+            const sentinel = document.createElement('li');
+            sentinel.className = 'firefly-agent-list-sentinel';
+            sentinel.setAttribute('aria-hidden', 'true');
+            sentinel.textContent = 'Loading more…';
+            els.list.appendChild(sentinel);
+            if (sessionsObserver) sessionsObserver.disconnect();
+            sessionsObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting) {
+                        appendNextSessionsBatch();
+                        break;
+                    }
+                }
+            }, { root: els.list, rootMargin: '100px' });
+            sessionsObserver.observe(sentinel);
+        } else if (sessionsObserver) {
+            // Fully rendered — release the observer.
+            sessionsObserver.disconnect();
+            sessionsObserver = null;
+        }
+    }
+
     function renderSessionList() {
         if (!els.list) return;
+        // Clean slate for any in-flight observer + DOM from a prior render.
+        if (sessionsObserver) { sessionsObserver.disconnect(); sessionsObserver = null; }
+        state.sessionsRenderedCount = 0;
         if (!state.sessions.length) {
             els.list.innerHTML = '<li class="firefly-capture-empty">No chats yet.</li>';
             if (els.count) els.count.textContent = '';
             return;
         }
         if (els.count) els.count.textContent = String(state.sessions.length);
-        const parts = state.sessions.map((s) => {
-            const isActive = Number(s.id) === Number(state.activeSessionId);
-            const title = escapeHtml(s.label || 'Untitled');
-            const meta  = escapeHtml(s.modified ? fmtDate(s.modified) : '');
-            return ''
-                + `<li class="firefly-agent-item${isActive ? ' is-active' : ''}" data-id="${s.id}">`
-                +   '<div class="firefly-agent-item-row">'
-                +     `<a class="firefly-agent-item-link" href="#" data-id="${s.id}">`
-                +       `<span class="firefly-agent-item-title">${title}</span>`
-                +       `<span class="firefly-agent-item-meta">${meta}</span>`
-                +     '</a>'
-                +     `<button type="button" class="firefly-agent-item-delete" data-id="${s.id}" `
-                +       `aria-label="Delete this chat" title="Delete this chat">`
-                +       '<span class="dashicons dashicons-trash" aria-hidden="true"></span>'
-                +     '</button>'
-                +   '</div>'
-                + '</li>';
-        });
-        els.list.innerHTML = parts.join('');
-        // Open session on row click
-        els.list.querySelectorAll('.firefly-agent-item-link').forEach((a) => {
-            a.addEventListener('click', (e) => {
-                e.preventDefault();
-                const id = Number(a.getAttribute('data-id'));
-                if (id) openSession(id);
-            });
-        });
-        // Delete on trash click — confirm modal, then cascade-delete.
-        els.list.querySelectorAll('.firefly-agent-item-delete').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const id = Number(btn.getAttribute('data-id'));
-                if (id) confirmAndDeleteSession(id);
-            });
-        });
+        els.list.innerHTML = '';
+        appendNextSessionsBatch();
     }
 
     // ===================================================================
@@ -556,7 +631,11 @@
         inst.fields.time.textContent = fmtDate(timestamp || new Date().toISOString());
         inst.fields.body.textContent = text;
         els.transcript.appendChild(inst.node);
-        scrollToBottom();
+        // User-send is a discrete event, not a streaming append — pass
+        // force=true so the smooth-scroll branch of scrollToBottom kicks
+        // in. The user just hit Enter; they should see their bubble
+        // glide into view, not snap.
+        scrollToBottom(true);
         return inst;
     }
 
@@ -2138,7 +2217,17 @@
     function scrollToBottom(force) {
         if (!els.transcript) return;
         if (force) state.cursorAtBottom = true;
-        els.transcript.scrollTop = els.transcript.scrollHeight;
+        // Smooth on discrete events (user just sent a message, session
+        // just loaded — force=true). Instant during streaming so the
+        // browser doesn't queue dozens of overlapping smooth-scroll
+        // animations as tokens arrive token-by-token — that mode wants
+        // the scrollTop to track the new bottom every frame, not to
+        // animate toward an already-stale target.
+        if (force) {
+            els.transcript.scrollTo({ top: els.transcript.scrollHeight, behavior: 'smooth' });
+        } else {
+            els.transcript.scrollTop = els.transcript.scrollHeight;
+        }
     }
 
     function onTranscriptScroll() {

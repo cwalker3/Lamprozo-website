@@ -1099,6 +1099,17 @@
     width: 16px; height: 16px; font-size: 16px; line-height: 1;
 }
 .firefly-capture-pane[hidden] { display: none; }
+/* The rec/doc entry + detail surfaces all set display:flex on their base
+   class rules below. A class selector (0,1,0) ties with the UA stylesheet
+   [hidden] {display:none} (0,1,0) declaration order, but our class rule
+   wins because it's defined later — so element.hidden = true silently
+   stops working on those surfaces. The compound attribute selector here
+   has specificity (0,2,0), beating the base class and restoring the
+   expected hide behavior. */
+.firefly-capture-rec-entry[hidden],
+.firefly-capture-rec-detail[hidden],
+.firefly-capture-doc-entry[hidden],
+.firefly-capture-doc-detail[hidden] { display: none; }
 /* Active pane fills the main column so the notes textarea and
    recording/document scrollable areas can grow into the available
    viewport height (especially important on mobile). */
@@ -1122,6 +1133,16 @@
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 10px;
     margin: 8px 0 16px;
+}
+/* When viewing a loaded recording's detail (`#firefly-capture-rec-detail`
+   is no longer [hidden]), the share-audio / room-audio / start-muted
+   toggles are about the NEXT recording — they don't apply to the one the
+   user is viewing. Hide them so the detail view stays focused on the
+   transcript / summary / playback. Same idea for documents below. The
+   :has() selector ships in Chrome 105+ / Safari 15.4+ / Firefox 121+,
+   which covers every browser the Capture admin supports. */
+.firefly-capture-pane-recordings:has(#firefly-capture-rec-detail:not([hidden])) .firefly-capture-rec-toggles {
+    display: none;
 }
 .firefly-capture-rec-toggle {
     display: grid;
@@ -2078,4 +2099,63 @@
 .firefly-capture-session-btn .dashicons-arrow-down-alt2 {
     margin-left: -2px;
     opacity: 0.55;
+}
+
+/* ===================================================================
+   Recovery banner — surfaced on Capture init when IndexedDB holds
+   chunks from a previous recording whose upload didn't finish.
+   Sits above the Record button so the user sees it before starting
+   a new recording (and accidentally orphaning the recoverable one).
+   Uses the amber accent + soft cream surface that matches the rest
+   of the firefly Capture chrome — recognizable as an action prompt
+   without looking like an error.
+   =================================================================== */
+.ffrec-recovery-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin: 16px 0;
+    padding: 14px 16px;
+    background: var(--firefly-capture-accent-soft);
+    border: 1px solid var(--firefly-capture-accent);
+    border-left: 4px solid var(--firefly-capture-accent-strong);
+    border-radius: 8px;
+    box-shadow: var(--firefly-capture-shadow);
+    color: var(--firefly-capture-accent-text);
+    font-size: 14px;
+    line-height: 1.45;
+}
+.ffrec-recovery-msg {
+    flex: 1 1 320px;
+    min-width: 0;
+}
+.ffrec-recovery-msg strong {
+    color: #1d2327;
+    margin-right: 4px;
+}
+.ffrec-recovery-duration {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #1d2327;
+}
+.ffrec-recovery-actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+.ffrec-recovery-actions .button-primary {
+    background: var(--firefly-capture-accent-strong);
+    border-color: var(--firefly-capture-accent-strong);
+    color: #1d2327;
+}
+.ffrec-recovery-actions .button-primary:hover {
+    background: var(--firefly-capture-accent);
+    border-color: var(--firefly-capture-accent-strong);
+    color: #1d2327;
+}
+.ffrec-recovery-actions .button-primary:disabled {
+    opacity: 0.65;
+    cursor: progress;
 }

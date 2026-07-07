@@ -359,11 +359,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="org-logo">Logo URL</label>
-                            <input type="url" id="org-logo" v-model="config.organization.logo" placeholder="https://fireflycreative.co/wp-content/uploads/logo.png">
+                            <input type="url" id="org-logo" v-model="config.organization.logo" placeholder="https://yourbusiness.com/logo.png">
                         </div>
                         <div class="geo-field">
                             <label for="org-image">OG Image URL</label>
-                            <input type="url" id="org-image" v-model="config.organization.image" placeholder="https://fireflycreative.co/wp-content/uploads/og-image.png">
+                            <input type="url" id="org-image" v-model="config.organization.image" placeholder="https://yourbusiness.com/og-image.png">
                             <p class="description">Social sharing image (1200x630px recommended)</p>
                         </div>
                     </div>
@@ -377,11 +377,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="loc-city">City</label>
-                            <input type="text" id="loc-city" v-model="config.location.city" placeholder="Redding">
+                            <input type="text" id="loc-city" v-model="config.location.city" placeholder="City">
                         </div>
                         <div class="geo-field">
                             <label for="loc-state">State / Province</label>
-                            <input type="text" id="loc-state" v-model="config.location.state" placeholder="California">
+                            <input type="text" id="loc-state" v-model="config.location.state" placeholder="State / Province">
                         </div>
                     </div>
                     <div class="geo-field-row">
@@ -410,11 +410,11 @@ if (!current_user_can('manage_options')) {
                     <div class="geo-field-row">
                         <div class="geo-field">
                             <label for="contact-email">Email Address</label>
-                            <input type="email" id="contact-email" v-model="config.contact.email" placeholder="info@fireflycreative.co">
+                            <input type="email" id="contact-email" v-model="config.contact.email" placeholder="info@yourbusiness.com">
                         </div>
                         <div class="geo-field">
                             <label for="contact-phone">Phone Number</label>
-                            <input type="tel" id="contact-phone" v-model="config.contact.phone" placeholder="+1 (530) 555-0123">
+                            <input type="tel" id="contact-phone" v-model="config.contact.phone" placeholder="+1 (555) 123-4567">
                             <p class="description">Include country code for international format</p>
                         </div>
                     </div>
@@ -438,11 +438,11 @@ if (!current_user_can('manage_options')) {
                             <div class="geo-field-row">
                                 <div class="geo-field">
                                     <label>Full Name</label>
-                                    <input type="text" v-model="founder.name" placeholder="Alex Strait">
+                                    <input type="text" v-model="founder.name" placeholder="Full name">
                                 </div>
                                 <div class="geo-field">
                                     <label>Job Title</label>
-                                    <input type="text" v-model="founder.jobTitle" placeholder="Co-Founder & Lead Developer">
+                                    <input type="text" v-model="founder.jobTitle" placeholder="Job title">
                                 </div>
                             </div>
                             <div class="geo-field">
@@ -489,11 +489,11 @@ if (!current_user_can('manage_options')) {
                             </div>
                             <div class="geo-field">
                                 <label>Service Name</label>
-                                <input type="text" v-model="service.name" placeholder="Custom WordPress Development">
+                                <input type="text" v-model="service.name" placeholder="Service name">
                             </div>
                             <div class="geo-field">
                                 <label>Description</label>
-                                <textarea v-model="service.description" rows="2" placeholder="Bespoke WordPress themes and plugins built from scratch"></textarea>
+                                <textarea v-model="service.description" rows="2" placeholder="What this service includes"></textarea>
                             </div>
                         </div>
                     </div>

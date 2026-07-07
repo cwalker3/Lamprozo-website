@@ -225,6 +225,25 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                     </label>
                 </div>
 
+                <!-- ===== Recovery banner =====
+                     Surfaces when the previous recording's upload didn't
+                     finish (tunnel down, network blip, crash). The actual
+                     audio chunks live in IndexedDB (firefly_capture_recordings/
+                     chunks); the recovery JS stitches them back into a Blob
+                     and retries the /audio/upload bridge. Hidden by default;
+                     maybeShowRecoveryBanner() reveals it on Capture init. -->
+                <div id="ffrec-recovery-banner" class="ffrec-recovery-banner" style="display:none;" role="status" aria-live="polite">
+                    <div class="ffrec-recovery-msg">
+                        <strong>Unfinished recording found</strong>
+                        (<span class="ffrec-recovery-duration">00:00:00</span>).
+                        Your last upload didn&rsquo;t finish &mdash; your audio is still safe.
+                    </div>
+                    <div class="ffrec-recovery-actions">
+                        <button type="button" id="ffrec-recovery-resume" class="button button-primary">Resume upload</button>
+                        <button type="button" id="ffrec-recovery-discard" class="button">Discard</button>
+                    </div>
+                </div>
+
                 <div class="firefly-capture-rec-entry" id="firefly-capture-rec-entry">
                     <button
                         type="button"
@@ -246,7 +265,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                     <div class="firefly-capture-rec-detail-head">
                         <span class="firefly-capture-rec-detail-status" id="firefly-capture-rec-detail-status">ready</span>
                         <div class="firefly-capture-rec-detail-actions">
-                            <button type="button" class="button" id="firefly-capture-rec-back" title="Back to new recording">← Back</button>
+                            <button type="button" class="button" id="firefly-capture-rec-back" title="Start a new recording">← New recording</button>
                             <button type="button" class="button button-primary" id="firefly-capture-rec-reprocess" title="Reprocess this recording">Reprocess</button>
                         </div>
                     </div>

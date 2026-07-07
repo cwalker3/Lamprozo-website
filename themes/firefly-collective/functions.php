@@ -38,7 +38,49 @@
         $post_type = get_post_type() ?: '';
         ?>
         <script>
-        (function(){if(navigator.sendBeacon){navigator.sendBeacon('/wp-json/firefly-collective/v1/hit',JSON.stringify({p:location.pathname,t:document.title,r:document.referrer,i:<?php echo $post_id; ?>,y:'<?php echo esc_js($post_type); ?>',tp:'<?php echo esc_js($template); ?>'}));}})();
+        (function(){
+            if(!navigator.sendBeacon) return;
+            var REST='/wp-json/firefly-collective/v1/';
+            function uuid(){
+                if(window.crypto&&crypto.randomUUID){try{return crypto.randomUUID();}catch(e){}}
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+                    var r=Math.random()*16|0,v=c=='x'?r:(r&0x3|0x8);return v.toString(16);
+                });
+            }
+            // Visit id: persists across in-tab navigations (sessionStorage,
+            // cleared on tab close). is-entry = first pageview of the visit.
+            var VK='ffa_vid',vid='',isEntry=0;
+            try{vid=sessionStorage.getItem(VK);if(!vid){vid=uuid();sessionStorage.setItem(VK,vid);isEntry=1;}}
+            catch(e){vid=uuid();isEntry=1;}
+            var eid=uuid();
+            var q;try{q=new URLSearchParams(location.search);}catch(e){q=null;}
+            function utm(k){try{return (q&&q.get(k))||'';}catch(e){return '';}}
+            navigator.sendBeacon(REST+'hit',JSON.stringify({
+                p:location.pathname,t:document.title,r:document.referrer,
+                i:<?php echo $post_id; ?>,y:'<?php echo esc_js($post_type); ?>',tp:'<?php echo esc_js($template); ?>',
+                vs:vid,ev:eid,e:isEntry,sw:(window.screen&&screen.width)||0,
+                us:utm('utm_source'),um:utm('utm_medium'),uc:utm('utm_campaign')
+            }));
+            // Engagement: dwell time + max scroll depth, flushed when the
+            // page is hidden / unloaded. Server keeps the high-water mark.
+            var start=Date.now(),maxScroll=0;
+            function pct(){
+                var de=document.documentElement,bd=document.body;
+                var full=Math.max(de.scrollHeight,bd?bd.scrollHeight:0)-window.innerHeight;
+                if(full<=0) return 100;
+                return Math.min(100,Math.round((window.scrollY/full)*100));
+            }
+            window.addEventListener('scroll',function(){var p=pct();if(p>maxScroll)maxScroll=p;},{passive:true});
+            var lastSent=-1;
+            function flush(){
+                var d=Math.round((Date.now()-start)/1000);
+                // Skip a redundant flush if nothing changed since the last one.
+                if(d===lastSent) return; lastSent=d;
+                try{navigator.sendBeacon(REST+'engagement',JSON.stringify({ev:eid,d:d,sd:maxScroll}));}catch(e){}
+            }
+            document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flush();});
+            window.addEventListener('pagehide',flush);
+        })();
         </script>
         <?php
     }, 999);

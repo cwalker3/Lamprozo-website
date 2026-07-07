@@ -1793,8 +1793,11 @@ function firefly_projects_export_page($request) {
     // Load asset mapping functions
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/asset-mapping.php';
 
-    // Detect assets in content
-    $assets = firefly_projects_detect_all_assets($post->post_content);
+    // Detect assets in content. Pass true so already-materialized
+    // /uploads/pages/<slug>/ inline assets (from a prior sync) are packaged too —
+    // otherwise the pull drops every inline image and per-page icon, leaving 404s
+    // on the receiver while media-library originals + featured images survive.
+    $assets = firefly_projects_detect_all_assets($post->post_content, true);
 
     // Package asset data with base64 content
     $asset_data = array();

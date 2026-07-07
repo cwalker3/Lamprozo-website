@@ -794,13 +794,19 @@ function firefly_geo_indexability_hints( $robots ) {
 add_filter('document_title_parts', 'firefly_geo_title_parts');
 
 function firefly_geo_title_parts($title) {
+    // A per-page SEO title (set via the per-page SEO panel) replaces the whole
+    // <title>. Otherwise fall through to WordPress' default parts (front page =
+    // site name + tagline; singular = post title + site name).
+    $pid = 0;
     if (is_front_page()) {
-        $config = firefly_geo_get_config();
-        $org = $config['organization'];
-        if (!empty($org['tagline'])) {
-            $title['tagline'] = $org['tagline'];
-        } elseif (!empty($config['location']['city']) && !empty($config['location']['stateCode'])) {
-            $title['tagline'] = $config['location']['city'] . ', ' . $config['location']['stateCode'];
+        $pid = (int) get_option('page_on_front');
+    } elseif (is_singular()) {
+        $pid = get_queried_object_id();
+    }
+    if ($pid) {
+        $override = get_post_meta($pid, '_seo_title', true);
+        if (!empty($override)) {
+            return array('title' => $override);
         }
     }
     return $title;

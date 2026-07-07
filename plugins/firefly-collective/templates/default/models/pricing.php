@@ -22,10 +22,16 @@
 
                 // Enqueue CSS & JS
                 wp_enqueue_style('pricing-css', $plugin_path . $template_name . '/assets/css/pricing.css', array(), $unique_id);
+
+                // Vue 3 global build (classic script) loaded before the ES
+                // module so window.Vue exists when pricing.js runs. Same build
+                // the Analytics + GEO admins use — one Vue version across admin.
+                wp_enqueue_script('vue-js', 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js', array(), '3', true);
+
                 wp_enqueue_script(
                     'pricing-js',
                     $plugin_path . $template_name . '/assets/js/pricing/pricing.js',
-                    array(),
+                    array('vue-js'),
                     $unique_id,
                     true
                 );

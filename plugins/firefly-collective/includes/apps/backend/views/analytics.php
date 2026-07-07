@@ -1,565 +1,347 @@
 <?php
 /**
- * Analytics Dashboard View
+ * Analytics Dashboard View — command center shell.
+ *
+ * Server-rendered wrapper: enqueues Vue 3 (CDN) + our bespoke SVG-charting
+ * app, localizes config (REST url + nonce + template list + currency), and
+ * holds the in-DOM Vue template. All logic + charts live in analytics.js;
+ * all styling in analytics.css (scoped under .ffa).
  */
 
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Enqueue Vue.js and our assets
-wp_enqueue_script('vue-js', 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js', array(), '3', true);
+wp_enqueue_script( 'vue-js', 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js', array(), '3', true );
 
-$js_file = plugin_dir_path(__FILE__) . '../assets/js/analytics.js';
-$css_file = plugin_dir_path(__FILE__) . '../assets/css/analytics.css';
+$js_file  = plugin_dir_path( __FILE__ ) . '../assets/js/analytics.js';
+$css_file = plugin_dir_path( __FILE__ ) . '../assets/css/analytics.css';
 
 wp_enqueue_script(
     'firefly-analytics',
-    plugin_dir_url(__FILE__) . '../assets/js/analytics.js',
-    array('vue-js'),
-    file_exists($js_file) ? filemtime($js_file) : '1.0.0',
+    plugin_dir_url( __FILE__ ) . '../assets/js/analytics.js',
+    array( 'vue-js' ),
+    file_exists( $js_file ) ? filemtime( $js_file ) : '2.0.0',
     true
 );
-
 wp_enqueue_style(
     'firefly-analytics',
-    plugin_dir_url(__FILE__) . '../assets/css/analytics.css',
+    plugin_dir_url( __FILE__ ) . '../assets/css/analytics.css',
     array(),
-    file_exists($css_file) ? filemtime($css_file) : '1.0.0'
+    file_exists( $css_file ) ? filemtime( $css_file ) : '2.0.0'
 );
 
-wp_localize_script('firefly-analytics', 'fireflyAnalytics', array(
-    'restUrl' => rest_url('firefly-collective/v1/analytics'),
-    'nonce' => wp_create_nonce('wp_rest'),
-    'adminUrl' => admin_url(),
-    'liveDevUrl' => defined('LIVE_DEV_URL') ? LIVE_DEV_URL : 'https://dev.fireflycreative.io',
-    'prodUrl' => defined('PROD_URL') ? PROD_URL : 'https://fireflycreative.io'
-));
+// Template list for the site selector.
+$active_template = function_exists( 'firefly_collective_get_active_template' )
+    ? firefly_collective_get_active_template() : 'default';
+$template_ids = function_exists( 'firefly_get_valid_templates' )
+    ? firefly_get_valid_templates() : array( $active_template );
+$templates = array();
+foreach ( (array) $template_ids as $t ) {
+    $templates[] = array( 'id' => $t, 'label' => ucwords( str_replace( array( '-', '_' ), ' ', $t ) ) );
+}
+
+wp_localize_script( 'firefly-analytics', 'fireflyAnalytics', array(
+    'restUrl'         => rest_url( 'firefly-collective/v1/analytics' ),
+    'nonce'           => wp_create_nonce( 'wp_rest' ),
+    'adminUrl'        => admin_url(),
+    'activeTemplate'  => $active_template,
+    'templates'       => $templates,
+    'currency'        => '$',
+    'isDev'           => defined( 'FIREFLY_DEV' ) && FIREFLY_DEV,
+    'trackLocal'      => (bool) get_option( 'firefly_analytics_track_local', false ),
+    'liveDevUrl'      => defined( 'LIVE_DEV_URL' ) ? LIVE_DEV_URL : 'https://dev.fireflycreative.io',
+    'prodUrl'         => defined( 'PROD_URL' ) ? PROD_URL : 'https://fireflycreative.io',
+) );
 ?>
 
-<div class="wrap">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h1>Analytics</h1>
-            <?php
-            $template = function_exists('firefly_collective_get_active_template')
-                ? firefly_collective_get_active_template()
-                : 'firefly';
-            $track_local = get_option('firefly_analytics_track_local', false);
-            $is_local = defined('FIREFLY_DEV') && FIREFLY_DEV;
-            ?>
-            <p style="margin: 0; color: #646970;">
-                Template: <strong><?php echo esc_html($template); ?></strong>
-                <?php if ($is_local): ?>
-                    <span style="margin-left: 10px; padding: 2px 8px; background: #f0f0f1; border-radius: 3px; font-size: 12px;">LOCAL</span>
-                <?php endif; ?>
-            </p>
-        </div>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <?php if ($is_local): ?>
-                <label style="display: flex; align-items: center; gap: 8px; margin: 0;">
-                    <input type="checkbox" id="analytics-track-local" <?php checked($track_local); ?>>
-                    <span>Track on Local</span>
-                </label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <span style="margin: 0; font-size: 13px;">Pull from:</span>
-                    <?php
-                    $live_dev_url = defined('LIVE_DEV_URL') ? LIVE_DEV_URL : 'https://dev.fireflycreative.io';
-                    $prod_url = defined('PROD_URL') ? PROD_URL : 'https://fireflycreative.io';
-                    ?>
-                    <div class="analytics-source-toggle" style="display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid #2271b1;">
-                        <button class="source-toggle-btn active" data-source="<?php echo esc_attr($live_dev_url); ?>" style="padding: 6px 14px; border: none; background: #2271b1; color: white; cursor: pointer; font-size: 13px; transition: all 0.2s;">
-                            Live Dev
-                        </button>
-                        <button class="source-toggle-btn" data-source="<?php echo esc_attr($prod_url); ?>" style="padding: 6px 14px; border: none; background: white; color: #2271b1; cursor: pointer; font-size: 13px; transition: all 0.2s;">
-                            Production
-                        </button>
-                    </div>
-                    <button id="analytics-pull-btn" class="button button-primary">Pull Data</button>
-                </div>
-            <?php endif; ?>
-            <button id="analytics-reset-btn" class="button button-secondary" style="color: #b32d2e;">Reset All Data</button>
-        </div>
-    </div>
+<div id="ffa-app" class="ffa" v-cloak>
 
-    <div id="firefly-analytics-app" v-cloak>
-        <!-- Overview Cards -->
-        <div class="analytics-overview">
-            <div class="analytics-card">
-                <h3>Today</h3>
-                <div class="analytics-stat">
-                    <span class="stat-value">{{ overview.today.views }}</span>
-                    <span class="stat-label">views</span>
-                </div>
-                <div class="analytics-stat secondary">
-                    <span class="stat-value">{{ overview.today.unique }}</span>
-                    <span class="stat-label">unique</span>
-                </div>
+    <!-- Boot loader -->
+    <div v-if="booting" class="ffa-boot"><span class="ffa-spinner"></span> Loading analytics…</div>
+
+    <template v-else>
+
+        <!-- ===== Top bar ===== -->
+        <div class="ffa-topbar ffa-fade">
+            <div class="ffa-title">
+                <h1>Analytics</h1>
+                <span class="ffa-sub" v-if="templates.length <= 1">{{ template }}</span>
             </div>
-            <div class="analytics-card">
-                <h3>Last 7 Days</h3>
-                <div class="analytics-stat">
-                    <span class="stat-value">{{ overview.week.views }}</span>
-                    <span class="stat-label">views</span>
-                </div>
-                <div class="analytics-stat secondary">
-                    <span class="stat-value">{{ overview.week.unique }}</span>
-                    <span class="stat-label">unique</span>
-                </div>
+
+            <label v-if="templates.length > 1" class="ffa-control">
+                <span class="dashicons dashicons-screenoptions" style="font-size:15px;width:15px;height:15px"></span>
+                <select :value="template" @change="setTemplate">
+                    <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.label }}</option>
+                </select>
+            </label>
+
+            <div class="ffa-seg">
+                <button v-for="r in ranges" :key="r.id" :class="{'is-active': range===r.id}" @click="setRange(r.id)">{{ r.label }}</button>
             </div>
-            <div class="analytics-card">
-                <h3>Last 30 Days</h3>
-                <div class="analytics-stat">
-                    <span class="stat-value">{{ overview.month.views }}</span>
-                    <span class="stat-label">views</span>
-                </div>
-                <div class="analytics-stat secondary">
-                    <span class="stat-value">{{ overview.month.unique }}</span>
-                    <span class="stat-label">unique</span>
+
+            <button class="ffa-control" :class="{'is-on': compare}" @click="toggleCompare">
+                <span class="dashicons dashicons-image-rotate" style="font-size:14px;width:14px;height:14px"></span>
+                Compare
+            </button>
+
+            <span class="ffa-live"><span class="ffa-dot"></span>{{ realtime.online }} online</span>
+
+            <!-- Manage menu (local only): track-local toggle, pull-from-remote, reset -->
+            <div class="ffa-menu-wrap" v-if="cfg.isDev">
+                <button class="ffa-control" :class="{'is-on': showSettings}" @click="showSettings = !showSettings" aria-label="Manage analytics data">
+                    <span class="dashicons dashicons-admin-generic" style="font-size:15px;width:15px;height:15px"></span>
+                    Manage
+                </button>
+                <div v-if="showSettings" class="ffa-menu-backdrop" @click="showSettings = false"></div>
+                <div v-if="showSettings" class="ffa-menu">
+                    <template v-if="cfg.isDev">
+                        <h4>Local environment</h4>
+                        <div class="ffa-menu-row">
+                            <span>Track data on local</span>
+                            <button class="ffa-switch" :class="{'is-on': trackLocal}" @click="toggleTrackLocal" role="switch" :aria-checked="trackLocal"><span class="ffa-switch-knob"></span></button>
+                        </div>
+                        <div class="ffa-menu-sep"></div>
+                        <h4>Pull from remote</h4>
+                        <div class="ffa-menu-row">
+                            <div class="ffa-seg ffa-seg-sm">
+                                <button :class="{'is-active': pullSource==='dev'}" @click="pullSource='dev'">Live Dev</button>
+                                <button :class="{'is-active': pullSource==='prod'}" @click="pullSource='prod'">Production</button>
+                            </div>
+                            <button class="ffa-btn ffa-btn-primary" style="padding:6px 12px" @click="modal='pull'; showSettings=false">Pull</button>
+                        </div>
+                        <div class="ffa-menu-sep"></div>
+                    </template>
+                    <button class="ffa-menu-danger" @click="modal='reset'; showSettings=false">
+                        <span class="dashicons dashicons-trash" style="font-size:15px;width:15px;height:15px;vertical-align:text-bottom"></span>
+                        Reset all analytics data
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Chart -->
-        <div class="analytics-section">
-            <h2>Views Over Time</h2>
-            <div class="analytics-chart">
-                <div class="chart-bars">
-                    <div 
-                        v-for="(day, index) in chartData" 
-                        :key="index"
-                        class="chart-bar-container"
-                        :title="day.date + ': ' + day.views + ' views'"
-                    >
-                        <div 
-                            class="chart-bar" 
-                            :style="{ height: getBarHeight(day.views) + '%' }"
-                        ></div>
-                        <span class="chart-label" v-if="index % 5 === 0">{{ formatDate(day.date) }}</span>
-                    </div>
+        <!-- ===== KPI tiles ===== -->
+        <div class="ffa-kpis ffa-fade">
+            <div v-for="tile in kpiTiles" :key="tile.id" class="ffa-kpi" :class="{'is-active': metric===tile.metric}"
+                 @click="setMetric(tile.metric)" @keydown.enter="setMetric(tile.metric)" @keydown.space.prevent="setMetric(tile.metric)"
+                 tabindex="0" role="button" :aria-pressed="metric===tile.metric" :aria-label="tile.label">
+                <div class="ffa-kpi-label">{{ tile.label }}</div>
+                <div class="ffa-kpi-value">{{ tileValue(tile) }}</div>
+                <div class="ffa-kpi-foot">
+                    <span class="ffa-delta" :class="deltaClass(tile)">{{ deltaText(tile) }}</span>
+                    <spark-line :data="sparkSeries" :color="metric===tile.metric ? '#d99b2c' : '#c4c9d2'"></spark-line>
                 </div>
             </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="analytics-tabs">
-            <button
-                :class="{ active: activeTab === 'pages' }"
-                @click="activeTab = 'pages'; loadData('pages')"
-            >Top Pages</button>
-            <button
-                :class="{ active: activeTab === 'posts' }"
-                @click="activeTab = 'posts'; loadData('posts')"
-            >Blog Posts</button>
-            <button
-                :class="{ active: activeTab === 'referrers' }"
-                @click="activeTab = 'referrers'; loadData('referrers')"
-            >Referrers</button>
-            <button
-                :class="{ active: activeTab === 'links' }"
-                @click="activeTab = 'links'; loadData('links')"
-            >Tracked Links</button>
-            <button
-                :class="{ active: activeTab === 'admin' }"
-                @click="activeTab = 'admin'; loadData('admin')"
-            >Admin Activity</button>
+        <!-- ===== Hero timeseries ===== -->
+        <div class="ffa-card ffa-fade">
+            <div class="ffa-card-head">
+                <h2>{{ metricLabel().charAt(0).toUpperCase() + metricLabel().slice(1) }} over time</h2>
+                <div class="ffa-spacer"></div>
+                <div class="ffa-tabs">
+                    <button v-for="m in metrics" :key="m.id" :class="{'is-active': metric===m.id}" @click="setMetric(m.id)">{{ m.label }}</button>
+                </div>
+            </div>
+            <area-chart :series="ts.series" :previous="ts.previous" :granularity="ts.granularity" :label="metricLabel()"></area-chart>
         </div>
 
-        <!-- Date Range -->
-        <div class="analytics-controls">
-            <select v-model="days" @change="loadAllData()">
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-            </select>
-        </div>
-
-        <!-- Data Tables -->
-        <div class="analytics-section" v-if="activeTab === 'pages'">
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>Page</th>
-                        <th width="100">Views</th>
-                        <th width="100">Unique</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="page in pages" :key="page.page_path">
-                        <td>
-                            <strong>{{ page.page_title || page.page_path }}</strong>
-                            <br><small>{{ page.page_path }}</small>
-                        </td>
-                        <td>{{ page.views }}</td>
-                        <td>{{ page.unique_visits }}</td>
-                    </tr>
-                    <tr v-if="pages.length === 0">
-                        <td colspan="3">No data yet</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="analytics-section" v-if="activeTab === 'posts'">
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>Blog Post</th>
-                        <th width="100">Views</th>
-                        <th width="100">Unique</th>
-                        <th width="80">Edit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="post in posts" :key="post.page_path">
-                        <td>
-                            <strong>{{ post.page_title || post.page_path }}</strong>
-                            <br><small>{{ post.page_path }}</small>
-                        </td>
-                        <td>{{ post.views }}</td>
-                        <td>{{ post.unique_visits }}</td>
-                        <td>
-                            <a v-if="post.post_id" :href="adminUrl + 'post.php?post=' + post.post_id + '&action=edit'" target="_blank">Edit</a>
-                        </td>
-                    </tr>
-                    <tr v-if="posts.length === 0">
-                        <td colspan="4">No blog post data yet</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="analytics-section" v-if="activeTab === 'referrers'">
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>Referrer</th>
-                        <th width="100">Visits</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="ref in referrers" :key="ref.domain">
-                        <td>{{ ref.domain }}</td>
-                        <td>{{ ref.visits }}</td>
-                    </tr>
-                    <tr v-if="referrers.length === 0">
-                        <td colspan="2">No referrer data yet</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="analytics-section" v-if="activeTab === 'links'">
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>Link URL</th>
-                        <th width="250">Post/Page</th>
-                        <th width="100">Total Clicks</th>
-                        <th width="100">Unique Clicks</th>
-                        <th width="120">Last Clicked</th>
-                        <th width="80">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="link in trackedLinks" :key="link.id">
-                        <td>
-                            <a :href="link.link_url" target="_blank" rel="noopener noreferrer" style="word-break: break-all;">
-                                {{ link.link_text || link.link_url }}
-                            </a>
-                        </td>
-                        <td>
-                            <a :href="adminUrl + 'post.php?post=' + link.post_id + '&action=edit'" target="_blank">
-                                {{ link.post_title }}
-                            </a>
-                            <span style="color: #666; font-size: 12px;"> ({{ link.post_type }})</span>
-                        </td>
-                        <td>{{ link.total_clicks }}</td>
-                        <td>{{ link.unique_clicks }}</td>
-                        <td>
-                            <span v-if="link.last_click">{{ formatDateTime(link.last_click) }}</span>
-                            <span v-else style="color: #999;">Never</span>
-                        </td>
-                        <td>
-                            <button
-                                v-if="link.total_clicks > 0"
-                                @click="showDeleteClickModal(link)"
-                                class="button button-small"
-                                style="padding: 2px 8px; font-size: 12px;"
-                                :disabled="link.deleting"
-                            >
-                                {{ link.deleting ? 'Deleting...' : 'Delete Last' }}
-                            </button>
-                        </td>
-                    </tr>
-                    <tr v-if="trackedLinks.length === 0">
-                        <td colspan="6">
-                            No tracked links yet. Enable tracking on links in the Gutenberg editor to see click data here.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="analytics-section" v-if="activeTab === 'admin'">
-            <div class="analytics-overview" style="margin-bottom: 20px;">
-                <div class="analytics-card">
-                    <h3>Login Page Views</h3>
-                    <div class="analytics-stat">
-                        <span class="stat-value">{{ adminActivity.login_views }}</span>
-                        <span class="stat-label">views</span>
-                    </div>
-                    <div class="analytics-stat secondary">
-                        <span class="stat-value">{{ adminActivity.login_unique }}</span>
-                        <span class="stat-label">unique</span>
+        <!-- ===== Breakdown grid: Sources + Pages ===== -->
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Sources</h2>
+                    <div class="ffa-spacer"></div>
+                    <div class="ffa-tabs">
+                        <button :class="{'is-active': sourcesDim==='channels'}" @click="setSourcesDim('channels')">Channels</button>
+                        <button :class="{'is-active': sourcesDim==='referrers'}" @click="setSourcesDim('referrers')">Referrers</button>
+                        <button :class="{'is-active': sourcesDim==='utm_source'}" @click="setSourcesDim('utm_source')">UTM source</button>
+                        <button :class="{'is-active': sourcesDim==='utm_campaign'}" @click="setSourcesDim('utm_campaign')">Campaign</button>
                     </div>
                 </div>
-                <div class="analytics-card">
-                    <h3>Successful Logins</h3>
-                    <div class="analytics-stat">
-                        <span class="stat-value">{{ adminActivity.logins.length }}</span>
-                        <span class="stat-label">logins</span>
+                <ranked-bars :rows="sources" :loading="loading.sources" val-key="views" val2-key="visitors"></ranked-bars>
+            </div>
+
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Pages</h2>
+                    <div class="ffa-spacer"></div>
+                    <div class="ffa-tabs">
+                        <button :class="{'is-active': pagesDim==='top'}" @click="setPagesDim('top')">Top</button>
+                        <button :class="{'is-active': pagesDim==='entry'}" @click="setPagesDim('entry')">Entry</button>
+                        <button :class="{'is-active': pagesDim==='exit'}" @click="setPagesDim('exit')">Exit</button>
                     </div>
                 </div>
-            </div>
-            <h3>Login History</h3>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th width="200">Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="login in adminActivity.logins" :key="login.created_at">
-                        <td><strong>{{ login.username }}</strong></td>
-                        <td>{{ formatDateTime(login.created_at) }}</td>
-                    </tr>
-                    <tr v-if="adminActivity.logins.length === 0">
-                        <td colspan="2">No login activity yet</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="loading" class="analytics-loading">Loading...</div>
-    </div>
-
-    <!-- Pull Data Confirmation Modal -->
-    <div id="pull-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h2>Confirm Pull</h2>
-                <button class="modal-close" onclick="closePullModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="modal-warning">
-                    <span class="warning-icon">⚠️</span>
-                    <strong>Replace local analytics data?</strong>
-                </div>
-                <div class="modal-details">
-                    <p><strong>Source:</strong> <span id="pull-source-name"></span></p>
-                    <p class="modal-description">
-                        This will download analytics data from the selected environment and replace all local analytics data.
-                        Your current local data will be lost. This action cannot be undone.
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="closePullModal()" class="modal-button modal-button-cancel">Cancel</button>
-                <button onclick="confirmPull()" class="modal-button modal-button-confirm modal-button-primary">Pull Data</button>
+                <ranked-bars :rows="pages" :loading="loading.pages" val-key="views" val2-key="visitors"></ranked-bars>
             </div>
         </div>
-    </div>
 
-    <!-- Reset Confirmation Modal -->
-    <div id="reset-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h2>Confirm Reset</h2>
-                <button class="modal-close" onclick="closeResetModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="modal-warning">
-                    <span class="warning-icon">⚠️</span>
-                    <strong>Delete ALL analytics data?</strong>
+        <!-- ===== Breakdown grid: Devices + Locations ===== -->
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Devices &amp; tech</h2>
+                    <div class="ffa-spacer"></div>
+                    <div class="ffa-tabs">
+                        <button :class="{'is-active': devicesDim==='device'}" @click="setDevicesDim('device')">Device</button>
+                        <button :class="{'is-active': devicesDim==='browser'}" @click="setDevicesDim('browser')">Browser</button>
+                        <button :class="{'is-active': devicesDim==='os'}" @click="setDevicesDim('os')">OS</button>
+                        <button :class="{'is-active': devicesDim==='screen'}" @click="setDevicesDim('screen')">Screen</button>
+                    </div>
                 </div>
-                <div class="modal-details">
-                    <p class="modal-description">
-                        This will permanently delete all analytics data from the database.
-                        All page views, statistics, and historical data will be lost.
-                        This action cannot be undone.
-                    </p>
-                </div>
+                <donut v-if="devicesDim==='device'" :slices="deviceSlices()" :total="deviceTotal()"></donut>
+                <ranked-bars v-else :rows="devices" :loading="loading.devices" val-key="views" val2-key="visitors"></ranked-bars>
             </div>
-            <div class="modal-footer">
-                <button onclick="closeResetModal()" class="modal-button modal-button-cancel">Cancel</button>
-                <button onclick="confirmReset()" class="modal-button modal-button-confirm modal-button-danger">Delete All Data</button>
+
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Locations</h2></div>
+                <ranked-bars :rows="countries" :loading="loading.countries" :is-flag="true" val-key="views" val2-key="visitors"></ranked-bars>
             </div>
         </div>
-    </div>
 
-    <!-- Delete Click Confirmation Modal -->
-    <div id="delete-click-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h2>Delete Click</h2>
-                <button class="modal-close" onclick="closeDeleteClickModal()">&times;</button>
+        <!-- ===== Engagement + Content ===== -->
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Scroll depth</h2></div>
+                <donut :slices="scrollSlices()" :total="scrollTotal()"></donut>
+                <div class="ffa-card-head" style="margin-top:18px"><h2>Top CTAs</h2></div>
+                <ranked-bars :rows="engagement.ctas" :loading="loading.engagement" label-key="label" val-key="clicks" val2-key="unique_clicks"></ranked-bars>
             </div>
-            <div class="modal-body">
-                <div class="modal-warning">
-                    <span class="warning-icon">⚠️</span>
-                    <strong>Delete most recent click?</strong>
-                </div>
-                <div class="modal-details">
-                    <p class="modal-description">
-                        This will delete the most recent click for this link and decrement the click count.
-                        This is useful for reversing accidental clicks.
-                    </p>
-                    <p style="margin-top: 10px;">
-                        <strong>Link:</strong> <a id="delete-click-link" href="#" target="_blank" style="word-break: break-all;"></a>
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="closeDeleteClickModal()" class="modal-button modal-button-cancel">Cancel</button>
-                <button id="delete-click-confirm-btn" onclick="confirmDeleteClick()" class="modal-button modal-button-confirm modal-button-danger">Delete Click</button>
+
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Blog posts</h2></div>
+                <ranked-bars :rows="posts" :loading="loading.posts" val-key="views" val2-key="visitors"></ranked-bars>
+                <div class="ffa-card-head" style="margin-top:18px"><h2>Avg time on page</h2></div>
+                <ranked-bars :rows="engagement.dwell" :loading="loading.engagement" val-key="avg_seconds" :val2-key="''" :fmt-val="dur"></ranked-bars>
             </div>
         </div>
-    </div>
+
+        <!-- ===== Realtime + Admin activity ===== -->
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Realtime</h2>
+                    <div class="ffa-spacer"></div>
+                    <div class="ffa-rt-head">
+                        <span class="ffa-rt-online">{{ realtime.online }}</span>
+                        <span class="ffa-rt-online-label">in the last 5 min</span>
+                    </div>
+                </div>
+                <div v-if="realtime.feed && realtime.feed.length" class="ffa-feed">
+                    <div v-for="(f,i) in realtime.feed" :key="i" class="ffa-feed-row">
+                        <span class="ffa-feed-path">{{ f.page_title || f.page_path }}</span>
+                        <span class="ffa-chip" v-if="f.device_type">{{ f.device_type }}</span>
+                        <span class="ffa-chip" v-if="f.country">{{ flag(f.country) }} {{ f.country }}</span>
+                        <span class="ffa-feed-meta">{{ relTime(f.created_at) }}</span>
+                    </div>
+                </div>
+                <div v-else class="ffa-empty">No visitors in the last 30 minutes</div>
+            </div>
+
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Admin activity</h2>
+                    <div class="ffa-spacer"></div>
+                    <span class="ffa-chip">{{ nfmt(admin.login_views) }} login views · {{ nfmt(admin.login_unique) }} unique</span>
+                </div>
+                <div v-if="admin.logins && admin.logins.length" class="ffa-feed">
+                    <div v-for="(l,i) in admin.logins" :key="i" class="ffa-feed-row">
+                        <span class="dashicons dashicons-admin-users" style="font-size:15px;width:15px;height:15px;color:var(--ffa-ink-3)"></span>
+                        <span class="ffa-feed-path">{{ l.username }}</span>
+                        <span class="ffa-chip">login</span>
+                        <span class="ffa-feed-meta">{{ relTime(l.created_at) }}</span>
+                    </div>
+                </div>
+                <div v-else class="ffa-empty">No admin logins in this range</div>
+            </div>
+        </div>
+
+        <!-- ===== Revenue / Conversions ===== -->
+        <div class="ffa-section-head ffa-fade">
+            <h2>Revenue &amp; conversions</h2>
+            <span class="ffa-chip">site-wide</span>
+            <span class="ffa-rule"></span>
+        </div>
+
+        <div class="ffa-kpis cols-4 ffa-fade">
+            <div v-for="tile in revTiles" :key="tile.id" class="ffa-kpi" style="cursor:default">
+                <div class="ffa-kpi-label">{{ tile.label }}</div>
+                <div class="ffa-kpi-value">{{ tileValue(tile) }}</div>
+                <div class="ffa-kpi-foot">
+                    <span class="ffa-delta" :class="deltaClass(tile)">{{ deltaText(tile) }}</span>
+                    <spark-line :data="revSparkSeries" color="#15a07a"></spark-line>
+                </div>
+            </div>
+        </div>
+
+        <div class="ffa-card ffa-fade">
+            <div class="ffa-card-head"><h2>Revenue over time</h2></div>
+            <area-chart :series="revenue.ts.series" :granularity="revenue.ts.granularity" label="revenue" :money="true"></area-chart>
+        </div>
+
+        <div class="ffa-grid ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Top products</h2></div>
+                <ranked-bars :rows="revenue.products" :loading="revLoading" label-key="label" val-key="revenue" val2-key="orders" :money="true"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Campaign attribution</h2></div>
+                <ranked-bars :rows="revenue.campaigns" :loading="revLoading" label-key="label" val-key="revenue" val2-key="orders" :money="true"></ranked-bars>
+            </div>
+        </div>
+
+        <div class="ffa-grid cols-3 ffa-fade">
+            <div class="ffa-card">
+                <div class="ffa-card-head">
+                    <h2>Bookings</h2>
+                    <div class="ffa-spacer"></div>
+                    <span class="ffa-chip">{{ nfmt(revenue.bookings.confirmed) }} confirmed</span>
+                </div>
+                <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.bookings.total) }}</span><span class="ffa-rt-online-label">requests</span></div>
+                <ranked-bars :rows="revenue.bookings.by_type" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Form submissions</h2></div>
+                <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.submissions.total) }}</span><span class="ffa-rt-online-label">submissions</span></div>
+                <ranked-bars :rows="revenue.submissions.by_form" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+            </div>
+            <div class="ffa-card">
+                <div class="ffa-card-head"><h2>Referrals</h2></div>
+                <template v-if="revenue.referrals.available">
+                    <div class="ffa-rt-head" style="margin-bottom:10px"><span class="ffa-rt-online">{{ nfmt(revenue.referrals.total) }}</span><span class="ffa-rt-online-label">referrals</span></div>
+                    <ranked-bars :rows="revenue.referrals.by_status" :loading="revLoading" val-key="views" :val2-key="''"></ranked-bars>
+                </template>
+                <div v-else class="ffa-empty">Referral program not installed on this site</div>
+            </div>
+        </div>
+
+        <!-- Pull confirm -->
+        <div v-if="modal==='pull'" class="ffa-modal-overlay" @click.self="modal=null">
+            <div class="ffa-modal">
+                <h3>Pull from {{ pullSource==='prod' ? 'Production' : 'Live Dev' }}?</h3>
+                <p>This replaces <strong>all local analytics, link-click, and admin-activity data</strong> with a copy fetched from
+                    <code>{{ pullSource==='prod' ? cfg.prodUrl : cfg.liveDevUrl }}</code>. Local-only data will be lost. This can't be undone.</p>
+                <div class="ffa-modal-actions">
+                    <button class="ffa-btn ffa-btn-ghost" @click="modal=null" :disabled="busy">Cancel</button>
+                    <button class="ffa-btn ffa-btn-primary" @click="confirmPull" :disabled="busy">{{ busy ? 'Pulling…' : 'Pull &amp; replace' }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset confirm -->
+        <div v-if="modal==='reset'" class="ffa-modal-overlay" @click.self="modal=null">
+            <div class="ffa-modal">
+                <h3>Reset all analytics data?</h3>
+                <p>This permanently deletes <strong>all</strong> pageview, engagement, link-click, and admin-activity records for every template. Tracked-link registrations are kept. This can't be undone.</p>
+                <div class="ffa-modal-actions">
+                    <button class="ffa-btn ffa-btn-ghost" @click="modal=null" :disabled="busy">Cancel</button>
+                    <button class="ffa-btn ffa-btn-danger" @click="confirmReset" :disabled="busy">{{ busy ? 'Resetting…' : 'Delete everything' }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast" class="ffa-toast" :class="{'is-error': toast.err}">{{ toast.msg }}</div>
+
+    </template>
 </div>
-
-<style>
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100000;
-}
-
-.modal-container {
-    background: white;
-    border-radius: 4px;
-    max-width: 500px;
-    width: 90%;
-    max-height: 90vh;
-    overflow: auto;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid #ddd;
-}
-
-.modal-header h2 {
-    margin: 0;
-    font-size: 18px;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 28px;
-    cursor: pointer;
-    color: #666;
-    line-height: 1;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-}
-
-.modal-close:hover {
-    color: #000;
-}
-
-.modal-body {
-    padding: 20px;
-}
-
-.modal-warning {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 15px;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: 4px;
-    margin-bottom: 15px;
-}
-
-.warning-icon {
-    font-size: 24px;
-}
-
-.modal-details {
-    color: #444;
-}
-
-.modal-details p {
-    margin: 10px 0;
-}
-
-.modal-description {
-    color: #666;
-    font-size: 14px;
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 20px;
-    border-top: 1px solid #ddd;
-}
-
-.modal-button {
-    padding: 8px 16px;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s;
-}
-
-.modal-button-cancel {
-    background: white;
-    color: #333;
-}
-
-.modal-button-cancel:hover {
-    background: #f5f5f5;
-}
-
-.modal-button-confirm {
-    color: white;
-}
-
-.modal-button-primary {
-    background: #2271b1;
-    border-color: #2271b1;
-}
-
-.modal-button-primary:hover {
-    background: #135e96;
-}
-
-.modal-button-danger {
-    background: #dc3545;
-    border-color: #dc3545;
-}
-
-.modal-button-danger:hover {
-    background: #c82333;
-}
-</style>

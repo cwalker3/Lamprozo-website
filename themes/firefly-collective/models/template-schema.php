@@ -744,6 +744,36 @@ function firefly_register_template_activation_endpoint() {
         'callback'            => 'firefly_handle_activate_template',
         'permission_callback' => 'firefly_cli_permission_check'
     ));
+
+    register_rest_route('firefly/v1', '/deactivate-template', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_deactivate_template',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
+
+    register_rest_route('firefly/v1', '/create-page', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_create_page',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
+
+    register_rest_route('firefly/v1', '/trash-page', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_trash_page',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
+
+    register_rest_route('firefly/v1', '/opcache-reset', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_opcache_reset',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
+
+    register_rest_route('firefly/v1', '/clear-cache', array(
+        'methods'             => 'POST',
+        'callback'            => 'firefly_handle_clear_cache',
+        'permission_callback' => 'firefly_cli_permission_check'
+    ));
 }
 
 /**
@@ -839,5 +869,217 @@ function firefly_handle_activate_template(WP_REST_Request $request) {
         'success' => true,
         'message' => "Template '{$template}' activated successfully",
         'created' => $result
+    ));
+}
+
+/**
+ * Handle template deactivation from CLI.
+ * Removes pages, posts, categories, menu, and per-template options.
+ */
+function firefly_handle_deactivate_template(WP_REST_Request $request) {
+    $template = sanitize_file_name($request->get_param('template'));
+    $switch_to = sanitize_file_name($request->get_param('switch_to'));
+
+    if (empty($template)) {
+        return new WP_Error('missing_template', 'Template name is required', array('status' => 400));
+    }
+
+    $result = array('template' => $template);
+
+    // Delete pages
+    $deleted_pages = firefly_delete_template_pages($template);
+    $result['pages_deleted'] = $deleted_pages;
+
+    // Delete posts scoped to this template
+    $posts = get_posts(array(
+        'post_type'      => 'post',
+        'posts_per_page' => -1,
+        'post_status'    => 'any',
+        'meta_query'     => array(
+            array(
+                'key'     => FIREFLY_TEMPLATE_META_KEY,
+                'value'   => $template,
+                'compare' => '='
+            )
+        ),
+        'firefly_skip_scoping' => true
+    ));
+    $deleted_posts = 0;
+    foreach ($posts as $post) {
+        if (wp_delete_post($post->ID, true)) {
+            $deleted_posts++;
+        }
+    }
+    $result['posts_deleted'] = $deleted_posts;
+
+    // Delete categories scoped to this template
+    $categories = get_terms(array(
+        'taxonomy'   => 'category',
+        'hide_empty' => false,
+        'meta_query' => array(
+            array(
+                'key'     => FIREFLY_TEMPLATE_META_KEY,
+                'value'   => $template,
+                'compare' => '='
+            )
+        )
+    ));
+    $deleted_cats = 0;
+    if (!is_wp_error($categories)) {
+        foreach ($categories as $cat) {
+            if (wp_delete_term($cat->term_id, 'category')) {
+                $deleted_cats++;
+            }
+        }
+    }
+    $result['categories_deleted'] = $deleted_cats;
+
+    // Delete menu
+    $menu_id = get_option("firefly_menu_{$template}", 0);
+    if ($menu_id && wp_get_nav_menu_object($menu_id)) {
+        wp_delete_nav_menu($menu_id);
+        delete_option("firefly_menu_{$template}");
+        $result['menu_deleted'] = true;
+    }
+
+    // Clean up per-template options
+    delete_option("firefly_front_page_{$template}");
+    delete_option("firefly_posts_page_{$template}");
+
+    // Switch to another template if requested or if this was active
+    $active = get_option('firefly_collective_active_template');
+    if ($active === $template) {
+        if (!empty($switch_to)) {
+            update_option('firefly_collective_active_template', $switch_to);
+            // Trigger activation of the new template
+            firefly_on_template_change($template, $switch_to);
+            $result['switched_to'] = $switch_to;
+        }
+    }
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'message' => "Template '{$template}' deactivated",
+        'result'  => $result
+    ));
+}
+
+/**
+ * Handle single page creation from CLI.
+ */
+function firefly_handle_create_page(WP_REST_Request $request) {
+    $slug     = sanitize_title($request->get_param('slug'));
+    $title    = sanitize_text_field($request->get_param('title'));
+    $content  = $request->get_param('content') ?: '';
+    $template = sanitize_file_name($request->get_param('template'));
+
+    if (empty($slug) || empty($title)) {
+        return new WP_Error('missing_params', 'slug and title are required', array('status' => 400));
+    }
+
+    // Check if page already exists for this template
+    $existing = get_posts(array(
+        'post_type'   => 'page',
+        'name'        => $slug,
+        'post_status' => 'publish',
+        'meta_key'    => '_firefly_template',
+        'meta_value'  => $template,
+        'numberposts' => 1
+    ));
+
+    if (!empty($existing)) {
+        return rest_ensure_response(array(
+            'success' => true,
+            'page_id' => $existing[0]->ID,
+            'message' => 'Page already exists'
+        ));
+    }
+
+    $page_id = wp_insert_post(array(
+        'post_title'   => $title,
+        'post_name'    => $slug,
+        'post_content' => $content,
+        'post_status'  => 'publish',
+        'post_type'    => 'page',
+    ));
+
+    if (is_wp_error($page_id)) {
+        return new WP_Error('create_failed', $page_id->get_error_message(), array('status' => 500));
+    }
+
+    update_post_meta($page_id, '_firefly_template', $template);
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'page_id' => $page_id
+    ));
+}
+
+/**
+ * Handle page trash from CLI.
+ */
+function firefly_handle_trash_page(WP_REST_Request $request) {
+    $slug     = sanitize_title($request->get_param('slug'));
+    $template = sanitize_file_name($request->get_param('template'));
+
+    if (empty($slug)) {
+        return new WP_Error('missing_params', 'slug is required', array('status' => 400));
+    }
+
+    $pages = get_posts(array(
+        'post_type'   => 'page',
+        'name'        => $slug,
+        'post_status' => array('publish', 'draft'),
+        'meta_key'    => '_firefly_template',
+        'meta_value'  => $template,
+        'numberposts' => 1
+    ));
+
+    if (empty($pages)) {
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => 'No matching page found'
+        ));
+    }
+
+    wp_trash_post($pages[0]->ID);
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'page_id' => $pages[0]->ID,
+        'message' => 'Page trashed'
+    ));
+}
+
+/**
+ * Handle PHP opcache reset from CLI.
+ */
+function firefly_handle_opcache_reset(WP_REST_Request $request) {
+    $reset = false;
+    if (function_exists('opcache_reset')) {
+        $reset = opcache_reset();
+    }
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'opcache_reset' => $reset
+    ));
+}
+
+/**
+ * Handle page cache clearing from CLI.
+ */
+function firefly_handle_clear_cache(WP_REST_Request $request) {
+    $template = sanitize_file_name($request->get_param('template'));
+
+    if (!empty($template) && function_exists('firefly_collective_cache_delete_template')) {
+        firefly_collective_cache_delete_template($template);
+    } elseif (function_exists('firefly_collective_cache_clear_all')) {
+        firefly_collective_cache_clear_all();
+    }
+
+    return rest_ensure_response(array(
+        'success' => true,
+        'message' => 'Cache cleared'
     ));
 }

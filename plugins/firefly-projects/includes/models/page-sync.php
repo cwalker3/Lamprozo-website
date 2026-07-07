@@ -538,6 +538,13 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
         'post_status'  => $post->post_status,
         'menu_order'   => $post->menu_order,
         'post_parent'  => $post->post_parent,
+        // Original publish date. Local is the source of truth for dates: the
+        // receiver applies this on BOTH create and update, so remote
+        // date-based permalinks (/2026/05/11/slug/) always mirror local.
+        // Operator contract: keep local dates correct (matching what prod
+        // has published) before syncing.
+        'post_date'     => $post->post_date,
+        'post_date_gmt' => $post->post_date_gmt,
     );
 
     // Check if this page has special WordPress roles (home page, posts page)
@@ -895,6 +902,19 @@ function firefly_projects_handle_incoming_page($request) {
         define( 'FIREFLY_PROJECTS_SYNCING_INBOUND', true );
     }
 
+    // TRUE SYNC: store post_content byte-for-byte, exactly as authored on the
+    // source (local). The receiver runs with no logged-in user (shared-secret
+    // auth), so WordPress registers KSES on `content_save_pre` and
+    // wp_insert/update_post would silently run safecss_filter_attr() over the
+    // content — dropping any inline CSS property not on its allowlist (e.g.
+    // `margin-inline`, which vanished from a synced hosting-care paragraph).
+    // The content originates from a trusted admin-authored environment and the
+    // endpoint is shared-secret authenticated, so we remove the KSES save
+    // filters for this request. kses_init_filters() is re-registered on
+    // shutdown so nothing else in the process is left unfiltered.
+    kses_remove_filters();
+    add_action( 'shutdown', 'kses_init_filters' );
+
     // Get content type to determine how data was sent
     $content_type = $request->get_content_type();
 
@@ -1002,13 +1022,30 @@ function firefly_projects_handle_incoming_page($request) {
     // string "u003c" on the live site.
     $wp_post_data = wp_slash($wp_post_data);
 
+    // LOCAL IS THE SOURCE OF TRUTH FOR DATES. Apply the sender's publish
+    // date on BOTH create and update, so remote date-based permalinks
+    // (/2026/05/11/slug/) always mirror local. Without this, a remote copy
+    // created by `firefly import` (which stamps "now") kept its wrong date
+    // forever and broke shared links; re-syncing now repairs it. The
+    // operator's contract: keep local dates correct (matching what prod has
+    // published) before syncing. Old senders that don't ship post_date leave
+    // the remote date untouched.
+    if (!empty($post_data['post_date'])) {
+        $wp_post_data['post_date'] = wp_slash($post_data['post_date']);
+        // Required for wp_update_post to accept an explicit date change.
+        $wp_post_data['edit_date'] = true;
+    }
+    if (!empty($post_data['post_date_gmt'])) {
+        $wp_post_data['post_date_gmt'] = wp_slash($post_data['post_date_gmt']);
+    }
+
     if ($existing_post) {
         $wp_post_data['ID'] = $existing_post->ID;
         $post_id = wp_update_post($wp_post_data, true);
-        $sync_log("  UPDATED ID={$post_id}");
+        $sync_log("  UPDATED ID={$post_id} date=" . (isset($wp_post_data['post_date']) ? $wp_post_data['post_date'] : "kept {$existing_post->post_date}"));
     } else {
         $post_id = wp_insert_post($wp_post_data, true);
-        $sync_log("  CREATED ID={$post_id}");
+        $sync_log("  CREATED ID={$post_id} date=" . (isset($wp_post_data['post_date']) ? $wp_post_data['post_date'] : 'now'));
     }
 
     if (is_wp_error($post_id)) {
