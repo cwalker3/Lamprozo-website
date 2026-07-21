@@ -38,6 +38,7 @@ require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/git-mode.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/geo-post.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/seo-post.php';
 require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/sync-log.php';
+require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/template-sync.php';
 
 /**
  * Activation hook - Create necessary directories
@@ -186,7 +187,8 @@ function firefly_projects_enqueue_gutenberg_assets() {
         'remoteSite' => defined('LIVE_DEV_ENDPOINT') ? parse_url(LIVE_DEV_ENDPOINT, PHP_URL_HOST) : '',
         'hasProdEndpoint' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT),
         'prodSite' => defined('PROD_ENDPOINT') && !empty(PROD_ENDPOINT) ? parse_url(PROD_ENDPOINT, PHP_URL_HOST) : '',
-        'isLocalDev' => firefly_projects_is_local_dev()
+        'isLocalDev' => firefly_projects_is_local_dev(),
+        'activeTemplate' => function_exists('firefly_get_scoping_template') ? firefly_get_scoping_template() : ''
     ));
 
 }

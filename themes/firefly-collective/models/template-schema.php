@@ -435,30 +435,7 @@ function firefly_create_template_posts($template) {
                     }
                 }
 
-                // Set GEO meta if specified
-                if (!empty($data['geo'])) {
-                    $geo = $data['geo'];
-                    if (!empty($geo['summary'])) {
-                        update_post_meta($post_id, '_geo_summary', $geo['summary']);
-                    }
-                    if (!empty($geo['article_type'])) {
-                        update_post_meta($post_id, '_geo_article_type', $geo['article_type']);
-                    }
-                    if (!empty($geo['key_facts'])) {
-                        update_post_meta($post_id, '_geo_key_facts', json_encode($geo['key_facts']));
-                    }
-                    if (!empty($geo['faq'])) {
-                        update_post_meta($post_id, '_geo_faq', json_encode($geo['faq']));
-                    }
-                }
-
-                // Set featured image if specified
-                if (!empty($data['featured_image'])) {
-                    $attachment_id = firefly_get_attachment_by_filename($data['featured_image']);
-                    if ($attachment_id) {
-                        set_post_thumbnail($post_id, $attachment_id);
-                    }
-                }
+                firefly_apply_schema_post_extras($post_id, $data);
 
                 $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'created');
             } else {
@@ -492,10 +469,51 @@ function firefly_create_template_posts($template) {
             } else {
                 $post_ids[$base_slug] = array('id' => $post_id, 'status' => 'unchanged');
             }
+
+            // GEO meta + featured image were create-only, so schema geo edits
+            // never reached existing posts on reimport. Import is idempotent
+            // with the schema as source of truth — refresh them here too.
+            firefly_apply_schema_post_extras($post_id, $data);
         }
     }
 
     return $post_ids;
+}
+
+/**
+ * Apply a schema post entry's GEO meta + featured image to a post.
+ * Shared by the create and reimport paths of firefly_create_template_posts().
+ *
+ * Values are wp_slash()ed because update_post_meta() unslashes its input —
+ * without it, the \uXXXX escapes json_encode() produces for ’ – etc. lose
+ * their backslash and get stored as literal "u2019" text. That's the bug
+ * that corrupted key_facts/faq on every import (and then round-tripped into
+ * the schema files via export) while the un-encoded summary stayed clean.
+ * JSON_UNESCAPED_UNICODE keeps the stored JSON readable as a bonus.
+ */
+function firefly_apply_schema_post_extras($post_id, $data) {
+    if (!empty($data['geo'])) {
+        $geo = $data['geo'];
+        if (!empty($geo['summary'])) {
+            update_post_meta($post_id, '_geo_summary', wp_slash($geo['summary']));
+        }
+        if (!empty($geo['article_type'])) {
+            update_post_meta($post_id, '_geo_article_type', wp_slash($geo['article_type']));
+        }
+        if (!empty($geo['key_facts'])) {
+            update_post_meta($post_id, '_geo_key_facts', wp_slash(json_encode($geo['key_facts'], JSON_UNESCAPED_UNICODE)));
+        }
+        if (!empty($geo['faq'])) {
+            update_post_meta($post_id, '_geo_faq', wp_slash(json_encode($geo['faq'], JSON_UNESCAPED_UNICODE)));
+        }
+    }
+
+    if (!empty($data['featured_image'])) {
+        $attachment_id = firefly_get_attachment_by_filename($data['featured_image'], $post_id);
+        if ($attachment_id && (int) get_post_thumbnail_id($post_id) !== $attachment_id) {
+            set_post_thumbnail($post_id, $attachment_id);
+        }
+    }
 }
 
 // =============================================================================
@@ -505,20 +523,40 @@ function firefly_create_template_posts($template) {
 /**
  * Find an attachment by its filename.
  * Searches the _wp_attached_file meta for a matching filename.
+ *
+ * Matches the path BASENAME exactly ("featured.webp" must not match
+ * "fable-blog-featured.webp" — the old suffix LIKE did). Generic filenames
+ * like "featured.webp" can still legitimately exist many times, so when
+ * $for_post_id is given, an attachment uploaded to that post (post_parent)
+ * wins over any other match — that's how a schema entry's featured_image
+ * resolves to the post's OWN upload instead of another article's.
  */
-function firefly_get_attachment_by_filename($filename) {
+function firefly_get_attachment_by_filename($filename, $for_post_id = 0) {
     global $wpdb;
 
-    // Search for attachment where _wp_attached_file ends with the filename
-    $attachment_id = $wpdb->get_var($wpdb->prepare(
-        "SELECT post_id FROM {$wpdb->postmeta}
-         WHERE meta_key = '_wp_attached_file'
-         AND meta_value LIKE %s
-         LIMIT 1",
-        '%' . $wpdb->esc_like($filename)
-    ));
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT pm.post_id, p.post_parent FROM {$wpdb->postmeta} pm
+         INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+         WHERE pm.meta_key = '_wp_attached_file'
+         AND (pm.meta_value = %s OR pm.meta_value LIKE %s)
+         ORDER BY pm.post_id DESC",
+        $filename,
+        '%/' . $wpdb->esc_like($filename)
+    ), ARRAY_A);
 
-    return $attachment_id ? (int) $attachment_id : 0;
+    if (empty($rows)) {
+        return 0;
+    }
+
+    if ($for_post_id) {
+        foreach ($rows as $row) {
+            if ((int) $row['post_parent'] === (int) $for_post_id) {
+                return (int) $row['post_id'];
+            }
+        }
+    }
+
+    return (int) $rows[0]['post_id'];
 }
 
 // =============================================================================
@@ -677,8 +715,19 @@ function firefly_on_template_change($old_value, $new_value) {
         update_option('page_for_posts', $posts_page);
     }
 
-    // Update menu assignment
-    $menu_id = get_option("firefly_menu_{$new_value}");
+    // Update menu assignment. Resolve robustly instead of trusting the raw
+    // firefly_menu_{template} option: a pull/import can replace the menu term
+    // (new ID) without updating the option, and the stale pointer here was
+    // exactly how the menu "disappeared" after switching templates —
+    // find_template_menu_id() re-resolves by term meta and heals the option.
+    $base_name = 'Main Menu';
+    $schema = firefly_get_template_schema($new_value);
+    if (!empty($schema['menu']['name'])) {
+        $base_name = $schema['menu']['name'];
+    }
+    $menu_id = function_exists('firefly_find_template_menu_id')
+        ? firefly_find_template_menu_id($new_value, $base_name)
+        : (int) get_option("firefly_menu_{$new_value}");
     if ($menu_id) {
         $locations = get_theme_mod('nav_menu_locations', array());
         $locations['website-menu'] = $menu_id;

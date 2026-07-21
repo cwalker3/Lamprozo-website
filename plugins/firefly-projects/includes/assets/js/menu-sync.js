@@ -405,13 +405,15 @@
      * Show the browse menus modal
      */
     function showBrowseMenusModal() {
+        // A pre-existing local menu is OPTIONAL: when none is selected the
+        // server resolves (or creates) the template-scoped local menu from
+        // the pulled menu's own template — so a fresh environment can pull
+        // a menu without hand-creating an empty one first.
         var menuId = getMenuId();
-        if (!menuId) {
-            alert('Please select a menu first.');
-            return;
-        }
 
-        var localMenuName = $('#menu-to-edit').closest('form').find('#menu-name').val() || 'this menu';
+        var localMenuName = menuId
+            ? ($('#menu-to-edit').closest('form').find('#menu-name').val() || 'this menu')
+            : 'its template’s menu (auto-created if missing)';
         var pullEnvLabel = getPullEnvLabel();
 
         var modalHtml = '<div id="firefly-menu-pull-modal" class="firefly-sync-modal-overlay">' +
@@ -551,10 +553,11 @@
         var html = '';
         for (var i = 0; i < menus.length; i++) {
             var menu = menus[i];
+            var templateTag = menu.template ? ' · ' + menu.template : '';
             html += '<div class="firefly-remote-menu-item" data-menu-id="' + menu.id + '" data-menu-name="' + menu.name + '">' +
                 '<div class="firefly-menu-item-info">' +
                     '<span class="firefly-menu-name">' + menu.name + '</span>' +
-                    '<span class="firefly-menu-meta">' + menu.items_count + ' item(s)</span>' +
+                    '<span class="firefly-menu-meta">' + menu.items_count + ' item(s)' + templateTag + '</span>' +
                 '</div>' +
                 '<span class="firefly-menu-check dashicons dashicons-yes"></span>' +
             '</div>';
@@ -610,11 +613,8 @@
     function performPull() {
         if (state.isPulling || !state.selectedRemoteMenu) return;
 
-        var localMenuId = getMenuId();
-        if (!localMenuId) {
-            showPullResult(false, 'No local menu selected.');
-            return;
-        }
+        // 0 = let the server resolve/create the template-scoped local menu.
+        var localMenuId = getMenuId() || 0;
 
         state.isPulling = true;
 

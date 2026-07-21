@@ -418,9 +418,12 @@ function firefly_projects_apply_associated_files( $associated, $post ) {
  * @param WP_Post $post The post object to sync
  * @param bool $include_assets Whether to include media assets
  * @param string $target_env Target environment: 'dev' (Live Dev) or 'prod' (Production)
+ * @param bool $sync_template_files Whether to also ship the theme-side files this
+ *                                  post owns (snippet HTML + schema entry) so the
+ *                                  remote's template tree matches local. Default on.
  * @return array Result array with success status and message
  */
-function firefly_projects_perform_page_sync($post, $include_assets = true, $target_env = 'dev') {
+function firefly_projects_perform_page_sync($post, $include_assets = true, $target_env = 'dev', $sync_template_files = true) {
     // Load asset mapping functions
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/asset-mapping.php';
 
@@ -633,7 +636,11 @@ function firefly_projects_perform_page_sync($post, $include_assets = true, $targ
 
     // Collect theme-side files associated with this post (snippet + schema entry).
     // Warnings are forwarded to the response so the caller can surface them.
-    $associated_files = firefly_projects_collect_associated_files( $post );
+    // Skipped when the sender's "Sync template files" toggle is off — the
+    // receiver applies nothing when the manifest carries no associated files.
+    $associated_files = $sync_template_files
+        ? firefly_projects_collect_associated_files( $post )
+        : array( 'warnings' => array() );
 
     // Get tracked links for this post (moved up so the zip manifest can include them)
     $tracked_links = array();
@@ -968,6 +975,19 @@ function firefly_projects_handle_incoming_page($request) {
 
     $sync_log("INCOMING slug={$post_data['post_name']} fpid={$firefly_page_id} tmpl=" . (isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : 'NONE'));
 
+    // Template guard: content only travels to environments that have its
+    // template installed ({template}-schema.json present). Refuse rather than
+    // landing pages a missing template can't render or scope.
+    $incoming_template_guard = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
+    if ('' !== $incoming_template_guard && function_exists('firefly_is_valid_template') && !firefly_is_valid_template($incoming_template_guard)) {
+        $sync_log("  REFUSED: template '{$incoming_template_guard}' not installed on this environment");
+        return array(
+            'success' => false,
+            'message' => "Refused: template '{$incoming_template_guard}' is not installed on this environment. "
+                       . "Initialize it there before syncing its content."
+        );
+    }
+
     if (!empty($firefly_page_id)) {
         $found = get_posts(array(
             'post_type'            => $post_data['post_type'],
@@ -985,12 +1005,25 @@ function firefly_projects_handle_incoming_page($request) {
         }
     }
 
-    // Fallback to slug lookup for backwards compatibility
+    // Fallback to slug lookup. TEMPLATE-SCOPED first: the same slug exists
+    // across templates, and get_page_by_path() returns whichever copy it
+    // happens to hit (typically the oldest — a SIBLING template's post),
+    // which then failed the template check and spawned a "-2" duplicate of
+    // this template's own post on every sync.
+    $incoming_template = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
+    if (!$existing_post && $incoming_template !== '' && function_exists('firefly_projects_find_scoped_page')) {
+        $scoped = firefly_projects_find_scoped_page($post_data['post_name'], $incoming_template, array($post_data['post_type']));
+        if ($scoped) {
+            $existing_post = $scoped;
+            $sync_log("  SCOPED SLUG MATCH: ID={$scoped->ID} slug={$scoped->post_name} tmpl={$incoming_template}");
+        }
+    }
+
+    // Legacy unscoped fallback for untagged posts (pre-scoping data).
     if (!$existing_post) {
         $fallback = get_page_by_path($post_data['post_name'], OBJECT, $post_data['post_type']);
         if ($fallback) {
             $fallback_template = get_post_meta($fallback->ID, '_firefly_template', true);
-            $incoming_template = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
             // Only use fallback if templates match (or fallback has no template)
             if (empty($fallback_template) || $fallback_template === $incoming_template) {
                 $existing_post = $fallback;

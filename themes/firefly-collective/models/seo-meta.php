@@ -279,3 +279,21 @@ function firefly_output_verification_meta() {
     }
 }
 add_action( 'wp_head', 'firefly_output_verification_meta', 3 );
+
+/**
+ * Drop the core "users" sitemap provider (wp-sitemap-users-1.xml).
+ *
+ * WordPress core registers a sitemap of author archive URLs by default,
+ * which exposes admin/author usernames via their archive slugs. No template
+ * uses author archives as a real navigation surface, so there's no upside —
+ * only a minor username-enumeration exposure. Pages/posts/taxonomies
+ * sitemaps (and robots.txt's Sitemap: line) are unaffected.
+ */
+add_filter( 'wp_sitemaps_add_provider', 'firefly_remove_users_sitemap_provider', 10, 2 );
+
+function firefly_remove_users_sitemap_provider( $provider, $name ) {
+    if ( 'users' === $name ) {
+        return false;
+    }
+    return $provider;
+}

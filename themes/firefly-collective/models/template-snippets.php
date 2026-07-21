@@ -117,8 +117,18 @@ add_filter( 'wp_calculate_image_srcset', function( $sources ) {
 /**
  * Catch any remaining absolute URLs in final HTML output.
  * Runs as an output buffer on template_redirect.
+ *
+ * Skips WordPress core's XML sitemaps (/wp-sitemap*.xml, the .xsl
+ * stylesheets). The sitemap protocol requires <loc> URLs to be absolute —
+ * relativizing them made every entry an "Invalid URL" in Google Search
+ * Console. Sitemap requests carry the `sitemap` or `sitemap-stylesheet`
+ * query var (set by WP core's rewrite rules) by the time template_redirect
+ * fires, so this is a targeted skip; ordinary page/post output is untouched.
  */
 add_action( 'template_redirect', function() {
+    if ( get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' ) ) {
+        return;
+    }
     ob_start( 'firefly_relativize_urls' );
 } );
 

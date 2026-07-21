@@ -736,3 +736,8 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* "Sync template files" toggle inside the sync confirmation modal */
+.firefly-sync-template-files {
+    margin: 12px 0 4px;
+}

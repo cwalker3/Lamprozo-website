@@ -146,6 +146,7 @@
                             '<tr><th>Last Sync</th><td id="firefly-modal-last-sync">' + (lastSyncFormatted || '<em>Never synced</em>') + '</td></tr>' +
                         '</table>' +
                     '</div>' +
+                    buildTemplateFilesToggleHtml() +
                     '<p class="firefly-sync-description">' +
                         'The ' + TYPE_SINGULAR_LC + ' content and assets will be synced to the remote site.' +
                     '</p>' +
@@ -210,6 +211,7 @@
                         '<span class="dashicons dashicons-warning"></span>' +
                         '<span id="firefly-orphan-warning-text">Checking remote ' + TYPE_PLURAL_LC + '...</span>' +
                     '</div>' +
+                    buildTemplateFilesToggleHtml() +
                     // Summary
                     '<div class="firefly-sync-summary">' +
                         '<table class="firefly-sync-table">' +
@@ -236,6 +238,28 @@
 
         // Fetch orphan count for current environment
         fetchOrphanCount();
+    }
+
+    /**
+     * Build the "Sync template files" toggle row (default ON). Ships the
+     * snippet HTML + schema entry the post owns so the remote's theme tree
+     * matches local. Value is read at request time via isTemplateFilesSyncOn().
+     */
+    function buildTemplateFilesToggleHtml() {
+        return '<div class="firefly-sync-template-files">' +
+            '<label class="firefly-sync-mode-option firefly-sync-template-files-label">' +
+                '<input type="checkbox" id="firefly-sync-template-files" checked>' +
+                '<div>' +
+                    '<strong>Sync template files</strong>' +
+                    '<p class="firefly-sync-mode-description">Also update the snippet HTML and schema entry on the remote so its template files match local.</p>' +
+                '</div>' +
+            '</label>' +
+        '</div>';
+    }
+
+    function isTemplateFilesSyncOn() {
+        var $cb = $('#firefly-sync-template-files');
+        return $cb.length ? $cb.is(':checked') : true; // absent => default on
     }
 
     /**
@@ -433,6 +457,7 @@
         var $modal = $('#firefly-pages-sync-modal');
         var $confirmBtn = $modal.find('#firefly-confirm-single');
         var $cancelBtn = $modal.find('.firefly-modal-cancel');
+        var syncTemplateFiles = isTemplateFilesSyncOn();
 
         $confirmBtn.prop('disabled', true).text('Syncing...');
         $cancelBtn.prop('disabled', true);
@@ -444,7 +469,8 @@
             data: JSON.stringify({
                 post_id: postId,
                 include_assets: true,
-                target_env: state.targetEnvProd ? 'prod' : 'dev'
+                target_env: state.targetEnvProd ? 'prod' : 'dev',
+                sync_template_files: syncTemplateFiles
             }),
             headers: { 'X-WP-Nonce': config.nonce },
             success: function(response) {
@@ -479,6 +505,10 @@
         var $content = $modal.find('.firefly-modal-content');
         var $footer = $modal.find('.firefly-modal-footer');
 
+        // Capture the toggle BEFORE the progress UI replaces the modal content
+        // (the checkbox is destroyed by the html() call below).
+        var syncTemplateFiles = isTemplateFilesSyncOn();
+
         // Show progress UI
         $content.html(
             '<div class="firefly-sync-progress">' +
@@ -498,7 +528,8 @@
             data: JSON.stringify({
                 sync_mode: syncMode,
                 target_env: state.targetEnvProd ? 'prod' : 'dev',
-                post_type: POST_TYPE
+                post_type: POST_TYPE,
+                sync_template_files: syncTemplateFiles
             }),
             headers: { 'X-WP-Nonce': config.nonce },
             timeout: 300000, // 5 minutes
@@ -531,6 +562,19 @@
         var html = '<div class="notice ' + statusClass + ' firefly-sync-result">' +
             '<p>' + escapeHtml(message) + '</p>' +
         '</div>';
+
+        // Template files the receiver wrote (snippet + schema entry), so the
+        // user can see exactly what changed in the remote theme tree.
+        if (details && Array.isArray(details.associated_files) && details.associated_files.length > 0) {
+            html += '<div class="firefly-sync-summary">' +
+                '<h4>Template files updated on remote</h4>' +
+                '<ul class="firefly-template-files-written">' +
+                details.associated_files.map(function(f) {
+                    return '<li><code>' + escapeHtml(f) + '</code></li>';
+                }).join('') +
+                '</ul>' +
+            '</div>';
+        }
 
         $content.html(html);
         $footer.html('<button type="button" class="button firefly-modal-cancel">Close</button>');

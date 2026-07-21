@@ -303,7 +303,15 @@ function firefly_plugin_register_rest_endpoints() {
         array(
             'methods'             => 'GET',
             'callback'            => 'firefly_projects_list_menus',
-            'permission_callback' => '__return_true' // Uses shared secret authentication
+            'permission_callback' => '__return_true', // Uses shared secret authentication
+            'args'                => array(
+                'template' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'sanitize_callback' => 'sanitize_text_field',
+                    'description'       => 'Template scope; defaults to this site\'s active template. Pass "all" to list every template\'s menus.'
+                )
+            )
         )
     );
 
@@ -341,6 +349,12 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'dev',
                     'enum'              => array('dev', 'prod'),
                     'description'       => 'Source environment: dev (Live Dev) or prod (Production)'
+                ),
+                'template' => array(
+                    'required'          => false,
+                    'type'              => 'string',
+                    'sanitize_callback' => 'sanitize_text_field',
+                    'description'       => 'Template scope; defaults to the local active template. Pass "all" to list every template\'s menus.'
                 )
             )
         )
@@ -362,10 +376,11 @@ function firefly_plugin_register_rest_endpoints() {
                     'description'       => 'The remote menu term ID to pull'
                 ),
                 'local_menu_id' => array(
-                    'required'          => true,
+                    'required'          => false,
                     'type'              => 'integer',
+                    'default'           => 0,
                     'sanitize_callback' => 'absint',
-                    'description'       => 'The local menu term ID to sync into'
+                    'description'       => 'The local menu term ID to sync into. Omit (or 0) to resolve/create the template-scoped menu automatically.'
                 ),
                 'source_env' => array(
                     'required'          => false,
@@ -464,7 +479,7 @@ function firefly_plugin_register_rest_endpoints() {
                 'template' => array(
                     'required'          => false,
                     'type'              => 'string',
-                    'description'       => 'Filter to posts/pages belonging to this firefly template (matches _firefly_template meta). Empty = unfiltered.'
+                    'description'       => 'Filter to posts/pages belonging to this firefly template (matches _firefly_template meta). Empty = this site\'s active template; "all" = unfiltered.'
                 )
             )
         )
@@ -502,6 +517,16 @@ function firefly_plugin_register_rest_endpoints() {
                     'default'           => 'dev',
                     'enum'              => array('dev', 'prod'),
                     'description'       => 'Source environment: dev (Live Dev) or prod (Production)'
+                ),
+                'firefly_page_id' => array(
+                    'required'    => false,
+                    'type'        => 'string',
+                    'description' => 'Stable cross-env id "{template}:{slug}" (preferred; scopes the remote lookup)'
+                ),
+                'template' => array(
+                    'required'    => false,
+                    'type'        => 'string',
+                    'description' => 'Template to scope the pull to (must be installed locally)'
                 )
             )
         )
@@ -581,11 +606,70 @@ function firefly_plugin_register_rest_endpoints() {
                 'template' => array(
                     'required'          => false,
                     'type'              => 'string',
-                    'description'       => 'Scope the remote list to this firefly template. Empty = no scoping.'
+                    'description'       => 'Scope the remote list to this firefly template. Empty = the local active template; "all" = no scoping.'
                 )
             )
         )
     );
+
+    // =========================================================================
+    // TEMPLATE SYNC — whole-template push/pull (handlers in template-sync.php)
+    // =========================================================================
+
+    // Initiating side (admin auth): these run where the operator is and call
+    // the remote peer with the shared secret.
+    $ts_admin_routes = array(
+        'push-files'      => 'firefly_projects_ts_push_files',
+        'pull-files'      => 'firefly_projects_ts_pull_files',
+        'remote-templates' => 'firefly_projects_ts_remote_templates',
+        'remote-manifest' => 'firefly_projects_ts_remote_manifest',
+        'media-diff'      => 'firefly_projects_ts_media_diff',
+        'push-media-item' => 'firefly_projects_ts_push_media_item',
+        'pull-media-item' => 'firefly_projects_ts_pull_media_item',
+        'mirror-media'    => 'firefly_projects_ts_mirror_media',
+        'mirror-content'  => 'firefly_projects_ts_mirror_content',
+        'push-settings'   => 'firefly_projects_ts_push_settings',
+        'pull-settings'   => 'firefly_projects_ts_pull_settings',
+        'remote-activate' => 'firefly_projects_ts_remote_activate',
+        'activate-local'  => 'firefly_projects_ts_activate_local',
+    );
+    foreach ($ts_admin_routes as $ts_path => $ts_callback) {
+        register_rest_route('firefly-plugin/v1', '/template-sync/' . $ts_path, array(
+            'methods'             => ($ts_path === 'remote-templates' || $ts_path === 'remote-manifest') ? 'GET' : 'POST',
+            'callback'            => $ts_callback,
+            'permission_callback' => 'firefly_plugin_verify_rest_admin',
+        ));
+    }
+
+    // Receiving side (shared secret verified inside each handler): callable
+    // by remote peers; version-tolerant with unknown params.
+    $ts_secret_routes = array(
+        'receive-files'      => array('POST', 'firefly_projects_ts_receive_files'),
+        'export-files'       => array('GET',  'firefly_projects_ts_export_files'),
+        'list-templates'     => array('GET',  'firefly_projects_ts_list_templates'),
+        'list-media'         => array('GET',  'firefly_projects_ts_list_media'),
+        'receive-media-item' => array('POST', 'firefly_projects_ts_receive_media_item'),
+        'export-media-item'  => array('GET',  'firefly_projects_ts_export_media_item'),
+        'delete-media'       => array('POST', 'firefly_projects_ts_delete_media'),
+        'export-settings'    => array('GET',  'firefly_projects_ts_export_settings'),
+        'receive-settings'   => array('POST', 'firefly_projects_ts_receive_settings'),
+        'receive-activate'   => array('POST', 'firefly_projects_ts_receive_activate'),
+    );
+    foreach ($ts_secret_routes as $ts_path => $ts_def) {
+        register_rest_route('firefly-plugin/v1', '/template-sync/' . $ts_path, array(
+            'methods'             => $ts_def[0],
+            'callback'            => $ts_def[1],
+            'permission_callback' => '__return_true', // Shared-secret auth inside handler
+        ));
+    }
+
+    // Manifest serves both the local planner (admin nonce) and remote peers
+    // (shared secret) — dual auth inside the handler.
+    register_rest_route('firefly-plugin/v1', '/template-sync/manifest', array(
+        'methods'             => 'GET',
+        'callback'            => 'firefly_projects_ts_manifest',
+        'permission_callback' => '__return_true', // Dual auth inside handler
+    ));
 
     // Bootstrap: Check if wp-dev exists on production (local calls this)
     register_rest_route(
@@ -1218,6 +1302,10 @@ function firefly_projects_sync_page($request) {
     $post_id = $request->get_param('post_id');
     $include_assets = $request->get_param('include_assets');
     $target_env = $request->get_param('target_env');
+    // "Sync template files" toggle (snippet + schema entry). Defaults ON when
+    // the caller doesn't send it, so older clients keep the full-sync behavior.
+    $stf = $request->get_param('sync_template_files');
+    $sync_template_files = ( null === $stf ) ? true : filter_var( $stf, FILTER_VALIDATE_BOOLEAN );
 
     // Get the post
     $post = get_post($post_id);
@@ -1258,7 +1346,7 @@ function firefly_projects_sync_page($request) {
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 
     // Perform the sync
-    $result = firefly_projects_perform_page_sync($post, $include_assets, $target_env);
+    $result = firefly_projects_perform_page_sync($post, $include_assets, $target_env, $sync_template_files);
 
     if ($result['success']) {
         return new WP_REST_Response(array(
@@ -1437,6 +1525,9 @@ function firefly_projects_sync_all_pages($request) {
     $sync_mode = $request->get_param('sync_mode');
     $target_env = $request->get_param('target_env');
     $post_type = $request->get_param('post_type') ?: 'page';
+    // "Sync template files" toggle — defaults ON when absent (older clients).
+    $stf = $request->get_param('sync_template_files');
+    $sync_template_files = ( null === $stf ) ? true : filter_var( $stf, FILTER_VALIDATE_BOOLEAN );
 
     // Check configuration based on target environment
     if ($target_env === 'prod') {
@@ -1504,7 +1595,7 @@ function firefly_projects_sync_all_pages($request) {
     }
 
     // Perform the bulk sync
-    $result = firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type);
+    $result = firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type, $sync_template_files);
 
     return new WP_REST_Response(array(
         'success' => true,
@@ -1620,6 +1711,22 @@ function firefly_projects_pull_page($request) {
     $source_env = $request->get_param('source_env');
     $firefly_page_id = $request->get_param('firefly_page_id');
     $template = $request->get_param('template');
+
+    // Template guard: a template travels between environments only where it
+    // exists on both sides. If this site doesn't have the named template
+    // (no {template}-schema.json), refuse up front rather than importing
+    // content into a system that can't render or manage it.
+    $check_template = $template;
+    if (!$check_template && $firefly_page_id && strpos($firefly_page_id, ':') !== false) {
+        $check_template = substr($firefly_page_id, 0, strpos($firefly_page_id, ':'));
+    }
+    if ($check_template && function_exists('firefly_is_valid_template') && !firefly_is_valid_template($check_template)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => "Template '{$check_template}' is not installed on this site. "
+                       . "Initialize it first (firefly templates init {$check_template}) before pulling its content."
+        ), 400);
+    }
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -1801,6 +1908,7 @@ function firefly_projects_export_page($request) {
 
     // Package asset data with base64 content
     $asset_data = array();
+    $packed_filenames = array();
     foreach ($assets as $asset_url) {
         $local_path = firefly_projects_resolve_asset_source($asset_url);
 
@@ -1811,6 +1919,63 @@ function firefly_projects_export_page($request) {
                 'content'  => base64_encode(file_get_contents($local_path)),
                 'size'     => filesize($local_path)
             );
+            $packed_filenames[basename($local_path)] = true;
+        }
+    }
+
+    // Also enumerate the page's whole /uploads/pages/<slug>/ directory. The
+    // content scan above only finds assets referenced inline; files that live
+    // in the page dir without an inline reference (per-page icons stored in
+    // meta, downloads linked from elsewhere) would otherwise be silently
+    // dropped and need manual FTP — the exact gap this closes.
+    //
+    // BUT page-asset dirs are keyed by slug ONLY, and the scoping system
+    // deliberately allows two templates to share a slug — so on a multi-template
+    // install (e.g. dev) another template's page can share this /pages/<slug>/
+    // dir. Enumerating the whole dir would then ship the OTHER template's files
+    // under this pull, breaking tenant isolation. Guard: if the slug is owned by
+    // more than one template, skip the whole-dir scan and ship only the
+    // content-referenced assets (which are unambiguously this page's).
+    $this_template = get_post_meta($post->ID, '_firefly_template', true);
+    $slug_shared_across_templates = false;
+    $same_slug_ids = get_posts(array(
+        'post_type'            => array('page', 'post'),
+        'post_status'          => 'publish',
+        'name'                 => $post->post_name,
+        'numberposts'          => -1,
+        'fields'               => 'ids',
+        'firefly_skip_scoping' => true,
+    ));
+    foreach ($same_slug_ids as $sid) {
+        if ((int) $sid === (int) $post->ID) continue;
+        if (get_post_meta($sid, '_firefly_template', true) !== $this_template) {
+            $slug_shared_across_templates = true;
+            break;
+        }
+    }
+
+    $page_dir = firefly_projects_get_page_asset_filesystem_path($post->post_name);
+    $page_dir_skipped = array();
+    if (is_dir($page_dir) && !$slug_shared_across_templates) {
+        foreach (scandir($page_dir) as $entry) {
+            if ($entry === '.' || $entry === '..' || isset($packed_filenames[$entry])) continue;
+            $path = $page_dir . '/' . $entry;
+            if (!is_file($path)) continue;
+            $asset_data[] = array(
+                'url'      => '/wp-content/uploads/pages/' . $post->post_name . '/' . $entry,
+                'filename' => $entry,
+                'content'  => base64_encode(file_get_contents($path)),
+                'size'     => filesize($path)
+            );
+            $packed_filenames[$entry] = true;
+        }
+    } elseif (is_dir($page_dir) && $slug_shared_across_templates) {
+        // Record what we deliberately did NOT ship so the operator knows any
+        // non-inline page-dir files for this slug need attention (the shared
+        // dir can't be attributed to one template safely).
+        foreach (scandir($page_dir) as $entry) {
+            if ($entry === '.' || $entry === '..' || isset($packed_filenames[$entry])) continue;
+            if (is_file($page_dir . '/' . $entry)) $page_dir_skipped[] = $entry;
         }
     }
 
@@ -1869,6 +2034,61 @@ function firefly_projects_export_page($request) {
         }
     }
 
+    // Mobile featured image (same file-shipping shape as push). The
+    // _firefly_mobile_thumbnail_id meta in the whitelist above carries a
+    // REMOTE attachment id — the importer re-resolves it locally from this
+    // file, exactly like the push receive side does.
+    $mobile_featured_image = null;
+    $mobile_featured_image_clear = false;
+    $mobile_id = (int) get_post_meta($post->ID, '_firefly_mobile_thumbnail_id', true);
+    if ($mobile_id) {
+        $mobile_path = get_attached_file($mobile_id);
+        if ($mobile_path && file_exists($mobile_path)) {
+            $mobile_featured_image = array(
+                'filename'  => basename($mobile_path),
+                'content'   => base64_encode(file_get_contents($mobile_path)),
+                'mime_type' => get_post_mime_type($mobile_id),
+                'alt_text'  => get_post_meta($mobile_id, '_wp_attachment_image_alt', true),
+                'title'     => get_the_title($mobile_id)
+            );
+        }
+    } else {
+        $mobile_featured_image_clear = true;
+    }
+
+    // Per-page OG image override (_seo_og_image_id). This is the pull-side OG
+    // file shipping the meta-whitelist note above anticipates: the id itself
+    // never travels, the file does, and the importer re-resolves a local id.
+    $og_image = null;
+    $og_image_clear = false;
+    $og_id = (int) get_post_meta($post->ID, '_seo_og_image_id', true);
+    if ($og_id) {
+        $og_path = get_attached_file($og_id);
+        if ($og_path && file_exists($og_path)) {
+            $og_image = array(
+                'filename'  => basename($og_path),
+                'content'   => base64_encode(file_get_contents($og_path)),
+                'mime_type' => get_post_mime_type($og_id),
+                'alt_text'  => get_post_meta($og_id, '_wp_attachment_image_alt', true),
+                'title'     => get_the_title($og_id)
+            );
+        }
+    } else {
+        $og_image_clear = true;
+    }
+
+    // Theme-side files (snippet + schema entry) so a pulled page carries its
+    // template files just like a push with "Sync template files" on.
+    $associated_files = function_exists('firefly_projects_collect_associated_files')
+        ? firefly_projects_collect_associated_files($post)
+        : array();
+
+    // Tracked links travel too when the link-tracking model is present.
+    $tracked_links = array();
+    if (function_exists('firefly_link_tracking_get_post_links_for_sync')) {
+        $tracked_links = firefly_link_tracking_get_post_links_for_sync($post->ID);
+    }
+
     // Check if this page has special WordPress roles (home page, posts page)
     $page_role = null;
     if ($post->post_type === 'page') {
@@ -1896,11 +2116,24 @@ function firefly_projects_export_page($request) {
             'post_status'  => $post->post_status,
             'menu_order'   => $post->menu_order,
             'post_parent'  => $post->post_parent,
+            // The environment being pulled FROM is the source of truth for
+            // dates — date-based post permalinks must survive the pull.
+            'post_date'     => $post->post_date,
+            'post_date_gmt' => $post->post_date_gmt,
         ),
         'meta_data'      => $meta_data,
         'assets'         => $asset_data,
+        // Non-inline page-dir files withheld because the slug is shared across
+        // templates (see the scandir guard above). Empty in the normal case.
+        'page_dir_skipped' => $page_dir_skipped,
         'asset_map'      => $asset_map,
         'featured_image' => $featured_image,
+        'mobile_featured_image'       => $mobile_featured_image,
+        'mobile_featured_image_clear' => $mobile_featured_image_clear,
+        'og_image'                    => $og_image,
+        'og_image_clear'              => $og_image_clear,
+        'associated_files'            => $associated_files,
+        'tracked_links'               => $tracked_links,
         'page_role'      => $page_role
     ), 200);
 }
@@ -1917,6 +2150,8 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     $meta_data = isset($data['meta_data']) ? $data['meta_data'] : array();
     $assets = isset($data['assets']) ? $data['assets'] : array();
     $remote_asset_map = isset($data['asset_map']) ? $data['asset_map'] : array();
+    $associated_files = isset($data['associated_files']) ? $data['associated_files'] : array();
+    $tracked_links = isset($data['tracked_links']) ? $data['tracked_links'] : array();
 
     $page_slug = $post_data['post_name'];
 
@@ -1925,6 +2160,35 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     // clobbering whichever template happens to own that slug.
     $incoming_template = isset($meta_data['_firefly_template']) ? $meta_data['_firefly_template'] : '';
     $firefly_page_id   = isset($meta_data['_firefly_page_id']) ? $meta_data['_firefly_page_id'] : '';
+
+    // Template guard (authoritative — pull_page pre-checks, but the template
+    // may only be discoverable here from the incoming meta). Content whose
+    // template isn't installed locally must not land.
+    if ($incoming_template && function_exists('firefly_is_valid_template') && !firefly_is_valid_template($incoming_template)) {
+        return array(
+            'success' => false,
+            'message' => "Refused: template '{$incoming_template}' is not installed on this site. "
+                       . "Initialize it first (firefly templates init {$incoming_template}) before pulling its content."
+        );
+    }
+
+    // When the export carries the authoritative snippet + schema entry,
+    // suppress the local save_post → snippet auto-export hook so it doesn't
+    // regenerate the snippet from post_content and clobber the remote's file.
+    // (Old remotes without associated_files keep the hook, so the snippet
+    // still refreshes from content.)
+    if (!empty($associated_files) && !defined('FIREFLY_PROJECTS_SYNCING_INBOUND')) {
+        define('FIREFLY_PROJECTS_SYNCING_INBOUND', true);
+    }
+
+    // TRUE SYNC: store post_content byte-for-byte. Without a logged-in user
+    // with unfiltered_html, KSES save filters mangle block markup (double
+    // hyphens in block-attribute JSON get unicode-escaped, inline CSS props
+    // get dropped). The content comes from a trusted admin-authored
+    // environment; strip KSES for this request, mirroring the push receive
+    // side. kses_init_filters() is re-registered on shutdown.
+    kses_remove_filters();
+    add_action('shutdown', 'kses_init_filters');
 
     // Ensure a stable id exists so future syncs match deterministically.
     if (empty($firefly_page_id) && $incoming_template) {
@@ -1967,6 +2231,17 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     // backslashes and render as literal "u003c" on the live site.
     $wp_post_data = wp_slash($wp_post_data);
 
+    // The pulled-from environment is the source of truth for dates, so
+    // date-based post permalinks (/2026/05/11/slug/) survive the pull. Old
+    // remotes that don't ship post_date leave the local date untouched.
+    if (!empty($post_data['post_date'])) {
+        $wp_post_data['post_date'] = wp_slash($post_data['post_date']);
+        $wp_post_data['edit_date'] = true;
+    }
+    if (!empty($post_data['post_date_gmt'])) {
+        $wp_post_data['post_date_gmt'] = wp_slash($post_data['post_date_gmt']);
+    }
+
     if ($existing_post) {
         $wp_post_data['ID'] = $existing_post->ID;
         $post_id = wp_update_post($wp_post_data, true);
@@ -2004,6 +2279,20 @@ function firefly_projects_import_pulled_page($data, $source_env) {
     $desired_slug = isset($post_data['post_name']) ? $post_data['post_name'] : '';
     if ($desired_slug && get_post_field('post_name', $post_id) !== $desired_slug) {
         wp_update_post(array('ID' => $post_id, 'post_name' => $desired_slug));
+    }
+
+    // Apply theme-side files (snippet + schema entry) shipped by the remote —
+    // the same manifest push uses, so a pulled page carries its template
+    // files without FTP. Runs after meta so the writer sees _firefly_template.
+    $associated_report = array('files_written' => array(), 'warnings' => array());
+    $applied_post = get_post($post_id);
+    if ($applied_post && !empty($associated_files) && function_exists('firefly_projects_apply_associated_files')) {
+        $associated_report = firefly_projects_apply_associated_files($associated_files, $applied_post);
+    }
+
+    // Sync tracked links if provided
+    if (!empty($tracked_links) && function_exists('firefly_link_tracking_sync_incoming_links')) {
+        firefly_link_tracking_sync_incoming_links($post_id, $tracked_links);
     }
 
     // Process assets - save to uploads/pages and create mappings
@@ -2074,6 +2363,11 @@ function firefly_projects_import_pulled_page($data, $source_env) {
         $featured = $data['featured_image'];
         $filename = sanitize_file_name($featured['filename']);
 
+        // Capture the prior featured attachment so it can be purged after the
+        // new one is wired up — otherwise every re-pull accumulates an orphan
+        // attachment (mirrors the push receive side).
+        $previous_thumb_id = (int) get_post_thumbnail_id($post_id);
+
         // Save to page assets directory
         $featured_path = $assets_dir . '/' . $filename;
         $featured_content = base64_decode($featured['content']);
@@ -2104,8 +2398,113 @@ function firefly_projects_import_pulled_page($data, $source_env) {
                 // Set as featured image
                 set_post_thumbnail($post_id, $attach_id);
                 $featured_image_set = true;
+
+                // Purge the previous featured attachment (path-aware: the new
+                // file typically lands on the same path the old one owned).
+                if (function_exists('firefly_projects_safely_replace_previous_attachment')) {
+                    firefly_projects_safely_replace_previous_attachment($previous_thumb_id, $attach_id);
+                }
             }
         }
+    }
+
+    // Mobile featured image (_firefly_mobile_thumbnail_id). The whitelisted
+    // meta carried the REMOTE attachment id — re-resolve it locally from the
+    // shipped file, mirroring the push receive side. Without this the meta
+    // points at whatever attachment happens to own that id here.
+    $featured = !empty($data['featured_image']) ? $data['featured_image'] : null;
+    $mobile_featured = !empty($data['mobile_featured_image']) ? $data['mobile_featured_image'] : null;
+    $mobile_attach_id = null;
+    if ($mobile_featured && !empty($mobile_featured['filename'])) {
+        $mobile_filename = sanitize_file_name($mobile_featured['filename']);
+        // Don't clobber the desktop featured file if they share a name.
+        $mobile_destination_name = $mobile_filename;
+        if ($featured && isset($featured['filename']) && sanitize_file_name($featured['filename']) === $mobile_filename) {
+            $mobile_destination_name = 'mobile-' . $mobile_filename;
+        }
+        $mobile_path = $assets_dir . '/' . $mobile_destination_name;
+        $previous_mobile_id = (int) get_post_meta($post_id, '_firefly_mobile_thumbnail_id', true);
+
+        if (file_put_contents($mobile_path, base64_decode($mobile_featured['content']))) {
+            $mobile_attachment = array(
+                'post_mime_type' => $mobile_featured['mime_type'],
+                'post_title'     => !empty($mobile_featured['title']) ? $mobile_featured['title'] : pathinfo($mobile_filename, PATHINFO_FILENAME),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
+            );
+            $mobile_attach_id = wp_insert_attachment($mobile_attachment, $mobile_path, $post_id);
+            if (!is_wp_error($mobile_attach_id)) {
+                require_once(ABSPATH . 'wp-admin/includes/image.php');
+                wp_update_attachment_metadata($mobile_attach_id, wp_generate_attachment_metadata($mobile_attach_id, $mobile_path));
+                if (!empty($mobile_featured['alt_text'])) {
+                    update_post_meta($mobile_attach_id, '_wp_attachment_image_alt', $mobile_featured['alt_text']);
+                }
+                update_post_meta($post_id, '_firefly_mobile_thumbnail_id', (int) $mobile_attach_id);
+                if (function_exists('firefly_projects_safely_replace_previous_attachment')) {
+                    firefly_projects_safely_replace_previous_attachment($previous_mobile_id, $mobile_attach_id);
+                }
+            } else {
+                $mobile_attach_id = null;
+            }
+        }
+    } elseif (!empty($data['mobile_featured_image_clear'])) {
+        delete_post_meta($post_id, '_firefly_mobile_thumbnail_id');
+    } elseif (isset($meta_data['_firefly_mobile_thumbnail_id'])) {
+        // Meta arrived (old remote / file missing) but no file to back it —
+        // the remote id is meaningless locally, drop it rather than point at
+        // an unrelated local attachment.
+        delete_post_meta($post_id, '_firefly_mobile_thumbnail_id');
+    }
+
+    // Per-page OG image override (_seo_og_image_id): re-resolve locally,
+    // reusing the featured/mobile attachment when the same file fills both
+    // slots (mirrors push receive de-dup).
+    $og_image = !empty($data['og_image']) ? $data['og_image'] : null;
+    if ($og_image && !empty($og_image['filename'])) {
+        $og_filename = sanitize_file_name($og_image['filename']);
+        $og_attach_id_use = null;
+
+        if (isset($attach_id) && !is_wp_error($attach_id) && $featured && isset($featured['filename']) && sanitize_file_name($featured['filename']) === $og_filename) {
+            $og_attach_id_use = (int) $attach_id;
+        } elseif ($mobile_attach_id && $mobile_featured && isset($mobile_featured['filename']) && sanitize_file_name($mobile_featured['filename']) === $og_filename) {
+            $og_attach_id_use = (int) $mobile_attach_id;
+        } else {
+            $og_destination_name = $og_filename;
+            $collides_with_featured = $featured && isset($featured['filename']) && sanitize_file_name($featured['filename']) === $og_filename;
+            $collides_with_mobile   = $mobile_featured && isset($mobile_featured['filename']) && sanitize_file_name($mobile_featured['filename']) === $og_filename;
+            if ($collides_with_featured || $collides_with_mobile) {
+                $og_destination_name = 'og-' . $og_filename;
+            }
+            $og_path = $assets_dir . '/' . $og_destination_name;
+            $previous_og_id = (int) get_post_meta($post_id, '_seo_og_image_id', true);
+
+            if (file_put_contents($og_path, base64_decode($og_image['content']))) {
+                $og_attachment = array(
+                    'post_mime_type' => $og_image['mime_type'],
+                    'post_title'     => !empty($og_image['title']) ? $og_image['title'] : pathinfo($og_filename, PATHINFO_FILENAME),
+                    'post_content'   => '',
+                    'post_status'    => 'inherit'
+                );
+                $og_new_id = wp_insert_attachment($og_attachment, $og_path, $post_id);
+                if (!is_wp_error($og_new_id)) {
+                    require_once(ABSPATH . 'wp-admin/includes/image.php');
+                    wp_update_attachment_metadata($og_new_id, wp_generate_attachment_metadata($og_new_id, $og_path));
+                    if (!empty($og_image['alt_text'])) {
+                        update_post_meta($og_new_id, '_wp_attachment_image_alt', $og_image['alt_text']);
+                    }
+                    $og_attach_id_use = (int) $og_new_id;
+                    if (function_exists('firefly_projects_safely_replace_previous_attachment')) {
+                        firefly_projects_safely_replace_previous_attachment($previous_og_id, $og_new_id);
+                    }
+                }
+            }
+        }
+
+        if ($og_attach_id_use) {
+            update_post_meta($post_id, '_seo_og_image_id', $og_attach_id_use);
+        }
+    } elseif (!empty($data['og_image_clear'])) {
+        delete_post_meta($post_id, '_seo_og_image_id');
     }
 
     // Set page role if specified (front page or posts page). The theme resolves
@@ -2164,7 +2563,9 @@ function firefly_projects_import_pulled_page($data, $source_env) {
             'featured_image_set' => $featured_image_set,
             'source_env'         => $source_env,
             'is_update'          => $existing_post ? true : false,
-            'page_role'          => $page_role
+            'page_role'          => $page_role,
+            'associated_files'   => $associated_report['files_written'],
+            'associated_files_warnings' => $associated_report['warnings']
         )
     );
 }
@@ -2211,6 +2612,14 @@ function firefly_projects_fetch_remote_pages($request) {
     $source_env = $request->get_param('source_env');
     $post_type = $request->get_param('post_type');
     $template = $request->get_param('template');
+    $template = is_string($template) ? trim($template) : '';
+
+    // The system is always template-scoped: when the caller doesn't name a
+    // template, scope to this site's active one instead of listing everything.
+    // `template=all` is the explicit escape hatch.
+    if ($template === '' && function_exists('firefly_get_scoping_template')) {
+        $template = firefly_get_scoping_template();
+    }
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -2237,7 +2646,7 @@ function firefly_projects_fetch_remote_pages($request) {
     if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
         $base_url = $matches[1];
         $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-pages?include_drafts=true&post_type=' . urlencode($post_type);
-        if ( ! empty( $template ) ) {
+        if ( $template !== '' ) {
             $list_url .= '&template=' . urlencode( $template );
         }
     } else {
@@ -2276,10 +2685,25 @@ function firefly_projects_fetch_remote_pages($request) {
 
     $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
 
+    // Belt-and-braces: an OLD remote plugin ignores the template param and
+    // returns every template's content. Its list still carries per-page
+    // firefly_page_id ("{template}:{slug}"), so filter locally. Pages with no
+    // id can't be attributed to a template and are dropped — safe-by-default
+    // beats leaking sibling templates. New remotes echo back 'template' and
+    // have already scoped server-side.
+    $pages = $data['pages'];
+    if ($template !== '' && $template !== 'all' && !isset($data['template'])) {
+        $prefix = $template . ':';
+        $pages = array_values(array_filter($pages, function ($p) use ($prefix) {
+            return !empty($p['firefly_page_id']) && strpos($p['firefly_page_id'], $prefix) === 0;
+        }));
+    }
+
     return new WP_REST_Response(array(
         'success'    => true,
-        'pages'      => $data['pages'],
-        'count'      => $data['count'],
+        'pages'      => $pages,
+        'count'      => count($pages),
+        'template'   => $template,
         'source_env' => $source_env,
         'source_label' => $env_label
     ), 200);
@@ -2297,13 +2721,26 @@ function firefly_projects_list_menus($request) {
     $auth_failure = firefly_projects_verify_shared_secret($request);
     if ($auth_failure !== null) return $auth_failure;
 
+    // Template scope: when the caller passes a template, only that template's
+    // menus are listed. No template → default to THIS site's active template
+    // (the system is always template-scoped). `template=all` lists everything.
+    $scope_template = $request->get_param('template');
+    $scope_template = is_string($scope_template) ? trim($scope_template) : '';
+    if ($scope_template === '' && function_exists('firefly_get_scoping_template')) {
+        $scope_template = firefly_get_scoping_template();
+    }
+
     // Get all nav menus
     $menus = wp_get_nav_menus();
     $menu_list = array();
 
     foreach ($menus as $menu) {
-        $items = wp_get_nav_menu_items($menu->term_id);
         $template = get_term_meta($menu->term_id, '_firefly_template', true);
+        $template = $template ? $template : '';
+        if ($scope_template !== '' && $scope_template !== 'all' && $template !== $scope_template) {
+            continue;
+        }
+        $items = wp_get_nav_menu_items($menu->term_id);
         $menu_list[] = array(
             'id'          => $menu->term_id,
             'name'        => $menu->name,
@@ -2311,14 +2748,15 @@ function firefly_projects_list_menus($request) {
             'description' => $menu->description,
             'count'       => $menu->count,
             'items_count' => $items ? count($items) : 0,
-            'template'    => $template ? $template : ''
+            'template'    => $template
         );
     }
 
     return new WP_REST_Response(array(
-        'success' => true,
-        'menus'   => $menu_list,
-        'count'   => count($menu_list)
+        'success'  => true,
+        'menus'    => $menu_list,
+        'count'    => count($menu_list),
+        'template' => $scope_template
     ), 200);
 }
 
@@ -2364,6 +2802,11 @@ function firefly_projects_export_menu($request) {
  */
 function firefly_projects_fetch_remote_menus($request) {
     $source_env = $request->get_param('source_env');
+    $template = $request->get_param('template');
+    $template = is_string($template) ? trim($template) : '';
+    if ($template === '' && function_exists('firefly_get_scoping_template')) {
+        $template = firefly_get_scoping_template();
+    }
 
     // Determine endpoint based on source environment
     if ($source_env === 'prod') {
@@ -2384,10 +2827,13 @@ function firefly_projects_fetch_remote_menus($request) {
         $endpoint = LIVE_DEV_ENDPOINT;
     }
 
-    // Build list-menus URL
+    // Build list-menus URL (template param scopes new remotes server-side)
     if (preg_match('/(https?:\/\/[^\/]+)/', $endpoint, $matches)) {
         $base_url = $matches[1];
         $list_url = $base_url . '/wp-json/firefly-plugin/v1/list-menus';
+        if ($template !== '') {
+            $list_url .= '?template=' . urlencode($template);
+        }
     } else {
         return new WP_REST_Response(array(
             'success' => false,
@@ -2424,10 +2870,22 @@ function firefly_projects_fetch_remote_menus($request) {
 
     $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
 
+    // Belt-and-braces for OLD remote plugins that ignore the template param:
+    // every menu row already carries its 'template' termmeta, so filter
+    // locally. Menus with no template tag can't be attributed and are
+    // dropped from a scoped listing.
+    $menus = $data['menus'];
+    if ($template !== '' && $template !== 'all' && !isset($data['template'])) {
+        $menus = array_values(array_filter($menus, function ($m) use ($template) {
+            return isset($m['template']) && $m['template'] === $template;
+        }));
+    }
+
     return new WP_REST_Response(array(
         'success'      => true,
-        'menus'        => $data['menus'],
-        'count'        => $data['count'],
+        'menus'        => $menus,
+        'count'        => count($menus),
+        'template'     => $template,
         'source_env'   => $source_env,
         'source_label' => $env_label
     ), 200);
@@ -2441,12 +2899,15 @@ function firefly_projects_fetch_remote_menus($request) {
  */
 function firefly_projects_pull_menu($request) {
     $remote_menu_id = $request->get_param('remote_menu_id');
-    $local_menu_id = $request->get_param('local_menu_id');
+    $local_menu_id = (int) $request->get_param('local_menu_id');
     $source_env = $request->get_param('source_env');
 
-    // Verify local menu exists
-    $local_menu = wp_get_nav_menu_object($local_menu_id);
-    if (!$local_menu) {
+    // local_menu_id is OPTIONAL: the local target is resolved (or created)
+    // template-scoped from the pulled menu's template after we fetch it —
+    // so pulling a menu into a fresh environment works without first
+    // hand-creating an empty menu. When an explicit id IS given, verify it.
+    $local_menu = $local_menu_id ? wp_get_nav_menu_object($local_menu_id) : null;
+    if ($local_menu_id && !$local_menu) {
         return new WP_REST_Response(array(
             'success' => false,
             'message' => 'Local menu not found.'
@@ -2510,6 +2971,59 @@ function firefly_projects_pull_menu($request) {
         ), $http_code);
     }
 
+    $menu_template = isset($data['menu_data']['template']) ? $data['menu_data']['template'] : '';
+    $menu_name = isset($data['menu_data']['name']) ? $data['menu_data']['name'] : '';
+
+    // Template guard: refuse to import a menu whose template isn't installed
+    // here — same invariant as page pull.
+    if ($menu_template && function_exists('firefly_is_valid_template') && !firefly_is_valid_template($menu_template)) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => "Template '{$menu_template}' is not installed on this site. "
+                       . "Initialize it first (firefly templates init {$menu_template}) before pulling its menu."
+        ), 400);
+    }
+
+    // Resolve the local target menu template-scoped.
+    if ($local_menu) {
+        // Explicit target: refuse if it belongs to a DIFFERENT template than
+        // the menu being pulled — that's exactly the cross-template collision
+        // the scoping system exists to prevent.
+        $local_template = get_term_meta($local_menu->term_id, '_firefly_template', true);
+        if ($menu_template && $local_template && $local_template !== $menu_template) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'message' => "Local menu '{$local_menu->name}' belongs to template '{$local_template}' "
+                           . "but the pulled menu belongs to '{$menu_template}'. Pick the matching menu or pull without one."
+            ), 400);
+        }
+    } elseif ($menu_template) {
+        // No explicit target: find this template's menu (canonical option →
+        // tagged name match → legacy name), or create a fresh scoped one.
+        if (function_exists('firefly_find_template_menu_id')) {
+            $found_id = firefly_find_template_menu_id($menu_template, $menu_name);
+            if ($found_id) {
+                $local_menu_id = $found_id;
+                $local_menu = wp_get_nav_menu_object($local_menu_id);
+            }
+        }
+        if (!$local_menu && function_exists('firefly_create_scoped_menu') && $menu_name !== '') {
+            $created = firefly_create_scoped_menu($menu_name, $menu_template);
+            if (!is_wp_error($created)) {
+                $local_menu_id = (int) $created;
+                $local_menu = wp_get_nav_menu_object($local_menu_id);
+            }
+        }
+    }
+
+    if (!$local_menu) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'message' => 'Could not resolve or create a local menu for the pull'
+                       . ($menu_template ? " (template '{$menu_template}')" : '') . '.'
+        ), 500);
+    }
+
     // Load the menu sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/menu-sync.php';
 
@@ -2519,6 +3033,12 @@ function firefly_projects_pull_menu($request) {
     $env_label = ($source_env === 'prod') ? 'Production' : 'Live Dev';
 
     if ($result['success']) {
+        // Heal the theme's canonical per-template menu pointer so the front
+        // end picks up exactly this menu for the template.
+        if ($menu_template) {
+            update_option("firefly_menu_{$menu_template}", (int) $local_menu_id);
+        }
+
         // Save pull timestamp
         $pull_time = time();
         $option_key = 'firefly_menu_pull_' . $source_env . '_' . $local_menu_id;
@@ -2531,6 +3051,7 @@ function firefly_projects_pull_menu($request) {
                 'local_menu_id'   => $local_menu_id,
                 'local_menu_name' => $local_menu->name,
                 'remote_menu_name' => $data['menu_data']['name'],
+                'template'        => $menu_template,
                 'items_pulled'    => $result['items_count'],
                 'source_env'      => $source_env,
                 'pulled_at'       => $pull_time

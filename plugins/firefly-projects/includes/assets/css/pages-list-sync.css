@@ -1007,3 +1007,22 @@ ol.firefly-sync-log-timeline {
     display: inline-flex;
     align-items: center;
 }
+
+/* "Sync template files" toggle row (single + bulk sync modals) */
+.firefly-sync-template-files {
+    margin: 12px 0;
+}
+.firefly-sync-template-files .firefly-sync-template-files-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.firefly-sync-template-files input[type="checkbox"] {
+    margin-top: 2px;
+}
+.firefly-template-files-written {
+    margin: 6px 0 0 18px;
+}
+.firefly-template-files-written code {
+    font-size: 12px;
+}

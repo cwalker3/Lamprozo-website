@@ -292,6 +292,60 @@ function firefly_override_menu_in_customizer($locations) {
     return $locations;
 }
 
+/**
+ * Self-heal the website-menu location for the ACTIVE template.
+ *
+ * The stored nav_menu_locations theme mod can drift out from under the active
+ * template: a switch that ran with a stale firefly_menu_{template} pointer, a
+ * pull/import that replaced the menu term with a new ID, or a menu recreated
+ * after the location was saved. Any of those left the header rendering no
+ * menu (or another template's menu) until someone reassigned it by hand.
+ *
+ * Runs on every read of nav_menu_locations (outside the customizer iframe,
+ * which the override above handles): if the assigned menu doesn't exist or
+ * belongs to a different template, re-resolve the active template's menu by
+ * term meta and return the corrected mapping. Read-only heal — the stored
+ * theme mod is left alone; find_template_menu_id() already heals the
+ * firefly_menu_{template} option as a side effect. Untagged (legacy) menus
+ * are left assigned as-is.
+ */
+add_filter('theme_mod_nav_menu_locations', 'firefly_heal_active_template_menu_location', 20);
+
+function firefly_heal_active_template_menu_location($locations) {
+    if (!is_array($locations)) {
+        return $locations;
+    }
+
+    if (function_exists('in_customizer_iframe') && in_customizer_iframe()) {
+        return $locations;
+    }
+
+    $template = firefly_get_scoping_template();
+    $current  = isset($locations['website-menu']) ? (int) $locations['website-menu'] : 0;
+
+    if ($current && term_exists($current, 'nav_menu')) {
+        $owner = get_term_meta($current, FIREFLY_TEMPLATE_META_KEY, true);
+        if ('' === $owner || $owner === $template) {
+            return $locations;
+        }
+    }
+
+    $base_name = 'Main Menu';
+    if (function_exists('firefly_get_template_schema')) {
+        $schema = firefly_get_template_schema($template);
+        if (!empty($schema['menu']['name'])) {
+            $base_name = $schema['menu']['name'];
+        }
+    }
+
+    $menu_id = firefly_find_template_menu_id($template, $base_name);
+    if ($menu_id) {
+        $locations['website-menu'] = $menu_id;
+    }
+
+    return $locations;
+}
+
 // =============================================================================
 // MENU ASSIGNMENT
 // =============================================================================
