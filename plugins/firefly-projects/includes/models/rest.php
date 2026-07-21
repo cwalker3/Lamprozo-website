@@ -632,6 +632,7 @@ function firefly_plugin_register_rest_endpoints() {
         'pull-settings'   => 'firefly_projects_ts_pull_settings',
         'remote-activate' => 'firefly_projects_ts_remote_activate',
         'activate-local'  => 'firefly_projects_ts_activate_local',
+        'clear-cache'     => 'firefly_projects_ts_clear_cache',
     );
     foreach ($ts_admin_routes as $ts_path => $ts_callback) {
         register_rest_route('firefly-plugin/v1', '/template-sync/' . $ts_path, array(

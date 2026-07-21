@@ -2034,6 +2034,30 @@ function firefly_projects_ts_activate_local($request) {
 }
 
 /**
+ * POST /template-sync/clear-cache (admin) — clear THIS site's static page cache
+ * as the final step of a pull. Freshly-synced content (the front page most
+ * visibly) is otherwise served stale from the cache until a manual purge; the
+ * cache helpers also trigger the nginx proxy purge. opcache is reset too since
+ * the files step may have replaced template PHP.
+ */
+function firefly_projects_ts_clear_cache($request) {
+    $template = sanitize_file_name((string) $request->get_param('template'));
+    $cleared = array();
+    if ($template !== '' && function_exists('firefly_collective_cache_delete_template')) {
+        firefly_collective_cache_delete_template($template);  // also purges nginx
+        $cleared[] = 'page cache: ' . $template;
+    } elseif (function_exists('firefly_collective_cache_clear_all')) {
+        firefly_collective_cache_clear_all();                 // also purges nginx
+        $cleared[] = 'page cache: all';
+    }
+    if (function_exists('opcache_reset')) {
+        @opcache_reset();
+        $cleared[] = 'opcache';
+    }
+    return new WP_REST_Response(array('success' => true, 'cleared' => $cleared), 200);
+}
+
+/**
  * POST /template-sync/mirror-content (admin).
  * direction 'push': delete remote pages/posts of this template that don't
  * exist locally (reuses the bulk-sync orphan machinery, template threaded

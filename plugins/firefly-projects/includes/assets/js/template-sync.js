@@ -433,6 +433,26 @@
             });
         }
 
+        // Final step: clear THIS site's page cache after a pull so freshly-synced
+        // content (the front page especially) renders immediately instead of
+        // being served stale from the static cache. Runs last, after content +
+        // activation. Never fails the pull — a cache miss is cosmetic.
+        if (direction === 'pull') {
+            steps.push({
+                id: 'clearcache',
+                label: 'Clear cache (this site)',
+                run: function () {
+                    return api('template-sync/clear-cache', { template: template })
+                        .then(function (res) {
+                            return { note: (res && res.cleared || []).join(', ') || 'cleared' };
+                        }, function () {
+                            // Non-fatal: report but don't reject the pipeline.
+                            return { note: 'skipped (clear cache manually if the front page looks stale)' };
+                        });
+                }
+            });
+        }
+
         return steps;
     }
 
