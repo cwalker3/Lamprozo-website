@@ -297,3 +297,57 @@ function firefly_remove_users_sitemap_provider( $provider, $name ) {
     }
     return $provider;
 }
+
+/**
+ * Keep the sitemap and the per-page robots meta in agreement.
+ *
+ * WP core's sitemap lists every published page/post regardless of its
+ * _seo_robots_noindex flag, so a page that emits <meta robots noindex> was
+ * still advertised in wp-sitemap.xml — Google crawls the sitemapped URL,
+ * finds noindex, and files "Excluded by 'noindex' tag" / "Crawled - not
+ * indexed". Exclude noindexed posts from the sitemap so the two signals
+ * never contradict. (Template scoping is already applied via the
+ * pre_get_posts meta_query; this clause ANDs with it.)
+ */
+add_filter( 'wp_sitemaps_posts_query_args', 'firefly_sitemap_exclude_noindex', 10, 2 );
+
+function firefly_sitemap_exclude_noindex( $args, $post_type ) {
+    // Exclude by ID, NOT via a meta_query. A `NOT EXISTS OR != '1'` meta_query
+    // combines with the template-scoping meta_query (added in pre_get_posts)
+    // into conflicting JOINs that silently drop pages which have NO
+    // _seo_robots_noindex row at all — including the front page. Resolve the
+    // noindexed IDs up front and post__not_in them instead.
+    $noindex_ids = get_posts( array(
+        'post_type'            => $post_type,
+        'post_status'          => 'publish',
+        'numberposts'          => -1,
+        'fields'               => 'ids',
+        'meta_key'             => '_seo_robots_noindex',
+        'meta_value'           => '1',
+        'firefly_skip_scoping' => true,
+        'no_found_rows'        => true,
+        'suppress_filters'     => false,
+    ) );
+
+    if ( ! empty( $noindex_ids ) ) {
+        $existing            = isset( $args['post__not_in'] ) ? (array) $args['post__not_in'] : array();
+        $args['post__not_in'] = array_merge( $existing, array_map( 'intval', $noindex_ids ) );
+    }
+
+    return $args;
+}
+
+/**
+ * Drop the tag (post_tag) sitemap. Tag archives are thin, near-duplicate
+ * listing pages that Google reports as "Crawled - currently not indexed";
+ * they're also noindexed by the robots filter (see seo-schema.php), so
+ * advertising them in the sitemap only sends mixed signals. Categories stay
+ * — they're the real content taxonomy. Pages/posts/category sitemaps are
+ * untouched.
+ */
+add_filter( 'wp_sitemaps_taxonomies', 'firefly_remove_tag_sitemap' );
+
+function firefly_remove_tag_sitemap( $taxonomies ) {
+    unset( $taxonomies['post_tag'] );
+    return $taxonomies;
+}

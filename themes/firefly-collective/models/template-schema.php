@@ -1119,7 +1119,10 @@ function firefly_handle_opcache_reset(WP_REST_Request $request) {
  * Handle page cache clearing from CLI.
  */
 function firefly_handle_clear_cache(WP_REST_Request $request) {
-    $template = sanitize_file_name($request->get_param('template'));
+    // Cast to string first: with no template param, get_param() returns null,
+    // and sanitize_file_name(null) fatals on PHP 8.1+ (null → wp_is_valid_utf8).
+    // Empty template means "clear all" (see below).
+    $template = sanitize_file_name( (string) $request->get_param('template') );
 
     if (!empty($template) && function_exists('firefly_collective_cache_delete_template')) {
         firefly_collective_cache_delete_template($template);

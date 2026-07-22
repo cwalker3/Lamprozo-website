@@ -119,14 +119,18 @@ add_filter( 'wp_calculate_image_srcset', function( $sources ) {
  * Runs as an output buffer on template_redirect.
  *
  * Skips WordPress core's XML sitemaps (/wp-sitemap*.xml, the .xsl
- * stylesheets). The sitemap protocol requires <loc> URLs to be absolute —
- * relativizing them made every entry an "Invalid URL" in Google Search
- * Console. Sitemap requests carry the `sitemap` or `sitemap-stylesheet`
- * query var (set by WP core's rewrite rules) by the time template_redirect
- * fires, so this is a targeted skip; ordinary page/post output is untouched.
+ * stylesheets) AND robots.txt. The sitemap protocol requires <loc> URLs to
+ * be absolute — relativizing them made every entry an "Invalid URL" in
+ * Google Search Console. robots.txt's `Sitemap:` directive likewise must be
+ * an absolute URL, and the relativizer was rewriting core's absolute
+ * `Sitemap: https://…/wp-sitemap.xml` down to a relative `/wp-sitemap.xml`
+ * that Google ignores. Sitemap requests carry the `sitemap` /
+ * `sitemap-stylesheet` query var and robots.txt sets is_robots() by the time
+ * template_redirect fires, so this is a targeted skip; ordinary page/post
+ * output is untouched.
  */
 add_action( 'template_redirect', function() {
-    if ( get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' ) ) {
+    if ( get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' ) || is_robots() ) {
         return;
     }
     ob_start( 'firefly_relativize_urls' );
