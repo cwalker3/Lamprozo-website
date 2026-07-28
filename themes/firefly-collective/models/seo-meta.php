@@ -338,6 +338,42 @@ function firefly_sitemap_exclude_noindex( $args, $post_type ) {
 }
 
 /**
+ * Drop the framework chrome pages (header/footer) from the sitemap.
+ *
+ * Every template stores its header/footer markup in `header`/`footer` pages
+ * (menu_order -100/-99, in_menu:false). They render at /header/ and /footer/
+ * but are content holders, not real pages — advertising them in the sitemap
+ * sends Google to crawl bare chrome fragments. Resolve their IDs and
+ * post__not_in them, mirroring firefly_sitemap_exclude_noindex. (They're also
+ * noindexed in seo-schema.php so the two signals agree.)
+ */
+add_filter( 'wp_sitemaps_posts_query_args', 'firefly_sitemap_exclude_chrome', 10, 2 );
+
+function firefly_sitemap_exclude_chrome( $args, $post_type ) {
+    if ( 'page' !== $post_type ) {
+        return $args;
+    }
+
+    $chrome_ids = get_posts( array(
+        'post_type'            => 'page',
+        'post_status'          => 'publish',
+        'numberposts'          => -1,
+        'fields'               => 'ids',
+        'post_name__in'        => array( 'header', 'footer' ),
+        'firefly_skip_scoping' => true,
+        'no_found_rows'        => true,
+        'suppress_filters'     => false,
+    ) );
+
+    if ( ! empty( $chrome_ids ) ) {
+        $existing             = isset( $args['post__not_in'] ) ? (array) $args['post__not_in'] : array();
+        $args['post__not_in'] = array_merge( $existing, array_map( 'intval', $chrome_ids ) );
+    }
+
+    return $args;
+}
+
+/**
  * Drop the tag (post_tag) sitemap. Tag archives are thin, near-duplicate
  * listing pages that Google reports as "Crawled - currently not indexed";
  * they're also noindexed by the robots filter (see seo-schema.php), so

@@ -368,6 +368,15 @@ function firefly_apply_robots_filters( $robots ) {
 
     $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
     if ( $post_id ) {
+        // Framework chrome pages (header/footer) are content holders, not real
+        // pages. They render at /header/ and /footer/ but should never be
+        // indexed — noindex them (they're also dropped from the sitemap in
+        // seo-meta.php's firefly_sitemap_exclude_chrome).
+        $chrome_slug = get_post_field( 'post_name', $post_id );
+        if ( 'header' === $chrome_slug || 'footer' === $chrome_slug ) {
+            $robots['noindex'] = true;
+            unset( $robots['index'] );
+        }
         if ( get_post_meta( $post_id, '_seo_robots_noindex', true ) ) {
             $robots['noindex']  = true;
             unset( $robots['index'] );

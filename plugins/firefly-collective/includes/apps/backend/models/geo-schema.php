@@ -133,6 +133,11 @@ function firefly_geo_get_default_config() {
         'organization' => [
             'name' => 'Firefly Creative, LLC',
             'legalName' => 'Firefly Creative, LLC',
+            'alternateName' => [
+                'Firefly Creative',
+                'Firefly Creative Agency',
+                'Firefly Web Development'
+            ],
             'url' => 'https://fireflycreative.co',
             'foundingDate' => '2022',
             'description' => 'Custom WordPress development agency providing bespoke themes, plugins, and web applications for businesses.',
@@ -202,7 +207,7 @@ function firefly_geo_inject_schema() {
     $schema = firefly_geo_build_page_schema();
 
     if (!empty($schema)) {
-        echo "\n<!-- Firefly Creative GEO Schema -->\n";
+        echo "\n<!-- GEO Schema -->\n";
         echo '<script type="application/ld+json">' . "\n";
         echo json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         echo "\n</script>\n";
@@ -271,18 +276,26 @@ function firefly_geo_organization_schema() {
         '@id' => $org['url'] . '/#organization',
         'name' => $org['name'],
         'legalName' => $org['legalName'],
-        'alternateName' => [
-            'Firefly Creative',
-            'Firefly Creative Agency',
-            'Firefly Web Development'
-        ],
         'url' => $org['url'],
         'description' => $org['description'],
         'disambiguatingDescription' => $org['disambiguatingDescription'],
-        'foundingDate' => $org['foundingDate'],
-        'naics' => $config['naics'],
-        'isicV4' => $config['isicV4']
     ];
+
+    // alternateName / foundingDate / industry codes are optional and per-client.
+    // Emit them only when configured so a site that hasn't set them doesn't ship
+    // empty strings — or, worse, another organization's alternate names.
+    if ( ! empty( $org['alternateName'] ) ) {
+        $schema['alternateName'] = $org['alternateName'];
+    }
+    if ( ! empty( $org['foundingDate'] ) ) {
+        $schema['foundingDate'] = $org['foundingDate'];
+    }
+    if ( ! empty( $config['naics'] ) ) {
+        $schema['naics'] = $config['naics'];
+    }
+    if ( ! empty( $config['isicV4'] ) ) {
+        $schema['isicV4'] = $config['isicV4'];
+    }
 
     // Logo
     if (!empty($org['logo'])) {
@@ -367,7 +380,7 @@ function firefly_geo_organization_schema() {
         }
         $schema['hasOfferCatalog'] = [
             '@type' => 'OfferCatalog',
-            'name' => 'Web Development Services',
+            'name' => trim( $org['name'] . ' Services' ),
             'itemListElement' => $offers
         ];
     }
@@ -415,7 +428,7 @@ function firefly_geo_webpage_schema($type = 'WebPage', $page_type = '') {
 
     if (is_front_page()) {
         $url = $org['url'];
-        $title = $org['name'] . ' - Custom WordPress Development';
+        $title = $org['name'];
     }
 
     $schema = [
@@ -521,7 +534,7 @@ function firefly_geo_contact_page_schema() {
         'about' => [
             '@id' => $org['url'] . '/#organization'
         ],
-        'description' => 'Contact ' . $org['name'] . ' for custom WordPress development services.',
+        'description' => 'Contact ' . $org['name'] . '.',
         'inLanguage' => 'en-US'
     ];
 }
