@@ -50,7 +50,14 @@ function firefly_get_schema_pages($template) {
             'in_menu'    => isset($page['in_menu']) ? $page['in_menu'] : true,
             'menu_order' => isset($page['menu_order']) ? $page['menu_order'] : 0,
             'set_as'     => isset($page['set_as']) ? $page['set_as'] : null,
-            'required'   => isset($page['required']) ? $page['required'] : false
+            'required'   => isset($page['required']) ? $page['required'] : false,
+            // Restorable meta (parity with posts): SEO, featured image, mobile
+            // featured, and GEO all travel in the page's schema entry now.
+            'seo'                        => isset($page['seo']) ? $page['seo'] : null,
+            'geo'                        => isset($page['geo']) ? $page['geo'] : null,
+            'featured_image'             => isset($page['featured_image']) ? $page['featured_image'] : null,
+            'mobile_featured_image'      => isset($page['mobile_featured_image']) ? $page['mobile_featured_image'] : null,
+            'mobile_featured_breakpoint' => isset($page['mobile_featured_breakpoint']) ? $page['mobile_featured_breakpoint'] : null,
         );
     }
 
@@ -239,6 +246,7 @@ function firefly_create_template_pages($template) {
 
                 update_post_meta($page_id, FIREFLY_TEMPLATE_META_KEY, $template);
                 update_post_meta($page_id, '_firefly_page_id', $template . ':' . $base_slug);
+                firefly_apply_schema_post_extras($page_id, $data);
                 $page_ids[$base_slug] = array('id' => $page_id, 'status' => 'created');
             } else {
                 $page_ids[$base_slug] = array('id' => 0, 'status' => 'error', 'error' => $page_id->get_error_message());
@@ -284,6 +292,11 @@ function firefly_create_template_pages($template) {
             if (empty($existing_fpid)) {
                 update_post_meta($page_id, '_firefly_page_id', $template . ':' . $base_slug);
             }
+
+            // Restore SEO / featured / mobile / GEO from the schema on every
+            // reimport too — schema is source of truth, so a from-scratch or
+            // repeat import reproduces the page's meta identically.
+            firefly_apply_schema_post_extras($page_id, $data);
         }
     }
 
@@ -356,7 +369,10 @@ function firefly_get_schema_posts($template) {
             'content'        => $content,
             'category'       => isset($post['category']) ? $post['category'] : 'uncategorized',
             'geo'            => isset($post['geo']) ? $post['geo'] : null,
-            'featured_image' => isset($post['featured_image']) ? $post['featured_image'] : null
+            'featured_image' => isset($post['featured_image']) ? $post['featured_image'] : null,
+            'seo'                        => isset($post['seo']) ? $post['seo'] : null,
+            'mobile_featured_image'      => isset($post['mobile_featured_image']) ? $post['mobile_featured_image'] : null,
+            'mobile_featured_breakpoint' => isset($post['mobile_featured_breakpoint']) ? $post['mobile_featured_breakpoint'] : null,
         );
     }
 
@@ -514,6 +530,191 @@ function firefly_apply_schema_post_extras($post_id, $data) {
             set_post_thumbnail($post_id, $attachment_id);
         }
     }
+
+    // Mobile featured image (resolved by filename, like the desktop featured
+    // image) + its breakpoint. Both are template-look data the site needs to
+    // rebuild identically.
+    if (!empty($data['mobile_featured_image'])) {
+        $mobile_id = firefly_get_attachment_by_filename($data['mobile_featured_image'], $post_id);
+        if ($mobile_id) {
+            update_post_meta($post_id, '_firefly_mobile_thumbnail_id', $mobile_id);
+        }
+    }
+    if (isset($data['mobile_featured_breakpoint']) && '' !== $data['mobile_featured_breakpoint']) {
+        update_post_meta($post_id, '_firefly_mobile_thumbnail_breakpoint', (int) $data['mobile_featured_breakpoint']);
+    }
+
+    // Per-page/post SEO meta. Scalars go straight to their meta keys; robots_*
+    // are booleans (store '1' or clear); og_image is resolved by filename so it
+    // survives across environments (the raw attachment id never travels).
+    if (!empty($data['seo']) && is_array($data['seo'])) {
+        $seo = $data['seo'];
+        foreach (firefly_seo_meta_map() as $key => $meta_key) {
+            if (!array_key_exists($key, $seo)) {
+                continue;
+            }
+            if (0 === strpos($key, 'robots_')) {
+                if (!empty($seo[$key])) {
+                    update_post_meta($post_id, $meta_key, '1');
+                } else {
+                    delete_post_meta($post_id, $meta_key);
+                }
+            } else {
+                update_post_meta($post_id, $meta_key, wp_slash((string) $seo[$key]));
+            }
+        }
+        if (!empty($seo['og_image'])) {
+            $og_id = firefly_get_attachment_by_filename($seo['og_image'], $post_id);
+            if ($og_id) {
+                update_post_meta($post_id, '_seo_og_image_id', $og_id);
+            }
+        }
+    }
+}
+
+/**
+ * Schema SEO key => post meta key. og_image is intentionally absent — it is
+ * stored/restored by filename (see firefly_get_post_seo_for_schema +
+ * firefly_apply_schema_post_extras), not as a raw, environment-specific id.
+ */
+function firefly_seo_meta_map() {
+    return array(
+        'title'           => '_seo_title',
+        'description'     => '_seo_description',
+        'canonical'       => '_seo_canonical',
+        'og_title'        => '_seo_og_title',
+        'og_description'  => '_seo_og_description',
+        'robots_noindex'  => '_seo_robots_noindex',
+        'robots_nofollow' => '_seo_robots_nofollow',
+    );
+}
+
+/**
+ * An attachment id -> its basename (env-independent handle for the schema).
+ */
+function firefly_attachment_filename($attachment_id) {
+    $attachment_id = (int) $attachment_id;
+    if (!$attachment_id) {
+        return null;
+    }
+    $path = get_attached_file($attachment_id);
+    return $path ? basename($path) : null;
+}
+
+/**
+ * Build a post/page's SEO block for the schema, or null when nothing is set.
+ * Mirrors firefly_apply_schema_post_extras()'s SEO handling in reverse.
+ */
+function firefly_get_post_seo_for_schema($post_id) {
+    $seo = array();
+    foreach (firefly_seo_meta_map() as $key => $meta_key) {
+        $val = get_post_meta($post_id, $meta_key, true);
+        if ('' === $val || null === $val) {
+            continue;
+        }
+        if (0 === strpos($key, 'robots_')) {
+            if (!empty($val)) {
+                $seo[$key] = true;
+            }
+        } else {
+            $seo[$key] = (string) $val;
+        }
+    }
+    $og_file = firefly_attachment_filename(get_post_meta($post_id, '_seo_og_image_id', true));
+    if ($og_file) {
+        $seo['og_image'] = $og_file;
+    }
+    return $seo ? $seo : null;
+}
+
+/**
+ * Apply schema-level global options on import: the custom login slug (a shared
+ * theme_mod that was previously carried by nothing) and the per-template look
+ * options (colors/typography — previously Template-Sync-only). Front/posts page
+ * and the menu are derived elsewhere; this fills the remaining DB-only gaps so
+ * the site rebuilds identically from schema.
+ */
+function firefly_apply_schema_options($template, $schema) {
+    if (empty($schema['options']) || !is_array($schema['options'])) {
+        return;
+    }
+    $opts = $schema['options'];
+
+    if (!empty($opts['custom_login_slug'])) {
+        set_theme_mod('custom_login_slug', sanitize_title($opts['custom_login_slug']));
+    }
+
+    if (!empty($opts['template_options']) && is_array($opts['template_options'])
+        && function_exists('firefly_set_template_option')) {
+        foreach ($opts['template_options'] as $key => $value) {
+            firefly_set_template_option(sanitize_key($key), $value, $template, false);
+        }
+    }
+}
+
+/**
+ * Snapshot schema-level globals (login slug + per-template look options) back
+ * into the active template's schema file. Fires after a Customizer save — the
+ * natural trigger for exactly these settings — so they stay schema-driven the
+ * same way the snippet-sync hook keeps page bodies in sync.
+ */
+function firefly_capture_schema_globals() {
+    $template = function_exists('firefly_get_scoping_template') ? firefly_get_scoping_template() : '';
+    if (!$template) {
+        return;
+    }
+    $schema_path = get_template_directory() . '/data/schemas/' . $template . '-schema.json';
+    if (!file_exists($schema_path)) {
+        return;
+    }
+    $schema = json_decode(file_get_contents($schema_path), true);
+    if (!is_array($schema)) {
+        return;
+    }
+    if (!isset($schema['options']) || !is_array($schema['options'])) {
+        $schema['options'] = array();
+    }
+
+    $slug = get_theme_mod('custom_login_slug', '');
+    if ($slug) {
+        $schema['options']['custom_login_slug'] = $slug;
+    }
+
+    if (function_exists('firefly_get_template_options') && function_exists('firefly_get_template_option')) {
+        $vals = array();
+        foreach (array_keys(firefly_get_template_options($template)) as $key) {
+            $vals[$key] = firefly_get_template_option($key, false, $template);
+        }
+        if ($vals) {
+            $schema['options']['template_options'] = $vals;
+        }
+    }
+
+    file_put_contents(
+        $schema_path,
+        json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+    );
+}
+add_action('customize_save_after', 'firefly_capture_schema_globals');
+
+/**
+ * Build a post/page's mobile-featured-image fields for the schema:
+ * array('mobile_featured_image' => filename, 'mobile_featured_breakpoint' => int)
+ * with only the keys that are actually set. Empty array when none.
+ */
+function firefly_get_post_mobile_featured_for_schema($post_id) {
+    $out = array();
+    $file = firefly_attachment_filename(get_post_meta($post_id, '_firefly_mobile_thumbnail_id', true));
+    if ($file) {
+        $out['mobile_featured_image'] = $file;
+    }
+    // Only a positive breakpoint is meaningful — a 0 (the default when no mobile
+    // image is set) is noise that would clutter every page's schema entry.
+    $bp = (int) get_post_meta($post_id, '_firefly_mobile_thumbnail_breakpoint', true);
+    if ($bp > 0) {
+        $out['mobile_featured_breakpoint'] = $bp;
+    }
+    return $out;
 }
 
 // =============================================================================
@@ -753,13 +954,15 @@ function firefly_create_template_categories($template) {
 
     foreach ($schema['categories'] as $cat_def) {
         $slug = $template === 'default' ? $cat_def['slug'] : "{$cat_def['slug']}-{$template}";
+        $description = isset($cat_def['description']) ? $cat_def['description'] : '';
 
         // Check if exists
         $existing = get_term_by('slug', $slug, 'category');
 
         if (!$existing) {
             $result = wp_insert_term($cat_def['name'], 'category', array(
-                'slug' => $slug
+                'slug'        => $slug,
+                'description' => $description,
             ));
 
             if (!is_wp_error($result)) {
@@ -769,8 +972,11 @@ function firefly_create_template_categories($template) {
                 $term_ids[$cat_def['slug']] = array('id' => 0, 'status' => 'error', 'error' => $result->get_error_message());
             }
         } else {
-            // Ensure template meta is set
+            // Ensure template meta is set + keep the description in sync with schema.
             update_term_meta($existing->term_id, FIREFLY_TEMPLATE_META_KEY, $template);
+            if ('' !== $description && $description !== $existing->description) {
+                wp_update_term($existing->term_id, 'category', array('description' => $description));
+            }
             $term_ids[$cat_def['slug']] = array('id' => $existing->term_id, 'status' => 'unchanged');
         }
     }
@@ -910,6 +1116,10 @@ function firefly_handle_activate_template(WP_REST_Request $request) {
         set_theme_mod('nav_menu_locations', $locations);
         update_option("firefly_menu_{$template}", $result['menu']);
     }
+
+    // Apply schema-level global options (custom login slug + per-template look
+    // options) so a from-scratch rebuild reproduces them too.
+    firefly_apply_schema_options($template, $schema);
 
     // Set active template
     update_option('firefly_collective_active_template', $template);

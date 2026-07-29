@@ -211,6 +211,51 @@ function firefly_get_snippet_path($post_id, $post_type = 'page') {
 /**
  * Save post content to snippet file
  */
+/**
+ * Normalize a snippet's HTML for EQUIVALENCE COMPARISON ONLY (never for what is
+ * written to disk). Canonicalizes the cosmetic differences WordPress's block
+ * editor introduces when it re-serializes every block on save — chiefly inline
+ * `style` attributes, where it adds a trailing ";", tweaks spacing, etc. Two
+ * snippets that differ only in those ways describe the identical page and must
+ * not produce a diff; any real change survives normalization and still writes.
+ */
+function firefly_normalize_snippet_for_compare($html) {
+    // Canonicalize every inline style attribute: split declarations on ";",
+    // trim each, normalize spacing around the first ":", drop empties, rejoin.
+    // Absorbs the trailing-";", double-";", and stray-space variations the
+    // editor emits without touching declaration order or values.
+    $html = preg_replace_callback(
+        '/style=(["\'])(.*?)\1/s',
+        function ($m) {
+            $decls = array();
+            foreach (explode(';', $m[2]) as $decl) {
+                $decl = trim($decl);
+                if ('' === $decl) {
+                    continue;
+                }
+                $decls[] = preg_replace('/\s*:\s*/', ':', $decl, 1);
+            }
+            return 'style=' . $m[1] . implode(';', $decls) . $m[1];
+        },
+        $html
+    );
+
+    return $html;
+}
+
+/**
+ * True when two snippet HTML strings describe the same page, ignoring only the
+ * cosmetic serialization noise firefly_normalize_snippet_for_compare() strips.
+ * Keeps snippet exports idempotent: a meta-only edit (which still re-serializes
+ * every block) no longer dirties the body snippet.
+ */
+function firefly_snippets_equivalent($a, $b) {
+    if ($a === $b) {
+        return true;
+    }
+    return firefly_normalize_snippet_for_compare($a) === firefly_normalize_snippet_for_compare($b);
+}
+
 function firefly_save_snippet($post_id) {
     // Suppress when an inbound page-sync is currently applying the snippet
     // explicitly from the sender's manifest. Without this guard the receiver
@@ -259,6 +304,18 @@ function firefly_save_snippet($post_id) {
     $post = get_post($post_id);
     $content = firefly_relativize_urls($post->post_content);
 
+    // Idempotent export: WordPress re-serializes every block on save (e.g. it
+    // appends a trailing ";" to inline styles), so a meta-only edit would
+    // otherwise rewrite the body snippet with purely cosmetic diffs. Skip the
+    // file write when the new content is equivalent to what's already on disk —
+    // but STILL refresh the schema entry, since title/menu/SEO/etc. may have
+    // changed even when the body didn't.
+    $existing = file_exists($snippet_path) ? file_get_contents($snippet_path) : null;
+    if (null !== $existing && firefly_snippets_equivalent($content, $existing)) {
+        firefly_update_schema_entry($post_id, $post_type, $template);
+        return;
+    }
+
     // Write to file
     $result = @file_put_contents($snippet_path, $content);
 
@@ -275,6 +332,21 @@ function firefly_save_snippet($post_id) {
     }
 }
 add_action('save_post', 'firefly_save_snippet', 20);
+
+// Block-editor (REST) saves persist post meta AFTER save_post fires, so the
+// hook above captures STALE SEO / featured / mobile / OG meta into the schema
+// (the meta the block editor just set isn't written yet). rest_after_insert_{type}
+// runs once the REST controller has stored the post AND all its registered meta,
+// so re-syncing here captures the just-saved values. firefly_save_snippet is
+// idempotent, so the extra run on a REST save is harmless — it simply wins with
+// the correct meta.
+function firefly_save_snippet_after_rest($post) {
+    if ($post instanceof WP_Post) {
+        firefly_save_snippet($post->ID);
+    }
+}
+add_action('rest_after_insert_page', 'firefly_save_snippet_after_rest', 10, 1);
+add_action('rest_after_insert_post', 'firefly_save_snippet_after_rest', 10, 1);
 
 /**
  * Show admin notice when snippet save fails (classic editor)
@@ -440,22 +512,16 @@ function firefly_update_schema_entry($post_id, $post_type, $template) {
             }
 
             if ($post_type === 'post') {
-                // Get category
+                // Category is post-only.
                 $categories = get_the_category($post_id);
                 if (!empty($categories)) {
                     $schema[$key][$index]['category'] = $categories[0]->slug;
                 }
-                // Get featured image
-                $featured_image = firefly_get_featured_image_filename($post_id);
-                if ($featured_image) {
-                    $schema[$key][$index]['featured_image'] = $featured_image;
-                }
-                // Get GEO data
-                $geo_data = firefly_get_post_geo_data($post_id);
-                if ($geo_data) {
-                    $schema[$key][$index]['geo'] = $geo_data;
-                }
             }
+
+            // SEO / featured image / mobile featured / GEO — captured for pages
+            // AND posts so the schema entry records everything substantial.
+            firefly_apply_entry_extras($schema[$key][$index], $post_id);
 
             $found = true;
             break;
@@ -478,17 +544,9 @@ function firefly_update_schema_entry($post_id, $post_type, $template) {
         if ($post_type === 'post') {
             $categories = get_the_category($post_id);
             $new_entry['category'] = !empty($categories) ? $categories[0]->slug : 'uncategorized';
-
-            $featured_image = firefly_get_featured_image_filename($post_id);
-            if ($featured_image) {
-                $new_entry['featured_image'] = $featured_image;
-            }
-
-            $geo_data = firefly_get_post_geo_data($post_id);
-            if ($geo_data) {
-                $new_entry['geo'] = $geo_data;
-            }
         }
+
+        firefly_apply_entry_extras($new_entry, $post_id);
 
         $schema[$key][] = $new_entry;
     }
@@ -504,9 +562,47 @@ function firefly_update_schema_entry($post_id, $post_type, $template) {
         });
     }
 
-    // Save schema
-    $json = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    // Save schema. UNESCAPED_UNICODE keeps accented chars literal (’ – …) so
+    // this writer matches the CLI export (json.dump ensure_ascii=False) — without
+    // it the two writers flip every unicode char to/from \uXXXX and every save
+    // churned the whole file.
+    $json = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     file_put_contents($schema_path, $json);
+}
+
+/**
+ * Merge the "substantial meta" fields into a schema page/post entry (by ref):
+ * SEO block, featured image (by filename), mobile featured (filename +
+ * breakpoint), and GEO. Keys are set when present and unset when cleared, so
+ * the schema entry always reflects the post's current state without stale
+ * fields. Used for BOTH pages and posts — this is the parity fix.
+ */
+function firefly_apply_entry_extras(&$entry, $post_id) {
+    // SEO
+    $seo = function_exists('firefly_get_post_seo_for_schema') ? firefly_get_post_seo_for_schema($post_id) : null;
+    if ($seo) { $entry['seo'] = $seo; } else { unset($entry['seo']); }
+
+    // Featured image (filename) — pages + posts.
+    $featured = firefly_get_featured_image_filename($post_id);
+    if ($featured) { $entry['featured_image'] = $featured; } else { unset($entry['featured_image']); }
+
+    // Mobile featured image (filename) + breakpoint.
+    $mobile = function_exists('firefly_get_post_mobile_featured_for_schema')
+        ? firefly_get_post_mobile_featured_for_schema($post_id) : array();
+    if (!empty($mobile['mobile_featured_image'])) {
+        $entry['mobile_featured_image'] = $mobile['mobile_featured_image'];
+    } else {
+        unset($entry['mobile_featured_image']);
+    }
+    if (isset($mobile['mobile_featured_breakpoint'])) {
+        $entry['mobile_featured_breakpoint'] = $mobile['mobile_featured_breakpoint'];
+    } else {
+        unset($entry['mobile_featured_breakpoint']);
+    }
+
+    // GEO
+    $geo = firefly_get_post_geo_data($post_id);
+    if ($geo) { $entry['geo'] = $geo; } else { unset($entry['geo']); }
 }
 
 /**
