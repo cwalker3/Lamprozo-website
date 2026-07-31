@@ -40,6 +40,10 @@
     // falls back to the default PHP mailer when unset).
     require_once get_template_directory() . '/models/firefly-smtp.php';
 
+    // Sends logged-out users to this site's panel console (login is console-only;
+    // nginx blocks wp-login.php). Derives the console host from the site domain.
+    require_once get_template_directory() . '/models/console-auth.php';
+
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {
         require_once get_template_directory() . '/models/template-scoping-admin.php';
