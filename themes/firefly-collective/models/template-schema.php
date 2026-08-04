@@ -746,7 +746,12 @@ function firefly_get_attachment_by_filename($filename, $for_post_id = 0) {
     ), ARRAY_A);
 
     if (empty($rows)) {
-        return 0;
+        // Not in the media library — but the FILE may still be on disk. Page
+        // sync copies a post's inline assets to uploads/pages/<slug>/ without
+        // registering attachments, so after a from-scratch rebuild every
+        // schema featured_image resolved to 0 and the blog lost every image.
+        // Adopt the file instead of giving up.
+        return firefly_adopt_attachment_from_disk($filename, $for_post_id);
     }
 
     if ($for_post_id) {
@@ -758,6 +763,106 @@ function firefly_get_attachment_by_filename($filename, $for_post_id = 0) {
     }
 
     return (int) $rows[0]['post_id'];
+}
+
+/**
+ * Register an on-disk uploads file as a media-library attachment and return its
+ * id (0 when the file can't be found).
+ *
+ * The file is adopted IN PLACE — never copied — so the URL a snippet already
+ * points at keeps resolving and no duplicate appears on disk. This is what
+ * makes a schema featured_image reproducible: `firefly import` on a fresh
+ * install now yields the same featured images as the site it was exported from,
+ * instead of silently leaving them blank.
+ *
+ * Search order is narrow-to-broad so a generic name ("featured-image.webp")
+ * resolves to the post's OWN asset before any other page's copy of it:
+ *   1. uploads/pages/<this post's slug>/   — where page sync puts inline assets
+ *   2. uploads/pages/<any slug>/           — a shared asset
+ *   3. anywhere else under uploads/        — year/month folders, template dirs
+ * Generated size variants (…-300x196.webp) are skipped: only originals adopt.
+ */
+function firefly_adopt_attachment_from_disk($filename, $for_post_id = 0) {
+    $filename = basename($filename);
+    if ('' === $filename) {
+        return 0;
+    }
+
+    $uploads = wp_get_upload_dir();
+    if (!empty($uploads['error']) || empty($uploads['basedir'])) {
+        return 0;
+    }
+    $basedir = rtrim($uploads['basedir'], '/');
+
+    $candidates = array();
+    if ($for_post_id) {
+        $slug = get_post_field('post_name', $for_post_id);
+        if ($slug) {
+            $candidates[] = $basedir . '/pages/' . $slug . '/' . $filename;
+        }
+    }
+    foreach (glob($basedir . '/pages/*/' . $filename) ?: array() as $hit) {
+        $candidates[] = $hit;
+    }
+
+    $path = '';
+    foreach ($candidates as $candidate) {
+        if (is_readable($candidate)) {
+            $path = $candidate;
+            break;
+        }
+    }
+
+    // Last resort: walk uploads. Bounded by skipping the size-variant caches and
+    // bailing on the first hit, so this stays cheap even on a large library.
+    if ('' === $path) {
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($basedir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+        foreach ($it as $file) {
+            if ($file->getFilename() === $filename) {
+                $path = $file->getPathname();
+                break;
+            }
+        }
+    }
+
+    if ('' === $path || !is_readable($path)) {
+        return 0;
+    }
+
+    $filetype = wp_check_filetype($path);
+    if (empty($filetype['type'])) {
+        return 0;
+    }
+
+    // _wp_attached_file is stored RELATIVE to the uploads basedir; storing an
+    // absolute path here yields broken URLs everywhere.
+    $relative = ltrim(str_replace($basedir, '', $path), '/');
+
+    $attachment_id = wp_insert_attachment(array(
+        'guid'           => trailingslashit($uploads['baseurl']) . $relative,
+        'post_mime_type' => $filetype['type'],
+        'post_title'     => sanitize_text_field(pathinfo($path, PATHINFO_FILENAME)),
+        'post_content'   => '',
+        'post_status'    => 'inherit',
+    ), $path, $for_post_id ? (int) $for_post_id : 0);
+
+    if (is_wp_error($attachment_id) || !$attachment_id) {
+        return 0;
+    }
+
+    update_post_meta($attachment_id, '_wp_attached_file', $relative);
+
+    // Thumbnail sizes, so cards/listings that request a size get a real crop
+    // rather than falling back to the full-size original.
+    if (!function_exists('wp_generate_attachment_metadata')) {
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+    }
+    wp_update_attachment_metadata($attachment_id, wp_generate_attachment_metadata($attachment_id, $path));
+
+    return (int) $attachment_id;
 }
 
 // =============================================================================

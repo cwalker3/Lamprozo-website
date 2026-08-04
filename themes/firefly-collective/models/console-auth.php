@@ -113,17 +113,29 @@ function firefly_console_url( $path = '/' ) {
 }
 
 /**
- * Send logout to the console instead of wp-login.php.
+ * Path the console shows a signed-in user: the "choose where to go" splash with
+ * cards for Production admin, Development admin, and Site Operations.
+ * (panel/app/routes/client.py — GET /dashboard)
+ */
+if ( ! defined( 'FIREFLY_CONSOLE_SPLASH_PATH' ) ) {
+    define( 'FIREFLY_CONSOLE_SPLASH_PATH', '/dashboard' );
+}
+
+/**
+ * Send logout to the console SPLASH, not to the console root.
  *
- * WordPress's logout case runs inside the real wp-login.php (loaded by the
- * /ffc-login/ page with CUSTOM_LOGIN_LOADING defined), and its default target is
- * wp-login.php?loggedout=true — which nginx blocks.
+ * Two things this gets right:
+ *  - wp-login.php?loggedout=true (WordPress's default) is 403'd by nginx, so
+ *    logout used to dead-end.
+ *  - The user stays signed in to the console. Logging out of WordPress should
+ *    hand them back to the splash so they can pick another environment; it is
+ *    not a request to end their console session.
  */
 add_filter( 'logout_redirect', 'firefly_console_logout_redirect', 10, 3 );
 function firefly_console_logout_redirect( $redirect_to, $requested_redirect_to, $user ) {
-    $console = firefly_console_url();
+    $splash = firefly_console_url( FIREFLY_CONSOLE_SPLASH_PATH );
 
-    return '' !== $console ? $console : $redirect_to;
+    return '' !== $splash ? $splash : $redirect_to;
 }
 
 /**

@@ -658,8 +658,10 @@
             // 3. Send them to the console login (the /ffc-login/ form posts to
             //    wp-login.php, which the server blocks). Local installs, which
             //    have no console, still fall back to the old page.
-            $console = function_exists('firefly_console_url') ? firefly_console_url() : '';
-            wp_redirect( $console !== '' ? $console : home_url(CUSTOM_LOGIN_SLUG) );
+            $splash = function_exists('firefly_console_url')
+                ? firefly_console_url( defined('FIREFLY_CONSOLE_SPLASH_PATH') ? FIREFLY_CONSOLE_SPLASH_PATH : '/dashboard' )
+                : '';
+            wp_redirect( $splash !== '' ? $splash : home_url(CUSTOM_LOGIN_SLUG) );
             exit;
         }
     }
