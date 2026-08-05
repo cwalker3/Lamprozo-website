@@ -1067,6 +1067,17 @@
 
     function firefly_collective_orders_email($order_id, $new_status = '', $order_data = null) {
         global $wpdb;
+
+        /* Sender address for this invoice, derived from the site. Falls back to
+           no-reply@<site host> so a site with no admin_email still sends from a
+           domain it actually controls. */
+        $ffc_order_from = get_option( 'admin_email' );
+        if ( ! $ffc_order_from || ! is_email( $ffc_order_from ) ) {
+            $ffc_order_host = wp_parse_url( home_url(), PHP_URL_HOST );
+            $ffc_order_host = $ffc_order_host ? preg_replace( '/^www\./', '', $ffc_order_host ) : 'localhost';
+            $ffc_order_from = 'no-reply@' . $ffc_order_host;
+        }
+        $ffc_order_from = apply_filters( 'firefly_order_from_address', $ffc_order_from );
         
         if ($order_data !== null) {
             $order_items = $order_data;
@@ -1421,18 +1432,22 @@
                 
                 <div class='invoice-footer'>
                     <div class='contact-info'>
-                        Firefly Creative<br>
-                        Email: <a href='mailto:donotreply@fireflycreative.io'>donotreply@fireflycreative.io</a>
+                        " . esc_html( get_bloginfo( 'name' ) ) . "<br>
+                        Email: <a href='mailto:" . esc_attr( $ffc_order_from ) . "'>" . esc_html( $ffc_order_from ) . "</a>
                     </div>
                 </div>
             </body>
             </html>
         ";
         
-        // Set headers for HTML mail
+        /* Sender identity comes from the SITE, never a hardcoded address.
+           This is base-system code that ships to every fork: sending From a
+           domain the server has no authority over fails SPF/DKIM and lands
+           invoices in spam, and it named the wrong company on someone else's
+           receipt. */
         $headers = array(
-            'From: Firefly Creative <donotreply@fireflycreative.io>',
-            'Reply-To: donotreply@fireflycreative.io',
+            'From: ' . get_bloginfo( 'name' ) . ' <' . $ffc_order_from . '>',
+            'Reply-To: ' . $ffc_order_from,
             'Content-Type: text/html; charset=UTF-8',
         );
 

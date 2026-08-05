@@ -1,0 +1,454 @@
+/* Booking widget — default template.
+ *
+ * Ported from the firefly-v2 site and rebuilt on this template's tokens.
+ * EVERY colour, radius and font here comes from _core_custom-properties.css:
+ * a forker rebrands the booking page by editing tokens, never this file. That
+ * is the same contract the rest of the template follows (see DESIGN.md).
+ *
+ * Pairs with views/request-an-appointment.php (markup + ids) and
+ * assets/js/booking.js (behaviour).
+ */
+
+.ffc-booking {
+    padding: var(--ff-section-y) var(--ff-gutter);
+    background: var(--ff-bg);
+    color: var(--ff-fg);
+}
+
+.ffc-booking__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: start;
+    max-width: var(--ff-container);
+    margin-inline: auto;
+}
+
+/* ----- pitch column (snippet content) ------------------------------------- */
+.ffc-booking__pitch h1,
+.ffc-booking__pitch h2 {
+    font-family: var(--font-heading);
+    color: var(--ff-fg);
+    margin: 0 0 1.25rem;
+    text-wrap: balance;
+}
+
+.ffc-booking__pitch p {
+    font-family: var(--font-body);
+    line-height: 1.65;
+    color: var(--ff-fg-muted);
+    max-width: 52ch;
+    margin: 0 0 1.1rem;
+}
+
+/* ----- the card ----------------------------------------------------------- */
+.ffc-booking__card {
+    background: var(--ff-surface);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius-lg);
+    padding: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.ffc-booking__title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--ff-fg);
+    margin: 0 0 .35rem;
+}
+
+.ffc-booking__note,
+.ffc-booking__tz {
+    font-family: var(--font-body);
+    font-size: .92rem;
+    color: var(--ff-fg-muted);
+    margin: 0 0 1.25rem;
+}
+
+.ffc-booking__tz { margin: 1.1rem 0 0; font-size: .82rem; color: var(--ff-fg-dim); }
+
+#ffc-booking-error {
+    font-family: var(--font-body);
+    font-size: .92rem;
+    color: var(--ff-fg);
+    background: rgba(199, 62, 62, .18);
+    border: 1px solid var(--outlineRed);
+    border-radius: var(--ff-radius);
+    padding: .7rem .85rem;
+    margin-bottom: 1.1rem;
+}
+/* Collapsed when empty so the card never reserves a gap for a message that
+   usually never appears. */
+#ffc-booking-error:empty { display: none; }
+
+/* ----- month bar ---------------------------------------------------------- */
+.ffc-booking__monthbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .9rem;
+}
+
+.ffc-booking__month {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    color: var(--ff-fg);
+}
+
+.ffc-booking__nav {
+    background: transparent;
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius);
+    color: var(--ff-amber);
+    font-size: 1rem;
+    line-height: 1;
+    padding: .45rem .7rem;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.ffc-booking__nav:hover { border-color: var(--ff-amber); background: var(--ff-amber-soft); }
+
+/* ----- day grid ----------------------------------------------------------- */
+.ffc-booking__dow,
+.ffc-booking__days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: .3rem;
+}
+
+/* The grid holds its size no matter what is inside it. Two things used to move
+   the whole page: swapping in the loading line collapsed the grid on every
+   month change, and a 5-row month is one row shorter than a 6-row one. Six
+   explicit rows plus an aspect ratio fixes both — the height now derives from
+   the WIDTH, so it stays correct at any breakpoint rather than being pinned to
+   a magic pixel value. */
+.ffc-booking__days {
+    grid-template-rows: repeat(6, 1fr);
+    aspect-ratio: 7 / 6;
+}
+
+.ffc-booking__dow span {
+    font-family: var(--font-body);
+    font-size: .68rem;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: .12em;
+    color: var(--ff-fg-dim);
+    text-align: center;
+    padding-bottom: .35rem;
+}
+
+.ffc-booking__day {
+    display: grid;
+    place-items: center;
+    font-family: var(--font-body);
+    font-size: .92rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--ff-radius);
+    color: var(--ff-fg-dim);
+    cursor: default;
+    position: relative;
+}
+
+/* Open days are the interactive ones: brighter, dotted, clickable. */
+.ffc-booking__day.is-open {
+    color: var(--ff-fg);
+    border-color: var(--ff-amber-ring);
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.ffc-booking__day.is-open::after {
+    content: "";
+    position: absolute;
+    bottom: 15%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--ff-amber);
+}
+.ffc-booking__day.is-open:hover { border-color: var(--ff-amber); background: var(--ff-amber-soft); }
+.ffc-booking__day.is-selected {
+    background: var(--ff-amber);
+    border-color: var(--ff-amber);
+    color: var(--ff-bg);
+    font-weight: var(--font-weight-bold);
+}
+.ffc-booking__day.is-selected::after { background: var(--ff-bg); }
+
+.ffc-booking__loading {
+    /* Spans the full reserved grid so it reads as the calendar loading, not as
+       an entry in the first cell. */
+    grid-area: 1 / 1 / -1 / -1;
+    place-self: center;
+    font-family: var(--font-body);
+    color: var(--ff-fg-dim);
+    text-align: center;
+}
+
+/* ----- time chips --------------------------------------------------------- */
+/* Picking a day used to un-hide the times instantly, so the card jumped and
+   anything below it moved with no explanation. Animating grid-template-rows
+   0fr -> 1fr grows the card to whatever height the chips actually need, which
+   a max-height transition cannot do: the chip count varies by day, so a guess
+   either clips a busy day or coasts through empty space on a quiet one. */
+.ffc-booking__slotswrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows .38s cubic-bezier(.22, .61, .36, 1);
+}
+
+.ffc-booking__slotswrap.is-open { grid-template-rows: 1fr; }
+
+/* min-height:0 is required — a grid item's default min-height is auto, which
+   refuses to shrink below its content and defeats the 0fr row entirely. */
+.ffc-booking__slotswrap-inner {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Chips fade up in sequence as the card opens. `backwards` holds the start
+   frame during the delay; without it every chip flashes at full opacity for a
+   frame before its animation begins. */
+@keyframes ffc-slot-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.ffc-booking__slotswrap.is-open .ffc-booking__slot {
+    animation: ffc-slot-in .34s cubic-bezier(.22, .61, .36, 1) backwards;
+    animation-delay: calc(var(--ffc-slot-i, 0) * 30ms);
+}
+
+.ffc-booking__slotswrap.is-open .ffc-booking__slots-day {
+    animation: ffc-slot-in .3s cubic-bezier(.22, .61, .36, 1) backwards;
+}
+
+/* Anyone who has asked their system to stop moving things gets the same
+   information with no motion — the card still opens, and booking.js skips the
+   smooth scroll to match. */
+@media (prefers-reduced-motion: reduce) {
+    .ffc-booking__slotswrap { transition: none; }
+    .ffc-booking__slotswrap.is-open .ffc-booking__slot,
+    .ffc-booking__slotswrap.is-open .ffc-booking__slots-day { animation: none; }
+}
+
+.ffc-booking__slots-day {
+    font-family: var(--font-body);
+    font-size: .78rem;
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--ff-amber);
+    margin: 1.25rem 0 .6rem;
+}
+
+.ffc-booking__slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .45rem;
+}
+
+.ffc-booking__slot {
+    font-family: var(--font-body);
+    font-size: .92rem;
+    color: var(--ff-fg);
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius);
+    padding: .55rem .4rem;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.ffc-booking__slot:hover { border-color: var(--ff-amber); background: var(--ff-amber-soft); }
+
+/* ----- details step ------------------------------------------------------- */
+.ffc-booking__chosen {
+    font-family: var(--font-body);
+    font-size: .95rem;
+    color: var(--ff-fg);
+    background: var(--ff-amber-soft);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius);
+    padding: .65rem .85rem;
+    margin: 0 0 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: .75rem;
+}
+
+.ffc-booking__change {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--font-body);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--ff-amber);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* ----- fields ------------------------------------------------------------- */
+/* Real labels, not placeholder-only: a placeholder vanishes the moment a field
+   is filled, so anyone reviewing their answers — or using a screen reader —
+   loses the question. */
+.ffc-field {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    margin-bottom: 1.1rem;
+}
+
+.ffc-field__label {
+    font-family: var(--font-body);
+    font-size: .74rem;
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--ff-amber);
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+}
+
+.ffc-field__opt {
+    font-weight: var(--font-weight-regular);
+    letter-spacing: .04em;
+    text-transform: none;
+    color: var(--ff-fg-dim);
+    font-size: .72rem;
+}
+
+.ffc-field__input {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--ff-fg);
+    background: var(--ff-surface-2);
+    border: 1px solid var(--ff-amber-ring);
+    border-radius: var(--ff-radius);
+    padding: .8rem .9rem;
+    width: 100%;
+    /* Without this, padding is added OUTSIDE the 100% and every input overflows
+       its card by the padding. */
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ffc-field__input::placeholder { color: var(--ff-fg-dim); opacity: 1; }
+
+/* Chrome paints autofilled inputs an opaque pale yellow, which punches a solid
+   block through a dark card. There is no way to set the background directly,
+   but a long inset shadow covers it and text-fill-color restores the type. */
+.ffc-field__input:-webkit-autofill,
+.ffc-field__input:-webkit-autofill:hover,
+.ffc-field__input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--ff-fg);
+    -webkit-box-shadow: 0 0 0 1000px var(--ff-surface-2) inset;
+    caret-color: var(--ff-fg);
+}
+
+.ffc-field__input:focus,
+.ffc-field__input:focus-visible {
+    outline: none;
+    border-color: var(--ff-amber);
+    box-shadow: 0 0 0 3px var(--ff-amber-soft);
+}
+
+.ffc-field__input--area {
+    resize: vertical;
+    min-height: 8.5rem;
+    line-height: 1.55;
+}
+
+/* Flag the offending field rather than only naming it in the message above. */
+.ffc-field__input.is-invalid { border-color: var(--outlineRed); }
+
+/* ----- buttons ------------------------------------------------------------ */
+/* The wrapper is what booking.js swaps contents into (loader, then the reply),
+   so size the button from the wrapper — that way both occupy the same space
+   and the card does not jump mid-submit. */
+.ffc-booking__submit {
+    margin-top: .35rem;
+    min-height: 3.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ffc-booking__submit,
+.ffc-booking__submit .ffc-btn { width: 100%; }
+.ffc-booking__submit .loader { height: 2rem; width: auto; }
+
+.ffc-btn {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-size: .85rem;
+    font-weight: var(--font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    padding: .95rem 1.6rem;
+    border-radius: var(--ff-radius);
+    border: 1px solid var(--ff-amber);
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    transition: background .18s ease, color .18s ease;
+}
+
+.ffc-btn--accent { background: var(--ff-amber); color: var(--ff-bg); }
+.ffc-btn--accent:hover { background: transparent; color: var(--ff-amber); }
+
+.ffc-btn--ghost { background: transparent; color: var(--ff-fg); border-color: var(--ff-amber-ring); }
+.ffc-btn--ghost:hover { border-color: var(--ff-amber); color: var(--ff-amber); }
+
+/* ----- success ------------------------------------------------------------ */
+.ffc-booking__success { text-align: center; padding: 1rem 0 .5rem; }
+.ffc-booking__success:focus { outline: none; }
+
+.ffc-booking__tick {
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1.1rem;
+    display: grid;
+    place-items: center;
+    color: var(--ff-green);
+    border: 1px solid var(--ff-green);
+    border-radius: 50%;
+}
+.ffc-booking__tick span { display: block; font-size: 1.35rem; line-height: 1; }
+
+.ffc-booking__success-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--ff-fg);
+    margin: 0 0 .4rem;
+}
+
+.ffc-booking__success-when {
+    font-family: var(--font-body);
+    font-size: .95rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--ff-amber);
+    margin: 0 0 .75rem;
+}
+
+.ffc-booking__success-note {
+    font-family: var(--font-body);
+    font-size: .92rem;
+    color: var(--ff-fg-muted);
+    max-width: 36ch;
+    margin: 0 auto 1.25rem;
+}
+
+/* ----- responsive --------------------------------------------------------- */
+@media (max-width: 900px) {
+    .ffc-booking__grid { grid-template-columns: 1fr; gap: 2.25rem; }
+    /* The widget is what they came for — the pitch reads second on a phone. */
+    .ffc-booking__panel { order: -1; }
+}
+
+@media (max-width: 600px) {
+    .ffc-booking__card { padding: 1.35rem 1.15rem; }
+    .ffc-booking__slots { grid-template-columns: repeat(2, 1fr); }
+}

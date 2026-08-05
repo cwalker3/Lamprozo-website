@@ -3,6 +3,53 @@
     // template/models/init.php
 
     // Register Navigation Menu
+
+/**
+ * Deterministic asset version for cache-busting.
+ *
+ * This replaced uniqid(), which returned A NEW RANDOM VALUE ON EVERY REQUEST.
+ * Every stylesheet and script therefore had a unique URL on every page view,
+ * so nothing could ever be cached — not by the visitor's browser, and not by a
+ * CDN, whose cache key includes the query string. Every page load re-fetched
+ * the entire asset bundle from origin.
+ *
+ * Measured on a live site whose origin sat far from its audience, that was the
+ * difference between a fast site and a 45-second one on a phone: ~12 assets
+ * per page view, each paying a full round trip, with nothing able to absorb
+ * them. The origin was never the bottleneck.
+ *
+ * The newest mtime across the template's own CSS/JS is the right value: stable
+ * between deploys so caches actually hold, and it moves the moment any asset
+ * is deployed, so a release still busts correctly.
+ *
+ * Memoised per request — this runs before every enqueue, and stat-ing the
+ * asset directory repeatedly for a value that cannot change mid-request is
+ * pure waste.
+ */
+function firefly_template_asset_version($template_name) {
+    static $cache = array();
+    if (isset($cache[$template_name])) {
+        return $cache[$template_name];
+    }
+
+    $base   = get_template_directory() . '/templates/' . $template_name . '/assets';
+    $newest = 0;
+    foreach (array('/css/*.css', '/js/*.js') as $pattern) {
+        foreach (glob($base . $pattern) as $file) {
+            $mtime = @filemtime($file);
+            if ($mtime && $mtime > $newest) {
+                $newest = $mtime;
+            }
+        }
+    }
+
+    // No readable assets (a misconfigured path) must not yield a constant that
+    // would pin browsers to a stale bundle forever — fall back to the theme
+    // version, which at least changes on a theme release.
+    $cache[$template_name] = $newest ? (string) $newest : (string) wp_get_theme()->get('Version');
+    return $cache[$template_name];
+}
+
     function register_website_menu() {
         register_nav_menu('website-menu', __('Main Website Menu', 'firefly-collective'));
     }
@@ -62,7 +109,7 @@
         $template_path = $theme_path_web . '/templates/' . $active_template;
         $template_path_web = $template_path;
         $version = wp_get_theme()->get('Version');
-        $unique_id = uniqid();
+        $unique_id = firefly_template_asset_version($active_template);
         $api_url = esc_url_raw(rest_url('custom-api/v1/'));
         $current_view = determine_view();
 
