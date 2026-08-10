@@ -387,3 +387,58 @@ function firefly_remove_tag_sitemap( $taxonomies ) {
     unset( $taxonomies['post_tag'] );
     return $taxonomies;
 }
+
+/**
+ * Keep feed URLs out of the search index.
+ *
+ * RSS/Atom feeds (/feed/, /tag/<x>/feed/, /comments/feed/, ...) are XML, not
+ * HTML, so the wp_robots <meta> in seo-schema.php can't reach them — Google
+ * was crawling and listing them as "Crawled - currently not indexed" pages.
+ * Send an X-Robots-Tag: noindex header on every feed request instead. Feeds
+ * keep working for subscribers; they just stop competing as search results.
+ */
+add_action( 'template_redirect', 'firefly_noindex_feeds' );
+
+function firefly_noindex_feeds() {
+    if ( is_feed() && ! headers_sent() ) {
+        header( 'X-Robots-Tag: noindex, follow', true );
+    }
+}
+
+/**
+ * Disable WordPress's emoji subsystem.
+ *
+ * WP injects wp-emoji-release.min.js plus an s.w.org dns-prefetch into every
+ * <head>. Modern browsers render emoji natively, so it is dead weight — and
+ * Google crawls the standalone .js as its own URL, which shows up as
+ * "Crawled - currently not indexed" noise in Search Console. Strip the whole
+ * emoji subsystem: scripts, styles, feed/mail filters, the TinyMCE plugin,
+ * and the dns-prefetch hint.
+ */
+add_action( 'init', 'firefly_disable_emojis' );
+
+function firefly_disable_emojis() {
+    remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+    remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+    remove_action( 'wp_print_styles', 'print_emoji_styles' );
+    remove_action( 'admin_print_styles', 'print_emoji_styles' );
+    remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
+    remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
+    remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+    add_filter( 'tiny_mce_plugins', 'firefly_disable_emojis_tinymce' );
+    add_filter( 'wp_resource_hints', 'firefly_disable_emojis_dns_prefetch', 10, 2 );
+}
+
+function firefly_disable_emojis_tinymce( $plugins ) {
+    return is_array( $plugins ) ? array_diff( $plugins, array( 'wpemoji' ) ) : array();
+}
+
+function firefly_disable_emojis_dns_prefetch( $urls, $relation_type ) {
+    if ( 'dns-prefetch' === $relation_type ) {
+        $urls = array_filter( $urls, function ( $url ) {
+            $href = is_array( $url ) ? ( isset( $url['href'] ) ? $url['href'] : '' ) : $url;
+            return strpos( (string) $href, 's.w.org' ) === false;
+        } );
+    }
+    return $urls;
+}
