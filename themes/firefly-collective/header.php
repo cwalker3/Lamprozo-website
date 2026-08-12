@@ -8,7 +8,7 @@
 
     // Ensure customize model is loaded
     if (!function_exists('firefly_collective_get_active_template')) {
-        require_once get_template_directory() . '/models/customize.php';
+        require_once get_template_directory() . '/template.php';
     }
 
     // Ensure $args is available and populated with proper data
