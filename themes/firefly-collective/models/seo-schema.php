@@ -357,10 +357,15 @@ function firefly_apply_robots_filters( $robots ) {
         return $robots;
     }
 
-    // Tag archives are thin, near-duplicate listing pages with low search
-    // value — noindex them (they're also dropped from the sitemap in
-    // seo-meta.php). Category archives stay indexable.
-    if ( is_tag() ) {
+    // Thin, auto-generated listing archives with low search value and high
+    // duplicate-content risk: tag archives, and date archives (/2026/,
+    // /2026/05/, /2026/05/30/) which just re-list the same posts and compete
+    // with the real post URLs. Author archives are noise too (and expose
+    // usernames). Noindex all of them so ranking signal concentrates on the
+    // canonical posts/pages. Category archives stay indexable — they're the
+    // real content taxonomy. (Tags are also dropped from the sitemap in
+    // seo-meta.php; date/author archives aren't in the WP core sitemap.)
+    if ( is_tag() || is_date() || is_author() ) {
         $robots['noindex'] = true;
         unset( $robots['index'] );
         return $robots;
