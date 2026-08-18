@@ -27,7 +27,11 @@
 
         // Admin Email
         // ----------------------------------------------------------------------------------------
-        $message = nl2br($message);
+        // This used to mail the message body and nothing else, signed with a
+        // hardcoded no-reply address — so the notification never said WHO had
+        // written in, and hitting Reply went nowhere. Both are fixed: the
+        // sender is named in the body, and their address is set as Reply-To.
+        $body    = nl2br($message);
         $subject = "{$name} has sent you a message";
         $html = "
             <html>
@@ -35,13 +39,15 @@
                 <title>Website contact</title>
             </head>
             <body>
-                <p>{$message}</p>
+                <p><strong>" . esc_html($name) . "</strong> &lt;<a href='mailto:" . esc_attr($email) . "'>" . esc_html($email) . "</a>&gt;</p>
 
-                <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+                <p>{$body}</p>
+
+                <p style='color:#666;font-size:12px;'>Sent from the contact form. Reply to this email to answer them directly.</p>
             </body>
             </html>
             ";
-        send_html_mail(NULL, $subject, $html, true);
+        send_html_mail(NULL, $subject, $html, true, $email);
         // ----------------------------------------------------------------------------------------
 
         return rest_ensure_response(array('message' => __('Message sent successfully.', 'firefly-collective')));

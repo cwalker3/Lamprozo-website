@@ -655,8 +655,13 @@
                 unset( $_COOKIE['auth_id'] );
             }
 
-            // 3. Redirect to custom login page
-            wp_redirect( home_url(CUSTOM_LOGIN_SLUG) );
+            // 3. Send them to the console login (the /ffc-login/ form posts to
+            //    wp-login.php, which the server blocks). Local installs, which
+            //    have no console, still fall back to the old page.
+            $splash = function_exists('firefly_console_url')
+                ? firefly_console_url( defined('FIREFLY_CONSOLE_SPLASH_PATH') ? FIREFLY_CONSOLE_SPLASH_PATH : '/dashboard' )
+                : '';
+            wp_redirect( $splash !== '' ? $splash : home_url(CUSTOM_LOGIN_SLUG) );
             exit;
         }
     }
@@ -780,7 +785,11 @@
     add_filter('login_url', 'custom_filter_login_url', 10, 3);
     function custom_filter_login_url($login_url, $redirect, $force_reauth) {
         if (!defined('CUSTOM_LOGIN_LOADING')) {
-            $login_url = home_url(CUSTOM_LOGIN_SLUG . '/');
+            // Login is console-only: nginx blocks wp-login.php, so the old
+            // /ffc-login/ form can never succeed. Fall back to it only where no
+            // console exists (local installs).
+            $console = function_exists('firefly_console_url') ? firefly_console_url() : '';
+            $login_url = $console !== '' ? $console : home_url(CUSTOM_LOGIN_SLUG . '/');
             
             if (!empty($redirect)) {
                 $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);

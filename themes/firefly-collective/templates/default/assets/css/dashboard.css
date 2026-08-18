@@ -305,6 +305,7 @@ body.firefly-page.page-dashboard .dash-spinner {
 /* Suppress all legacy loading.gif images on dashboard / order pages.
    We use the amber CSS spinner everywhere now. */
 body.firefly-page.page-dashboard img[src*="loading.gif"],
+body.firefly-page.page-dashboard img[src*="loading.gif"],
 body.firefly-page.page-dashboard img[src*="loading-dark.gif"],
 body.firefly-page.page-order-history img[src*="loading.gif"],
 body.firefly-page.page-order-history img[src*="loading-dark.gif"] {
@@ -354,6 +355,11 @@ body.firefly-page.page-dashboard .dash-modal-content {
     padding: clamp(1.5rem, 3vw, 2rem);
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
     color: var(--ff-fg);
+    /* Never exceed the viewport: the .dash-modal 1.5rem padding stays as
+       top/bottom margin, and a tall form (Stripe Elements) scrolls inside
+       instead of running off the top/bottom of the device. */
+    max-height: 100%;
+    overflow-y: auto;
 }
 
 body.firefly-page.page-dashboard .dash-modal-content h3 {
@@ -2004,6 +2010,28 @@ body.firefly-page.page-dashboard .order-confirm-modal > * {
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
 }
 
+/* Confirm-modal inner: match the shared dash-modal typography and give
+   the actions a right-aligned row so Confirm reads primary, Cancel ghost. */
+body.firefly-page.page-dashboard .order-confirm-content h3 {
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.5rem;
+    color: var(--ff-fg);
+}
+
+body.firefly-page.page-dashboard .order-confirm-content p {
+    color: var(--ff-fg-muted);
+    line-height: 1.55;
+    margin: 0 0 1.25rem;
+}
+
+body.firefly-page.page-dashboard .order-confirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
 /* Loading overlay */
 body.firefly-page.page-dashboard .loading-overlay {
     position: fixed;
@@ -2024,15 +2052,9 @@ body.firefly-page.page-dashboard .loading-overlay.active {
     pointer-events: auto;
 }
 
-body.firefly-page.page-dashboard .loading-overlay::after {
-    content: '';
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--ff-border);
-    border-top-color: var(--ff-amber);
-    border-radius: 50%;
-    animation: dash-spin 720ms linear infinite;
-}
+/* The overlay spinner is the JS-injected `.loading-spinner` child
+   (styled above). No `::after` here — a second ring rendered next to
+   the child produced the double-spinner. */
 
 /* ---------- Toast (top-right viewport, auto-dismiss) ------------ */
 

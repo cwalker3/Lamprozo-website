@@ -6,6 +6,12 @@
 !/.htaccess
 !/LICENSE.md
 
+# Must-use plugins — track ONLY framework mu-plugins; site-specific ones
+# (e.g. ffc-magic-login.php) stay ignored so they aren't swept into the repo.
+!mu-plugins/
+mu-plugins/*
+!mu-plugins/ffc-sitehealth-tweaks.php
+
 # Plugins directory
 !plugins/
 plugins/*

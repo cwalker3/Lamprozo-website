@@ -24,7 +24,7 @@
                 'util',
                 'encrypt',      'profile',
                 'app',          'editor-preview',
-                'social-share');
+                'social-share', 'redirects');
                 
     foreach($models as $model) {
         $model_path = $template_path . "/models/$model.php";

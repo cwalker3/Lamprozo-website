@@ -121,6 +121,11 @@
         ]
     },
     "options": {
-        "show_on_front": "page"
+        "show_on_front": "page",
+        "template_options": {
+            "menu_overlay": 1,
+            "nav_overlay_menu": 1,
+            "background_color": "#ffffff"
+        }
     }
 }

@@ -333,6 +333,58 @@ function firefly_template_scope_terms($args, $taxonomies) {
     return $args;
 }
 
+/**
+ * Scope nav_menu NAME lookups to the active template.
+ *
+ * Menu names are meant to repeat across templates (each template has its own
+ * "Main Menu", distinguished by slug + term meta), but WordPress core enforces
+ * globally unique menu names: wp_update_nav_menu_object() runs a duplicate-name
+ * check via get_term_by( 'name', ... ) — a raw get_terms that bypasses the
+ * wp_get_nav_menus list scoping. Result: every "Save Menu" in wp-admin errored
+ * with "The menu name Main Menu conflicts with another menu name" as soon as a
+ * second template owned a same-named menu.
+ *
+ * This filter narrows ONLY name lookups ($args['name'] set) on the nav_menu
+ * taxonomy to menus belonging to the active template — plus untagged menus, so
+ * legacy menus without term meta still conflict globally rather than silently
+ * duplicating. Same-template duplicates still conflict, as they should.
+ * Deliberately active in wp-admin (that's where the check runs). Callers that
+ * need a cross-template name lookup pass firefly_skip_scoping.
+ */
+add_filter('get_terms_args', 'firefly_template_scope_nav_menu_name_lookups', 10, 2);
+
+function firefly_template_scope_nav_menu_name_lookups($args, $taxonomies) {
+    if (isset($args['firefly_skip_scoping']) && $args['firefly_skip_scoping']) {
+        return $args;
+    }
+
+    if (!in_array('nav_menu', (array) $taxonomies, true)) {
+        return $args;
+    }
+
+    if (empty($args['name'])) {
+        return $args;
+    }
+
+    $template = firefly_get_scoping_template();
+
+    $args['meta_query'] = (isset($args['meta_query']) && is_array($args['meta_query'])) ? $args['meta_query'] : array();
+    $args['meta_query'][] = array(
+        'relation' => 'OR',
+        array(
+            'key'     => FIREFLY_TEMPLATE_META_KEY,
+            'value'   => $template,
+            'compare' => '=',
+        ),
+        array(
+            'key'     => FIREFLY_TEMPLATE_META_KEY,
+            'compare' => 'NOT EXISTS',
+        ),
+    );
+
+    return $args;
+}
+
 // =============================================================================
 // POST NAVIGATION FILTERING
 // =============================================================================

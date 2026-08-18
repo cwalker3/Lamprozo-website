@@ -65,10 +65,12 @@
                 break;
 
             case 'request-an-appointment':
-                $assets['css'][]    = $template_path . '/assets/css/calendar.css';
-                $assets['css'][]    = $template_path . '/assets/css/request-an-appointment.css';
-                $assets['js'][]     = $template_path . '/assets/js/calendar.js';
-                $assets['js'][]     = $template_path . '/assets/js/request-an-appointment.js';
+                /* v2 booking widget. calendar.css/js and
+                   request-an-appointment.js served the v1 slot-inventory flow
+                   (admin hand-opened each slot; a visitor claimed the row) and
+                   are no longer loaded — the files remain for reference. */
+                $assets['css'][]    = $template_path . '/assets/css/booking.css';
+                $assets['js'][]     = $template_path . '/assets/js/booking.js';
                 break;
 
             case 'dashboard':

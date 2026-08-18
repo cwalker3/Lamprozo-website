@@ -20,9 +20,11 @@ if (!defined('ABSPATH')) {
  *                          all along; the handler previously ignored it and
  *                          hardcoded 'page', so a bulk sync launched from the
  *                          Posts list silently synced pages instead.
+ * @param bool $sync_template_files Also ship each post's theme-side files
+ *                          (snippet HTML + schema entry). Default on.
  * @return array Results array with counts and errors
  */
-function firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type = 'page') {
+function firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_type = 'page', $sync_template_files = true) {
     // Load the page sync handler
     require_once FIREFLY_PROJECTS_PLUGIN_DIR . 'includes/models/page-sync.php';
 
@@ -65,7 +67,7 @@ function firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_
         if ($fpid) {
             $local_page_ids[] = $fpid;
         }
-        $result = firefly_projects_perform_page_sync($page, true, $target_env);
+        $result = firefly_projects_perform_page_sync($page, true, $target_env, $sync_template_files);
 
         if ($result['success']) {
             $results['synced']++;
@@ -98,7 +100,7 @@ function firefly_projects_sync_all_pages_handler($sync_mode, $target_env, $post_
  * @param string $target_env Target environment
  * @return array Result with deleted count and page list
  */
-function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $post_type = 'page') {
+function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $post_type = 'page', $template = '') {
     $result = array(
         'deleted'       => 0,
         'deleted_pages' => array()
@@ -106,6 +108,12 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $p
 
     if (!in_array($post_type, array('page', 'post'), true)) {
         $post_type = 'page';
+    }
+
+    // Template being mirrored. Callers that don't pass one (the legacy bulk
+    // sync) get the active template — the previous hardcoded behavior.
+    if (!is_string($template) || $template === '') {
+        $template = firefly_get_scoping_template();
     }
 
     // Get remote endpoint based on target environment
@@ -119,8 +127,10 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $p
 
     // Fetch remote list for the SAME post type being synced. Without this,
     // a posts mirror compared local POST ids against remote PAGE ids — every
-    // page of the template looked orphaned and got deleted.
-    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages?post_type=' . rawurlencode($post_type), array(
+    // page of the template looked orphaned and got deleted. The explicit
+    // template param keeps the remote's listing scoped to the template being
+    // mirrored even when the remote's ACTIVE template differs.
+    $response = wp_remote_get($base_url . '/wp-json/firefly-plugin/v1/list-pages?post_type=' . rawurlencode($post_type) . '&template=' . rawurlencode($template), array(
         'headers' => array('X-Firefly-Secret' => FIREFLY_SHARED_SECRET),
         'timeout' => 30
     ));
@@ -140,11 +150,10 @@ function firefly_projects_delete_remote_orphans($local_page_ids, $target_env, $p
     }
 
     // Find orphan pages by _firefly_page_id (remote pages not in local)
-    // Only consider remote pages belonging to the active template
-    $active_template = firefly_get_scoping_template();
+    // Only consider remote pages belonging to the template being mirrored
     $remote_page_ids = array();
     foreach ( $remote_data['pages'] as $page ) {
-        if ( ! empty( $page['firefly_page_id'] ) && strpos( $page['firefly_page_id'], $active_template . ':' ) === 0 ) {
+        if ( ! empty( $page['firefly_page_id'] ) && strpos( $page['firefly_page_id'], $template . ':' ) === 0 ) {
             $remote_page_ids[] = $page['firefly_page_id'];
         }
     }
@@ -287,11 +296,18 @@ function firefly_projects_list_pages_handler($request) {
         $post_statuses[] = 'pending';
     }
 
-    // Optional template scope. When the caller passes a template, we filter
-    // to posts with matching _firefly_template meta so callers from one
-    // template's admin don't see sibling-template posts with the same slug.
+    // Template scope. When the caller passes a template, we filter to posts
+    // with matching _firefly_template meta so callers from one template's
+    // admin don't see sibling-template posts with the same slug. When no
+    // template is given (old caller), default to THIS site's active template
+    // rather than leaking every template's content — the system is always
+    // template-scoped; an unscoped listing is never the right answer.
+    // `template=all` is the explicit escape hatch.
     $template = $request->get_param('template');
     $template = is_string($template) ? trim($template) : '';
+    if ( $template === '' && function_exists('firefly_get_scoping_template') ) {
+        $template = firefly_get_scoping_template();
+    }
 
     $query_args = array(
         'post_type'            => $post_type,
@@ -301,7 +317,7 @@ function firefly_projects_list_pages_handler($request) {
         'order'                => 'ASC',
         'firefly_skip_scoping' => true,
     );
-    if ( $template !== '' ) {
+    if ( $template !== '' && $template !== 'all' ) {
         $query_args['meta_key']   = '_firefly_template';
         $query_args['meta_value'] = $template;
     }
@@ -342,7 +358,8 @@ function firefly_projects_list_pages_handler($request) {
         'success'   => true,
         'pages'     => $list,
         'count'     => count($list),
-        'post_type' => $post_type
+        'post_type' => $post_type,
+        'template'  => $template
     );
 }
 

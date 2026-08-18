@@ -259,6 +259,17 @@ function firefly_projects_handle_incoming_menu($request) {
     // the moment a second template's "Main Menu" is synced.
     $menu_template = !empty($menu_data['template']) ? $menu_data['template'] : '';
 
+    // Template guard: a menu only travels to environments that have its
+    // template installed. Refuse rather than creating a menu no template
+    // here can render or manage.
+    if ('' !== $menu_template && function_exists('firefly_is_valid_template') && !firefly_is_valid_template($menu_template)) {
+        return array(
+            'success' => false,
+            'message' => "Refused: template '{$menu_template}' is not installed on this environment. "
+                       . "Initialize it there before syncing its menu."
+        );
+    }
+
     $menu = get_term_by('slug', $menu_data['slug'], 'nav_menu');
 
     if (!$menu && '' !== $menu_template) {
@@ -443,8 +454,9 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
     }
 
     // Set template meta if provided
-    if (!empty($menu_data['template'])) {
-        update_term_meta($local_menu_id, '_firefly_template', $menu_data['template']);
+    $menu_template = !empty($menu_data['template']) ? $menu_data['template'] : '';
+    if ($menu_template) {
+        update_term_meta($local_menu_id, '_firefly_template', $menu_template);
     }
 
     // Delete ALL existing menu items (full sync)
@@ -475,8 +487,18 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
         $resolved = false;
 
         if ($item['object_type'] === 'post_type' && !empty($item['object_slug'])) {
-            // Try to find post by slug
-            $post = get_page_by_path($item['object_slug'], OBJECT, $item['object']);
+            // Find the post by slug WITHIN the menu's template — the same slug
+            // can exist across templates, and an unscoped get_page_by_path
+            // would link menu items to whichever sibling template happens to
+            // own the slug. Fall back to the unscoped lookup only when the
+            // menu carries no template (legacy data).
+            $post = null;
+            if ($menu_template && function_exists('firefly_projects_find_scoped_page')) {
+                $post = firefly_projects_find_scoped_page($item['object_slug'], $menu_template, array($item['object']));
+            }
+            if (!$post && !$menu_template) {
+                $post = get_page_by_path($item['object_slug'], OBJECT, $item['object']);
+            }
             if ($post) {
                 $item_data['menu-item-type'] = 'post_type';
                 $item_data['menu-item-object'] = $item['object'];
@@ -522,8 +544,13 @@ function firefly_projects_import_pulled_menu($local_menu_id, $data) {
         }
     }
 
-    // Assign menu to theme locations if specified in the pulled data
-    if (!empty($menu_data['locations'])) {
+    // Assign menu to theme locations if specified in the pulled data — but
+    // only when the menu belongs to the locally ACTIVE template (or carries
+    // no template). Pulling an inactive template's menu must never hijack the
+    // live site's nav locations; activation wires locations later.
+    $active_template = function_exists('firefly_get_scoping_template') ? firefly_get_scoping_template() : '';
+    $is_active_template = (!$menu_template || !$active_template || $menu_template === $active_template);
+    if (!empty($menu_data['locations']) && $is_active_template) {
         $current_locations = get_nav_menu_locations();
         foreach ($menu_data['locations'] as $location) {
             $current_locations[$location] = $local_menu_id;

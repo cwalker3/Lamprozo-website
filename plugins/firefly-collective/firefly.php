@@ -21,6 +21,13 @@
 
     // Load all default template models for activation/deactivation hooks
     $ffc_load_default_models = function() use ($default_models_dir) {
+        // The main plugin body already loads the ACTIVE template's models by
+        // the time the activation hook fires. Forked templates (firefly,
+        // firefly-v2) declare the same function names as default's models,
+        // so loading default's set on top is a fatal redeclare — and it's
+        // unnecessary: the loaded fork provides the same hook functions.
+        // Only load default's models when no template set is loaded at all.
+        if (function_exists('firefly_collective_create_tables')) return;
         $templates_config_path = plugin_dir_path(__FILE__) . 'templates.json';
         if (!file_exists($templates_config_path)) return;
         $config = json_decode(file_get_contents($templates_config_path), true);

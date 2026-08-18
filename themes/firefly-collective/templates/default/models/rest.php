@@ -99,29 +99,14 @@
             'permission_callback' => 'verify_rest_request'
         ));
 
-        register_rest_route('custom-api/v1', '/change-template-temp', array(
-            'methods'             => 'POST',
-            'callback'            => 'handle_change_template_temp',
-            'permission_callback' => 'safe_verify_request'
-        ));
-
-        register_rest_route('custom-api/v1', '/change-landing-style-preview', array(
-            'methods'             => 'POST',
-            'callback'            => 'handle_change_landing_style_preview',
-            'permission_callback' => 'safe_verify_request'
-        ));
-
-        register_rest_route('custom-api/v1', '/get-landing-style-preview', array(
-            'methods'             => 'GET',
-            'callback'            => 'handle_get_landing_style_preview',
-            'permission_callback' => 'safe_verify_request'
-        ));
-
-        register_rest_route('custom-api/v1', '/edit-landing-in-gutenberg', array(
-            'methods'             => 'POST',
-            'callback'            => 'handle_edit_landing_in_gutenberg',
-            'permission_callback' => 'safe_verify_request'
-        ));
+        // NOTE: the customizer routes (change-template-temp,
+        // change-landing-style-preview, get-landing-style-preview,
+        // edit-landing-in-gutenberg) used to be re-registered here with the
+        // looser 'safe_verify_request' gate. They are framework-level and are
+        // registered once in template.php behind
+        // firefly_customizer_permission_check (capability + CSRF nonce).
+        // Duplicating them here raced that registration and silently downgraded
+        // the permission check depending on hook order.
 
     }
     add_action('rest_api_init', 'register_custom_api_endpoints');

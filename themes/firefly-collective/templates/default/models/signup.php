@@ -65,7 +65,7 @@
                     <strong>Email:</strong> {$email}<br>
                     <strong>Phone:</strong> {$phone}
                 </p>
-                <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+                <p style='color:#666;font-size:12px;'>Sent from the website.</p>
             </body>
             </html>
             ";
@@ -84,7 +84,7 @@
                     <strong>Email:</strong> {$email}<br>
                     <strong>Phone:</strong> {$phone}
                 </p>
-                <p>from: <a href='mailto:donotreply@fireflycollective.org'>donotreply@fireflycollective.org</a></p>
+                <p style='color:#666;font-size:12px;'>Sent from the website.</p>
             </body>
             </html>
             ";

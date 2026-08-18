@@ -1,0 +1,37 @@
+/* plugin/assets/css/bookings-admin.css — layout the shared submissions.css
+   doesn't cover. wp-admin styles do most of the work here on purpose. */
+
+#ffc-bookings-app [v-cloak] { display: none; }
+
+#ffc-bookings-app h2 { margin-top: 2em; }
+
+#ffc-bookings-app .ffc-booking-strap { max-width: 720px; }
+
+#ffc-bookings-app .ffc-muted { color: #666; }
+#ffc-bookings-app .ffc-error { color: #b32d2e; font-weight: 600; }
+#ffc-bookings-app .ffc-saved { color: #007017; margin-left: 8px; }
+
+#ffc-bookings-app .ffc-cancelled td { opacity: .5; text-decoration: line-through; }
+#ffc-bookings-app .ffc-notes-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+
+#ffc-bookings-app .ffc-availability td { padding: 4px 16px 4px 0; }
+#ffc-bookings-app .ffc-dayname { min-width: 130px; }
+
+#ffc-bookings-app .ffc-sync-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    max-width: 1100px;
+}
+@media (max-width: 960px) {
+    #ffc-bookings-app .ffc-sync-grid { grid-template-columns: 1fr; }
+}
+
+#ffc-bookings-app .ffc-feed-url {
+    display: block;
+    padding: 8px 10px;
+    margin: 4px 0;
+    word-break: break-all;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+}

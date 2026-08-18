@@ -40,6 +40,10 @@
     // falls back to the default PHP mailer when unset).
     require_once get_template_directory() . '/models/firefly-smtp.php';
 
+    // Sends logged-out users to this site's panel console (login is console-only;
+    // nginx blocks wp-login.php). Derives the console host from the site domain.
+    require_once get_template_directory() . '/models/console-auth.php';
+
     // Include admin UI for template scoping (only in admin)
     if (is_admin()) {
         require_once get_template_directory() . '/models/template-scoping-admin.php';
@@ -432,15 +436,6 @@
             'choices' => $landing_style_choices,
         ));
 
-        // Landing Style control with button
-        $wp_customize->add_control('firefly_collective_landing_style', array(
-            'label' => __('Landing Style'),
-            'description' => __('Choose the landing page layout style.'),
-            'section' => 'firefly_collective_landing',
-            'type' => 'select',
-            'choices' => $landing_style_choices,
-        ));
-
         // Add Edit in Gutenberg button setting (hidden, just for the control)
         $wp_customize->add_setting('firefly_collective_edit_landing_button', array(
             'default' => '',
@@ -461,13 +456,6 @@
         ));
         
         // Add Navigation section
-        $wp_customize->add_section('firefly_collective_navigation', array(
-            'title' => __('Navigation'),
-            'priority' => 122,
-            'description' => __('Navigation configuration options.'),
-        ));
-        
-        // Navigation section
         $wp_customize->add_section('firefly_collective_navigation', array(
             'title' => __('Navigation'),
             'priority' => 122,
@@ -1387,13 +1375,40 @@
     /**
      * Permission check for customizer endpoints.
      */
+    /**
+     * Permission gate for the customizer REST endpoints.
+     *
+     * These are state-changing, cookie-authenticated calls, so capability alone
+     * is not enough — without a nonce any site the logged-in admin visits could
+     * POST to them cross-origin (CSRF). Require the standard wp_rest nonce
+     * (sent by assets/js/customize.js as X-WP-Nonce) and then the 'customize'
+     * capability. GET requests are read-only and stay nonce-optional so a bare
+     * preview fetch still works.
+     */
     function firefly_customizer_permission_check(WP_REST_Request $request) {
+        $is_write = ($request->get_method() !== 'GET');
+
+        if ($is_write) {
+            $nonce = $request->get_header('X-WP-Nonce');
+            if (empty($nonce)) {
+                $nonce = $request->get_param('_wpnonce');
+            }
+            if (empty($nonce) || !wp_verify_nonce($nonce, 'wp_rest')) {
+                return new WP_Error(
+                    'firefly_bad_nonce',
+                    'Invalid or missing security token.',
+                    array('status' => 403)
+                );
+            }
+        }
+
         // Allow if user can customize
         if (is_user_logged_in() && current_user_can('customize')) {
             return true;
         }
 
-        // Check logged in cookie
+        // Fall back to validating the logged-in cookie directly (the customizer
+        // iframe context doesn't always resolve the current user first).
         if (!empty($_COOKIE[LOGGED_IN_COOKIE])) {
             $cookie_value = sanitize_text_field($_COOKIE[LOGGED_IN_COOKIE]);
             $user_id = wp_validate_auth_cookie($cookie_value, 'logged_in');

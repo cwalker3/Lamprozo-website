@@ -1,3 +1,5 @@
-<Files "debug.log">
+# Deny direct web access to any log file in wp-content (debug.log,
+# sync-debug.log, etc.). Firefly framework logs live here; none are public.
+<FilesMatch "\.log$">
     Require all denied
-</Files>
+</FilesMatch>

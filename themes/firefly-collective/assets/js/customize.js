@@ -5,6 +5,71 @@
 
     var refreshTimeout = null;
 
+    // -----------------------------------------------------------------------
+    //  REST helper — root + nonce come from the server (never hardcode
+    //  /wp-json/, which breaks on plain permalinks and subdirectory installs).
+    // -----------------------------------------------------------------------
+
+    function ffRoot() {
+        var data = window.fireflyTemplateOptions;
+        if (data && data.restRoot) {
+            return data.restRoot;
+        }
+        // Fall back to WP's own API settings when available.
+        if (window.wpApiSettings && wpApiSettings.root) {
+            return wpApiSettings.root + 'custom-api/v1/';
+        }
+        return '/wp-json/custom-api/v1/';
+    }
+
+    function ffPost(path, body) {
+        var data = window.fireflyTemplateOptions;
+        var headers = { 'Content-Type': 'application/json' };
+        if (data && data.nonce) {
+            headers['X-WP-Nonce'] = data.nonce;   // CSRF protection
+        }
+        return fetch(ffRoot() + path, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: headers,
+            body: JSON.stringify(body)
+        }).then(function(r) { return r.json(); });
+    }
+
+    function ffGet(path) {
+        var data = window.fireflyTemplateOptions;
+        var headers = {};
+        if (data && data.nonce) {
+            headers['X-WP-Nonce'] = data.nonce;
+        }
+        return fetch(ffRoot() + path, {
+            credentials: 'same-origin',
+            headers: headers
+        }).then(function(r) { return r.json(); });
+    }
+
+    // The control id for an option key on a template (mirrors
+    // firefly_option_control_id() in template-options.php).
+    function controlIdFor(template, key) {
+        var data = window.fireflyTemplateOptions;
+        var tmpl = data && data.templates && data.templates[template];
+        if (tmpl && tmpl.controls && tmpl.controls[key]) {
+            return tmpl.controls[key];
+        }
+        return 'tplopt_' + template + '_' + key;
+    }
+
+    function currentTemplate() {
+        var setting = wp.customize('firefly_collective_active_template');
+        return setting ? setting.get() : null;
+    }
+
+    function optionKeysFor(template) {
+        var data = window.fireflyTemplateOptions;
+        var tmpl = data && data.templates && data.templates[template];
+        return tmpl && tmpl.controls ? Object.keys(tmpl.controls) : [];
+    }
+
     // Force-reload the Customizer preview iframe.
     // WordPress's refresh() relies on a 'ready' handshake from customize-preview.js
     // inside the iframe. If that handshake fails, the old iframe stays visible.
@@ -47,14 +112,13 @@
         var data = window.fireflyTemplateOptions;
         if (!data) return false;
 
-        var currentTemplate = wp.customize('firefly_collective_active_template').get();
-        var tmplData = data.templates[currentTemplate];
+        var tmpl = currentTemplate();
+        var tmplData = tmpl && data.templates ? data.templates[tmpl] : null;
         if (!tmplData) return false;
 
         var hasChanges = false;
-        tmplData.options.forEach(function(key) {
-            var settingId = 'template_' + key;
-            var setting = wp.customize(settingId);
+        optionKeysFor(tmpl).forEach(function(key) {
+            var setting = wp.customize(controlIdFor(tmpl, key));
             if (setting && originalOptionValues[key] !== undefined) {
                 if (setting.get() !== originalOptionValues[key]) {
                     hasChanges = true;
@@ -108,15 +172,13 @@
 
     function updateTemplateOptionControls(newTemplate) {
         var data = window.fireflyTemplateOptions;
-        if (!data) return;
+        if (!data || !data.templates) return;
 
-        var allKeys = data.allOptionKeys || [];
-        var tmplData = data.templates[newTemplate] || { options: [], values: {}, sections: [] };
-        var activeKeys = tmplData.options;
+        var tmplData = data.templates[newTemplate] || { controls: {}, values: {}, sections: [] };
         var activeSections = tmplData.sections || [];
         var allSections = data.allSections || [];
 
-        // Hide/show custom sections based on template
+        // Show only the sections this template actually uses.
         allSections.forEach(function(sectionId) {
             var section = wp.customize.section(sectionId);
             if (section) {
@@ -124,30 +186,28 @@
             }
         });
 
-        // Hide controls not in new template, show those that are
-        allKeys.forEach(function(key) {
-            var control = wp.customize.control('template_' + key);
-            if (control) {
-                var isActive = activeKeys.indexOf(key) !== -1;
-                control.active.set(isActive);
-            }
+        // Every template's controls are registered (namespaced), so show only
+        // the selected template's and hide all the others'.
+        Object.keys(data.templates).forEach(function(tmpl) {
+            var controls = data.templates[tmpl].controls || {};
+            var isCurrent = (tmpl === newTemplate);
+            Object.keys(controls).forEach(function(key) {
+                var control = wp.customize.control(controls[key]);
+                if (control) {
+                    control.active.set(isCurrent);
+                }
+            });
         });
 
-        // Update control values to the new template's saved values
-        activeKeys.forEach(function(key) {
-            var setting = wp.customize('template_' + key);
-            if (setting && tmplData.values[key] !== undefined) {
+        // Sync this template's controls to its saved values + reset change tracking.
+        originalOptionValues = {};
+        optionKeysFor(newTemplate).forEach(function(key) {
+            var setting = wp.customize(controlIdFor(newTemplate, key));
+            if (!setting) return;
+            if (tmplData.values[key] !== undefined) {
                 setting.set(tmplData.values[key]);
             }
-        });
-
-        // Reset original values for change tracking
-        originalOptionValues = {};
-        activeKeys.forEach(function(key) {
-            var setting = wp.customize('template_' + key);
-            if (setting) {
-                originalOptionValues[key] = setting.get();
-            }
+            originalOptionValues[key] = setting.get();
         });
 
         templateOptionsChanged = false;
@@ -160,35 +220,34 @@
 
     function bindTemplateOptionListeners() {
         var data = window.fireflyTemplateOptions;
-        if (!data) return;
+        if (!data || !data.templates) return;
 
-        var allKeys = data.allOptionKeys || [];
-
-        allKeys.forEach(function(key) {
-            var settingId = 'template_' + key;
-
-            wp.customize(settingId, function(setting) {
-                setting.bind(function(newValue) {
-                    // Update preview via REST
-                    fetch('/wp-json/custom-api/v1/change-template-option-preview', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
+        // Bind every template's controls. Only the selected template's are
+        // visible, and the server validates the key against the temp template,
+        // so a stale binding can never write to the wrong template.
+        Object.keys(data.templates).forEach(function(tmpl) {
+            var controls = data.templates[tmpl].controls || {};
+            Object.keys(controls).forEach(function(key) {
+                wp.customize(controls[key], function(setting) {
+                    setting.bind(function(newValue) {
+                        if (currentTemplate() !== tmpl) {
+                            return; // not the template being previewed
+                        }
+                        ffPost('change-template-option-preview', {
                             option_key: key,
                             option_value: newValue
                         })
-                    })
-                    .then(function(r) { return r.json(); })
-                    .then(function(respData) {
-                        if (respData.success) {
-                            checkTemplateOptionsChanged();
-                            refreshPreview();
-                        } else {
-                            console.error('[FF] Failed to update option preview:', respData);
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('[FF] Error updating option preview:', err);
+                        .then(function(respData) {
+                            if (respData && respData.success) {
+                                checkTemplateOptionsChanged();
+                                refreshPreview();
+                            } else {
+                                console.error('[FF] Failed to update option preview:', respData);
+                            }
+                        })
+                        .catch(function(err) {
+                            console.error('[FF] Error updating option preview:', err);
+                        });
                     });
                 });
             });
@@ -203,13 +262,13 @@
 
         // Store initial option values for change tracking
         var data = window.fireflyTemplateOptions;
-        if (data) {
-            var currentTemplate = wp.customize('firefly_collective_active_template').get();
-            var tmplData = data.templates[currentTemplate] || { options: [], values: {} };
+        if (data && data.templates) {
+            var tmpl = currentTemplate();
+            var tmplData = (tmpl && data.templates[tmpl]) || { controls: {}, values: {} };
 
             // Set initial control values from server data
-            tmplData.options.forEach(function(key) {
-                var setting = wp.customize('template_' + key);
+            optionKeysFor(tmpl).forEach(function(key) {
+                var setting = wp.customize(controlIdFor(tmpl, key));
                 if (setting && tmplData.values[key] !== undefined) {
                     setting.set(tmplData.values[key]);
                 }
@@ -217,16 +276,16 @@
 
             // Record originals after a tick (so set() calls settle)
             setTimeout(function() {
-                tmplData.options.forEach(function(key) {
-                    var setting = wp.customize('template_' + key);
+                optionKeysFor(tmpl).forEach(function(key) {
+                    var setting = wp.customize(controlIdFor(tmpl, key));
                     if (setting) {
                         originalOptionValues[key] = setting.get();
                     }
                 });
             }, 100);
 
-            // Hide controls for options not in the current template
-            updateTemplateOptionControls(currentTemplate);
+            // Show only this template's sections + controls
+            updateTemplateOptionControls(tmpl);
         }
 
         // Bind listeners for template option changes
@@ -243,12 +302,7 @@
                 wp.customize.previewer.refresh = function() {};
 
                 // 3. Update temp via REST (also resets preview options)
-                fetch('/wp-json/custom-api/v1/change-template-temp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ template: newTemplate })
-                })
-                .then(function(r) { return r.json(); })
+                ffPost('change-template-temp', { template: newTemplate })
                 .then(function(respData) {
                     // Restore Customizer refresh before our own refresh
                     wp.customize.previewer.refresh = origRefresh;
@@ -269,12 +323,7 @@
         // Landing style changes
         wp.customize('firefly_collective_landing_style', function(setting) {
             setting.bind(function(newLandingStyle) {
-                fetch('/wp-json/custom-api/v1/change-landing-style-preview', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ landing_style: newLandingStyle })
-                })
-                .then(function(r) { return r.json(); })
+                ffPost('change-landing-style-preview', { landing_style: newLandingStyle })
                 .then(function(respData) {
                     if (respData.success) {
                         refreshPreview();
@@ -311,8 +360,7 @@
         setTimeout(function() {
             var landingStyleSetting = wp.customize('firefly_collective_landing_style');
             if (landingStyleSetting) {
-                fetch('/wp-json/custom-api/v1/get-landing-style-preview')
-                .then(function(r) { return r.json(); })
+                ffGet('get-landing-style-preview')
                 .then(function(respData) {
                     if (respData.success && respData.preview_style) {
                         landingStyleSetting.set(respData.preview_style);
@@ -359,12 +407,7 @@
     function openGutenbergEditor() {
         var currentPreviewStyle = wp.customize('firefly_collective_landing_style').get();
 
-        fetch('/wp-json/custom-api/v1/edit-landing-in-gutenberg', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preview_style: currentPreviewStyle })
-        })
-        .then(function(r) { return r.json(); })
+        ffPost('edit-landing-in-gutenberg', { preview_style: currentPreviewStyle })
         .then(function(data) {
             if (data.success) {
                 window.onbeforeunload = null;

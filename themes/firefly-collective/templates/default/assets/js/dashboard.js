@@ -962,8 +962,8 @@
                 <h3>Confirm Your Order</h3>
                 <p>Are you sure you want to place this order?</p>
                 <div class="order-confirm-buttons">
-                    <button class="confirm-button">Confirm</button>
-                    <button class="cancel-button">Cancel</button>
+                    <button class="btn btn-primary confirm-button">Confirm</button>
+                    <button class="btn btn-ghost cancel-button">Cancel</button>
                 </div>
                 </div>
             `;

@@ -19,6 +19,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Self-heal moved blog-post URLs (301).
+ *
+ * Post permalinks are date-based (/YYYY/MM/DD/slug/). When a post's publish
+ * date is corrected, its old dated URL 404s while Google (and old
+ * links/shares) still point at it — a "Not found (404)" in Search Console.
+ * On any 404 whose path looks like a dated post URL, resolve the post by its
+ * slug (active-template scope) and 301 to its current permalink. Heals the
+ * one flagged URL and any future date change automatically. Only fires on a
+ * genuine 404 for a dated path, and only when a matching published post
+ * exists at a different URL — so it can never loop or shadow a live page.
+ */
+add_action( 'template_redirect', 'firefly_heal_moved_post_url', 5 );
+
+function firefly_heal_moved_post_url() {
+    if ( ! is_404() ) {
+        return;
+    }
+    $path = isset( $_SERVER['REQUEST_URI'] ) ? parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) : '';
+    if ( ! $path || ! preg_match( '#/\d{4}/\d{2}(?:/\d{2})?/([^/]+)/?$#', $path, $m ) ) {
+        return;
+    }
+    $found = get_posts( array(
+        'name'        => sanitize_title( $m[1] ),
+        'post_type'   => 'post',
+        'post_status' => 'publish',
+        'numberposts' => 1,
+    ) );
+    if ( empty( $found ) ) {
+        return;
+    }
+    $target = get_permalink( $found[0]->ID );
+    if ( $target && untrailingslashit( wp_parse_url( $target, PHP_URL_PATH ) ) !== untrailingslashit( $path ) ) {
+        wp_safe_redirect( $target, 301 );
+        exit;
+    }
+}
+
+/**
  * Return the publisher organization for schema.org Organization markup.
  *
  * Defaults: site title (Settings > General > Site Title) + active template's
@@ -319,8 +357,31 @@ function firefly_apply_robots_filters( $robots ) {
         return $robots;
     }
 
+    // Thin, auto-generated listing archives with low search value and high
+    // duplicate-content risk: tag archives, and date archives (/2026/,
+    // /2026/05/, /2026/05/30/) which just re-list the same posts and compete
+    // with the real post URLs. Author archives are noise too (and expose
+    // usernames). Noindex all of them so ranking signal concentrates on the
+    // canonical posts/pages. Category archives stay indexable — they're the
+    // real content taxonomy. (Tags are also dropped from the sitemap in
+    // seo-meta.php; date/author archives aren't in the WP core sitemap.)
+    if ( is_tag() || is_date() || is_author() ) {
+        $robots['noindex'] = true;
+        unset( $robots['index'] );
+        return $robots;
+    }
+
     $post_id = function_exists( 'firefly_get_seo_post_id' ) ? firefly_get_seo_post_id() : ( is_singular() ? get_queried_object_id() : 0 );
     if ( $post_id ) {
+        // Framework chrome pages (header/footer) are content holders, not real
+        // pages. They render at /header/ and /footer/ but should never be
+        // indexed — noindex them (they're also dropped from the sitemap in
+        // seo-meta.php's firefly_sitemap_exclude_chrome).
+        $chrome_slug = get_post_field( 'post_name', $post_id );
+        if ( 'header' === $chrome_slug || 'footer' === $chrome_slug ) {
+            $robots['noindex'] = true;
+            unset( $robots['index'] );
+        }
         if ( get_post_meta( $post_id, '_seo_robots_noindex', true ) ) {
             $robots['noindex']  = true;
             unset( $robots['index'] );
@@ -334,6 +395,34 @@ function firefly_apply_robots_filters( $robots ) {
     return $robots;
 }
 add_filter( 'wp_robots', 'firefly_apply_robots_filters', 20 );
+
+/**
+ * Self-referential canonical for taxonomy/date/author archives.
+ *
+ * WP core's rel_canonical() only fires on singular content, so category and
+ * other archive pages shipped with NO canonical tag at all (GSC "Crawled -
+ * currently not indexed" is worsened by missing canonicals). Emit a clean
+ * self-canonical for the archive, stripping pagination/query noise. Singular
+ * + posts-page canonicals are still handled by core + the two functions
+ * above — this only fills the archive gap.
+ */
+function firefly_output_archive_canonical() {
+    if ( is_singular() || is_home() || is_front_page() ) {
+        return; // handled by core rel_canonical / the posts-page function
+    }
+    if ( is_category() || is_tax() || is_date() ) {
+        $term = get_queried_object();
+        if ( is_category() || is_tax() ) {
+            $link = get_term_link( $term );
+        } else {
+            $link = '';
+        }
+        if ( $link && ! is_wp_error( $link ) ) {
+            echo '<link rel="canonical" href="' . esc_url( $link ) . '" />' . "\n";
+        }
+    }
+}
+add_action( 'wp_head', 'firefly_output_archive_canonical', 10 );
 
 /* ----------------------------------------------------------------------------
  * GEO helpers — kept here for backward compatibility with any caller that

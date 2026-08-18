@@ -185,7 +185,7 @@ function firefly_geo_inject_schema() {
     $schema = firefly_geo_build_page_schema();
 
     if (!empty($schema)) {
-        echo "\n<!-- Firefly Creative GEO Schema -->\n";
+        echo "\n<!-- GEO Schema -->\n";
         echo '<script type="application/ld+json">' . "\n";
         echo json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         echo "\n</script>\n";
@@ -257,13 +257,22 @@ function firefly_geo_organization_schema() {
         'url' => $org['url'],
         'description' => $org['description'],
         'disambiguatingDescription' => $org['disambiguatingDescription'],
-        'foundingDate' => $org['foundingDate'],
-        'naics' => $config['naics'],
-        'isicV4' => $config['isicV4']
     ];
 
-    if (!empty($org['alternateNames']) && is_array($org['alternateNames'])) {
-        $schema['alternateName'] = array_values(array_filter($org['alternateNames']));
+    // alternateName / foundingDate / industry codes are optional and per-client.
+    // Emit them only when configured so a site that hasn't set them doesn't ship
+    // empty strings — or, worse, another organization's alternate names.
+    if ( ! empty( $org['alternateName'] ) ) {
+        $schema['alternateName'] = $org['alternateName'];
+    }
+    if ( ! empty( $org['foundingDate'] ) ) {
+        $schema['foundingDate'] = $org['foundingDate'];
+    }
+    if ( ! empty( $config['naics'] ) ) {
+        $schema['naics'] = $config['naics'];
+    }
+    if ( ! empty( $config['isicV4'] ) ) {
+        $schema['isicV4'] = $config['isicV4'];
     }
 
     // Logo
@@ -357,7 +366,7 @@ function firefly_geo_organization_schema() {
         }
         $schema['hasOfferCatalog'] = [
             '@type' => 'OfferCatalog',
-            'name' => !empty($org['serviceCatalogName']) ? $org['serviceCatalogName'] : 'Services',
+            'name' => trim( $org['name'] . ' Services' ),
             'itemListElement' => $offers
         ];
     }
@@ -406,9 +415,6 @@ function firefly_geo_webpage_schema($type = 'WebPage', $page_type = '') {
     if (is_front_page()) {
         $url = $org['url'];
         $title = $org['name'];
-        if (!empty($org['tagline'])) {
-            $title .= ' - ' . $org['tagline'];
-        }
     }
 
     $schema = [
@@ -507,9 +513,7 @@ function firefly_geo_contact_page_schema() {
         'about' => [
             '@id' => $org['url'] . '/#organization'
         ],
-        'description' => !empty($org['contactDescription'])
-            ? $org['contactDescription']
-            : 'Contact ' . $org['name'] . '.',
+        'description' => 'Contact ' . $org['name'] . '.',
         'inLanguage' => 'en-US'
     ];
 }

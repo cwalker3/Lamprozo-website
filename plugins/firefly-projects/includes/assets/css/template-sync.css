@@ -1,0 +1,105 @@
+/* Template Sync — Tools page. Visual vocabulary matches the other firefly
+   sync surfaces (env badges, progress, status pills). */
+
+.fts-wrap { max-width: 900px; }
+.fts-intro { max-width: 640px; color: #50575e; }
+
+.fts-panel {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+.fts-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.fts-field { display: flex; flex-direction: column; gap: 4px; }
+.fts-field--grow { flex: 1 1 200px; }
+.fts-field label { font-weight: 600; font-size: 12px; text-transform: uppercase; color: #50575e; }
+.fts-field select { min-width: 220px; }
+
+.fts-toggle-group { display: inline-flex; }
+.fts-toggle-group .fts-toggle { border-radius: 0; margin: 0; }
+.fts-toggle-group .fts-toggle:first-child { border-radius: 3px 0 0 3px; }
+.fts-toggle-group .fts-toggle:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+.fts-toggle-group .fts-toggle.active {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+    z-index: 1;
+}
+
+.fts-options { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 18px; }
+.fts-check { display: block; }
+.fts-hint { color: #787c82; font-size: 12px; }
+
+.fts-summary { margin-top: 18px; }
+.fts-summary-title { font-weight: 600; margin-bottom: 8px; }
+.fts-summary-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 0;
+    padding: 10px 14px;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    list-style: none;
+}
+.fts-summary-list li { display: flex; gap: 6px; margin: 0; }
+.fts-summary-list li span { color: #646970; }
+
+.fts-actions { margin-top: 18px; align-items: center; }
+.fts-run-warning { color: #b32d2e; font-weight: 600; }
+
+.fts-error {
+    padding: 10px 14px;
+    background: #fcf0f1;
+    border-left: 4px solid #d63638;
+    color: #3c434a;
+}
+
+/* Progress */
+.fts-steps { list-style: none; margin: 16px 0; padding: 0; }
+.fts-steps li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 10px;
+    border-left: 3px solid transparent;
+    margin: 0;
+}
+.fts-steps li[data-status="running"] { background: #f0f6fc; border-left-color: #2271b1; }
+.fts-steps li[data-status="done"]    { border-left-color: #00a32a; }
+.fts-steps li[data-status="warn"]    { border-left-color: #dba617; }
+.fts-steps li[data-status="fail"]    { background: #fcf0f1; border-left-color: #d63638; }
+
+.fts-step-icon { width: 18px; text-align: center; flex: 0 0 auto; }
+li[data-status="done"] .fts-step-icon { color: #00a32a; }
+li[data-status="warn"] .fts-step-icon { color: #dba617; }
+li[data-status="fail"] .fts-step-icon { color: #d63638; }
+li[data-status="running"] .fts-step-icon { color: #2271b1; }
+
+.fts-step-label { font-weight: 600; }
+.fts-step-note { color: #646970; font-size: 12px; }
+
+.fts-log-wrap h3 { margin-bottom: 6px; }
+.fts-log {
+    max-height: 280px;
+    overflow-y: auto;
+    background: #1d2327;
+    color: #c3c4c7;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    padding: 10px 14px;
+    border-radius: 3px;
+}
+.fts-log .fts-log-warn { color: #dba617; }
+.fts-log .fts-log-error { color: #ff8085; }

@@ -29,6 +29,11 @@
             return localStorage.getItem('firefly_page_sync_env') === 'prod';
         });
 
+        // "Sync template files" toggle — ships the snippet HTML + schema entry
+        // this post owns so the remote's theme tree matches local. Defaults ON
+        // every time the modal opens (reset in handleSyncClick).
+        const [syncTemplateFiles, setSyncTemplateFiles] = useState(true);
+
         // Get configuration from PHP
         const hasProdEndpoint = window.fireflyPageSync?.hasProdEndpoint || false;
         const remoteSite = window.fireflyPageSync?.remoteSite || '';
@@ -127,6 +132,7 @@
          */
         const handleSyncClick = () => {
             setSyncResult(null);
+            setSyncTemplateFiles(true); // default ON for every sync
             setIsModalOpen(true);
             analyzeContent();
         };
@@ -155,7 +161,8 @@
                     data: {
                         post_id: postId,
                         include_assets: true,
-                        target_env: targetEnv
+                        target_env: targetEnv,
+                        sync_template_files: syncTemplateFiles
                     }
                 });
 
@@ -209,6 +216,13 @@
                         syncResult.details && syncResult.details.files_synced ?
                             el('div', { className: 'firefly-sync-details' },
                                 el('p', null, __('Files synced:', 'firefly-projects') + ' ' + syncResult.details.files_synced)
+                            ) : null,
+                        syncResult.details && Array.isArray(syncResult.details.associated_files) && syncResult.details.associated_files.length > 0 ?
+                            el('div', { className: 'firefly-sync-details' },
+                                el('p', null, __('Template files updated on remote:', 'firefly-projects')),
+                                el('ul', { className: 'firefly-asset-list' },
+                                    syncResult.details.associated_files.map((f, i) => el('li', { key: i }, el('code', null, f)))
+                                )
                             ) : null
                     )
                 );
@@ -288,6 +302,22 @@
                     el('div', { key: 'assets', className: 'firefly-sync-assets' },
                         el('h4', null, __('Detected Assets', 'firefly-projects')),
                         assetsContent
+                    )
+                );
+
+                // Template files toggle — snippet HTML + schema entry ride
+                // along so the remote's theme tree matches local (default on).
+                modalChildren.push(
+                    el('div', { key: 'template-files', className: 'firefly-sync-template-files' },
+                        el(ToggleControl, {
+                            label: __('Sync template files', 'firefly-projects'),
+                            help: syncTemplateFiles
+                                ? __('The snippet HTML and schema entry for this content will be updated on the remote.', 'firefly-projects')
+                                : __('Only the database content and media will sync — remote template files stay untouched.', 'firefly-projects'),
+                            checked: syncTemplateFiles,
+                            onChange: setSyncTemplateFiles,
+                            __nextHasNoMarginBottom: true
+                        })
                     )
                 );
 
@@ -558,8 +588,12 @@
             setSelectedPage(null);
 
             try {
+                // Scope the browse to the active template — without it, same-slug
+                // pages from sibling templates leak into the pull modal.
+                const activeTemplate = (window.fireflyPageSync && window.fireflyPageSync.activeTemplate) || '';
                 const response = await wp.apiFetch({
-                    path: '/firefly-plugin/v1/fetch-remote-pages?source_env=' + sourceEnv + '&post_type=' + postType,
+                    path: '/firefly-plugin/v1/fetch-remote-pages?source_env=' + sourceEnv + '&post_type=' + postType +
+                          (activeTemplate ? '&template=' + encodeURIComponent(activeTemplate) : ''),
                     method: 'GET'
                 });
 

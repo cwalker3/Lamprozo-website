@@ -2,6 +2,23 @@
 
     // plugin/models/pricing.php
 
+    /**
+     * Absolute path under the pricing OWNER template's directory.
+     *
+     * Pricing is one canonical system owned by the template named in
+     * FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE (site-specific: 'default' on the
+     * collective base, 'firefly' on the agency site). View, assets, and
+     * pricing.json must ALL resolve through this constant. The admin broke
+     * ("Pricing form container not found") when the view path was hardcoded
+     * to templates/default/ while the enqueued assets honored the constant —
+     * pairing the Vue view with another template's legacy DOM bundle.
+     */
+    function firefly_pricing_template_path( $rel = '' ) {
+        $templates_dir = dirname( dirname( dirname( __FILE__ ) ) ) . '/';
+        $path = $templates_dir . FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
+        return '' === $rel ? $path : $path . '/' . ltrim( $rel, '/' );
+    }
+
     function enqueue_pricing_styles_and_scripts($hook) {
         if ($hook !== 'toplevel_page_pricing') {
             return;
@@ -39,8 +56,8 @@
                 // Add module type for ES6 modules
                 wp_script_add_data('pricing-js', 'type', 'module');
 
-                // Load pricing.json from template data folder
-                $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
+                // Load pricing.json from the owner template's data folder
+                $pricing_json_path = firefly_pricing_template_path( 'data/pricing.json' );
                 $pricing_data      = array();
                 if (file_exists($pricing_json_path)) {
                     $content = file_get_contents($pricing_json_path);
@@ -89,13 +106,9 @@
     }, 10, 3);
 
     function firefly_collective_pricing_dashboard() {
-        // Get the current template directory
-        $template_name = FIREFLY_COLLECTIVE_DEFAULT_TEMPLATE;
-        // Go up from models/ -> default/ -> templates/ -> plugin_root/
-        $plugin_base = dirname(dirname(dirname(dirname(__FILE__)))) . '/';
-
-        // Construct the path to the view file in the template directory
-        $view_path = $plugin_base . 'templates/default/views/pricing.php';
+        // View lives under the pricing OWNER template (same template the
+        // assets + pricing.json resolve to — they must never diverge).
+        $view_path = firefly_pricing_template_path( 'views/pricing.php' );
 
         if (file_exists($view_path)) {
             require_once $view_path;
@@ -1008,8 +1021,8 @@
         create_ffc_orders_table_if_not_exist();
         create_pricing_tables_if_not_exist();
         
-        // Check if pricing.json exists and has data in template data folder
-        $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
+        // Check if pricing.json exists and has data in the owner template's data folder
+        $pricing_json_path = firefly_pricing_template_path( 'data/pricing.json' );
         
         if (file_exists($pricing_json_path)) {
             $content = file_get_contents($pricing_json_path);
@@ -1236,8 +1249,8 @@
      */
     function firefly_collective_save_pricing($request) {
         $data              = $request->get_json_params();
-        // Save to template data folder
-        $pricing_json_path = dirname(dirname(__FILE__)) . '/data/pricing.json';
+        // Save to the owner template's data folder
+        $pricing_json_path = firefly_pricing_template_path( 'data/pricing.json' );
 
         // Process the data before saving to both JSON and database
         if (isset($data['pricingData']) && isset($data['pricingData']['features']) && is_array($data['pricingData']['features'])) {
